@@ -6,11 +6,16 @@ import {
   AUTHORITY, MANAGED, PHASES, authority, digest, includes, keyOf, readBytes, relativeName, replaceBytes,
   replaceWithHistory, text, workspaceRoot,
 } from "./policy.mjs";
+import {
+  QUALITY, citation, claimRow, deliveryQuality, lineList, numericChecks,
+  rejectedClaims, reviewedQuality, supplementChecks,
+} from "./preflight.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools"];
 const WORKFLOW = "building_loop";
 const FILE = "building_loop_file";
+const ASSESS = "building_loop_quality";
 const EMPTY = { read: [], write: [] };
 
 const BEGIN = {
@@ -23,32 +28,32 @@ const BEGIN = {
 const RULES = {
   intake: "接单。按指定二级索引找到候选。第一轮只做任务单允许的工作，保留送审原稿。读回候选后用 building_loop 的 submit 交接，证据不足则用 block。宿主通知总控。",
   "first-review": "首次验收。独立打开候选和每条引用的原文，核数字、行号和适用范围。无出处或原文不支持就填 unsupported，不代为补查。",
-  supplement: "补查。读取退回回执和原始材料，按证据替换错误数字、口径或结论，不能只在错误断言旁加备注。保留断言编号，出处路径写在同一行。写工具自动备份并记日志。读回候选后用 submit。",
+  supplement: "补查。读退回回执，用 building_loop 的 preflight 获取脚本复算和待改项。读原始材料，按证据原位修订，保留编号，出处路径和原文行写在同一行，例如 第 2-3 行。修改后完整读回，submit 带 quality 的六项说明。未修复的退回项或复算不符会被拦住。",
   "final-review": "终审。回到修订稿和原始证据，重新核对所有断言与改动。只有所有要求都支持才关单。",
 };
-const REVIEW_FORMAT = '用 building_loop 的 review 提交每项结果，宿主写回执和通知总控。受支持项填写 id、status="supported"、file=原文项目相对路径、start/end=实际读过的原文首末行、basis=支持理由。无来源或不支持的项填 id、status="unsupported"、basis=原因。候选行由宿主按编号和出处查找。';
+const REVIEW_FORMAT = '先独立读候选和原始证据。有事实不成立时，直接用 building_loop 的 review 退回。若事实支持，必须先调用 building_loop_quality（action="assess"，顶层六项各填一句独立依据，revise 列出需要退回的质量项，全部通过则填 []），成功后再用 building_loop 的 review 交 checks。每条支持项填 id、status="supported"、file=原文项目相对路径、start/end=已读原文起止行、basis=短理由。缺源或不支持填 id、status="unsupported"、basis=原因，无编号行时加候选行号 line。宿主合并事实和质量回执。';
+const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。";
 const COORDINATOR = {
   dispatch: "派单。确认任务、单元与范围，advance 签发接单。",
   "review-ready": "接单方已交付。advance 发起首次独立核验。",
   "supplement-ready": "核验退回。依据回执用 advance 发起补查，默认续用执行会话。",
   "final-review-ready": "补查已交付。advance 发起终审。",
-  blocked: "先确认回执的解阻条件，再用 advance 恢复原阶段。",
-  closed: "单元已验收关单。核对通过回执和执行身份，更新授权台账并汇报。",
+  blocked: "先确认解阻条件，再用 advance 恢复原阶段和原子会话。模型首次中断可以续派，反复中断则把实际阻塞记入台账。",
+  closed: "单元已验收关单。读通过回执、核对执行身份并更新授权台账。汇报先给结论，再按需展开出处、方法、备选和未证边界，最后一句大白话。",
 };
 
 const string = { type: "string" };
 const number = { type: "integer" };
-const lineList = value => text(value).split(/\r\n|\n|\r/);
 const isReview = phase => phase.endsWith("review");
 const buffer = value => Buffer.from(JSON.stringify(value, null, 2) + "\n", "utf8");
 
-function tool(name, description, action, properties, execute) {
+function tool(name, description, action, properties, execute, required = []) {
   return {
     name, description,
     parameters: {
       type: "object",
       properties: { action: { type: "string", enum: action }, ...properties },
-      required: ["action"],
+      required: ["action", ...required],
       additionalProperties: false,
     },
     output: {
@@ -76,9 +81,9 @@ function viewUnits(frame) {
   return Object.keys(frame.policy.units).map(id => {
     const unit = Object.hasOwn(frame.state.units, id) ? frame.state.units[id] : undefined;
     if (!unit) return { unit: id, phase: "dispatch", next: "intake" };
-    const { phase, executor, reviewer, receipt, unsupported, blocked } = unit;
+    const { phase, executor, reviewer, receipt, unsupported, qualityRejected, blocked, interruptions } = unit;
     return {
-      unit: id, phase, executor, reviewer, receipt, unsupported, blocked,
+      unit: id, phase, executor, reviewer, receipt, unsupported, qualityRejected, blocked, interruptions,
       next: phase === "blocked" ? unit.resumePhase : BEGIN[phase],
       owned: unit.owner === frame.agent.id,
     };
@@ -242,9 +247,17 @@ export function apply(ctx, config = {}) {
       };
       delete record.blocked;
       delete record.resumePhase;
+      delete record.assessment;
+      if (plan.prior?.phase !== "blocked") delete record.interruptions;
+      const spec = unitOf(frame, id);
+      if (plan.phase === "supplement" && record.unsupported?.length && !record.rejected) {
+        const candidate = readBytes(frame.root, spec.candidate);
+        if (!candidate) throw new Error("无法为旧退回记录建立候选基线");
+        record.rejected = rejectedClaims(frame.root, spec, lineList(candidate),
+          record.unsupported.map(id => ({ id })), spec.phases.supplement.read);
+      }
       frame.state.units[id] = record;
       frame.changed = true;
-      const spec = unitOf(frame, id);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
         + (record.receipt && plan.phase === "supplement" ? "。请读取退回回执 " + record.receipt : "")
         + "。执行前依据已注入的阶段规则与授权范围。"
@@ -280,6 +293,26 @@ export function apply(ctx, config = {}) {
     return { unit: id, phase: next.phase, childId, reused: Boolean(prepared.reusable) };
   }
 
+  function pause(active, reason) {
+    active.blocked = reason;
+    active.resumePhase = active.phase;
+    active.phase = "blocked";
+  }
+
+  function assess(args, exec) {
+    return change(exec.agent, frame => {
+      if (frame.role !== "reviewer" || frame.assignment[0] !== args.unit) {
+        throw new Error("只有本单元的独立核验方可提交质量判断");
+      }
+      const [id, active] = frame.assignment;
+      const bytes = reviewCandidate(frame, active, unitOf(frame, id));
+      const checks = reviewedQuality(args, args.revise);
+      active.assessment = { hash: digest(bytes), checks };
+      frame.changed = true;
+      return { unit: id, assessed: true, revise: Object.keys(checks).filter(field => !checks[field].pass), next: "review" };
+    });
+  }
+
   function report(args, exec) {
     return change(exec.agent, frame => {
       if (!frame.assignment) throw new Error("当前会话没有可交付阶段");
@@ -287,9 +320,7 @@ export function apply(ctx, config = {}) {
       if (args.unit !== id) throw new Error("当前会话无该单元的权限");
       const spec = unitOf(frame, id);
       if (args.action === "block") {
-        active.blocked = requireText(args.note, "阻塞原因、责任人和恢复条件");
-        active.resumePhase = active.phase;
-        active.phase = "blocked";
+        pause(active, requireText(args.note, "阻塞原因、责任人和恢复条件"));
       } else if (args.action === "submit" && frame.role === "executor") {
         const bytes = readBytes(frame.root, spec.candidate);
         if (!bytes) throw new Error("候选文件尚未交付");
@@ -297,24 +328,52 @@ export function apply(ctx, config = {}) {
         if (seen?.hash !== digest(bytes) || !seen.ranges.some(([a, b]) => a === 1 && b >= lineList(bytes).length)) {
           throw new Error("请先完整读回当前候选文件");
         }
-        active.phase = active.phase === "intake" ? "review-ready" : "final-review-ready";
+        if (active.phase === "supplement") {
+          const preflight = supplementChecks(frame.root, spec, lineList(bytes), frame.reads, active);
+          if (!preflight.ok) throw new Error("[building-loop/preflight] " + preflight.issues.join("；"));
+          active.quality = deliveryQuality(args.quality, active.quality, active.qualityRejected);
+          active.phase = "final-review-ready";
+        } else {
+          active.phase = "review-ready";
+        }
       } else if (args.action === "review" && frame.role === "reviewer") {
         const grant = spec.phases[active.phase];
-        const checked = reviewChecks(frame, active, spec, grant, args.checks);
+        const bytes = reviewCandidate(frame, active, spec);
+        const lines = lineList(bytes);
+        const hash = digest(bytes);
+        let checked = reviewChecks(frame, active, spec, grant, args.checks, lines);
+        const calculations = checked.every(check => check.status === "supported")
+          ? numericChecks(frame.root, spec, lines, frame.reads) : [];
+        const mismatches = new Map(calculations.filter(result => !result.ok).map(result => [result.id, result.issue]));
+        checked = checked.map(check => mismatches.has(check.id)
+          ? { ...check, status: "unsupported", basis: "脚本复算未通过 " + mismatches.get(check.id) } : check);
         const unsupported = checked.filter(check => check.status !== "supported").map(check => check.id);
-        const decision = unsupported.length ? "reject" : "accept";
-        const receipt = { unit: id, phase: active.phase, reviewer: exec.agent.id, decision, unsupported, checks: checked };
+        const qualityChecks = active.assessment?.hash === hash ? active.assessment.checks : null;
+        if (!unsupported.length && !qualityChecks) throw new Error("请先用 building_loop_quality 提交当前候选的六项独立质量判断，再执行 review");
+        const qualityRejected = qualityChecks ? Object.keys(qualityChecks).filter(field => !qualityChecks[field].pass) : [];
+        const decision = unsupported.length || qualityRejected.length ? "reject" : "accept";
+        active.rejected = rejectedClaims(frame.root, spec, lines, checked.filter(check => check.status !== "supported"), frame.reads);
+        const receipt = {
+          unit: id, phase: active.phase, reviewer: exec.agent.id, decision, candidateSha256: hash,
+          unsupported, qualityRejected, checks: checked, calculations,
+          ...(active.quality ? { quality: active.quality } : {}),
+          ...(qualityChecks ? { qualityChecks } : {}),
+        };
         replaceWithHistory(frame.root, grant.receipt, text(buffer(receipt)), "独立核验 " + decision,
           tag(frame), frame.state.markers);
         active.receipt = grant.receipt;
         active.unsupported = unsupported;
+        active.qualityRejected = qualityRejected;
         active.phase = decision === "accept" ? "closed" : "supplement-ready";
+        delete active.assessment;
+        if (decision === "accept") delete active.quality;
       } else {
         throw new Error("当前角色和阶段不允许此动作");
       }
       active.seen = {};
       frame.changed = true;
-      return { unit: id, phase: active.phase, receipt: active.receipt, unsupported: active.unsupported, parent: active.owner };
+      return { unit: id, phase: active.phase, receipt: active.receipt, unsupported: active.unsupported,
+        qualityRejected: active.qualityRejected, parent: active.owner };
     });
   }
 
@@ -328,6 +387,17 @@ export function apply(ctx, config = {}) {
       } catch (error) { return { blocked: String(error.message) }; }
     }
     if (args.action === "advance") return advance(args, exec);
+    if (args.action === "preflight") {
+      const frame = scope(exec.agent);
+      const assignment = frame.assignment;
+      if (!assignment || args.unit !== assignment[0] || assignment[1].phase !== "supplement") {
+        throw new Error("只有本单元的补查执行方可预检");
+      }
+      const spec = unitOf(frame, args.unit);
+      const bytes = readBytes(frame.root, spec.candidate);
+      if (!bytes) throw new Error("候选文件尚未交付");
+      return supplementChecks(frame.root, spec, lineList(bytes), frame.reads, assignment[1]);
+    }
     const { parent, ...result } = report(args, exec);
     try {
       const notice = "building-loop 已落盘 " + JSON.stringify(result);
@@ -339,7 +409,7 @@ export function apply(ctx, config = {}) {
   }
 
   const deny = exec => {
-    if (exec.name === WORKFLOW || exec.name === FILE) return undefined;
+    if (exec.name === WORKFLOW || exec.name === FILE || exec.name === ASSESS) return undefined;
     return "[building-loop/denied] 原生工具 " + exec.name + " 禁止直接调用。使用受控文件或派单入口";
   };
   ctx.tools.guard(deny);
@@ -352,22 +422,44 @@ export function apply(ctx, config = {}) {
     if (decision.kind !== "enter") return decision;
     return { ...decision, messages: decision.messages.filter(message => message.source?.kind !== "agent-instructions") };
   });
+  ctx.on("session/event", (session, event) => {
+    if (event.type !== "turn/end" || !["error", "max-tokens", "blocked"].includes(event.data?.reason?.kind)) return;
+    const agent = ctx.agents.get(session.id);
+    if (agent?.session !== session || session.header.parentSession === undefined) return;
+    try {
+      change(agent, frame => {
+        if (!frame.assignment) return;
+        const [, active] = frame.assignment;
+        pause(active, "子会话中断 " + event.data.reason.kind + "，本阶段未交付。总控可续派到原会话。");
+        active.interruptions = (active.interruptions ?? 0) + 1;
+        frame.changed = true;
+      });
+    } catch (error) { ctx.logger.warn("building-loop 无法记录子会话中断 " + error.message); }
+  });
 
   ctx.tools.register(tool(FILE, "按当前角色的准确路径白名单列出、读取、字面搜索或原子写入 UTF-8 文件。写入自动维护一份改前备份和逐文件日志。history 取授权文件的最近更新。", ["list", "read", "search", "write", "history"], {
     path: string, query: string, content: string, note: string, start: number, count: number,
   }, fileAction));
 
-  ctx.tools.register(tool(WORKFLOW, "查询流程，按状态派发、续用、交付或验收。advance 仅总控。submit 仅执行方。review 仅核验方，提交逐条 checks，回执由宿主生成。", ["status", "advance", "submit", "review", "block"], {
+  const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
+  const qualityNames = Object.keys(QUALITY);
+  ctx.tools.register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
+    unit: string, ...qualityFields,
+    revise: { type: "array", items: { type: "string", enum: qualityNames } },
+  }, assess, ["unit", ...qualityNames, "revise"]));
+  ctx.tools.register(tool(WORKFLOW, "按状态派发、续用、交付和验收。advance 仅总控。preflight 和补查 submit 由执行方使用。review 仅核验方，提交逐条事实 checks。事实支持时须先用 building_loop_quality。宿主写回执。", ["status", "advance", "preflight", "submit", "review", "block"], {
     unit: string, note: string,
     checks: { type: "array", items: {
       type: "object", properties: {
         id: string, status: { type: "string", enum: ["supported", "unsupported"] },
+        line: { ...number, description: "退回项在候选中没有编号行时填写候选行号" },
         file: { ...string, description: "支持项必填。实际读取的原文项目相对路径" },
         start: { ...number, description: "支持项必填。原文起始行，1 起计" },
         end: { ...number, description: "支持项必填。原文结束行，1 起计" },
         basis: { ...string, description: "为何支持或为何不足" },
       }, required: ["id", "status", "basis"], additionalProperties: false,
     } },
+    quality: { type: "object", properties: qualityFields, required: qualityNames, additionalProperties: false },
   }, workflow));
 
   ctx.systemPrompt.context({
@@ -392,8 +484,11 @@ export function apply(ctx, config = {}) {
         const detail = assignment ? {
           unit: assignment[0], candidate: unitOf(frame, assignment[0]).candidate, receipt: assignment[1].receipt,
           ...(frame.role === "reviewer" ? { claims: unitOf(frame, assignment[0]).claims } : {}),
+          ...(phase === "final-review" && assignment[1].quality ? { executionQuality: assignment[1].quality } : {}),
         } : units;
-        return [descriptor, rule, ...(frame.role === "reviewer" ? [REVIEW_FORMAT] : []), "工具仅 building_loop 和 building_loop_file。",
+        return [descriptor, rule, ...(frame.role === "reviewer" ? [REVIEW_FORMAT] : []),
+          ...(phase === "supplement" || frame.role === "reviewer" ? [QUALITY_RULE] : []),
+          "工具仅 building_loop 和 building_loop_file。" + (frame.role === "reviewer" ? "质量判断用 building_loop_quality。" : ""),
           JSON.stringify({ read: frame.reads, write: frame.writes, detail }), ...shared].join("\n");
       } catch (error) {
         return "building-loop role=blocked phase=authority\n" + error.message + "。请项目维护者核对 " + AUTHORITY + "。";
@@ -412,13 +507,16 @@ function mergeRanges(ranges) {
   return merged;
 }
 
-function reviewChecks(frame, active, spec, grant, checks) {
+function reviewCandidate(frame, active, spec) {
   const bytes = readBytes(frame.root, spec.candidate);
-  const candidate = bytes && lineList(bytes);
   const seen = active.seen[keyOf(spec.candidate)];
-  if (!candidate || seen?.hash !== digest(bytes) || !seen.ranges.some(([a, b]) => a === 1 && b >= candidate.length)) {
+  if (!bytes || seen?.hash !== digest(bytes) || !seen.ranges.some(([a, b]) => a === 1 && b >= lineList(bytes).length)) {
     throw new Error("验收前须完整读取当前候选正文");
   }
+  return bytes;
+}
+
+function reviewChecks(frame, active, spec, grant, checks, candidate) {
   if (!Array.isArray(checks) || checks.length > 64) throw new Error("核验须逐条提交检查结果");
   const byId = new Map();
   for (const check of checks) {
@@ -433,8 +531,9 @@ function reviewChecks(frame, active, spec, grant, checks) {
     const check = byId.get(id);
     if (!check) return { id, status: "unsupported", basis: "缺少核验结果" };
     const basis = requireText(check.basis, "核验依据", 600);
-    if (check.status !== "supported") return { id, status: "unsupported", basis };
-    const fail = reason => ({ id, status: "unsupported", basis: reason + "。" + basis });
+    const reject = Number.isSafeInteger(check.line) ? { id, status: "unsupported", line: check.line } : { id, status: "unsupported" };
+    if (check.status !== "supported") return { ...reject, basis };
+    const fail = reason => ({ ...reject, basis: reason + "。" + basis });
     let file;
     try { file = relativeName(check.file); }
     catch { throw new Error(id + " 的支持项需要有效的原文路径"); }
@@ -445,14 +544,14 @@ function reviewChecks(frame, active, spec, grant, checks) {
       || check.start < 1 || check.end < check.start || !coverage.ranges.some(([a, b]) => a <= check.start && b >= check.end)) {
       throw new Error(id + " 的原文行未读、行号无效或来源已变，请读取后重新核验");
     }
-    let line = null;
+    let line = Number.isSafeInteger(check.line) ? check.line : null;
     if (spec.claims.length) {
-      const idPattern = new RegExp("^\\s*(?:[-*]\\s+|\\d+[.)]\\s+)?(?:\\*\\*)?" + id + "(?:\\*\\*)?\\s*[:：]");
-      const matching = candidate.map((text, index) => ({ text, line: index + 1 })).filter(row => idPattern.test(row.text));
-      if (matching.length !== 1 || !matching[0].text.replaceAll("\\", "/").includes(file)) {
-        return fail("候选断言行缺少对应出处");
-      }
-      line = matching[0].line;
+      const row = claimRow(candidate, id);
+      const cited = row && citation(row.body, file);
+      if (!cited) return fail("候选断言行缺少对应出处");
+      if (cited.start && (check.end < cited.start || check.start > cited.end
+        || !coverage.ranges.some(([a, b]) => a <= cited.start && b >= cited.end))) return fail("候选所引原文行与核验位置不一致或未完整读取");
+      line = row.line;
     }
     return { id, status: "supported", file, line, start: check.start, end: check.end, sha256: digest(evidence), basis };
   });

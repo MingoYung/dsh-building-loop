@@ -156,7 +156,7 @@ export function authority(root) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations"]);
     const candidate = relativeName(value.candidate);
     const claims = value.claims ?? [];
     if (!Array.isArray(claims) || claims.length > 64 || claims.some(claim => typeof claim !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(claim))
@@ -189,7 +189,21 @@ export function authority(root) {
       throw new Error("总控和执行方的写入授权须分开");
     }
     mutable.push(...PHASES.flatMap(phase => phases[phase].write));
-    units[id] = { candidate, claims, continuation, phases };
+    const calculations = Object.create(null);
+    for (const [claim, formula] of Object.entries(object(value.calculations ?? {}, "复算规则"))) {
+      if (!claims.includes(claim)) throw new Error("复算规则须绑定已登记的断言编号");
+      object(formula, "复算规则", ["kind", "source", "keyColumn", "valueColumn", "before", "after", "decimals"]);
+      const { kind, keyColumn, valueColumn, before, after, decimals = 2 } = formula;
+      const source = relativeName(formula.source);
+      if (kind !== "percent-decrease" || !Number.isSafeInteger(decimals) || decimals < 0 || decimals > 6
+        || [keyColumn, valueColumn, before, after].some(item => typeof item !== "string" || !item.trim() || item.length > 80)
+        || keyColumn === valueColumn || before === after) throw new Error("无效的 CSV 降幅复算规则");
+      if (!includes(phases.supplement.read, source) || !includes(phases["final-review"].evidence, source)) {
+        throw new Error("复算原始文件须在补查读授权和终审证据授权内");
+      }
+      calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
+    }
+    units[id] = { candidate, claims, continuation, phases, calculations };
   }
   const protectedFiles = [...instructions, ...Object.values(units).flatMap(unit => [
     unit.phases["first-review"].receipt, unit.phases["final-review"].receipt,
