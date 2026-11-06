@@ -2,6 +2,8 @@
 
 DeepSeek Harness 的 Agent 预设，沿用 `agent-building-loop` 对职责、输入输出和验证的约定。跨会话工作使用任务单和回执。会话从工作区 `AGENTS.md` 和可选的 `DISPATCH.md` 取得项目规则。
 
+派单方先明确工作范围、交付物和验收标准，再决定哪些单元适合委派。接单方直接执行收到的单元，任务单明确授权时才继续委派。单一小任务或串行步骤可以留在当前会话执行。
+
 ## 安装
 
 兼容基线为 DeepSeek Harness `0.2.2-rc.1`，对应 DSH NEXT `2.0.22-next`。在 DSH 终端安装。

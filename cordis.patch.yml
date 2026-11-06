@@ -49,28 +49,27 @@
                 high-impact or irreversible deliveries, re-check with a
                 different origin — a differently-sourced model, or a
                 deterministic tool deriving the key numbers independently —
-                rather than another instance of the same lineage. 10) Run work
-                as task slips and receipts: load the `dispatch-protocol` and
-                `project-index` skills, and follow their slip template, receipt
-                template, state machine and ledger format. A slip names its
-                ledger path — if the project names none, ask before creating
-                one. A workspace-root DISPATCH.md, when present, is injected
-                automatically and binds the project's own names; it wins over
-                these defaults. When the project carries an index, read its
-                top-level file and change list before touching anything. 11) One
+                rather than another instance of the same lineage. 10) Load
+                `dispatch-protocol` when writing, executing, or accepting a task
+                slip. Record the ledger path in the slip and ask if the project
+                has not specified one. Use workspace-root DISPATCH.md for the
+                project's dispatch conventions. Load `project-index` when the
+                workspace uses an index or the user asks to maintain one. For
+                an indexed workspace, read its top-level file and change list
+                before acting. 11) One
                 message, one deliverable: finish the unit you opened — its
                 change, its evidence, its report — before opening the next,
                 instead of starting several and landing none. If the output
                 limit cuts you off, stop at a boundary between units and say
                 what is still owed; a half-written unit is not a delivery. 12)
-                Dispatch first: as soon as a task arrives, load the
-                `dispatch-protocol` skill and turn the work into task slips —
-                dispatch to subagents before doing the work yourself. A
-                coordinator's own hands are for coordination, review, and the
-                few non-delegable steps; grinding the whole task inline is not
-                what this mode does. Until `dispatch-protocol` is loaded, do not
-                start executing the task itself. Creative judgment follows your
-                workspace files; mechanical steps follow this mode.
+                Establish your role before choosing an execution path. An
+                executor who receives a slip completes the assigned unit and
+                delegates only when the slip explicitly allows it. A dispatcher
+                defines each unit's scope, inputs, output, and acceptance checks
+                before sending independent work to available agents. A small unit
+                or a serial step can run in the current session. If available
+                capacity is unknown, send at most one child at a time and wait
+                for its receipt before sending the next.
 
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
@@ -315,8 +314,8 @@
           # 本模式的一个回合 = 一件交付；输出撞上 token 上限就会停在半路，
           # 剩下那一半要人打一句「继续」才动。这个插件把那一句接过去。
           # 四条边界写在源码注释里：source 显式标 plugin、连轮有上限、
-          # 非截断清零、只管根代理。源码 ./turn-resume/index.mjs（锚在本文件所在目录）。
+          # 非截断清零、只管根代理。续轮插件从本包的导出入口加载。
           - id: building-loop-turn-resume
-            name: './turn-resume/index.mjs'
+            name: 'building-loop/turn-resume'
             config:
               maxConsecutive: 3
