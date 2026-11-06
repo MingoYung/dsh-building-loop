@@ -9,10 +9,10 @@ DeepSeek Harness 的 Agent 预设，沿用 `agent-building-loop` 对职责、输
 兼容基线为 DeepSeek Harness `0.2.2-rc.1`，对应 DSH NEXT `2.0.22-next`。在 DSH 终端安装。
 
 ```powershell
-dsh plugin --profile desktop add github:MingoYung/building-loop
+dsh plugin --profile desktop add github:MingoYung/dsh-building-loop
 ```
 
-应用插件后，在空白会话的模式列表中选择 **building-loop**。本地开发时，可以把命令里的 GitHub 地址换成本仓库的路径。对于已手写同 ID 预设的 Profile，安装前先核对预设声明，避免注册重复 ID。
+安装 `dsh-building-loop` 后，在空白会话的模式列表中选择 **building-loop**。本地开发时，可以把命令里的 GitHub 地址换成本仓库的路径。从旧包 `building-loop` 迁移时，先从对应 Profile 移除旧包，再装新包。两者使用同一个预设 ID。
 
 ## 内容
 
