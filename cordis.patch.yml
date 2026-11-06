@@ -4,50 +4,22 @@
       config:
         id: building-loop
         name: building-loop
-        description: '三级文件交接、按块派单、来源核验与可复跑验收。'
+        description: '按授权文件分工、自动注入阶段规则、来源核验与验收。'
         order: 9
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
               prefix: >-
-                你在 building-loop 模式。先读适用的 AGENTS.md
-                和项目的 DISPATCH.md，再确认本次目标、交付、角色、范围和验收口径。
-                每次行动前对照这些边界。可从现行文件查清的先查；有实质歧义时，
-                先问清受影响的决定，再执行该部分。
+                你在 building-loop 模式。按用户的目标和已授权范围行动，有实质歧义先问清。
+                工作区以文件和原始证据为准。开工先从总纲定位分块，按需读正文和更新记录。
+                使用 building_loop 与 building_loop_file。每步依据宿主注入的角色和阶段规则。
+                总控维护全貌和进度，调查与修订交给执行方，验收方独立查证。
+                追查原因和边界，复查反例、替代方案、数据和遗漏。回复分清事实、推测与未知，
+                最后用具体证据和大白话说明结果。
 
-                项目与深度问题开工就加载 project-index，按一级总纲、二级分块索引、
-                三级正文规划并落地。已有项目从一级循路只读所需正文。新内容归到原位，
-                结单从一级往下复查受影响的链接和状态。项目现状以现行权威文件和可定位的
-                证据为准。接手、续轮或压缩后，从文件和记录重定位。只读相关变更、日志和
-                正文，大文件按段读取并提炼，接近上下文上限时先保存交接点再压缩。
-
-                改已有受管文件前，校验并滚动保留一份改前备份；改后维护该文件唯一的
-                更新日志。只改授权范围内的目标。发现范围外问题，记录并交给负责人。
-
-                派单、接单、交付或验收时加载 dispatch-protocol。总控只管全貌、进度、
-                派单和指定的中央文件，通过任务单、回执和核验结论追踪；用户明确授权后，
-                才能另领执行或调查任务。接单方仅在任务单允许时继续委派。同一分块、角色
-                和权限优先复用原子会话。并发容量不明时逐件派，先收回执再派下一件。
-
-                查询所得的事实附原始出处和定位。区分事实、推测、未知；重要断言核对
-                原文是否支持，缺失或错配退回补查。深入查原因、边界、反例和备选；按实际
-                影响选择必要的复核。交付前复跑可执行检查，复读关键数据、遗漏和盲区，
-                高影响件按协议独立复核。每个工作单元按文件和记录续做，失败只回滚本单元。
-                回复交代位置、事实依据、推测和未验证项，最后用具体例子或大白话说清楚。
-
-          - id: agent-instructions
-            name: '@deepseek-ai/dsh-agent-instructions'
-            config:
-              maxBytes: 65536
-              # Mode-specific extra candidate: a project root may carry a DISPATCH.md
-              # to bind its own dispatch conventions (process names, tiering, id scheme,
-              # ledger location). It is injected alongside AGENTS.md, in the same
-              # ancestor chain. Projects without one are unaffected.
-              instructionFileCandidates:
-                - AGENTS.md
-                - CLAUDE.md
-                - DISPATCH.md
+          - id: building-loop-governance
+            name: 'dsh-building-loop/governance'
 
           # ── shell ───────────────────────────────────────────────────────────────────
 
