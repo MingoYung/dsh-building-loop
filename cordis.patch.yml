@@ -136,8 +136,18 @@
             name: '@deepseek-ai/dsh-skill-filesystem'
             config:
               customSkillDirs:
-                - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
-              agentsHome: !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills-disabled/', baseUrl))"
+                - !!js >-
+                  process.getBuiltinModule('node:path').join(
+                    process.getBuiltinModule('node:path').dirname(
+                      process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-building-loop/package.json')
+                    ), 'skills'
+                  )
+              agentsHome: !!js >-
+                process.getBuiltinModule('node:path').join(
+                  process.getBuiltinModule('node:path').dirname(
+                    process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-building-loop/package.json')
+                  ), 'skills-disabled'
+                )
 
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
