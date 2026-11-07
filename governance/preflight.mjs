@@ -240,6 +240,13 @@ function directQuantityIssues(lines, rule, expected, evidence) {
 /** 补查提交前逐项检查退回、遗漏事实及可复算数字。 */
 export function supplementChecks(root, spec, lines, readable, active) {
   const issues = [];
+  // Unnumbered findings are bound to their full original line. An unrelated title
+  // edit cannot repair them; a real correction returns to semantic review.
+  for (const finding of active.coverageRejections ?? []) {
+    if (lines.some(line => normalized(line) === normalized(finding.lineText))) {
+      issues.push("全文退回 " + finding.block + " 第 " + finding.line + " 行未落实：" + finding.repair);
+    }
+  }
   for (const finding of active.unlisted ?? []) {
     // Older receipts could wrongly classify a blank line as a fact. A blank can
     // never carry an assertion; ignoring that legacy entry prevents an impossible repair.

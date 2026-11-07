@@ -96,14 +96,14 @@ def collect(run, clean):
                          and p.suffix in {".json", ".jsonl", ".md", ".csv", ".txt"})
     runtime = run / "isolated-home/profiles/web/node_modules/dsh-building-loop"
     for name in ("package.json", "cordis.patch.yml", "governance/index.mjs", "governance/policy.mjs",
-                 "governance/preflight.mjs", "governance/evidence.mjs", "governance/ledger.mjs", "governance/goals.mjs"):
+                 "governance/preflight.mjs", "governance/evidence.mjs", "governance/ledger.mjs", "governance/goals.mjs", "governance/coverage.mjs"):
         if (runtime / name).is_file():
             files.append(runtime / name)
     for name in ("cordis.patch.yml", "witness.mjs"):
         profile = run / "isolated-home/profiles/web" / name
         if profile.is_file():
             files.append(profile)
-    if run.parent.name == "building-loop-repair-audit":
+    if run.parent.name in {"building-loop-repair-audit", "building-loop-coverage-audit"}:
         # The keyless Desktop probe loads these installed bytes, not the package copy.
         installed = run / "isolated-home/profiles/web/building-loop-governance"
         if installed.is_dir():
@@ -148,8 +148,8 @@ def export(root, destination):
     (destination / name).write_bytes(data)
     manifest["smoke"] = {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), "artifacts": len(smoke)}
     harnesses = []
-    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance", "building-loop-source-audit", "building-loop-repair-audit"):
-        for basename in ("run.py", "witness.mjs", "analyze.py", "report.py", "manual_records.py", "final_manual.py", "verify-dsh.py", "acquire.py", "fixture.py", "preflight-replay.mjs"):
+    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance", "building-loop-source-audit", "building-loop-repair-audit", "building-loop-coverage-audit", "building-loop-coverage-stage"):
+        for basename in ("run.py", "witness.mjs", "analyze.py", "report.py", "manual_records.py", "final_manual.py", "verify-dsh.py", "acquire.py", "fixture.py", "fixtures.py", "bootstrap.py", "progress.py", "stop_debug.py", "quote-replay.mjs", "preflight-replay.mjs", "validate.py", "install_desktop.py"):
             file = root / "work" / directory / basename
             if file.is_file():
                 harnesses.append(artifact(file, directory + "/" + basename, clean))

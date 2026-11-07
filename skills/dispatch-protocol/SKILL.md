@@ -14,6 +14,7 @@ description: building-loop 的派单、接单、子会话复用、回执和验�
 | 总控／派单方 | 看一级全貌和进度，定目标、依赖、优先级与验收标准。维护指定中央文件，分派和收回任务 | 根据任务单、台账、回执和核验结论决策。如需改变职责，由维护者另授执行方权限 |
 | 执行方 | 在任务单范围内调查、实现、自验，交回执并同步自己管的文件 | 在本模式中通过总控分派。发现范围外问题，把位置、影响和需要的权限反馈给总控 |
 | 核验／验收方 | 核原始出处、产物、验收标准和范围。判定通过、退回或证据不足 | 只读核验所需材料。补查和修正交原执行方。执行方的自验不能签作独立验收 |
+| 独立反证方 | 从当前正文和原文重新核全文、概念、因果、推导与反例 | 不同于执行及核验会话；不读第一核验回执，不接收预判答案，通过宿主 audit 交付 |
 
 总控和执行方的文件权限由维护者分别授权。即使是小单元，也按宿主绑定的角色处理。重要事实查询或来源核验时，按[证据核验约定](references/evidence.md)给断言定位。
 
@@ -31,14 +32,16 @@ DSH 中以项目维护者编写的 `BUILDING-LOOP.json` 为文件和阶段授权
 
 ```text
 dispatch → intake → review-ready → first-review
-                                        ├── accept → ledger-review → closed
-                                        └── reject → supplement-ready
-supplement-ready → supplement → final-review-ready → final-review
-                                                        ├── accept → ledger-review → closed
-                                                        └── reject → supplement-ready
+first-review / final-review → reject → supplement-ready → supplement → final-review-ready
+first-review / final-review → pending-audit → first-audit-ready / final-audit-ready
+    → 独立反证 audit → accept → ledger-review → closed
+                    → reject → supplement-ready
+                    → 仅分类分歧 → 原核验会话重核
 ```
 
 - 执行方完整读回当前候选后用 `submit` 提交，核验方以 `review` 提交逐条证据。宿主生成回执、退回或关单状态。总控据此更新项目台账。
+- 核验和独立反证都必须先完整读正文，再用 `building_loop_coverage inventory/record/status` 覆盖全文。不能仅核编号、标题或自选重要项，`unlisted=[]` 不构成全文已核。推导须原文前提、桥接关系、适用对象、假设及反例检验；详见仓库治理分块的 `full-coverage.md`。任一事实未证实都不能接受。
+- 第一次通过只算 `pending-audit`，总控继续 advance 交独立反证。正确直接转述不要求扩写新知识；仅分类分歧留在核验方解决，不把调用错误或可选写法当成正文返工。
 - 补查先用 `preflight` 对照退回项及复算结果。每条退回项要修改结论或补上实际读取的可定位证据。已配置的数字先按授权原始数据复算，宿主提交时重跑检查。
 - `source-number` 明确配置 `scope: document` 时，说明段和标题中同一登记量的数值也受直接转述约束，不能在正确编号行外另写无据小数或上下界。修正编号之外的问题后保留正确编号行即可，宿主会重查全文。没有声明的语义关系仍逐项核验，不能把脚本通过当作全文真实。
 - 修订后的退回断言在同行标出本阶段实际读过的授权证据及原文行号。文末表格可作汇总，但不代替逐断言出处；项目规则不能作为外部事实的原始证据。缺少这条关联时留在补查阶段修正。
@@ -91,6 +94,6 @@ supplement-ready → supplement → final-review-ready → final-review
 
 `sourceRefs` 只引用本阶段 `evidence` 白名单里的实际已读原文。`unlisted` 只登记尚未编号且仍待核的事实，不列空行、没有事实的标题或已编号断言；没有遗漏时填 `[]`。标题如果提出真实断言也需核验，不因位于标题就自动略过。
 
-已有抽样信用记录的项目可沿用。默认只记录抽样通过率。明确启用全量重审时，连续两批抽样失败，对当批该执行方的全部单元重审。
+抽样可用于额外复跑昂贵的运行检查，不能替代本单元必需的全文记录与逐条推导核验。高影响事项依项目要求加入异构或专业人工复核。
 
 回复先说完成和验收到了哪一步，再分别给事实和证据、推测与未确认项。最后用用户能核对的具体例子、数字或大白话说明结果。

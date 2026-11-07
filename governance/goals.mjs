@@ -34,6 +34,12 @@ export function acceptedVersion(frame, id, active) {
   const bytes = readBytes(frame.root, active.receipt);
   if (!bytes || digest(bytes) !== active.receiptHash) throw new Error("验收回执在账本复核前发生变化，停止关单并核实");
   const receipt = JSON.parse(bytes.toString("utf8"));
+  if (receipt.coverage?.version !== 1 || receipt.coverage.pending?.length !== 0 || receipt.coverage.rejected?.length !== 0
+    || receipt.independentAudit?.coverage?.version !== 1 || receipt.independentAudit.coverage.pending?.length !== 0
+    || receipt.independentAudit.coverage.rejected?.length !== 0 || !receipt.independentAudit.auditor
+    || receipt.independentAudit.auditor === receipt.reviewer || receipt.independentAudit.auditor === active.executor) {
+    throw new Error("验收缺少完整全文核验和独立反证回执，需重新验收");
+  }
   const current = goalSnapshot(frame);
   if (receipt.goal?.sha256 !== current.sha256 || receipt.goalFit?.pass !== true) {
     throw new Error("验收未覆盖当前目标，请总控 advance 重新独立验收；原事实证据保留");
@@ -48,6 +54,24 @@ export function acceptedVersion(frame, id, active) {
 /** Permit revalidation without granting the coordinator access to module contents. */
 export function needsRevalidation(frame, id, active) {
   if (!active) return false;
+  const phase = active.phase === "blocked" ? active.resumePhase : active.phase;
+  if (["first-audit", "final-audit", "first-audit-ready", "final-audit-ready"].includes(phase)) {
+    const pending = active.pendingReceipt;
+    const candidate = readBytes(frame.root, frame.policy.units[id].candidate);
+    if (!pending || !candidate || pending.candidateSha256 !== digest(candidate)) return true;
+    for (const record of pending.coverage?.records ?? []) for (const part of record.parts) {
+      const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
+        ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
+      for (const ref of refs) {
+        const source = readBytes(frame.root, ref.file);
+        if (!source || digest(source) !== ref.sha256) return true;
+      }
+    }
+    for (const quote of pending.coverage?.quotations ?? []) for (const ref of quote.refs) {
+      const source = readBytes(frame.root,ref.file);
+      if (!source || digest(source) !== ref.sha256) return true;
+    }
+  }
   // Old rejected fingerprints cannot describe text after a citation. Rebuild them
   // through the independent reviewer, never by treating the edited draft as baseline.
   if (["supplement-ready","supplement","blocked"].includes(active.phase)
@@ -55,6 +79,6 @@ export function needsRevalidation(frame, id, active) {
   if (["ledger-review", "closed"].includes(active.phase)) {
     try { acceptedVersion(frame, id, active); return false; } catch { return true; }
   }
-  return ["first-review", "final-review", "goal-review-ready"].includes(active.phase)
+  return ["first-review", "final-review", "first-audit", "final-audit", "first-audit-ready", "final-audit-ready", "goal-review-ready"].includes(phase)
     && active.goal?.sha256 !== goalSnapshot(frame).sha256;
 }

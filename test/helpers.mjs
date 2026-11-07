@@ -57,7 +57,7 @@ async function fixture(run) {
 }
 
 /** Exercise the registered production handlers with real files and host identities. */
-function host(root) {
+function host(root, { automaticCoverage = true } = {}) {
   const live = new Map();
   const tools = new Map();
   const listeners = new Map();
@@ -77,8 +77,52 @@ function host(root) {
     systemPrompt: { context: () => {} }, on: (name, listener) => listeners.set(name, listener),
   });
   const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(3000) });
+  // Older tests isolate arithmetic/ledger behavior. Supply explicit scripted
+  // reviewer and independent-auditor decisions through the production tools;
+  // this is not evidence that the fixture's semantic judgments are correct.
+  const fill = async (id, checks) => {
+    const inventory = await invoke(id, "building_loop_coverage", { action: "inventory" });
+    const entries = inventory.blocks.map(block => {
+      const check = checks.find(c => new RegExp("\\b" + c.id + "[：:]").test(block.text));
+      let part = { kind: "nonfactual", status: "supported", basis: "脚本测试中的结构或说明，不属于本用例的事实判断。" };
+      if (check) {
+        part = { kind: "direct", status: check.status, sourceRelation: check.status === "supported" ? "supports" : "insufficient", basis: check.basis };
+        if (check.status === "supported" && check.file) part.evidence = [{ file: check.file, start: check.start, end: check.end,
+          quote: fs.readFileSync(path.join(root, check.file), "utf8").split(/\r?\n/).slice(check.start-1,check.end).join("\n") }];
+        else {
+          part.repair = check.finding?.fix ?? "按实际来源修订该条结论。";
+          part.finding = check.finding ?? {kind:"missing-evidence",quote:block.text,fix:part.repair};
+        }
+      }
+      return { block: block.id, parts: [part] };
+    });
+    await invoke(id, "building_loop_coverage", { action: "record", entries });
+    return entries;
+  };
+  const flow = async (id, action, args = {}) => {
+    const status = automaticCoverage && action === "review" ? await invoke(id,"building_loop",{action:"status"}) : null;
+    // Let original validation report malformed arguments or changed goals first.
+    let entries;
+    if (status?.role === "reviewer" && args.unit !== "K02") {
+      const state = (await invoke("root","building_loop",{action:"status"})).units[0];
+      if (!state.goalStale && args.checks?.length && args.checks.every(c => c.status !== "supported" || c.file && c.start && c.end)) {
+        try { entries = await fill(id,args.checks); } catch { /* Original review reports its primary input error. */ }
+      }
+    }
+    const result = await invoke(id,"building_loop",{action,unit:"K01",...args});
+    if (automaticCoverage && result.phase?.endsWith("audit-ready")) {
+      const auditor = (await invoke("root","building_loop",{action:"advance",unit:"K01"})).childId;
+      const grant = await invoke(auditor,"building_loop_file",{action:"list"});
+      for (const file of grant.read) if (fs.existsSync(path.join(root,file))) await invoke(auditor,"building_loop_file",{action:"read",path:file});
+      await invoke(auditor,"building_loop_coverage",{action:"inventory"});
+      await invoke(auditor,"building_loop_coverage",{action:"record",entries});
+      return invoke(auditor,"building_loop",{action:"audit",unit:"K01"});
+    }
+    return result;
+  };
   return {
-    flow: (id, action, args = {}) => invoke(id, "building_loop", { action, unit: "K01", ...args }),
+    flow,
+    coverage: (id, action, args = {}) => invoke(id, "building_loop_coverage", { action, ...args }),
     file: (id, action, path, args = {}) => invoke(id, "building_loop_file", { action, path, ...args }),
     assess: (id, args) => invoke(id, "building_loop_quality", { action: "assess", unit: "K01", ...args }),
     ledger: (id, action, args = {}) => invoke(id, "building_loop_ledger", { action, unit: "K01", ...args }),

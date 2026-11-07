@@ -4,7 +4,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 export const AUTHORITY = "BUILDING-LOOP.json";
 export const MANAGED = ".building-loop";
-export const PHASES = ["intake", "first-review", "supplement", "final-review"];
+const BASE_PHASES = ["intake", "first-review", "supplement", "final-review"];
+export const PHASES = [...BASE_PHASES, "first-audit", "final-audit"];
 const LIMIT = 256 * 1024;
 
 export const digest = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -104,14 +105,14 @@ export function equal(left, right) {
 }
 
 /** 同卷暂存、刷新、核改前版本后替换，失败清理暂存。 */
-export function replaceBytes(root, name, bytes, before) {
+export function replaceBytes(root, name, bytes, before, limit = LIMIT) {
   const { file } = resolveFile(root, name, bytes !== null);
   if (bytes === null) {
-    if (!equal(readBytes(root, name), before)) throw new Error("文件在写入前发生变化");
+    if (!equal(readBytes(root, name, limit), before)) throw new Error("文件在写入前发生变化");
     if (before !== null) fs.unlinkSync(file);
     return;
   }
-  if (bytes.length > LIMIT) throw new Error("内容超过受控工具的大小上限");
+  if (bytes.length > limit) throw new Error("内容超过受控工具的大小上限");
   const temp = path.join(path.dirname(file), ".building-loop-write-" + randomUUID());
   let staged = false;
   try {
@@ -121,7 +122,7 @@ export function replaceBytes(root, name, bytes, before) {
       fs.writeFileSync(fd, bytes);
       fs.fsyncSync(fd);
     } finally { fs.closeSync(fd); }
-    if (!equal(readBytes(root, name), before)) throw new Error("文件在写入前发生变化");
+    if (!equal(readBytes(root, name, limit), before)) throw new Error("文件在写入前发生变化");
     fs.renameSync(temp, file);
     staged = false;
   } finally { if (staged) fs.unlinkSync(temp); }
@@ -185,8 +186,8 @@ export function authority(root) {
     const continuation = value.continuation ?? "reuse";
     if (!["reuse", "fresh"].includes(continuation)) throw new Error("未知续派方式");
     const phases = Object.create(null);
-    object(value.phases, "阶段", PHASES);
-    for (const phase of PHASES) {
+    object(value.phases, "阶段", BASE_PHASES);
+    for (const phase of BASE_PHASES) {
       const review = phase.endsWith("review");
       const raw = value.phases[phase];
       const access = grants(raw, phase, review ? ["receipt", "evidence"] : []);
@@ -206,10 +207,10 @@ export function authority(root) {
         phases[phase] = access;
       }
     }
-    if (includes(coordinator.write, candidate) || PHASES.some(phase => phases[phase].write.some(file => includes(coordinator.write, file)))) {
+    if (includes(coordinator.write, candidate) || BASE_PHASES.some(phase => phases[phase].write.some(file => includes(coordinator.write, file)))) {
       throw new Error("总控和执行方的写入授权须分开");
     }
-    mutable.push(...PHASES.flatMap(phase => phases[phase].write));
+    mutable.push(...BASE_PHASES.flatMap(phase => phases[phase].write));
     const calculations = Object.create(null);
     for (const [claim, formula] of Object.entries(object(value.calculations ?? {}, "复算规则"))) {
       if (!claims.includes(claim)) throw new Error("复算规则须绑定已登记的断言编号");
@@ -259,6 +260,12 @@ export function authority(root) {
     || Object.values(unit.phases).some(phase => phase.write.some(file => includes(goalContext,file))
       || phase.receipt && includes(goalContext,phase.receipt) || phase.evidence?.some(file => includes(goalContext,file))))) {
     throw new Error("目标文件须与候选、模块写入、证据和回执分开");
+  }
+  // Auditors inherit only the relevant candidate/evidence read scope. Review receipts
+  // are removed, so an independent pass cannot read the first model's verdict.
+  for (const unit of Object.values(units)) for (const prefix of ["first", "final"]) {
+    const grant = unit.phases[prefix + "-review"];
+    unit.phases[prefix + "-audit"] = { ...grant, write: [], read: grant.read.filter(file => !receiptsSeen.has(keyOf(file))) };
   }
   return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext };
 }
