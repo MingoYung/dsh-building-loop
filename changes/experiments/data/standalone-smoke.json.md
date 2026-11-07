@@ -1,0 +1,5 @@
+# experiments/data/standalone-smoke.json 更新日志
+
+## 2026-11-07
+
+- 归档实验材料或提供清单核对，保留失败、缺失状态和脱敏摘要。
