@@ -7,6 +7,7 @@
 | 看 DSH 预设、工具和模式约束 | [预设配置](../cordis.patch.yml) |
 | 设置文件授权与阶段 | [项目配置和工具说明](../governance/README.md) · [宿主机制](../governance/index.mjs) · [路径与权限检查](../governance/policy.mjs) |
 | 检查退回项、数字复算和交付质量 | [提交预检](../governance/preflight.mjs) |
+| 核实际读取、来源凭据与每轮账本复盘 | [核验与账本](../governance/verification.md) · [来源检查](../governance/evidence.mjs) · [账本机制](../governance/ledger.mjs) |
 | 复跑权限和提交回归 | [文件权限测试](../test/governance.test.mjs) · [补查预检测试](../test/preflight.test.mjs) |
 | 派单、接单、复用会话、处理阻塞 | [派单协议](../skills/dispatch-protocol/SKILL.md) |
 | 查询和核对断言出处 | [证据核验约定](../skills/dispatch-protocol/references/evidence.md) |

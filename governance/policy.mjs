@@ -10,6 +10,7 @@ const LIMIT = 256 * 1024;
 export const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 export const keyOf = value => process.platform === "win32" ? value.toLowerCase() : value;
 
+/** 只接受普通项目相对路径，内部记录由宿主专用调用访问。 */
 export function relativeName(value, internal = false) {
   if (typeof value !== "string" || !value || value.length > 500) throw new Error("需要明确的项目相对文件路径");
   const parts = value.replaceAll("\\", "/").split("/");
@@ -22,11 +23,13 @@ export function relativeName(value, internal = false) {
   return parts.join("/");
 }
 
+/** 文件不存在是可预期状态，其他读取错误向上保留。 */
 function stat(file) {
   try { return fs.lstatSync(file); }
   catch (error) { if (error.code === "ENOENT") return null; throw error; }
 }
 
+/** 解析真实工作区并防止项目范围覆盖 DSH 私人数据目录。 */
 export function workspaceRoot(value, hostHome) {
   if (typeof value !== "string" || !path.isAbsolute(value)) throw new Error("请先选择本地项目目录");
   const root = fs.realpathSync.native(value);
@@ -40,6 +43,7 @@ export function workspaceRoot(value, hostHome) {
   return root;
 }
 
+/** 逐段拒绝链接、硬链接和别名，创建父目录也走同一规则。 */
 function resolveFile(root, name, createParents = false) {
   const parts = relativeName(name, true).split("/");
   let file = root;
@@ -64,6 +68,7 @@ function resolveFile(root, name, createParents = false) {
   return { file, entry: stat(file) };
 }
 
+/** 打开后再次核文件身份和大小，防止检查与读取之间被替换。 */
 export function readBytes(root, name, limit = LIMIT) {
   const { file, entry } = resolveFile(root, name);
   if (!entry) return null;
@@ -88,14 +93,17 @@ export function readBytes(root, name, limit = LIMIT) {
   }
 }
 
+/** 严格解码 UTF-8，损坏字节需要修复后才能作为证据。 */
 export function text(bytes) {
   return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
+/** 比较文件当前版本，同时区分不存在和空文件。 */
 export function equal(left, right) {
   return left === null ? right === null : right !== null && left.equals(right);
 }
 
+/** 同卷暂存、刷新、核改前版本后替换，失败清理暂存。 */
 export function replaceBytes(root, name, bytes, before) {
   const { file } = resolveFile(root, name, bytes !== null);
   if (bytes === null) {
@@ -119,6 +127,7 @@ export function replaceBytes(root, name, bytes, before) {
   } finally { if (staged) fs.unlinkSync(temp); }
 }
 
+/** 规范授权路径数组并拒绝重复登记。 */
 function pathList(value = []) {
   if (!Array.isArray(value) || value.length > 80) throw new Error("授权文件须为路径数组");
   const paths = value.map(item => relativeName(item));
@@ -126,27 +135,33 @@ function pathList(value = []) {
   return paths;
 }
 
+/** 清单结构只接受已定义字段，拼写错误须显式修正。 */
 function object(value, label, fields) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(label + "须为对象");
   if (fields && Object.keys(value).some(name => !fields.includes(name))) throw new Error(label + "包含未知字段");
   return value;
 }
 
+/** 把各角色读写权限解析成统一形式。 */
 function grants(value, label, fields = []) {
   object(value, label, ["read", "write", ...fields]);
   return { read: pathList(value.read), write: pathList(value.write) };
 }
 
+/** 路径匹配遵循当前平台大小写规则，避免 Windows 别名绕过。 */
 export function includes(paths, name) {
   return paths.some(item => keyOf(item) === keyOf(name));
 }
 
+/** 解析项目权威清单，核角色隔离、证据只读和来源凭据。 */
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
   if (!bytes) throw new Error("需要项目维护者配置 " + AUTHORITY);
-  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units"]);
+  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
   const coordinator = grants(source.coordinator, "总控");
+  const ledgerContext = pathList(source.ledgerContext);
+  if (ledgerContext.length > 3 || ledgerContext.some(file => !includes(coordinator.read, file))) throw new Error("账本现状依据须在总控读授权内，最多三份");
   const instructions = pathList(source.instructions);
   if (instructions.length > 3 || instructions.some(file => !includes(coordinator.read, file) || includes(coordinator.write, file))) {
     throw new Error("注入的项目规则须在总控只读授权中，最多三份");
@@ -156,7 +171,8 @@ export function authority(root) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins"]);
+    if (value.requireSourcePins !== undefined && typeof value.requireSourcePins !== "boolean") throw new Error("requireSourcePins 须为布尔值");
     const candidate = relativeName(value.candidate);
     const claims = value.claims ?? [];
     if (!Array.isArray(claims) || claims.length > 64 || claims.some(claim => typeof claim !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(claim))
@@ -203,16 +219,30 @@ export function authority(root) {
       }
       calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
     }
-    units[id] = { candidate, claims, continuation, phases, calculations };
+    units[id] = { candidate, claims, continuation, phases, calculations, requireSourcePins: value.requireSourcePins === true };
+  }
+  const sourcePins = Object.create(null);
+  for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
+    const file = relativeName(path);
+    object(entry, "来源凭据", ["sha256", "kind", "locator"]);
+    if (!/^[a-f0-9]{64}$/.test(entry.sha256 ?? "") || !["primary", "secondary", "synthetic"].includes(entry.kind)
+      || typeof entry.locator !== "string" || !entry.locator.trim() || entry.locator.length > 1000) throw new Error("来源凭据需要原始摘要、类型和可追查位置");
+    if (sourcePins[keyOf(file)]) throw new Error("来源凭据路径重复");
+    sourcePins[keyOf(file)] = { sha256: entry.sha256, kind: entry.kind, locator: entry.locator.trim() };
+  }
+  for (const unit of Object.values(units)) {
+    if (unit.requireSourcePins && ["first-review", "final-review"].some(phase =>
+      unit.phases[phase].evidence.some(file => !sourcePins[keyOf(file)]))) throw new Error("本单元要求每份原始证据登记来源凭据");
   }
   const protectedFiles = [...instructions, ...Object.values(units).flatMap(unit => [
     unit.phases["first-review"].receipt, unit.phases["final-review"].receipt,
     ...unit.phases["first-review"].evidence, ...unit.phases["final-review"].evidence,
   ])];
   if (mutable.some(file => includes(protectedFiles, file))) throw new Error("指令、原始证据和核验回执不能授予模型写权");
-  return { hash: digest(bytes), coordinator, instructions, units };
+  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext };
 }
 
+/** 受控写入事务维护正文、单份改前备份和逐文件更新记录。 */
 export function replaceWithHistory(root, file, content, note, tag, markers) {
   const before = readBytes(root, file);
   const after = Buffer.from(content, "utf8");

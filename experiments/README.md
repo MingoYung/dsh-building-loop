@@ -7,7 +7,9 @@
 | 查所有运行、完成状态、已记录用量与文件摘要 | [实验清单](data/index.json) |
 | 重算公开数据、检查摘要与缺失记录 | [只读核对脚本](verify.py) |
 | 了解导出范围、路径处理和用量统计 | [导出脚本](archive.py) |
+| 查各版本原始运行器、事件记录器和统计脚本 | [运行脚本快照](data/harnesses.json) |
 | 0.3.0 的两轮补查对照 | [20261106T161548Z](data/building-loop-governance-audit/20261106T161548Z.json) |
+| 0.4.0 的来源核验与账本复盘 | [实测报告](results-0.4.0.md) · [原始材料](data/building-loop-evidence-audit/20261107T042819Z.json) |
 | 0.3.1 的提交预检和六项质量验收 | [20261106T171107Z](data/building-loop-preflight-audit/20261106T171107Z.json) |
 
 ## 数据口径

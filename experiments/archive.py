@@ -140,6 +140,19 @@ def export(root, destination):
     data = serialize({"spec": "building-loop-smoke/1", "artifacts": smoke})
     (destination / name).write_bytes(data)
     manifest["smoke"] = {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), "artifacts": len(smoke)}
+    harnesses = []
+    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance"):
+        for basename in ("run.py", "witness.mjs", "analyze.py", "report.py", "verify-dsh.py"):
+            file = root / "work" / directory / basename
+            if file.is_file():
+                harnesses.append(artifact(file, directory + "/" + basename, clean))
+    file = root / "work/building-loop-smoke.py"
+    if file.is_file():
+        harnesses.append(artifact(file, file.name, clean))
+    data = serialize({"spec": "building-loop-harnesses/1", "artifacts": harnesses})
+    name = "harnesses.json"
+    (destination / name).write_bytes(data)
+    manifest["harnesses"] = {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), "artifacts": len(harnesses)}
     (destination / "index.json").write_bytes(serialize(manifest))
     total = sum(v.get("totalTokens", 0) for r in manifest["runs"] for v in r["recordedUsage"].values())
     print("Exported", len(manifest["runs"]), "runs and", len(smoke), "standalone artifacts; recorded total tokens", total)

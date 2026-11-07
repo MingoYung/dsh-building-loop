@@ -12,6 +12,7 @@ export const QUALITY = {
 export const lineList = bytes => text(bytes).split(/\r\n|\n|\r/);
 const escape = value => value.replace(/[|\\{}()[\]^$+*?.-]/g, "\\$&");
 
+/** 以唯一编号定位事实行，重复编号交回修改。 */
 export function claimRow(lines, id) {
   const pattern = new RegExp("^\\s*(?:[-*]\\s+|\\d+[.)]\\s+)?(?:\\*\\*)?" + escape(id) + "(?:\\*\\*)?\\s*[:：]\\s*(.*)$");
   const found = [];
@@ -22,6 +23,7 @@ export function claimRow(lines, id) {
   return found.length === 1 ? found[0] : null;
 }
 
+/** 识别准确路径及原文行范围，排除同名前缀和备份别名。 */
 export function citation(body, file) {
   const pattern = new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、])" + escape(file)
     + "(?=$|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "i" : "");
@@ -36,14 +38,17 @@ export function citation(body, file) {
   return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start ? { start, end } : null;
 }
 
+/** 分离断言与出处，逐条比较补查是否改变有效结论。 */
 function conclusion(body) {
   return body.normalize("NFKC").replaceAll("−", "-").split(/\s*[（(〔【\[]?\s*(?:出处|来源|证据|source|evidence)\s*[:：]/i, 1)[0];
 }
 
+/** 消除排版差异，标题或标点调整不能伪装成实质补查。 */
 function normalized(body) {
   return body.normalize("NFKC").replace(/[\s,，。;；!?“”‘’\x60*_()\[\]【】〔〕]+/g, "").toLowerCase();
 }
 
+/** 对结论与已读证据位置建立可比对的退回基线。 */
 function shape(root, spec, row, readable, seen) {
   const refs = [];
   for (const file of spec.phases["final-review"].evidence) {
@@ -59,6 +64,7 @@ function shape(root, spec, row, readable, seen) {
   return { conclusion: digest(normalized(conclusion(row.body))), refs };
 }
 
+/** 保存本轮被退回的实际断言，供下一轮逐项检查。 */
 export function rejectedClaims(root, spec, lines, rejected, readable) {
   return Object.fromEntries(rejected.map(check => {
     const row = claimRow(lines, check.id) ?? (Number.isSafeInteger(check.line) && check.line > 0 && check.line <= lines.length
@@ -68,6 +74,7 @@ export function rejectedClaims(root, spec, lines, rejected, readable) {
   }));
 }
 
+/** 把普通十进制拆成整数比，复算不依赖浮点近似。 */
 function decimal(value) {
   const parsed = /^([+-]?)(\d{1,18})(?:\.(\d{1,9}))?$/.exec(value);
   if (!parsed) throw new Error("原始数值需要普通十进制数字");
@@ -75,12 +82,14 @@ function decimal(value) {
   return { n: BigInt(parsed[2] + fraction) * (parsed[1] === "-" ? -1n : 1n), scale: 10n ** BigInt(fraction.length) };
 }
 
+/** 按数值比较百分比，允许等价的小数表示。 */
 function equalNumber(left, right) {
   const a = decimal(left);
   const b = decimal(right);
   return a.n * b.scale === b.n * a.scale;
 }
 
+/** 输出按声明精度取整后的十进制结果。 */
 function formatDecimal(n, places) {
   const prefix = n < 0n ? "-" : "";
   const digits = (n < 0n ? -n : n).toString().padStart(places + 1, "0");
@@ -88,6 +97,7 @@ function formatDecimal(n, places) {
   return (prefix + digits.slice(0, -places) + "." + digits.slice(-places)).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+/** 从指定 CSV 行取原始值，检查口径后复算相对降幅。 */
 function calculate(bytes, rule) {
   const lines = lineList(bytes);
   if (lines.some(line => line.includes('"'))) throw new Error("复算支持无引号和无跨行字段的 UTF-8 CSV");
@@ -117,6 +127,7 @@ function calculate(bytes, rule) {
   return { expected: formatDecimal(rounded, rule.decimals), before, after };
 }
 
+/** 每次从当前原始文件计算，核结果、来源版本和引用行。 */
 export function numericChecks(root, spec, lines, readable) {
   return Object.entries(spec.calculations).map(([id, rule]) => {
     try {
@@ -126,7 +137,11 @@ export function numericChecks(root, spec, lines, readable) {
       const { expected, before, after } = calculate(bytes, rule);
       const row = claimRow(lines, id);
       const cites = row && citation(row.body, rule.source);
-      const percentages = row ? [...conclusion(row.body).matchAll(/(?<![\dA-Za-z.,+\-])([+-]?\d+(?:\.\d+)?)\s*%/g)].map(x => x[1]) : [];
+      const body = row ? conclusion(row.body) : "";
+      // A literal ×100% is a formula multiplier, while 24% in a claim is a result.
+      const percentages = [...body.matchAll(/(?<![\dA-Za-z.,+\-])([+-]?\d+(?:\.\d+)?)\s*%/g)]
+        .filter(match => !(match[1] === "100" && /[×*]\s*$/.test(body.slice(0, match.index))))
+        .map(match => match[1]);
       const correct = percentages.length > 0 && percentages.every(value => equalNumber(value, expected));
       const coversRows = cites?.start && cites.start <= Math.min(before.line, after.line)
         && cites.end >= Math.max(before.line, after.line) && cites.end <= lineList(bytes).length;
@@ -140,8 +155,12 @@ export function numericChecks(root, spec, lines, readable) {
   });
 }
 
+/** 补查提交前逐项检查退回、遗漏事实及可复算数字。 */
 export function supplementChecks(root, spec, lines, readable, active) {
   const issues = [];
+  for (const finding of active.unlisted ?? []) {
+    if (lines.some(line => normalized(line) === normalized(finding.text))) issues.push("候选第 " + finding.line + " 行的未登记事实仍未修订或编号溯源");
+  }
   for (const id of active.unsupported ?? []) {
     const before = active.rejected?.[id];
     const row = claimRow(lines, id);
@@ -164,6 +183,7 @@ export function supplementChecks(root, spec, lines, readable, active) {
   return { ok: issues.length === 0, issues, calculations };
 }
 
+/** 质量说明须有具体内容或边界，拒绝空白和通用占位词。 */
 function qualityText(value, field) {
   if (typeof value !== "string" || !value.trim() || /^(?:已核对|已检查|已优化|完成|通过|无|同上|ok|pass|n\/a)[。.!！]?$/i.test(value.trim())) {
     throw new Error("请给出质量项 " + field + " 的具体内容或适用边界");
@@ -172,6 +192,7 @@ function qualityText(value, field) {
   return value.trim();
 }
 
+/** 六项交付说明逐项保留，退回的质量项必须修订。 */
 export function deliveryQuality(value, previous, rejected = []) {
   return Object.fromEntries(Object.keys(QUALITY).map(field => {
     const note = qualityText(value?.[field], field);
@@ -182,6 +203,7 @@ export function deliveryQuality(value, previous, rejected = []) {
   }));
 }
 
+/** 独立核验的六项结果由明确退回项计算，保留具体依据。 */
 export function reviewedQuality(value, revise) {
   if (!Array.isArray(revise) || revise.some(field => !Object.hasOwn(QUALITY, field))) {
     throw new Error("revise 只能列出需要退回的质量项名称");
