@@ -87,7 +87,7 @@ def usage(artifacts):
 
 
 def collect(run, clean):
-    """Take experiment outputs and synthetic workspaces, plus tested runtime code."""
+    """Take experiment outputs and isolated fixtures, plus the exact runtime and recorder."""
     files = [p for p in run.iterdir() if p.is_file()]
     for group in ("reuse", "fresh"):
         directory = run / group
@@ -99,9 +99,10 @@ def collect(run, clean):
                  "governance/preflight.mjs", "governance/evidence.mjs", "governance/ledger.mjs"):
         if (runtime / name).is_file():
             files.append(runtime / name)
-    profile = run / "isolated-home/profiles/web/cordis.patch.yml"
-    if profile.is_file():
-        files.append(profile)
+    for name in ("cordis.patch.yml", "witness.mjs"):
+        profile = run / "isolated-home/profiles/web" / name
+        if profile.is_file():
+            files.append(profile)
     result = []
     for file in sorted(set(files)):
         assert file.resolve().is_relative_to(run.resolve()), "Refusing an artifact outside its isolated run"
@@ -114,7 +115,8 @@ def export(root, destination):
     clean = sanitizer(root)
     destination.mkdir(parents=True, exist_ok=True)
     manifest = {"spec": "building-loop-experiments/1", "redaction": ["workspace and user-home paths", "launch credentials"],
-                "excluded": ["private runtime session stores", "dependencies", "duplicated installation payloads"], "runs": []}
+                "excluded": ["private runtime session stores", "dependencies", "duplicated installation payloads",
+                             "full-page external source downloads"], "runs": []}
     for family in sorted((root / "outputs").glob("building-loop-*audit")):
         for run in sorted(p for p in family.iterdir() if p.is_dir()):
             artifacts = collect(run, clean)
@@ -141,8 +143,8 @@ def export(root, destination):
     (destination / name).write_bytes(data)
     manifest["smoke"] = {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), "artifacts": len(smoke)}
     harnesses = []
-    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance"):
-        for basename in ("run.py", "witness.mjs", "analyze.py", "report.py", "verify-dsh.py"):
+    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance", "building-loop-source-audit"):
+        for basename in ("run.py", "witness.mjs", "analyze.py", "report.py", "verify-dsh.py", "acquire.py", "fixture.py", "preflight-replay.mjs"):
             file = root / "work" / directory / basename
             if file.is_file():
                 harnesses.append(artifact(file, directory + "/" + basename, clean))

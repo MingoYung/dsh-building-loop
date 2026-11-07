@@ -23,7 +23,7 @@ DeepSeek Harness 的长任务 Agent 预设，适用于项目建设、深度研�
 | 项目文件与接手 | 新项目、深度问题、恢复上下文、改档 | [文件与接手](docs/project-files.md) |
 | 派单、核验与交付 | 发任务、收回执、续做、验收 | [派单与交付](docs/work-delivery.md) |
 | 资料真实性与任务账本 | 核来源、反查读取记录、复盘计划和搁置任务 | [核验与账本](governance/verification.md) |
-| 实验与验收 | 复核真实模型结果、失败记录、Token 和缓存 | [实验记录](experiments/README.md) |
+| 实验与验收 | 复核真实模型结果、失败记录、Token 和缓存 | [实验记录](experiments/README.md) · [真实资料与中途改目标实测](experiments/results-real-sources.md) |
 
 接手时先看本页，选择相关分块，从分块索引读正文。项目自定总纲、分块负责人和台账位置。仓库的机器索引用 `INDEX.json` 对账，逐文件变更见 `changes/`。
 
