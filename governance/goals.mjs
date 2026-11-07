@@ -1,5 +1,32 @@
 import { digest, keyOf, readBytes } from "./policy.mjs";
-import { lineList } from "./preflight.mjs";
+import { lineList, plainLastIssues } from "./preflight.mjs";
+
+/** All evidence used by either reviewer stays pinned through final ledger closure.
+ * This reads host proof metadata only; it does not grant the coordinator source access.
+ */
+function requireProofSources(frame, id, active) {
+  for (const coverage of [active.proof?.reviewerCoverage, active.proof?.auditorCoverage]) {
+    if (!coverage?.records) throw new Error("宿主缺少完整核验证明，需重新验收");
+    for (const record of coverage.records) for (const part of record.parts) {
+      const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
+        ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
+      for (const ref of refs) {
+        const bytes = readBytes(frame.root, ref.file);
+        if (!bytes || digest(bytes) !== ref.sha256) throw new Error("验收后来源已经变化，须重新判断，不能用旧证明关单：" + ref.file);
+      }
+      const calculation = part.inference?.calculation;
+      if (calculation?.sourceHash) {
+        const source = frame.policy.units[id]?.calculations?.[calculation.id]?.source;
+        const bytes = source && readBytes(frame.root, source);
+        if (source && (!bytes || digest(bytes) !== calculation.sourceHash)) throw new Error("验收后复算来源已经变化");
+      }
+    }
+    for (const quote of coverage.quotations ?? []) for (const ref of quote.refs) {
+      const bytes = readBytes(frame.root, ref.file);
+      if (!bytes || digest(bytes) !== ref.sha256) throw new Error("验收后引文来源已经变化");
+    }
+  }
+}
 
 /** Bind acceptance to explicit central files; hashes identify versions, not truth. */
 export function goalSnapshot(frame) {
@@ -48,6 +75,16 @@ export function acceptedVersion(frame, id, active) {
   if (!candidate || receipt.candidateSha256 !== digest(candidate) || receipt.decision !== "accept") {
     throw new Error("当前候选与通过回执不一致，请总控 advance 重新独立验收");
   }
+  requireProofSources(frame, id, active);
+  for (const calculation of receipt.calculations ?? []) {
+    const source = frame.policy.units[id].calculations[calculation.id]?.source;
+    const sourceBytes = source && readBytes(frame.root, source);
+    if (source && calculation.sourceHash && (!sourceBytes || digest(sourceBytes) !== calculation.sourceHash)) {
+      throw new Error("验收后复算来源已经变化，需重新验收");
+    }
+  }
+  const layout = plainLastIssues(frame.policy.units[id], lineList(candidate));
+  if (layout.length) throw new Error(layout.join("；"));
   return receipt;
 }
 

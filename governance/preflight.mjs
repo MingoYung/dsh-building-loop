@@ -54,6 +54,163 @@ function normalized(body) {
   return body.normalize("NFKC").replace(/[\s,，。;；!?“”‘’\x60*_()\[\]【】〔〕]+/g, "").toLowerCase();
 }
 
+/** Read only an explicit visible error label on this very sentence/span.
+ * Markdown and numbered labels change presentation, never quoted source bytes.
+ */
+export function errorExample(value) {
+  let visible=value.normalize("NFKC").trimStart();
+  for(let depth=0;depth<8;depth++){
+    const next=visible.replace(/^(?:>\s*|#{1,6}\s+|[-+*]\s+|\d{1,9}[.)]\s+)/u,"");
+    if(next===visible)break;visible=next.trimStart();
+  }
+  visible=visible.replace(/(\*\*|__|\*|_)([^\r\n]+?)\1/gu,"$2");
+  const number="(?:\\d+|[零〇一二两三四五六七八九十百千]+)";
+  const ordinal="(?:\\s*(?:第\\s*)?"+number+"|\\s*\\(\\s*"+number+"\\s*\\))";
+  // A short parenthetical description does not change an explicit label. Allow
+  // one non-nested description and one ordinal in either order; no vocabulary
+  // inside the description is privileged. NFKC also covers Chinese parentheses.
+  const annotation="\\s*\\((?![ \\t]*\\))[^()\\r\\n]{1,64}\\)";
+  const suffix="(?:(?:"+ordinal+")(?:"+annotation+")?|(?:"+annotation+")(?:"+ordinal+")?)?";
+  const label="(?:误读|错例|错误示例|错误推理)"+suffix;
+  const match=visible.match(new RegExp("^(?:\\[\\s*"+label+"\\s*\\]|【\\s*"+label+"\\s*】|"+label+"\\s*:)\\s*:?(.*)$","u"));
+  return !!match&&/[^\s:。.!！?？]/u.test(match[1]);
+}
+
+/** Fingerprint only the cited, actually observed source range. Whole-file hashes
+ * authenticate the read version; per-line content fingerprints detect substantive
+ * new information without treating unrelated file edits or line shifts as proof.
+ */
+function repairReferences(root,spec,body,readable,seen,extra=[]) {
+  const files=spec.phases?.["final-review"]?.evidence??[];
+  const candidates=[...extra,...files.flatMap(file=>{const range=citation(body,file);return range?.start?[{file,...range}]:[];})];
+  const refs=[];
+  for(const ref of candidates){
+    const {file,start,end}=ref;
+    if(!includes(files,file)||!includes(readable,file)||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<1||end<start)continue;
+    const bytes=readBytes(root,file),observed=seen?.[keyOf(file)];
+    if(!bytes||observed?.hash!==digest(bytes)||!observed.ranges.some(([a,b])=>a<=start&&b>=end))continue;
+    const lines=lineList(bytes);if(end>lines.length)continue;
+    const lineHashes=lines.slice(start-1,end).map(normalized).filter(Boolean).map(digest);
+    const item={file,start,end,sha256:digest(bytes),rangeHash:digest(JSON.stringify(lineHashes)),lineHashes};
+    if(!refs.some(old=>keyOf(old.file)===keyOf(file)&&old.start===start&&old.end===end))refs.push(item);
+  }
+  return refs;
+}
+
+/** A scope return may be repaired by an explicit local limitation while keeping
+ * its factual core. Group equivalent surface markers so renaming “本例” to
+ * “本样例” alone does not masquerade as a new limitation.
+ */
+function scopeMarkers(value) {
+  return [/(?:本|该)(?:样例|样本|案例|记录|观察|实验|试验|场景|例)/u.test(value)?"specified-case":null,
+    /(?:仅|只)(?:限于|在|对|适用于|针对)/u.test(value)?"explicit-limitation":null].filter(Boolean);
+}
+
+/** Bind a new factual return to its actual rejected substring and evidence state.
+ * This is a repair baseline, not a semantic verdict about a later new source.
+ */
+export function repairBaseline(root,spec,lines,finding,readable,seen,extra=[]) {
+  const quote=finding.finding?.quote??finding.quote,line=lines[finding.line-1];
+  const context=finding.text??line;
+  if(typeof quote!=="string"||!quote.trim()||typeof line!=="string"||!line.includes(quote)||!context.includes(quote))throw new Error("退回片段须来自当前候选原文");
+  const contextStart=finding.contextStart??line.indexOf(context),start=contextStart+context.indexOf(quote);
+  if(contextStart<0||context.indexOf(quote,context.indexOf(quote)+1)!==-1)throw new Error("退回 finding.quote 在本段必须唯一定位，请缩小或补足实际错误片段；不要把正确前缀列入退回");
+  if(line.slice(contextStart,contextStart+context.length)!==context)throw new Error("退回片段位置与当前正文不一致");
+  return {version:1,quote,line:finding.line,start,end:start+quote.length,candidateSha256:digest(readBytes(root,spec.candidate)),
+    kind:finding.finding?.kind,scopeMarkers:scopeMarkers(context),refs:repairReferences(root,spec,line,readable,seen,extra)};
+}
+
+/** Group only Markdown paragraph continuations, keeping physical source rows.
+ * A soft wrap is presentation, while a blank paragraph, heading, new list item,
+ * quote/table/HTML/code boundary must never manufacture a joined assertion.
+ */
+function repairParagraphs(lines) {
+  const groups=[];let rows=[],fence=null;
+  const flush=()=>{if(rows.length){groups.push(rows);rows=[];}};
+  for(const [index,text] of lines.entries()){
+    const row={line:index+1,text},marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(text);
+    if(marker||fence){
+      flush();groups.push([row]);
+      if(marker){if(!fence)fence=marker[1];else if(marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;}
+      continue;
+    }
+    if(!text.trim()){flush();continue;}
+    // Indented code cannot interrupt an existing paragraph (including a list
+    // item's paragraph). Without a blank/structural boundary it is a soft wrap.
+    const isolated=!rows.length&&/^(?: {4}|\t)/u.test(text)
+      ||/^ {0,3}(?:#{1,6}(?:\s|$)|>|\||<|(?:---+|___+|\*\*\*+)\s*$|\[[^\]]+\]:)/u.test(text);
+    if(isolated){flush();groups.push([row]);continue;}
+    if(/^ {0,3}(?:[-+*]|\d+[.)])\s+/u.test(text))flush();
+    rows.push(row);
+  }
+  flush();return groups;
+}
+
+/** Locate every retained occurrence while ignoring cosmetic Unicode/spacing edits.
+ * Offsets refer to NFKC text only for contextual stance checks; saved baselines
+ * retain the exact original quotation and UTF-16 source offsets separately.
+ */
+function repairOccurrences(lines,quote) {
+  const target=normalized(quote),result=[];if(!target)return result;
+  for(const rows of repairParagraphs(lines)){
+    const lineAt=[],parts=rows.map(row=>{
+      const part=row.text.normalize("NFKC"),offset=lineAt.length;
+      lineAt.length+=part.length+1;lineAt.fill(row.line,offset);return part;
+    });
+    const display=parts.join("\n"),positions=[];let searchable="";
+    for(let i=0;i<display.length;i++)for(const char of normalized(display[i])){searchable+=char;positions.push(i);}
+    for(let cursor=0;;){
+      const at=searchable.indexOf(target,cursor);if(at<0)break;
+      const start=positions[at],end=positions[at+target.length-1]+1;
+      const before=display.slice(0,start),after=display.slice(end);
+      const sentenceStart=Math.max(...[...before.matchAll(/[。；;!?！？]/gu)].map(match=>match.index+1),0);
+      const tail=after.search(/[。；;!?！？]/u),sentenceEnd=tail<0?display.length:end+tail+1;
+      result.push({line:lineAt[start],endLine:lineAt[end-1],text:display,
+        sentence:display.slice(sentenceStart,sentenceEnd).replaceAll("\n"," "),
+        before:display.slice(sentenceStart,start).replaceAll("\n"," "),after:display.slice(end,sentenceEnd).replaceAll("\n"," ")});
+      cursor=at+target.length;
+    }
+  }
+  return result;
+}
+
+/** Accept only unambiguous local withdrawal forms as a changed author stance.
+ * Teaching labels apply to this sentence, never following unlabelled assertions.
+ * These surface forms grant another full review; they do not prove the negation.
+ */
+function withdrawnOccurrence(item) {
+  if(errorExample(item.sentence))return true;
+  const prefix=item.before.replace(/[*_]/gu,"").split(/[，,:：]/u).at(-1).trim();
+  const suffix=item.after.replace(/[*_]/gu,"").trim();
+  const denial=/^(?:并非|不是|不能(?:据此)?(?:断言|认为|说|得出)|不应(?:断言|认为|说)|无法(?:据此)?(?:证明|断言|得出)|没有证据(?:证明|支持))\s*[“"‘'(（]?\s*$/u;
+  const retracted=/^[”"’')）]?\s*(?:(?:这一|这个|该)(?:说法|结论|断言))?\s*(?:不成立|不正确|是错误的?(?:说法|结论|断言)?|没有依据|缺乏依据)(?:[，,。；;!?！？\s]|$)/u;
+  return denial.test(prefix)||retracted.test(suffix);
+}
+
+/** Evaluate one returned span. Source changes qualify only for re-review and only
+ * when they are cited at the retained assertion and read in this supplement.
+ */
+function checkRepairSpan(root,spec,lines,readable,active,finding) {
+  const baseline=finding.repairBaseline;
+  const quote=baseline?.version===1?baseline.quote:finding.finding?.quote??finding.quote;
+  if(typeof quote!=="string"||!quote.trim())return null; // Explicit legacy full-line fallback below.
+  const occurrences=repairOccurrences(lines,quote);
+  const unresolved=[],evidence=[];let withdrawn=0,limited=0;
+  for(const item of occurrences){
+    if(withdrawnOccurrence(item)){withdrawn++;continue;}
+    if(baseline?.kind==="scope"&&scopeMarkers(item.sentence).some(marker=>!baseline.scopeMarkers?.includes(marker))){limited++;continue;}
+    const refs=baseline?.version===1?repairReferences(root,spec,item.sentence,readable,active.seen):[];
+    const fresh=refs.filter(ref=>{
+      const old=(baseline?.refs??[]).filter(value=>keyOf(value.file)===keyOf(ref.file));
+      return ref.lineHashes.length>0&&ref.lineHashes.some(hash=>!old.some(value=>value.lineHashes?.includes(hash)));
+    });
+    if(fresh.length)evidence.push({line:item.line,endLine:item.endLine,refs:fresh});
+    else for(let line=item.line;line<=item.endLine;line++)unresolved.push(line);
+  }
+  return {quote,baseline:baseline?.version===1?"precise-v1":"legacy-quote-no-evidence-snapshot",unresolved:[...new Set(unresolved)],
+    resolution:unresolved.length?"unchanged":evidence.length?"new-evidence-for-review":limited?"explicit-scope-for-review":withdrawn?"explicitly-withdrawn":"removed-or-rewritten",evidence};
+}
+
 /** A document-scoped numeric return may be repaired outside its valid numbered row. */
 function documentHash(spec, lines) {
   return digest(normalized(conclusion(lines.join("\n"), spec.phases["final-review"].evidence)));
@@ -237,21 +394,80 @@ function directQuantityIssues(lines, rule, expected, evidence) {
   return issues;
 }
 
+/** Check the final substantive paragraph without confusing a displayed label with
+ * a closing explanation. Non-prose deliverables may explicitly opt out in policy.
+ */
+export function plainLastIssues(spec, lines) {
+  if (spec.plainLast === false) return [];
+  const visible=value=>value.replace(/[*_~]/gu,"").trim();
+  const labelled=/^(?:#{1,6}\s*)?(?:大白话|直白说明)\s*[:：]\s*\S/u;
+  const heading=/^(?:#{1,6}\s+)?(?:大白话|直白说明)\s*[:：]?\s*$/u;
+  let fence=null,html=0,comment=false,quoted=false,last=-1,section=false;
+  for(const [index,line] of lines.entries()){
+    const marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+    if(marker){
+      if(!fence)fence=marker[1];
+      else if(marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;
+      continue;
+    }
+    if(fence)continue;
+    if(!line.trim())quoted=false;
+    if(/^ {0,3}>/u.test(line))quoted=true;
+    const outside=!html&&!comment&&!quoted&&!/^(?: {4}|\t)/u.test(line);
+    if(outside&&(labelled.test(visible(line))||heading.test(visible(line)))){
+      last=index;section=heading.test(visible(line));
+    }
+    // Ignore markers inside HTML or comments. This small containment check is
+    // deliberately conservative; it is not a general Markdown/HTML renderer.
+    for(const token of line.matchAll(/<!--[\s\S]*?-->|<!--|-->|<\/?[A-Za-z][^>]*>/gu)){
+      const value=token[0];
+      if(value.startsWith("<!--")){if(!value.endsWith("-->"))comment=true;continue;}
+      if(value==="-->"){comment=false;continue;}if(comment)continue;
+      if(/^<\//u.test(value))html=Math.max(0,html-1);
+      else if(!/\/>$/u.test(value)&&!/^<(?:br|hr|img|input|meta|link|wbr|source|area|base|col|embed|param|track)(?:\s|>)/iu.test(value))html++;
+    }
+  }
+  // An explicit standalone line can follow a list without a blank separator.
+  // Its own trailing explanation must still be the final substantive paragraph.
+  const tail=last<0?[]:lines.slice(last+(section?1:0));
+  const paragraphs=tail.join("\n").trim().split(/\n\s*\n/u).filter(Boolean);
+  const body=tail.slice(section?0:1);
+  const blockBoundary = /^\s*(?:#{1,6}\s|```|~~~|\||[-*+]\s|\d+[.)]\s|>|\[\^[^\]]+\]:|<(?:!--|\/?[A-Za-z][^>]*>)|(?:---+|___+|\*\*\*+)\s*$)/u;
+  const newLabel = /^\s*(?:\[|【)?(?:错例|误读|错误示例|错误推理|附录)(?:\s*(?:第)?(?:\d+|[零〇一二两三四五六七八九十百千]+))?(?:\]|】|\s*[:：])/u;
+  const appended = body.some(line => blockBoundary.test(line) || newLabel.test(visible(line)) || errorExample(line));
+  return last>=0&&paragraphs.length===1&&!appended?[]
+    : ["正文末尾须有代码/HTML/引用块之外的独立行‘大白话：…’或‘直白说明：…’，可直接接在列表后；其解释之后不能再放错例、附录或其他段落。"];
+}
+
 /** 补查提交前逐项检查退回、遗漏事实及可复算数字。 */
 export function supplementChecks(root, spec, lines, readable, active) {
-  const issues = [];
-  // Unnumbered findings are bound to their full original line. An unrelated title
-  // edit cannot repair them; a real correction returns to semantic review.
+  const issues = plainLastIssues(spec, lines);
+  const repairs=[],legacy=[];
+  // New receipts bind the actual rejected substring, not surrounding correct
+  // prose. Every retained assertion needs real revision or newly read evidence.
   for (const finding of active.coverageRejections ?? []) {
-    if (lines.some(line => normalized(line) === normalized(finding.lineText))) {
-      issues.push("全文退回 " + finding.block + " 第 " + finding.line + " 行未落实：" + finding.repair);
+    const repair=checkRepairSpan(root,spec,lines,readable,active,finding);
+    if(repair){repairs.push({...repair,channel:"coverage",block:finding.block});
+      if(repair.unresolved.length)issues.push("全文退回 "+finding.block+" 的实际片段仍未修订或补入已读新证据，当前第 "+repair.unresolved.join("、")+" 行："+repair.quote
+        +"。修改正确前缀或文件其他行不算落实；可删除/实质修订、在该句明确否定或标为错例，或同行引用本轮已读的新证据后重核。"+(repair.baseline.startsWith("legacy")?"旧回执无证据快照，不能据文件变化宣称补证成功。":""));
+    }else{
+      legacy.push({channel:"coverage",block:finding.block,guarantee:"legacy-whole-line-only"});
+      if(typeof finding.lineText==="string"&&lines.some(line=>normalized(line)===normalized(finding.lineText)))issues.push("全文退回 "+finding.block+" 第 "+finding.line+" 行未落实（legacy 整行比较，无精确片段保证）："+finding.repair);
     }
   }
   for (const finding of active.unlisted ?? []) {
     // Older receipts could wrongly classify a blank line as a fact. A blank can
     // never carry an assertion; ignoring that legacy entry prevents an impossible repair.
     if (!finding.text.trim()) continue;
-    if (lines.some(line => normalized(line) === normalized(finding.text))) issues.push("候选第 " + finding.line + " 行的未登记事实仍未修订或编号溯源");
+    const repair=checkRepairSpan(root,spec,lines,readable,active,finding);
+    if(repair){repairs.push({...repair,channel:"unlisted"});
+      if(repair.unresolved.length)issues.push("原验收第 "+finding.line+" 行的未登记事实仍未修订或补入已读新证据（按实际片段匹配，当前第 "+repair.unresolved.join("、")+" 行）："+repair.quote
+        +(repair.baseline.startsWith("legacy")?"；旧回执无证据快照，不能据文件变化宣称补证成功。":""));
+    }else{
+      legacy.push({channel:"unlisted",line:finding.line,guarantee:"legacy-whole-line-only"});
+      const current=lines.flatMap((line,index)=>normalized(line)===normalized(finding.text)?[index+1]:[]);
+      if(current.length)issues.push("原验收第 "+finding.line+" 行的未登记事实仍未修订或编号溯源（legacy 整行按原文匹配，当前第 "+current.join("、")+" 行；不是按旧行号读取新稿；无精确片段保证）");
+    }
   }
   for (const id of active.unsupported ?? []) {
     const before = active.rejected?.[id];
@@ -285,7 +501,7 @@ export function supplementChecks(root, spec, lines, readable, active) {
   }
   const calculations = numericChecks(root, spec, lines, readable);
   for (const result of calculations) if (!result.ok) issues.push(result.id + " " + result.issue);
-  return { ok: issues.length === 0, issues, calculations };
+  return { ok: issues.length === 0, issues, calculations,repairs,legacy };
 }
 
 /** 质量说明须有具体内容或边界，拒绝空白和通用占位词。 */

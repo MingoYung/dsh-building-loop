@@ -1,14 +1,16 @@
 import { digest, readBytes } from "./policy.mjs";
-import { citation, claimRow, lineList, numericChecks } from "./preflight.mjs";
+import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseline } from "./preflight.mjs";
 import { evidenceReference } from "./evidence.mjs";
 
 export const COVERAGE_VERSION = 1;
+// Only this error authorizes persisting a failed call's proof invalidation. Other
+// failures retain the ordinary all-or-nothing state transaction behavior.
+export class CoverageRecordError extends Error {}
 const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example"];
 const STATUSES = ["supported", "unsupported", "uncertain"];
 // These unambiguous surface connectives are a conservative minimum, not a
 // universal parser. Untagged/implicit deductions remain the reviewers' duty.
 const explicitInference = text => /(?:因此|所以|由此(?:可见|可得|推出)?|据此(?:可知|推出)?|therefore|\bhence\b|\bthus\b)/i.test(text);
-const errorExample = text => /^\s*(?:[-*#>]\s*)?(?:\[(?:误读|错例|错误示例|错误推理)\]|(?:误读|错例|错误示例|错误推理)\s*[:：])/u.test(text);
 
 /** Build the mandatory inventory from actual bytes, not a model-selected fact list.
  * Every nonblank character belongs to one block. Sentence punctuation splits long
@@ -105,15 +107,50 @@ function inferenceProof(frame, active, spec, value, lines) {
   return proof;
 }
 
+/** Explain an exact span failure with bounded source text and a precise cursor.
+ * The supplied quote remains untrusted: diagnostics never repair, classify or
+ * accept it. Offsets use JavaScript UTF-16 units, as documentCoverage already does.
+ */
+function spanError(block, part, cursor, quote, reason) {
+  const remaining = block.text.slice(cursor);
+  const leading = remaining.length - remaining.trimStart().length;
+  const expectedStart = cursor + (typeof quote === "string" && /^\s/u.test(quote) ? 0 : leading);
+  const expected = block.text.slice(expectedStart);
+  const supplied = typeof quote === "string" ? quote : "";
+  let common = 0;
+  while (common < expected.length && common < supplied.length && expected[common] === supplied[common]) common++;
+  // Small blocks are returned whole. Long blocks show the failing neighborhood,
+  // not an unbounded duplicate of a potentially very long document line.
+  const from = block.text.length <= 800 ? 0 : Math.max(0, Math.min(expectedStart - 100, block.text.length - 800));
+  const diagnostic = {
+    block: block.id, line: block.line, part, reason, offsetUnit: "UTF-16", cursor,
+    blockLength: block.text.length,
+    firstMismatch: { blockOffset: expectedStart + common, partOffset: common,
+      expected: expected[common] ?? null, received: supplied[common] ?? null },
+    blockText: { from, text: block.text.slice(from, from + 800), truncated: block.text.length > 800 },
+    expectedSuffix: { from: expectedStart, text: expected.slice(0, 240), truncated: expected.length > 240 },
+    receivedQuote: { text: supplied.slice(0, 240), truncated: supplied.length > 240 },
+  };
+  const issue = reason === "missing-tail" ? "的末尾仍有未覆盖内容"
+    : reason === "missing-quote" ? "多段拆分须为每段填写连续原文 quote"
+    : reason === "past-block-end" ? "当前块已全部覆盖，后续 part 已越过块尾，不能把下一块原文放入本块"
+    : "的拆分遗漏或改写了原文，请连续覆盖整个块";
+  return new Error(block.id + " " + issue + "。[coverage-span] " + JSON.stringify(diagnostic)
+    + "。只修正核验参数，不改写候选。单一判断可省 quote，由宿主取整块；复合判断仍须按真实原文连续拆分。"
+    + "其他块须用它自己的编号提交；不得降为 nonfactual、跳过推导或省掉任何正文内容。");
+}
+
 /** Bind every part to a real, nonoverlapping span; leaving even a suffix unassigned fails. */
 function reviewBlock(frame, active, spec, block, parts, lines) {
   if (!Array.isArray(parts) || !parts.length || parts.length > 20) throw new Error(block.id + " 需 parts，复合句请拆出各独立判断");
   let cursor = 0;
-  const reviewed = parts.map(part => {
+  const reviewed = parts.map((part, index) => {
     const quote = part.quote ?? (parts.length === 1 ? block.text : undefined);
-    if (typeof quote !== "string" || !quote.trim()) throw new Error("多段拆分须为每段填写连续原文 quote");
+    if (typeof quote !== "string" || !quote.trim()) throw spanError(block,index+1,cursor,quote,"missing-quote");
     const start = block.text.indexOf(quote, cursor);
-    if (start < 0 || block.text.slice(cursor, start).trim()) throw new Error(block.id + " 的拆分遗漏或改写了原文，请连续覆盖整个块");
+    if (start < 0 || block.text.slice(cursor, start).trim()) {
+      throw spanError(block,index+1,cursor,quote,cursor===block.text.length?"past-block-end":start<0?"quote-mismatch":"gap-before-part");
+    }
     cursor = start + quote.length;
     if (!KINDS.includes(part.kind) || !STATUSES.includes(part.status)) throw new Error("每段须声明 kind 与 supported/unsupported/uncertain");
     const basis = explanation(part.basis, "该段的判断依据");
@@ -129,7 +166,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
       if (part.status === "supported" && part.sourceRelation !== "supports") throw new Error("原文关系为 " + part.sourceRelation + "，该断言不能 supported。请给实际事实退回；写作者须明确修订或标注错例，核验者不能自行补上写作意图。");
     }
     if (part.kind === "error-example") {
-      if (!errorExample(quote)) throw new Error("error-example 须在该原句开头明确写 [误读]/[错例] 或 误读：/错例：等标签，不能自行猜测作者意图");
+      if (!errorExample(quote)) throw new Error("error-example 须在该原句开头明确写 [误读]/[错例] 或 误读：/错例 1：/错误示例二：等标签，不能自行猜测作者意图或从前一标题继承标签");
       if (!["contradicts", "insufficient"].includes(part.sourceRelation)) throw new Error("错例须指出所展示推理与原文矛盾或证据不足，sourceRelation 不可写 supports");
       if (!Array.isArray(part.evidence) || !part.evidence.length) throw new Error("错例须给实际已读的 evidence 反证或推理依据及逐字引句");
       result.sourceRelation = part.sourceRelation;
@@ -164,7 +201,8 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
       if (!result.finding) {
         const finding = part.finding;
         if (!finding || !["missing-evidence", "contradiction", "scope", "invalid-inference"].includes(finding.kind)
-          || typeof finding.quote !== "string" || !finding.quote.trim() || !quote.includes(finding.quote)) {
+          || typeof finding.quote !== "string" || !finding.quote.trim() || !quote.includes(finding.quote)
+          || quote.indexOf(finding.quote,quote.indexOf(finding.quote)+1)!==-1) {
           throw new Error("事实退回须 finding.kind/quote/fix，quote 指该段实际的错误断言；排版、详细度和收尾表达建议只能走质量判断，不能冒充事实错误");
         }
         result.finding = { kind: finding.kind, quote: finding.quote, fix: explanation(finding.fix, "事实最小修正") };
@@ -175,12 +213,12 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
     }
     return result;
   });
-  if (block.text.slice(cursor).trim()) throw new Error(block.id + " 的末尾仍有未覆盖内容");
+  if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
   return { block: block.id, line: block.line, text: block.text, lineText: block.lineText, parts: reviewed };
 }
 
 /** Inventory and per-block decisions are incremental, bounded calls under the host lock. */
-export function coverageAction(frame, active, spec, args) {
+export function coverageAction(frame, active, spec, args, options = {}) {
   const bytes = readBytes(frame.root, spec.candidate);
   if (!bytes) throw new Error("候选不存在");
   const manifest = documentCoverage(bytes);
@@ -191,29 +229,105 @@ export function coverageAction(frame, active, spec, args) {
     }
     const offset = args.offset ?? 0, count = args.count ?? 8;
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(count) || count < 1 || count > 24) throw new Error("覆盖分页 offset/count 无效，每页最多 24 块");
-    return { candidateSha256: manifest.candidateSha256, total: manifest.blocks.length,
-      pending: manifest.blocks.filter(b => !Object.hasOwn(active.coverage.records, b.id)).map(b => b.id),
-      blocks: manifest.blocks.slice(offset, offset + count).map(({ lineText, ...block }) => block) };
+    const invalidated = retireStaleProofs(frame, active, spec, bytes);
+    const pending = manifest.blocks.filter(b => !Object.hasOwn(active.coverage.records, b.id)).map(b => b.id);
+    const result = { candidateSha256: manifest.candidateSha256, total: manifest.blocks.length,
+      pending: options.maxBytes ? pending.slice(0,24) : pending, pendingCount: pending.length,
+      invalidated:options.maxBytes?invalidated.slice(0,8).map(row=>({...row,reason:row.reason.slice(0,240),
+        ...(row.reason.length>240?{reasonTruncated:true}:{})})):invalidated,
+      invalidatedCount:invalidated.length,offset,blocks:[] };
+    for (const {lineText,...block} of manifest.blocks.slice(offset,offset+count)) {
+      // prepare has a separate response budget. Never stamp blocks removed by
+      // that budget as shown; the explicit next page remains unobserved.
+      if (options.maxBytes && Buffer.byteLength(JSON.stringify({...result,blocks:[...result.blocks,block]}))>options.maxBytes-400) break;
+      result.blocks.push(block);
+    }
+    if (offset+result.blocks.length<manifest.blocks.length) result.next = {
+      tool:"building_loop_coverage",action:"inventory",offset:offset+result.blocks.length,count:result.blocks.length?24:1,
+      note:"pending 仅是待核编号；record 前必须取得该块的 inventory 原文，不能按编号猜内容。",
+    };
+    active.coverage.presented=[...new Set([...(active.coverage.presented??[]),...result.blocks.map(block=>block.id)])];
+    active.coverage.presentationOwner={actor:frame.agent?.id??null,phase:active.phase,candidateSha256:manifest.candidateSha256};
+    frame.changed=true;
+    return result;
   }
   if (active.coverage?.version !== COVERAGE_VERSION || active.coverage.candidateSha256 !== manifest.candidateSha256) throw new Error("请先 inventory 当前正文；正文变化后旧覆盖记录失效");
-  if (args.action === "status") return coverageSummary(frame, active, spec, false);
+  if (args.action === "status") {
+    const summary = coverageSummary(frame, active, spec, false);
+    // Status is a progress query, not another full proof download. A reviewer may
+    // explicitly inspect one prior block; the complete proof remains in host state.
+    if (args.block !== undefined && !manifest.blocks.some(row => row.id === args.block)) throw new Error("未知覆盖块编号");
+    const { records, ...compact } = summary;
+    return { ...compact, ...(args.block === undefined ? {} : { record: records.find(row => row.block === args.block) ?? null }) };
+  }
   if (args.action !== "record" || !Array.isArray(args.entries) || !args.entries.length || args.entries.length > 12) throw new Error("record 每次提交 1–12 个 entries");
-  const records = { ...active.coverage.records }, supplied = new Set();
+  // A source change can invalidate more blocks than fit in one record call.
+  // Retire them before incremental repair, so an untouched stale block cannot
+  // roll back eleven newly checked proofs. Completion still rechecks every ref.
+  const invalidated = retireStaleProofs(frame, active, spec, bytes);
+  const records = { ...active.coverage.records }, supplied = new Set(), invalid = [];
   for (const entry of args.entries) {
     const block = manifest.blocks.find(row => row.id === entry.block);
     if (!block || supplied.has(entry.block)) throw new Error("覆盖编号不存在或重复，请使用 inventory 返回的当前编号");
     supplied.add(entry.block);
-    records[block.id] = reviewBlock(frame, active, spec, block, entry.parts, lineList(bytes));
+    try {
+      const owner=active.coverage.presentationOwner;
+      if (owner?.actor!==(frame.agent?.id??null)||owner.phase!==active.phase||owner.candidateSha256!==manifest.candidateSha256
+        ||!active.coverage.presented?.includes(block.id)) throw new Error("该块尚未由本会话本阶段 inventory/prepare 实际返回；pending 编号不能代替块原文。请调用 inventory offset="+manifest.blocks.indexOf(block)+" count=1 后再判断，不要猜编号对应内容。");
+      records[block.id] = reviewBlock(frame, active, spec, block, entry.parts, lineList(bytes));
+      requireDisputedProof(active,[records[block.id]]);
+    }
+    catch (error) {
+      // One malformed block must not make the model resend eleven valid proofs.
+      // It also must not retain an older accepted record for the failed replacement.
+      delete records[block.id];
+      invalid.push({ block: block.id, error: error.message });
+    }
   }
   active.coverage.records = records;
   frame.changed = true;
+  if (invalid.length === supplied.size) throw new CoverageRecordError(invalid.map(row => row.block + ": " + row.error).join("；"));
   const result = coverageSummary(frame, active, spec, false);
-  return { recorded: [...supplied], total: result.total, pending: result.pending, rejected: result.rejected };
+  return { recorded: [...supplied].filter(id => !invalid.some(row => row.block === id)), invalid,
+    invalidated, total: result.total, pending: result.pending, rejected: result.rejected };
+}
+
+/** The same strict version/read/pin checks serve both progress and acceptance.
+ * Retiring a stale proof means pending, never a verdict about the new source.
+ */
+function validateRecordSources(frame, active, spec, record, bytes) {
+  for (const part of record.parts) {
+    const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
+      ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
+    for (const ref of refs) {
+      const current = sourceQuote(frame, active, spec, ref);
+      if (ref.sha256 !== current.sha256) throw new Error("覆盖证据版本已经变化，须重新判断该块而非仅重读文件");
+    }
+    if (part.inference?.calculation) {
+      const current = numericChecks(frame.root, spec, lineList(bytes), frame.reads).find(r => r.id === part.inference.calculation.id);
+      if (!current?.ok || current.sourceHash !== part.inference.calculation.sourceHash) throw new Error("推导绑定的脚本计算已失效");
+    }
+  }
+}
+
+/** Keep independent unaffected blocks; explicitly expose every invalidation. */
+function retireStaleProofs(frame, active, spec, bytes) {
+  const invalidated = [];
+  for (const [id, record] of Object.entries(active.coverage.records)) {
+    try { validateRecordSources(frame, active, spec, record, bytes); }
+    catch (error) {
+      delete active.coverage.records[id];
+      invalidated.push({ block: id, reason: error.message });
+      frame.changed = true;
+    }
+  }
+  return invalidated;
 }
 
 /** Revalidate every source on completion so fresh reading cannot legitimize a stale proof. */
 export function coverageSummary(frame, active, spec, complete = true) {
   const bytes = readBytes(frame.root, spec.candidate);
+  const lines=lineList(bytes);
   const manifest = documentCoverage(bytes);
   const inventory = active.coverage;
   if (inventory?.version !== COVERAGE_VERSION || inventory.candidateSha256 !== manifest.candidateSha256) throw new Error("当前正文尚无有效全文覆盖记录，请 inventory 后逐块 record");
@@ -226,27 +340,23 @@ export function coverageSummary(frame, active, spec, complete = true) {
       throw new Error("必核断言 " + id + " 不能全部分类成非事实或假设后跳过核验");
     }
   }
-  for (const record of records) for (const part of record.parts) {
-    const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
-      ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
-    for (const ref of refs) {
-      const current = sourceQuote(frame, active, spec, ref);
-      if (ref.sha256 !== current.sha256) throw new Error("覆盖证据版本已经变化，须重新判断该块而非仅重读文件");
-    }
-    if (part.inference?.calculation) {
-      const current = numericChecks(frame.root, spec, lineList(bytes), frame.reads).find(r => r.id === part.inference.calculation.id);
-      if (!current?.ok || current.sourceHash !== part.inference.calculation.sourceHash) throw new Error("推导绑定的脚本计算已失效");
-    }
-  }
+  for (const record of records) validateRecordSources(frame, active, spec, record, bytes);
   const rejected = records.flatMap(record => record.parts.filter(part => ["direct", "inference"].includes(part.kind) && part.status !== "supported")
-    .map(part => ({ block: record.block, line: record.line, text: part.quote, lineText: record.lineText,
-      basis: part.basis, repair: part.repair, finding: part.finding, status: part.status })));
+    .map(part => {
+      const finding={block:record.block,line:record.line,text:part.quote,lineText:record.lineText,
+        basis:part.basis,repair:part.repair,finding:part.finding,status:part.status};
+      const refs=[...(part.evidence??[]),...(part.inference?.premises??[]),...(part.inference?.warrant??[]),
+        ...(part.inference?.assumptions??[]).map(item=>item.evidence)];
+      const contextStart=manifest.blocks.find(block=>block.id===record.block).start+part.start;
+      return {...finding,repairBaseline:repairBaseline(frame.root,spec,lines,{...finding,contextStart},frame.reads,active.seen,refs)};
+    }));
   const quotations = complete ? quotationChecks(frame, active, spec, manifest) : [];
   for (const quote of quotations.filter(row => !row.matches)) rejected.push({ block: quote.block, line: quote.line,
     text: quote.text, lineText: quote.lineText, status: "unsupported", sourceRelation: "contradicts",
     basis: "声明为逐字原文的引句与同行所引原文范围不一致，不能用意思相近替代逐字引用。",
     repair: "换成原文中实际存在的逐字引句，或明确改称转述，不冒充原话。",
-    finding: { kind: "verbatim-quote", quote: quote.text, fix: "恢复逐字引句或改称转述。" } });
+    finding: { kind: "verbatim-quote", quote: quote.text, fix: "恢复逐字引句或改称转述。" },
+    repairBaseline:repairBaseline(frame.root,spec,lines,{line:quote.line,text:quote.text,quote:quote.text,contextStart:quote.contextStart},frame.reads,active.seen,quote.refs) });
   return { version: COVERAGE_VERSION, candidateSha256: manifest.candidateSha256, total: manifest.blocks.length,
     pending, rejected, records, quotations, receiptSha256: digest(JSON.stringify({ records, quotations })) };
 }
@@ -269,7 +379,7 @@ function quotationChecks(frame, active, spec, manifest) {
       const refs = locators.map(ref => evidenceReference(frame,active,spec,ref));
       const matches = refs.some(ref => normalize(lineList(readBytes(frame.root,ref.file)).slice(ref.start-1,ref.end).join("\n")).includes(normalize(match[1])));
       results.push({block:manifest.blocks.find(b=>b.line===index+1&&b.start<=match.index&&b.end>match.index)?.id ?? "Q"+(index+1),
-        line:index+1,text:match[0],lineText:line,refs,matches});
+        line:index+1,text:match[0],lineText:line,contextStart:match.index,refs,matches});
     }
   }
   return results;
@@ -279,10 +389,43 @@ function quotationChecks(frame, active, spec, manifest) {
 export function classificationDisagreements(first, second) {
   return first.records.flatMap(record => {
     const other = second.records.find(row => row.block === record.block);
-    const factual = row => row.parts.some(part => ["direct", "inference"].includes(part.kind));
-    return other && factual(record) !== factual(other) ? [{ block: record.block, line: record.line,
-      text: record.text, basis: "两位核验者对该块是否包含事实判断存在分歧，先重核分类，不能当作无事实略过" }] : [];
+    if(!other)return [];
+    const factual=row=>{
+      const mask=new Uint8Array(record.text.length);
+      for(const part of row.parts.filter(value=>["direct","inference"].includes(value.kind))) {
+        const start=Number.isSafeInteger(part.start)?part.start:0,end=Number.isSafeInteger(part.end)?part.end:record.text.length;
+        mask.fill(1,Math.max(0,start),Math.min(mask.length,end));
+      }
+      return mask;
+    };
+    const a=factual(record),b=factual(other),factualSpans=[];
+    for(let i=0;i<record.text.length;i++)if(record.text[i].trim()&&a[i]!==b[i]) {
+      const prior=factualSpans.at(-1);
+      if(prior&&!record.text.slice(prior[1],i).trim())prior[1]=i+1;
+      else factualSpans.push([i,i+1]);
+    }
+    // Both reviews may contain some facts while disagreeing about an appended
+    // assertion. Compare factual coverage by span, not one Boolean per block.
+    return factualSpans.length ? [{ block: record.block, line: record.line, text: record.text,factualSpans,
+      basis: "两位核验者对该块是否包含事实判断存在分歧。争议范围须按 direct/inference 实质核证，不能原样 nonfactual 重送；依据不足请 block 说明待维护者裁定，不要求作者改写正确正文。" }] : [];
   });
+}
+
+/** A disputed factual span cannot disappear behind a different category label.
+ * Both roles retain their own proof; only candidate spans, never the other
+ * role's source mapping or verdict, are exchanged as the work to reconcile.
+ */
+export function requireDisputedProof(active, records, complete=false) {
+  for(const dispute of active.reconciliation??[]) {
+    const record=records.find(row=>row.block===dispute.block);
+    if(!record&&!complete)continue;
+    const spans=dispute.factualSpans?.length?dispute.factualSpans:[[0,dispute.text.length]];
+    const missing=!record||spans.some(([a,b])=>Array.from({length:b-a},(_,i)=>a+i)
+      .some(i=>dispute.text[i]?.trim()&&!record.parts.some(part=>["direct","inference"].includes(part.kind)&&part.start<=i&&part.end>i)));
+    if(missing)throw new Error("[building-loop/reconciliation] "+dispute.block+" 的事实分类争议尚未逐项落实。"
+      +"已标记范围必须重新以 direct/inference 提交实际证据和推导，不能原样 nonfactual/hypothesis 再送。"
+      +"不确定或无依据时用 building_loop block 说明需维护者裁定；不要编证据，也不要要求作者改写正确正文。范围="+JSON.stringify(spans));
+  }
 }
 
 /** Shared schema keeps formal premises, quoted evidence and the tool contract aligned. */
@@ -300,10 +443,10 @@ export function coverageSchema() {
     counterexample: { type: "object", properties: { possible: { type: "boolean" }, reason: string }, required: ["possible", "reason"], additionalProperties: false },
     formal: { type: "object", description: "modus-ponens 的两项依次为 implies(P,Q)、asserts(P)，结论 asserts(Q)；equality-transitive 为 equals(A,B)、equals(B,C)，结论 equals(A,C)。premises 与原文前提顺序一致。", properties: { premises: { type: "array", minItems: 2, maxItems: 2, items: proposition }, conclusion: proposition }, required: ["premises", "conclusion"], additionalProperties: false }, calculation: string,
   }, required: ["rule", "premises", "scope", "assumptions", "counterexample"], additionalProperties: false };
-  return { offset: integer, count: integer, entries: { type: "array", minItems: 1, maxItems: 12,
+  return { offset: integer, count: integer, block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: 12,
     description: "每次提交1至12块，按 inventory 分页分批提交；不能把全文超过12块塞进一次调用。", items: { type: "object", properties: {
     block: string, parts: { type: "array", items: { type: "object", properties: {
-      quote: { ...string, description: "单段可省略，自动取整块原文；多段必须逐段连续覆盖整块" },
+      quote: { ...string, description: "单一判断可省略，自动取该块完整原文；复合判断须逐段连续覆盖本块，不能把下一块文字并入。匹配失败按 coverage-span 的 part/cursor/expectedSuffix 修正核验参数，不得改写正文或省掉事实。" },
       kind: { type: "string", enum: KINDS }, status: { type: "string", enum: STATUSES,
         description: "direct/inference 给事实判定；nonfactual 用 supported；hypothesis 宿主固定 uncertain，不能成为已证前提。" }, basis: string, repair: string,
       sourceRelation: { type: "string", enum: ["supports", "contradicts", "insufficient"], description: "direct/inference 必填：原始证据对该断言字面含义的关系。error-example 核展示的错误推理，只能 contradicts/insufficient，并提供 evidence；明确错例的状态由宿主固定，不作为已证前提。" },

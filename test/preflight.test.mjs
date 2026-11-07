@@ -185,7 +185,7 @@ test("unlisted prose and newly numbered facts cannot escape independent review",
   write("BUILDING-LOOP.json", JSON.stringify(doc));
   const candidate = seed.replace("25%。", "20%（出处：timing.csv 第 2-3 行）。") + "本系统在所有环境都更快。\n- C3：另一个未核实的结论。\n";
   write("candidate.md", candidate);
-  const { flow, file, assess } = host(root);
+  const { flow, file, assess, coverage } = host(root,{automaticCoverage:false});
   const worker = (await flow("root", "advance")).childId;
   await file(worker, "read", "candidate.md");
   await file(worker, "read", "overview.md");
@@ -195,6 +195,16 @@ test("unlisted prose and newly numbered facts cannot escape independent review",
   const checks = [{ id: "C1", status: "supported", file: "functional.csv", start: 1, end: 2, basis: "通过数与总数与数据一致" },
     { id: "C2", status: "supported", file: "timing.csv", start: 2, end: 3, basis: "原始两值复算为20%" }];
   const notes = Object.fromEntries(Object.keys(QUALITY).map(key => [key, "本轮已读样例与范围的独立判断。"]));
+  // Metadata must now agree with actual full-document decisions. The numbered
+  // checks below still independently test the missing-C3 review contract.
+  const inventory=await coverage(reviewer,"inventory");
+  await coverage(reviewer,"record",{entries:inventory.blocks.map(block=>({block:block.id,parts:[
+    block.line===1?{kind:"nonfactual",status:"supported",basis:"结构标题没有外部事实判断。"}
+    :block.line===2||block.line===3?{kind:"direct",status:"supported",sourceRelation:"supports",basis:"本条转述对应的原始样例数据。",
+      evidence:[block.line===2?{file:"functional.csv",start:2,end:2,quote:"19,20"}:{file:"timing.csv",start:2,end:3,quote:"before,120\nafter,96"}]}
+    :{kind:"direct",status:"unsupported",sourceRelation:"insufficient",basis:"泛化或新增结论缺少对应范围的证据。",
+      finding:{kind:"missing-evidence",quote:block.text,fix:"查证后收窄为有据的结论，并给原文位置。"}},
+  ]}))});
   await assess(reviewer, { ...notes, goalFit: { pass: true, basis: "小样例范围符合项目目标。" }, revise: [], sourceRefs: checks.map(({ file, start, end }) => ({ file, start, end })),
     unverifiedSources: [], unlisted: [{ line: 4, basis: "泛化到所有环境缺少相应采样。" }] });
   await assert.rejects(flow(reviewer, "review", { checks }), /核验参数缺少 C3/);

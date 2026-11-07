@@ -71,6 +71,18 @@ def usage(artifacts):
     groups = {}
     for event in events:
         group = groups.setdefault(event.get("group", "unknown"), Counter())
+        if event.get("type") == "unit-recorded":
+            # Direct-API threshold experiments have one attempt per unit. Their
+            # provider prompt total includes cache; normalize to the DSH columns.
+            amount = event["data"].get("knownUsage")
+            if amount is None:
+                group["attemptEvents"] += 1
+                group["messagesWithoutUsage"] += 1
+            else:
+                group["responses"] += 1
+                for key in ("inputTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "totalTokens"):
+                    group[key] += amount.get(key, 0)
+            continue
         if event.get("type") == "assistant/attempt":
             group["attemptEvents"] += 1
         if event.get("type") != "assistant/message":
@@ -83,12 +95,37 @@ def usage(artifacts):
         group["responses"] += 1
         for key in ("inputTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "totalTokens"):
             group[key] += amount.get(key, 0)
+    if not events:
+        # Controlled causal diagnostics preserve each HTTP attempt. Top-level
+        # usage duplicates the successful attempt and must never be added again.
+        calls = [a for a in artifacts if a["path"].startswith("calls/") and a["kind"] == "json"]
+        if calls:
+            group = groups.setdefault("controlled-http", Counter())
+            for call in calls:
+                for attempt in call["data"].get("attempts", []):
+                    amount = attempt.get("usage")
+                    if amount is None:
+                        group["attemptEvents"] += 1
+                        group["messagesWithoutUsage"] += 1
+                        continue
+                    raw = amount["providerRaw"]
+                    hit = raw.get("prompt_cache_hit_tokens", raw.get("prompt_tokens_details", {}).get("cached_tokens"))
+                    assert isinstance(hit, int)
+                    miss = raw.get("prompt_cache_miss_tokens", raw["prompt_tokens"] - hit)
+                    assert raw["prompt_tokens"] == hit + miss
+                    assert raw["total_tokens"] == hit + miss + raw["completion_tokens"]
+                    group.update(responses=1, inputTokens=miss, cacheReadTokens=hit, cacheWriteTokens=0,
+                                 outputTokens=raw["completion_tokens"], totalTokens=raw["total_tokens"])
     return {name: dict(values) for name, values in groups.items()}
 
 
 def collect(run, clean):
     """Take experiment outputs and isolated fixtures, plus the exact runtime and recorder."""
     files = [p for p in run.iterdir() if p.is_file()]
+    for directory in ("calls", "scores", "requests"):
+        folder = run / directory
+        if folder.is_dir():
+            files.extend(p for p in folder.rglob("*.json") if p.is_file())
     for group in ("reuse", "fresh"):
         directory = run / group
         if directory.is_dir():
@@ -103,7 +140,7 @@ def collect(run, clean):
         profile = run / "isolated-home/profiles/web" / name
         if profile.is_file():
             files.append(profile)
-    if run.parent.name in {"building-loop-repair-audit", "building-loop-coverage-audit"}:
+    if run.parent.name in {"building-loop-repair-audit", "building-loop-coverage-audit", "building-loop-efficiency-audit"}:
         # The keyless Desktop probe loads these installed bytes, not the package copy.
         installed = run / "isolated-home/profiles/web/building-loop-governance"
         if installed.is_dir():
@@ -143,13 +180,27 @@ def export(root, destination):
             continue
         for file in sorted(p for p in directory.iterdir() if p.is_file()):
             smoke.append(artifact(file, file.relative_to(root / "work").as_posix(), clean))
+        # Independent validation keeps compact results separately from generated
+        # negative-test copies. Publish the results and their generator, without
+        # duplicating entire HTTP trials as if they were additional real calls.
+        results = directory / "results"
+        if results.is_dir():
+            for file in sorted(results.glob("*.json")):
+                smoke.append(artifact(file, file.relative_to(root / "work").as_posix(), clean))
     name = "standalone-smoke.json"
     data = serialize({"spec": "building-loop-smoke/1", "artifacts": smoke})
     (destination / name).write_bytes(data)
     manifest["smoke"] = {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), "artifacts": len(smoke)}
     harnesses = []
-    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance", "building-loop-source-audit", "building-loop-repair-audit", "building-loop-coverage-audit", "building-loop-coverage-stage"):
-        for basename in ("run.py", "witness.mjs", "analyze.py", "report.py", "manual_records.py", "final_manual.py", "verify-dsh.py", "acquire.py", "fixture.py", "fixtures.py", "bootstrap.py", "progress.py", "stop_debug.py", "quote-replay.mjs", "preflight-replay.mjs", "validate.py", "install_desktop.py"):
+    for directory in ("building-loop-real-audit", "building-loop-guard-stage", "building-loop-preflight-stage", "building-loop-evidence-stage", "building-loop-governance", "building-loop-source-audit", "building-loop-repair-audit", "building-loop-coverage-audit", "building-loop-coverage-stage", "building-loop-efficiency-audit", "building-loop-efficiency-stage", "building-loop-causal-audit", "building-loop-threshold-audit"):
+        basenames = {"run.py", "witness.mjs", "analyze.py", "report.py", "manual_records.py", "final_manual.py", "verify.py", "verify-dsh.py", "acquire.py", "fixture.py", "fixtures.py", "bootstrap.py", "progress.py", "stop_debug.py", "quote-replay.mjs", "preflight-replay.mjs", "validate.py", "install_desktop.py", "design.md", "baseline-analysis.json", "baseline-analysis.md"}
+        if directory in {"building-loop-efficiency-audit", "building-loop-efficiency-stage", "building-loop-causal-audit", "building-loop-threshold-audit"}:
+            # New controlled experiments also preserve the sealed design,
+            # adaptive-size decision, independent scores and manual findings.
+            # Subdirectories (dependencies/backups/private sessions) are excluded.
+            basenames.update(p.name for p in (root / "work" / directory).iterdir()
+                             if p.is_file() and p.suffix in {".py", ".mjs", ".md", ".json"})
+        for basename in sorted(basenames):
             file = root / "work" / directory / basename
             if file.is_file():
                 harnesses.append(artifact(file, directory + "/" + basename, clean))

@@ -158,7 +158,7 @@ export function includes(paths, name) {
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
   if (!bytes) throw new Error("需要项目维护者配置 " + AUTHORITY);
-  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext"]);
+  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
   const coordinator = grants(source.coordinator, "总控");
   const ledgerContext = pathList(source.ledgerContext);
@@ -174,7 +174,11 @@ export function authority(root) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold"]);
+    if (value.plainLast !== undefined && typeof value.plainLast !== "boolean") throw new Error("plainLast 须为布尔值；非文字产物由项目维护者明确关闭");
+    if (value.cacheReadRotationThreshold !== undefined && (!Number.isSafeInteger(value.cacheReadRotationThreshold) || value.cacheReadRotationThreshold < 1)) {
+      throw new Error("cacheReadRotationThreshold 须为正整数；未配置时不按用量轮换");
+    }
     if (value.requireSourcePins !== undefined && typeof value.requireSourcePins !== "boolean") throw new Error("requireSourcePins 须为布尔值");
     const candidate = relativeName(value.candidate);
     const covers = value.covers ?? [];
@@ -236,7 +240,9 @@ export function authority(root) {
       }
       calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
     }
-    units[id] = { candidate, claims, continuation, phases, calculations, covers, requireSourcePins: value.requireSourcePins === true };
+    units[id] = { candidate, claims, continuation, phases, calculations, covers,
+      requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
+      cacheReadRotationThreshold: value.cacheReadRotationThreshold };
   }
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
@@ -261,17 +267,24 @@ export function authority(root) {
       || phase.receipt && includes(goalContext,phase.receipt) || phase.evidence?.some(file => includes(goalContext,file))))) {
     throw new Error("目标文件须与候选、模块写入、证据和回执分开");
   }
+  // The optional ledger projection is an explicitly authorized host document,
+  // never an inferred filename or a source that can justify its own dispositions.
+  const ledgerDocument=source.ledgerDocument===undefined?undefined:relativeName(source.ledgerDocument);
+  if(ledgerDocument&&(!includes(coordinator.write,ledgerDocument)
+    ||includes([...goalContext,...ledgerContext,...protectedFiles,...Object.values(units).map(unit=>unit.candidate)],ledgerDocument))) {
+    throw new Error("ledgerDocument 须在 coordinator.write 精确授权，并与目标、现状依据、指令、候选、来源及验收回执分开");
+  }
   // Auditors inherit only the relevant candidate/evidence read scope. Review receipts
   // are removed, so an independent pass cannot read the first model's verdict.
   for (const unit of Object.values(units)) for (const prefix of ["first", "final"]) {
     const grant = unit.phases[prefix + "-review"];
     unit.phases[prefix + "-audit"] = { ...grant, write: [], read: grant.read.filter(file => !receiptsSeen.has(keyOf(file))) };
   }
-  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext };
+  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument };
 }
 
 /** 受控写入事务维护正文、单份改前备份和逐文件更新记录。 */
-export function replaceWithHistory(root, file, content, note, tag, markers) {
+export function replaceWithHistory(root, file, content, note, tag, markers, rollback) {
   const before = readBytes(root, file);
   const after = Buffer.from(content, "utf8");
   if (equal(before, after)) return { path: file, changed: false, sha256: digest(after) };
@@ -282,18 +295,25 @@ export function replaceWithHistory(root, file, content, note, tag, markers) {
   const record = "- " + new Date().toISOString() + " " + tag + " " + summary + " SHA-256 " + digest(after) + "\n";
   const history = Buffer.from(record + (oldLog ? text(oldLog) : ""), "utf8");
   if (history.length > LIMIT || after.length > LIMIT) throw new Error("内容或更新日志超过受控工具的大小上限");
+  // Optional compensation joins a generated projection to its surrounding host
+  // state transaction. Each undo requires our exact written bytes, so a concurrent
+  // external edit is reported rather than silently overwritten during recovery.
+  const write=(name,value,previous)=>{
+    replaceBytes(root,name,value,previous);
+    rollback?.push(()=>replaceBytes(root,name,previous,value));
+  };
   const marker = keyOf(file);
   if (markers[marker] !== tag) {
-    if (before) replaceBytes(root, backup, before, readBytes(root, backup));
+    if (before) write(backup,before,readBytes(root,backup));
     if (oldLog) {
       const logBackup = MANAGED + "/latest_backup/" + log;
-      replaceBytes(root, logBackup, oldLog, readBytes(root, logBackup));
+      write(logBackup,oldLog,readBytes(root,logBackup));
     }
   }
-  replaceBytes(root, log, history, oldLog);
-  try { replaceBytes(root, file, after, before); }
+  write(log,history,oldLog);
+  try { write(file,after,before); }
   catch (error) {
-    replaceBytes(root, log, oldLog, history);
+    if(!rollback)replaceBytes(root,log,oldLog,history);
     throw error;
   }
   markers[marker] = tag;

@@ -14,7 +14,7 @@ test("empty lines and numbered facts cannot become unlisted repair deadlocks",()
   assert.equal(coverageFindings([{line:1,basis:"标题含实际待核断言"}],lines)[0].text,lines[0]);
   assert.equal(coverageFindings([{line:4,basis:"新增事实缺少出处"}],lines).length,1);
   const legacy={unlisted:[{line:2,text:"",basis:"旧回执错误"}],unsupported:[]};
-  assert.equal(supplementChecks("",{calculations:{}},lines,[],legacy).ok,true);
+  assert.equal(supplementChecks("",{calculations:{},plainLast:false},lines,[],legacy).ok,true);
 });
 
 test("actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked", async () => fixture(async (root,write) => {
@@ -32,7 +32,8 @@ test("actual failed NASA before/after pair passes repair preflight while unchang
   const writes=artifacts["events.jsonl"].filter(e=>e.type==="tool/call"&&e.data.name==="building_loop_file").map(e=>JSON.parse(e.data.arguments));
   const before=writes.find(a=>a.action==="write"&&a.path==="module/candidate.md"&&digest(Buffer.from(a.content))===receipt.candidateSha256).content;
   const after=artifacts["reuse/workspace/module/candidate.md"];
-  const spec={...artifacts["reuse/workspace/BUILDING-LOOP.json"].units.K01,calculations:{}};
+  // Reproduce the historical numeric repair as recorded, before prose layout gates.
+  const spec={...artifacts["reuse/workspace/BUILDING-LOOP.json"].units.K01,calculations:{},plainLast:false};
   const readable=spec.phases.supplement.read;
   const seen=Object.fromEntries(readable.filter(file=>fs.existsSync(path.join(root,file))).map(file=>{
     const bytes=fs.readFileSync(path.join(root,file));

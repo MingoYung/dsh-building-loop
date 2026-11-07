@@ -1,4 +1,4 @@
-import { digest, includes, keyOf, readBytes } from "./policy.mjs";
+import { digest, includes, keyOf, readBytes, replaceWithHistory } from "./policy.mjs";
 import { lineList } from "./preflight.mjs";
 import { acceptedVersion } from "./goals.mjs";
 
@@ -71,6 +71,49 @@ export function ledgerSummary(frame, includeClosed = false) {
   return { revision: ledger.revision, items };
 }
 
+/** Render stored strings as literal Markdown text, not new headings/table rows. */
+function literal(value) {
+  return String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replace(/[\\`*_{}\[\]()#!|]/g,"\\$&").replace(/\r\n|\n|\r/g,"<br>");
+}
+
+/** Project the complete current owned ledger, never a model-rewritten selection.
+ * No historical stage sequence is inferred from current state or free prose.
+ */
+export function exportLedger(frame) {
+  const file=frame.policy.ledgerDocument;
+  if(!file)return {configured:false,exported:false,authority:"host-state",
+    next:"项目维护者可配置 ledgerDocument 并加入 coordinator.write；未配置时保留现有文档，宿主台账仍为权威。"};
+  if(frame.role!=="coordinator"||!includes(frame.policy.coordinator.write,file))throw new Error("账本导出缺少总控的精确路径授权");
+  const view=ledgerSummary(frame,true),items=[...view.items].sort((a,b)=>a.id.localeCompare(b.id));
+  const units=Object.entries(frame.state.units).filter(([,unit])=>unit.owner===frame.agent.id).sort(([a],[b])=>a.localeCompare(b));
+  const counts=items.reduce((result,item)=>{result[item.status]=(result[item.status]??0)+1;return result;},{});
+  const lines=["# 当前总控账本快照","", "账本 revision："+view.revision,
+    "总控："+literal(frame.agent.id),"条目总数："+items.length,"",
+    "状态统计："+Object.entries(counts).map(([status,count])=>literal(status)+" = "+count).join("；"),"",
+    "## 当前工作单元","","| 单元 | 当前阶段 | 当前回执 |","|---|---|---|",
+    ...units.map(([id,unit])=>"| "+literal(id)+" | "+literal(unit.phase)+" | "+literal(unit.receipt??"未生成")+" |"),
+    "","## 全部当前账项","","| ID | 类型 | 当前状态 | 名称 |","|---|---|---|---|",
+    ...items.map(item=>"| "+[item.id,item.kind,item.status,item.title].map(literal).join(" | ")+" |")];
+  for(const item of items) {
+    const disposition=item.disposition,evidence=disposition?.evidence,coverage=disposition?.coverage;
+    lines.push("","### "+literal(item.id),"", "名称："+literal(item.title),
+      "当前状态："+literal(item.status),"依据："+literal(disposition?.basis??item.note));
+    if(disposition)lines.push("已登记处置："+literal(disposition.outcome)+"；核对单元："+literal(disposition.checkpoint));
+    if(evidence)lines.push("处置证据："+literal(evidence.file)+" 第 "+evidence.start+"–"+evidence.end+" 行；SHA-256 "+literal(evidence.sha256));
+    if(coverage)lines.push("覆盖关系："+literal(coverage.unit)+"；验收回执 "+literal(coverage.receipt)+"；回执 SHA-256 "+literal(coverage.receiptHash)
+      +"；候选 SHA-256 "+literal(coverage.candidateSha256)+"；目标 SHA-256 "+literal(coverage.goal?.sha256));
+    if(item.origin)lines.push("原始请求："+literal(item.origin.session)+"；事件 "+item.origin.event+"；SHA-256 "+literal(item.origin.sha256));
+    if(item.updatedAt)lines.push("最近登记时间："+literal(item.updatedAt));
+  }
+  const content=lines.join("\n")+"\n";
+  const result=replaceWithHistory(frame.root,file,content,"宿主导出当前账本 revision "+view.revision,
+    frame.agent.id+"/ledger/"+view.revision,frame.state.markers,frame.rollback??=[]);
+  const projection={path:file,revision:view.revision,owner:frame.agent.id,sha256:digest(content),itemIds:items.map(item=>item.id)};
+  frame.state.ledgerProjection=projection;frame.changed=true;
+  return {configured:true,exported:true,...projection,itemCount:items.length,changed:result.changed};
+}
+
 /** Record a fresh coordinator read of a context file during the closing checkpoint. */
 export function noteContextRead(frame, file, hash, start, end) {
   if (frame.role !== "coordinator") return;
@@ -111,6 +154,7 @@ function contextReference(frame, active, value) {
 export function ledgerAction(frame, args) {
   if (frame.role !== "coordinator") throw new Error("账本由总控维护，执行方通过阻塞回执登记中断");
   const ledger = book(frame);
+  if(args.action==="export")return exportLedger(frame);
   if (args.action === "record") {
     const linked = args.originId && ledger.items[args.originId];
     if (args.originId && (!linked?.origin || linked.owner !== frame.agent.id)) throw new Error("originId 须指向本总控已有的自动请求记录");
@@ -131,20 +175,37 @@ export function ledgerAction(frame, args) {
     frame.state.units[id].owner === frame.agent.id && frame.state.units[id].phase === "ledger-review");
   const active = frame.state.units[unitId];
   if (args.action === "read") {
+    if(active&&active.owner!==frame.agent.id)throw new Error("账本读取不能指定其他总控持有的单元");
     const view = ledgerSummary(frame, args.includeClosed === true);
     if (active?.owner === frame.agent.id && active.phase === "ledger-review") {
       active.ledgerRead = { revision: ledger.revision, serial: active.serial };
       frame.changed = true;
     }
+    // A workspace has one configured output path. Its last generated metadata
+    // belongs only to that exporting coordinator; never expose another owner's
+    // item IDs through the shared state slot or imply it is this caller's book.
+    const projection=frame.state.ledgerProjection?.owner===frame.agent.id
+      &&frame.state.ledgerProjection.path===frame.policy.ledgerDocument?frame.state.ledgerProjection:null;
     return { ...view, context: [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])],
+      document:frame.policy.ledgerDocument?{path:frame.policy.ledgerDocument,managedBy:"host",projection}
+        :{configured:false,authority:"host-state",next:"维护者可配置 ledgerDocument；不会按文件名自动覆盖现有叙事文档。"},
       coverage: active ? frame.policy.units[unitId].covers.map(id => ({ id,coveredBy:unitId })) : [],
-      current: active ? { unit: unitId, phase: active.phase, receipt: active.receipt } : null };
+      current: active ? { unit: unitId, phase: active.phase, receipt: active.receipt } : null,
+      // Publish the existing mechanical contract, never choose a semantic outcome
+      // for the coordinator. Exact IDs and evidence files prevent paid trial/error.
+      constraints: view.items.map(item=>({id:item.id,
+        outcomes:item.id==="unit-"+unitId?["completed"]
+          : active&&frame.policy.units[unitId].covers.includes(item.id)?["covered","obsolete"]
+          : item.unit||item.origin?["keep","resume","defer","completed","covered","obsolete"]
+          : ["keep","resume","defer","covered","obsolete"],
+        ...(item.id==="unit-"+unitId?{requiredEvidenceFile:active.receipt}:{}),
+        evidenceRequiredFor:["completed","covered","obsolete"],coveredByRequiredFor:"covered"})) };
   }
   const requestHash = digest(JSON.stringify({ note: args.note, decisions: args.decisions }));
   if (args.action === "review" && active?.owner === frame.agent.id && active.phase === "closed"
     && active.ledgerDecision?.requestHash === requestHash) {
     acceptedVersion(frame, unitId, active);
-    return { unit: unitId, phase: "closed", replayed: true };
+    return { unit: unitId, phase: "closed", replayed: true,document:exportLedger(frame) };
   }
   if (args.action !== "review" || !active || active.owner !== frame.agent.id || active.phase !== "ledger-review") throw new Error("当前没有由本总控持有的账本复核阶段");
   if (active.ledgerRead?.revision !== ledger.revision || active.ledgerRead?.serial !== active.serial) throw new Error("请先调用账本 read（unit=" + unitId + "）读取最新账本，变更后须重新读取");
@@ -207,5 +268,8 @@ export function ledgerAction(frame, args) {
     contextOrigin: args.note === undefined ? "host-from-validated-decisions" : "provided",
     reviewed: planned.map(row => row.item.id), requestHash };
   frame.changed = true;
-  return { unit: unitId, phase: "closed", ledgerRevision: ledger.revision, reviewed: planned.length };
+  // Export runs inside the existing locked state transaction. A write failure
+  // aborts it: callers never receive closed while a configured document failed.
+  const document=exportLedger(frame);
+  return { unit: unitId, phase: "closed", ledgerRevision: ledger.revision, reviewed: planned.length,document };
 }

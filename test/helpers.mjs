@@ -14,7 +14,8 @@ const policy = {
   coordinator: { read: ["first.json", "final.json", "overview.md"] },
   ledgerContext: ["overview.md"],
   units: { K01: {
-    candidate: "candidate.md", claims: ["C1", "C2"],
+    // These older fixtures isolate arithmetic/source gates, not prose formatting.
+    candidate: "candidate.md", plainLast: false, claims: ["C1", "C2"],
     calculations: { C2: {
       kind: "percent-decrease", source: "timing.csv", keyColumn: "phase", valueColumn: "mean_ms", before: "before", after: "after",
     } },
@@ -57,26 +58,38 @@ async function fixture(run) {
 }
 
 /** Exercise the registered production handlers with real files and host identities. */
-function host(root, { automaticCoverage = true } = {}) {
+function host(root, { automaticCoverage = true, failNotifications = false } = {}) {
   const live = new Map();
   const tools = new Map();
+  const admissions = new Map(), restrictions = new Map(), concluded = [];
+  let prompt;
+  let guard;
   const listeners = new Map();
   const notifications = [];
+  const activations = [];
   function agent(id, parentSession) {
     live.set(id, { id, session: { header: { cwd: root, parentSession } },
-      whenIdle: async () => {}, model: { current: () => null } });
+      whenIdle: async () => {}, model: { current: () => null }, ctx: {tools:{
+        view:()=>({restrictableNames:new Set(["read","pwsh",...tools.keys()])}),
+        restrict:value=>{ restrictions.set(id,value);return ()=>restrictions.delete(id); },
+      }} });
   }
   agent("root");
   apply({
     agents: { get: id => live.get(id) },
     subagents: {
-      startActivation: async args => agent(args.childId, args.request.parent.id),
-      sendMessage: async (sender, target, content) => notifications.push({ sender: sender.id, target, content }),
+      startActivation: async args => {activations.push(args);agent(args.childId, args.request.parent.id);},
+      sendMessage: async (sender, target, content) => {
+        if(failNotifications)throw new Error("synthetic parent delivery failure");
+        return notifications.push({ sender: sender.id, target, content });
+      },
     },
-    tools: { register: tool => tools.set(tool.name, tool), guard: () => {} },
-    systemPrompt: { context: () => {} }, on: (name, listener) => listeners.set(name, listener),
+    tools: { register: (tool,options) => {tools.set(tool.name, tool);admissions.set(tool.name,options?.when);}, guard: handler => {guard=handler;} },
+    systemPrompt: { context: value => {prompt=value;} }, on: (name, listener) => listeners.set(name, listener),
+    logger:{warn:()=>{}},
   });
-  const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(3000) });
+  const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(3000),
+    concludeTurn:()=>concluded.push(id) });
   // Older tests isolate arithmetic/ledger behavior. Supply explicit scripted
   // reviewer and independent-auditor decisions through the production tools;
   // this is not evidence that the fixture's semantic judgments are correct.
@@ -135,7 +148,18 @@ function host(root, { automaticCoverage = true } = {}) {
     finish: id => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
       type: "turn/end", data: { reason: { kind: "completed" } },
     }),
+    usage: (id,turn,step,cacheReadTokens) => listeners.get("session/event")(Object.assign(live.get(id).session,{id}),{
+      type:"assistant/message",data:{turn,step,usage:cacheReadTokens===undefined?undefined:{cacheReadTokens}},
+    }),
     notifications,
+    activations,
+    coordinator: id => agent(id),
+    concluded,
+    invoke,
+    prompt:id=>prompt.text({agent:live.get(id)}),
+    visible:id=>[...tools.keys()].filter(name=>!admissions.get(name)||admissions.get(name)({agent:live.get(id)})),
+    restriction:id=>restrictions.get(id),
+    guard:(id,name)=>guard({agent:live.get(id),name}),
   };
 }
 

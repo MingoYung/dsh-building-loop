@@ -5,7 +5,7 @@ import test from "node:test";
 import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
-import { coverageAction, coverageSummary, documentCoverage, classificationDisagreements } from "../governance/coverage.mjs";
+import { coverageAction, coverageSummary, documentCoverage, classificationDisagreements, requireDisputedProof } from "../governance/coverage.mjs";
 
 /** Raw helpers test the mandatory production gate without auto-generated reviews. */
 function environment(root) {
@@ -43,6 +43,58 @@ test("empty omissions and partial spans cannot bypass complete coverage",async()
   assert.throws(e.finish,/2 个未核块/);
   assert.throws(()=>e.invoke("record",{entries:[{block:inventory.blocks[1].id,parts:[{...nonfact,quote:"前半句"}]}]}),/末尾仍有未覆盖/);
   assert.throws(()=>e.invoke("record",{entries:[{block:inventory.blocks[1].id,parts:[{...nonfact,quote:"后半句。"}]}]}),/遗漏或改写/);
+}));
+
+/** Extract only the bounded machine-readable diagnostic from the actual error. */
+function spanDiagnostic(error) {
+  const marker="[coverage-span] ";const start=error.message.indexOf(marker)+marker.length;
+  assert.ok(start>=marker.length);
+  return JSON.parse(error.message.slice(start,error.message.indexOf("。只修正核验参数",start)));
+}
+
+test("a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part",async()=>fixture(async(root,write)=>{
+  // Reproduce the real DSH failure shape: the first quote is the complete current
+  // block, while a second quote belongs to the next sentence/block in that line.
+  const first="1. 字段边界（状态与结果分开）：模拟记录 A 为 status=completed、conclusion=failure（出处：sources/synthetic.md 第 2 行，模拟记录），所以记录 A 已完成，其结论为 failure，因此不能把完成状态当作成功。";
+  const neighbor="此条与 C1 同理：completed 是状态字段，failure 是结论字段。";
+  write("candidate.md",first+neighbor+"\n");
+  write("functional.csv","记录 A：status=completed，conclusion=failure。\n完成状态不等于成功结果。\n");
+  const e=environment(root),[block,next]=e.invoke("inventory").blocks;
+  const premise={file:"functional.csv",start:1,end:1,quote:"记录 A：status=completed，conclusion=failure。"};
+  const inference={kind:"inference",status:"supported",sourceRelation:"supports",basis:"按记录和字段区分核验这一限定结论。",
+    inference:{rule:"source-warrant",premises:[premise],warrant:[{file:"functional.csv",start:2,end:2,quote:"完成状态不等于成功结果。"}],
+      scope:"只讨论本例记录A的完成状态与失败结果。",assumptions:[],counterexample:{possible:false,reason:"本例实际已给出完成而失败的记录，不能把完成等同成功。"}}};
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...inference,quote:first},{...nonfact,quote:neighbor}]}]}),error=>{
+    const diagnostic=spanDiagnostic(error);assert.equal(diagnostic.part,2);assert.equal(diagnostic.reason,"past-block-end");
+    assert.equal(diagnostic.cursor,first.length);assert.equal(diagnostic.firstMismatch.blockOffset,first.length);
+    assert.equal(diagnostic.firstMismatch.expected,null);assert.equal(diagnostic.firstMismatch.received,"此");
+    assert.equal(diagnostic.blockText.text,first);assert.equal(diagnostic.expectedSuffix.text,"");return true;
+  });
+  assert.deepEqual(e.invoke("status").pending,[block.id,next.id]);
+  // Removing the misplaced parameter fixes the span, without changing the
+  // author's correct sentence or replacing its factual inference by nonfactual.
+  e.invoke("record",{entries:[{block:block.id,parts:[inference]}]});
+  e.invoke("record",{entries:[{block:next.id,parts:[{...fact,evidence:[premise]}]}]});
+  assert.equal(e.finish().rejected.length,0);
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),first+neighbor+"\n");
+}));
+
+test("span diagnostics locate altered characters, missing suffixes and bound long source previews",async()=>fixture(async(root,write)=>{
+  write("candidate.md","前半句，后半句。\n");let e=environment(root),block=e.invoke("inventory").blocks[0];
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...nonfact,quote:"前半句，错半句。"}]}]}),error=>{
+    const diagnostic=spanDiagnostic(error);assert.equal(diagnostic.firstMismatch.blockOffset,4);
+    assert.equal(diagnostic.firstMismatch.expected,"后");assert.equal(diagnostic.firstMismatch.received,"错");return true;
+  });
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...nonfact,quote:"前半句，"}]}]}),error=>{
+    const diagnostic=spanDiagnostic(error);assert.equal(diagnostic.part,2);assert.equal(diagnostic.reason,"missing-tail");
+    assert.equal(diagnostic.expectedSuffix.text,"后半句。");return true;
+  });
+  write("candidate.md","长".repeat(4000)+"。\n");e=environment(root);block=e.invoke("inventory").blocks[0];
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...nonfact,quote:"错".repeat(4000)}]}]}),error=>{
+    const diagnostic=spanDiagnostic(error);assert.equal(diagnostic.blockText.truncated,true);
+    assert.equal(diagnostic.blockText.text.length,800);assert.equal(diagnostic.expectedSuffix.text.length,240);
+    assert.equal(diagnostic.receivedQuote.text.length,240);assert.ok(error.message.length<2400);return true;
+  });
 }));
 
 test("quoted proof must be real authorized source text and cannot cite the candidate",async()=>fixture(async(root,write)=>{
@@ -110,7 +162,7 @@ test("hypotheses require visible labels and cannot disguise mandatory facts",asy
 
 test("an unchanged unnumbered finding is blocked before review; a real line correction can return",()=>{
   const active={coverageRejections:[{block:"B2",line:2,lineText:"两者相关，所以一定存在因果。",repair:"区分相关与因果。"}]};
-  const spec={calculations:{}};
+  const spec={calculations:{},plainLast:false};
   assert.equal(supplementChecks("",spec,["新标题","两者相关，所以一定存在因果。"],[],active).ok,false);
   assert.equal(supplementChecks("",spec,["原标题","两者相关，现有证据不足以确定因果。"],[],active).ok,true);
 });
@@ -150,6 +202,15 @@ test("classification disagreement is distinct from a proven false claim",()=>{
   const b={records:[{block:"B1",line:1,text:"结论",parts:[fact]}]};
   assert.equal(classificationDisagreements(a,b).length,1);
   assert.equal(classificationDisagreements(b,b).length,0);
+});
+
+test("a factual first part cannot hide a classification dispute in the rest of the same block",()=>{
+  const text="甲项是事实，乙项也提出事实判断。";
+  const first={records:[{block:"B1",line:1,text,parts:[{...fact,start:0,end:6},{...nonfact,start:6,end:text.length}]}]};
+  const second={records:[{block:"B1",line:1,text,parts:[{...fact,start:0,end:text.length}]}]};
+  const disputes=classificationDisagreements(first,second);assert.deepEqual(disputes[0].factualSpans,[[6,text.length]]);
+  assert.throws(()=>requireDisputedProof({reconciliation:disputes},first.records,true),/reconciliation/);
+  assert.doesNotThrow(()=>requireDisputedProof({reconciliation:disputes},second.records,true));
 });
 
 test("presentation advice cannot enter factual repair debt without an actual factual defect",async()=>fixture(async(root,write)=>{
@@ -231,4 +292,80 @@ test("visible error examples need counterevidence but are not endorsed facts",as
   assert.equal(e.finish().rejected.length,0);assert.equal(e.finish().records[0].parts[0].status,"illustrated-error");
   write("candidate.md","本样例全部通过。\n");block=e.invoke("inventory").blocks[0];
   assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[part]}]}),/不能自行猜测/);
+}));
+
+test("numbered error labels and Markdown presentation preserve the same counterevidence gate",async()=>fixture(async(root,write)=>{
+  const labels=["错例 1：","错例一：","错误示例二：","错误推理 第3：","误读（四）：","[错例 12]","【错误示例二】",
+    "- **错例 1：**","+ __错误示例二__：","2. *错例一：*","> - **[错例 ２]**","### **错误示例二：**",
+    "错例（任意分类说明）：","错例(another description):","错例 2（本段示范）：","错误示例（本段示范）二：",
+    "错误推理（2）（接口含义）：","误读（范围描述）(3)：","- **错例一（仅作示范）：**","[错例二（附注）]",
+    "错例（"+"例".repeat(64)+"）："];
+  const e=environment(root),part={kind:"error-example",status:"unsupported",sourceRelation:"contradicts",
+    basis:"原始记录19/20反证本段明确展示的全部通过错误。",evidence:[ref]};
+  for(const label of labels) {
+    const body=label+"本样例全部通过。\n";write("candidate.md",body);const block=e.invoke("inventory").blocks[0];
+    assert.equal(block.stance,"error-example",label);
+    assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...part,evidence:[]}]}]}),/实际已读的 evidence/,label);
+    assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...part,sourceRelation:"supports"}]}]}),/不可写 supports/,label);
+    e.invoke("record",{entries:[{block:block.id,parts:[part]}]});
+    assert.equal(e.finish().records[0].parts[0].status,"illustrated-error",label);
+    assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),body);
+  }
+}));
+
+test("negated labels, unlabelled assertions and a previous example heading cannot borrow example status",async()=>fixture(async(root,write)=>{
+  const e=environment(root),part={kind:"error-example",status:"unsupported",sourceRelation:"contradicts",
+    basis:"尝试把没有实际标签的断言当成反例应被宿主拒绝。",evidence:[ref]};
+  for(const body of ["不是错例：本样例全部通过。","- **不是错例 1：**本样例全部通过。","并非错误示例二：本样例全部通过。",
+    "错例分析：本样例全部通过。","正文提到错例 1：本样例全部通过。","本样例全部通过。","## 错例 1：\n本样例全部通过。",
+    "不是错例（任意描述）：本样例全部通过。","错例分析（说明）：本样例全部通过。","错例（说明）本样例全部通过。",
+    "错例（未闭合：本样例全部通过。","错例（嵌套（说明））：本样例全部通过。","错例（ ）：本样例全部通过。",
+    "错例（"+"例".repeat(65)+"）：本样例全部通过。","## 错例（单独的标题）：\n本样例全部通过。"]){
+    write("candidate.md",body+"\n");const blocks=e.invoke("inventory").blocks;
+    for(const block of blocks){
+      assert.notEqual(block.stance,"error-example",body);
+      assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[part]}]}),/不能自行猜测作者意图/,body);
+    }
+  }
+}));
+
+test("the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block",async()=>fixture(async(root,write)=>{
+  // Exact rejected block B32-1eade2c2 from 161408Z events.jsonl line 443.
+  const body="- 错例（字段混滑）：记录 A 已完成，所以记录 A 必定成功——错在把 status=completed 当成 conclusion=success；\n";
+  const p=structuredClone(policy);p.units.K01.phases["final-review"].read.push("sources/synthetic.md");
+  p.units.K01.phases["final-review"].evidence.push("sources/synthetic.md");
+  write("BUILDING-LOOP.json",JSON.stringify(p));fs.mkdirSync(path.join(root,"sources"));
+  write("sources/synthetic.md","# 合成逻辑样例\n记录 A：status=completed，conclusion=failure。\n");write("candidate.md",body);
+  const e=environment(root),[block]=e.invoke("inventory").blocks;assert.equal(block.stance,"error-example");
+  const proof={kind:"error-example",status:"unsupported",sourceRelation:"contradicts",basis:"实际记录同时completed且failure，反证示例中把完成状态等同成功结果。",
+    evidence:[{file:"sources/synthetic.md",start:2,end:2,quote:"记录 A：status=completed，conclusion=failure。"}]};
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...proof,evidence:[]}]}]}),/实际已读的 evidence/);
+  e.invoke("record",{entries:[{block:block.id,parts:[proof]}]});
+  assert.equal(e.finish().records[0].parts[0].status,"illustrated-error");assert.equal(e.finish().rejected.length,0);
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),body);
+}));
+
+test("real numbered-example rejection replays without changing the author's three original examples",async()=>fixture(async(root,write)=>{
+  // Frozen excerpt from 151723Z's pre-repair candidate. This local fixture
+  // reproduces the parameter error without depending on mutable run artifacts.
+  const body=[
+    "- 错例 1：记录 A 已完成，因此记录 A 必定成功（与 sources/synthetic.md 第 2 行 conclusion=failure 相反）。",
+    "- 错例 2：模拟观测组的训练时长与分数正相关，因此延长训练必然提高每个人的分数（把相关当因果，并把群体相关推到每个人，与 sources/synthetic.md 第 3 行所缺的随机分配、共同因素排除条件冲突）。",
+    "- 错例 3：样本 X 应送复核，因此任何送复核的样本都是 A 级（把单向蕴含反推为充要，与 sources/synthetic.md 第 4 行规则不符）。",
+  ].join("\n")+"\n";
+  const source=["# 合成逻辑样例；不是外部研究、生产日志或真实效果数据","记录 A：status=completed，conclusion=failure。",
+    "模拟观测组：训练时长与分数正相关；没有随机分配，也没有排除其他共同影响因素。",
+    "本例分级规则：如果一个样本是 A 级，则该样本应送复核。","本例对象：样本 X 是 A 级。"];
+  const p=structuredClone(policy);p.units.K01.phases["final-review"].read.push("sources/synthetic.md");
+  p.units.K01.phases["final-review"].evidence.push("sources/synthetic.md");
+  write("BUILDING-LOOP.json",JSON.stringify(p));fs.mkdirSync(path.join(root,"sources"));
+  write("sources/synthetic.md",source.join("\n")+"\n");write("candidate.md",body);
+  const e=environment(root),blocks=e.invoke("inventory").blocks;assert.equal(blocks.length,3);
+  const result=e.invoke("record",{entries:blocks.map((block,i)=>({block:block.id,parts:[{kind:"error-example",status:"unsupported",
+    sourceRelation:i===0?"contradicts":"insufficient",basis:["完成且失败的原始记录直接反证完成等同成功。",
+      "相关观测没有排除共同因素，不足以证明对每个人的必然因果效应。","原文只给A到复核的单向规则，没有反向充分条件。"][i],
+    evidence:[{file:"sources/synthetic.md",start:i+2,end:i+2,quote:source[i+1]}]}]}))});
+  assert.equal(result.errors?.length??0,0);assert.equal(e.finish().rejected.length,0);
+  assert.ok(e.finish().records.every(row=>row.parts[0].status==="illustrated-error"));
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),body);
 }));
