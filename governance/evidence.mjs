@@ -64,6 +64,9 @@ export function coverageFindings(value, lines) {
   return value.map(item => {
     if (!Number.isSafeInteger(item?.line) || item.line < 1 || item.line > lines.length
       || typeof item.basis !== "string" || !item.basis.trim() || item.basis.length > 1200) throw new Error("未登记事实须给候选行号及原因");
-    return { line: item.line, basis: item.basis.trim(), text: lines[item.line - 1] };
+    const text = lines[item.line - 1];
+    if (!text.trim()) throw new Error("unlisted 只登记尚未编号的真实待核事实，不能把空行列为退回项；没有待核事实时填 []");
+    if (expectedClaims({ claims: [] }, [text]).length) throw new Error("已编号断言请在 checks 逐条判断，不得重复填入 unlisted；没有其他待核事实时填 []");
+    return { line: item.line, basis: item.basis.trim(), text };
   });
 }

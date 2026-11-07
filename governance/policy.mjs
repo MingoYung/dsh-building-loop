@@ -157,11 +157,13 @@ export function includes(paths, name) {
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
   if (!bytes) throw new Error("需要项目维护者配置 " + AUTHORITY);
-  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext"]);
+  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
   const coordinator = grants(source.coordinator, "总控");
   const ledgerContext = pathList(source.ledgerContext);
   if (ledgerContext.length > 3 || ledgerContext.some(file => !includes(coordinator.read, file))) throw new Error("账本现状依据须在总控读授权内，最多三份");
+  const goalContext = pathList(source.goalContext ?? source.ledgerContext);
+  if (goalContext.length > 3 || goalContext.some(file => !includes(coordinator.read, file))) throw new Error("项目目标须为总控可读的中央文件，最多三份");
   const instructions = pathList(source.instructions);
   if (instructions.length > 3 || instructions.some(file => !includes(coordinator.read, file) || includes(coordinator.write, file))) {
     throw new Error("注入的项目规则须在总控只读授权中，最多三份");
@@ -171,9 +173,12 @@ export function authority(root) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers"]);
     if (value.requireSourcePins !== undefined && typeof value.requireSourcePins !== "boolean") throw new Error("requireSourcePins 须为布尔值");
     const candidate = relativeName(value.candidate);
+    const covers = value.covers ?? [];
+    if (!Array.isArray(covers) || covers.length > 80 || covers.some(id => typeof id !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id))
+      || new Set(covers).size !== covers.length) throw new Error("covers 须列出唯一的被替代账目编号");
     const claims = value.claims ?? [];
     if (!Array.isArray(claims) || claims.length > 64 || claims.some(claim => typeof claim !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(claim))
       || new Set(claims).size !== claims.length) throw new Error("断言编号无效或重复");
@@ -208,9 +213,20 @@ export function authority(root) {
     const calculations = Object.create(null);
     for (const [claim, formula] of Object.entries(object(value.calculations ?? {}, "复算规则"))) {
       if (!claims.includes(claim)) throw new Error("复算规则须绑定已登记的断言编号");
-      object(formula, "复算规则", ["kind", "source", "keyColumn", "valueColumn", "before", "after", "decimals"]);
+      object(formula, "复算规则", ["kind", "source", "keyColumn", "valueColumn", "before", "after", "decimals", "line", "sourceUnit", "units", "scope"]);
       const { kind, keyColumn, valueColumn, before, after, decimals = 2 } = formula;
       const source = relativeName(formula.source);
+      if (kind === "source-number") {
+        if (![undefined,"claim","document"].includes(formula.scope)
+          || !Number.isSafeInteger(formula.line) || formula.line < 1 || typeof formula.sourceUnit !== "string" || !formula.sourceUnit.trim()
+          || !Array.isArray(formula.units) || !formula.units.length || formula.units.length > 8
+          || formula.units.some(unit => typeof unit !== "string" || !unit.trim() || unit.length > 40)
+          || !includes(phases.supplement.read,source) || ["first-review","final-review"].some(phase=>!includes(phases[phase].evidence,source))) {
+          throw new Error("原文数值核对须配置原文行、原文单位和等价交付单位，并授权各核验阶段读取");
+        }
+        calculations[claim] = { kind, source, line:formula.line, sourceUnit:formula.sourceUnit, units:formula.units, scope:formula.scope ?? "claim" };
+        continue;
+      }
       if (kind !== "percent-decrease" || !Number.isSafeInteger(decimals) || decimals < 0 || decimals > 6
         || [keyColumn, valueColumn, before, after].some(item => typeof item !== "string" || !item.trim() || item.length > 80)
         || keyColumn === valueColumn || before === after) throw new Error("无效的 CSV 降幅复算规则");
@@ -219,7 +235,7 @@ export function authority(root) {
       }
       calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
     }
-    units[id] = { candidate, claims, continuation, phases, calculations, requireSourcePins: value.requireSourcePins === true };
+    units[id] = { candidate, claims, continuation, phases, calculations, covers, requireSourcePins: value.requireSourcePins === true };
   }
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
@@ -239,7 +255,12 @@ export function authority(root) {
     ...unit.phases["first-review"].evidence, ...unit.phases["final-review"].evidence,
   ])];
   if (mutable.some(file => includes(protectedFiles, file))) throw new Error("指令、原始证据和核验回执不能授予模型写权");
-  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext };
+  if (Object.values(units).some(unit => includes(goalContext, unit.candidate)
+    || Object.values(unit.phases).some(phase => phase.write.some(file => includes(goalContext,file))
+      || phase.receipt && includes(goalContext,phase.receipt) || phase.evidence?.some(file => includes(goalContext,file))))) {
+    throw new Error("目标文件须与候选、模块写入、证据和回执分开");
+  }
+  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext };
 }
 
 /** 受控写入事务维护正文、单份改前备份和逐文件更新记录。 */

@@ -8,89 +8,7 @@ import { QUALITY, lineList, numericChecks, rejectedClaims, supplementChecks } fr
 import { authority, digest } from "../governance/policy.mjs";
 import { evidenceReference, expectedClaims } from "../governance/evidence.mjs";
 
-const seed = "# 摘要\n- C1：通过 19/20（出处：functional.csv 第 2 行）。\n- C2：平均耗时下降 25%。\n";
-const policy = {
-  spec: "building-loop/1",
-  coordinator: { read: ["first.json", "final.json", "overview.md"] },
-  ledgerContext: ["overview.md"],
-  units: { K01: {
-    candidate: "candidate.md", claims: ["C1", "C2"],
-    calculations: { C2: {
-      kind: "percent-decrease", source: "timing.csv", keyColumn: "phase", valueColumn: "mean_ms", before: "before", after: "after",
-    } },
-    phases: {
-      intake: { read: ["candidate.md"] },
-      "first-review": { read: ["candidate.md", "functional.csv"], evidence: ["functional.csv"], receipt: "first.json" },
-      supplement: { read: ["candidate.md", "timing.csv", "first.json", "final.json"], write: ["candidate.md"] },
-      "final-review": {
-        read: ["candidate.md", "functional.csv", "timing.csv"], evidence: ["functional.csv", "timing.csv"], receipt: "final.json",
-      },
-    },
-  } },
-};
-
-/** Each scenario owns an isolated host and project, including filesystem cleanup. */
-async function fixture(run) {
-  const base = fs.realpathSync.native(os.tmpdir());
-  const dir = fs.mkdtempSync(path.join(base, "dsh-building-loop-preflight-"));
-  const root = path.join(dir, "workspace");
-  const host = path.join(dir, "host");
-  fs.mkdirSync(root);
-  fs.mkdirSync(host);
-  const previous = process.env.DSH_HOME;
-  process.env.DSH_HOME = host;
-  const write = (name, value) => fs.writeFileSync(path.join(root, name), value);
-  try {
-    write("candidate.md", seed);
-    write("functional.csv", "passed,total\n19,20\n");
-    write("timing.csv", "phase,mean_ms\nbefore,120\nafter,96\n");
-    write("overview.md", "# 当前项目\n旧采集方案已由当前 CSV 样例覆盖。后续扩大样本的计划仍有效。\n");
-    write("BUILDING-LOOP.json", JSON.stringify(policy));
-    await run(root, write);
-  } finally {
-    if (previous === undefined) delete process.env.DSH_HOME;
-    else process.env.DSH_HOME = previous;
-    assert.equal(path.dirname(fs.realpathSync.native(dir)), base);
-    assert.match(path.basename(dir), /^dsh-building-loop-preflight-/);
-    fs.rmSync(dir, { recursive: true });
-  }
-}
-
-/** Exercise the registered production handlers with real files and host identities. */
-function host(root) {
-  const live = new Map();
-  const tools = new Map();
-  const listeners = new Map();
-  const notifications = [];
-  function agent(id, parentSession) {
-    live.set(id, { id, session: { header: { cwd: root, parentSession } },
-      whenIdle: async () => {}, model: { current: () => null } });
-  }
-  agent("root");
-  apply({
-    agents: { get: id => live.get(id) },
-    subagents: {
-      startActivation: async args => agent(args.childId, args.request.parent.id),
-      sendMessage: async (sender, target, content) => notifications.push({ sender: sender.id, target, content }),
-    },
-    tools: { register: tool => tools.set(tool.name, tool), guard: () => {} },
-    systemPrompt: { context: () => {} }, on: (name, listener) => listeners.set(name, listener),
-  });
-  const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(3000) });
-  return {
-    flow: (id, action, args = {}) => invoke(id, "building_loop", { action, unit: "K01", ...args }),
-    file: (id, action, path, args = {}) => invoke(id, "building_loop_file", { action, path, ...args }),
-    assess: (id, args) => invoke(id, "building_loop_quality", { action: "assess", unit: "K01", ...args }),
-    ledger: (id, action, args = {}) => invoke(id, "building_loop_ledger", { action, unit: "K01", ...args }),
-    user: (id, seq, content) => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
-      type: "user/message", seq, data: { source: { kind: "user" }, content: [{ type: "text", text: content }] },
-    }),
-    interrupt: id => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
-      type: "turn/end", data: { reason: { kind: "error" } },
-    }),
-    notifications,
-  };
-}
+import { fixture, host, policy, seed } from "./helpers.mjs";
 
 test("actual submit handler blocks unchanged and incorrect candidates before final review", async () => fixture(async (root, write) => {
   const { flow, file, assess, interrupt, notifications, ledger, user } = host(root);
@@ -99,15 +17,17 @@ test("actual submit handler blocks unchanged and incorrect candidates before fin
   await ledger("root", "record", { id: "old-collector", kind: "temporary", title: "旧采集方案", note: "待结合当前项目现状判断。" });
   const worker = (await flow("root", "advance")).childId;
   await file(worker, "read", "candidate.md");
+  await file(worker, "read", "overview.md");
   await flow(worker, "submit");
   const reviewer = (await flow("root", "advance")).childId;
-  for (const name of ["candidate.md", "functional.csv"]) await file(reviewer, "read", name);
+  for (const name of ["candidate.md", "functional.csv", "overview.md"]) await file(reviewer, "read", name);
   const c1 = { id: "C1", status: "supported", file: "functional.csv", start: 1, end: 2, basis: "第1行为表头，第2行确为19,20" };
   const c2 = { id: "C2", status: "supported", file: "timing.csv", start: 2, end: 3, basis: "原文为120到96，差24，除以120得20%" };
-  const rejected = await flow(reviewer, "review", { checks: [c1, { id: "C2", status: "unsupported", basis: "没有来源" }] });
+  const rejected = await flow(reviewer, "review", { checks: [c1, { id: "C2", status: "unsupported", basis: "没有来源", finding: { kind: "missing-evidence", quote: "平均耗时下降 25%", fix: "读取原始耗时数据后更正或补证据" } }] });
   assert.deepEqual(rejected.unsupported, ["C2"]);
   assert.deepEqual(await flow("root", "advance"), { unit: "K01", phase: "supplement", childId: worker, reused: true });
   await file(worker, "read", "candidate.md");
+  await file(worker, "read", "overview.md");
   const check = await flow(worker, "preflight");
   assert.equal(check.calculations[0].expected, "20%");
   const notified = notifications.length;
@@ -117,11 +37,15 @@ test("actual submit handler blocks unchanged and incorrect candidates before fin
   const withValue = n => seed.replace("25%。", n + "%（出处：timing.csv 第 2-3 行）。");
   await file(worker, "write", "candidate.md", { content: withValue("24"), note: "负向复现" });
   await file(worker, "read", "candidate.md");
+  await file(worker, "read", "overview.md");
   await assert.rejects(flow(worker, "submit"), /降幅应为 20%/);
   await assert.rejects(flow("root", "advance"), /尚未交付/);
   assert.ok(!fs.existsSync(path.join(root, "final.json")));
   await file(worker, "write", "candidate.md", { content: withValue("20"), note: "重算" });
   await file(worker, "read", "candidate.md");
+  await file(worker, "read", "overview.md");
+  await assert.rejects(flow(worker, "submit"), /本补查阶段实际读取/);
+  await file(worker, "read", "timing.csv");
   await assert.rejects(flow(worker, "submit"), /质量项 sources/);
   const quality = Object.fromEntries(Object.entries(QUALITY).map(([k, label]) => [k, "本样例具体说明 " + label]));
   quality.sources += "证据位于原始数据文件及相应行。".repeat(65);
@@ -134,29 +58,33 @@ test("actual submit handler blocks unchanged and incorrect candidates before fin
   assert.equal(paused.interruptions, 1);
   assert.deepEqual(await flow("root", "advance"), { unit: "K01", phase: "final-review", childId: reviewer, reused: true });
   await assert.rejects(assess("root", {}), /独立核验方/);
-  for (const name of ["candidate.md", "functional.csv", "timing.csv"]) await file(reviewer, "read", name);
+  for (const name of ["candidate.md", "functional.csv", "timing.csv", "overview.md"]) await file(reviewer, "read", name);
   await assert.rejects(flow(reviewer, "review", { checks: [c1, c2] }), /先用 building_loop_quality/);
   await assert.rejects(assess(reviewer, { revise: [] }), /质量项 sources/);
   const qualityChecks = Object.fromEntries(Object.entries(QUALITY).map(([k, label]) => [k, "独立核验 " + label]));
-  const proofArgs = { sourceRefs: [{ file: "functional.csv", start: 1, end: 2 }, { file: "timing.csv", start: 2, end: 3 }],
+  const proofArgs = { goalFit: { pass: true, basis: "本轮只验 CSV 小样例，交付边界符合现目标。" }, sourceRefs: [{ file: "functional.csv", start: 1, end: 2 }, { file: "timing.csv", start: 2, end: 3 }],
     unverifiedSources: [], unlisted: [] };
   await assert.rejects(assess(reviewer, { ...qualityChecks, ...proofArgs, sources: "我实际读过 first.json。", revise: [] }), /本轮未实际读取/);
   await assert.rejects(assess(reviewer, { ...qualityChecks, ...proofArgs,
     sourceRefs: [{ file: "first.json", start: 1, end: 2 }], revise: [] }), /证据授权/);
   qualityChecks.sources = "没有交代数据是合成材料";
-  assert.deepEqual((await assess(reviewer, { ...qualityChecks, ...proofArgs, revise: ["sources"] })).revise, ["sources"]);
+  assert.deepEqual((await assess(reviewer, { ...qualityChecks, ...proofArgs, revise: ["sources"], revisions: [{ field: "sources", change: "候选标明合成数据边界", requirement: { file: "overview.md", start: 2, end: 2 } }] })).revise, ["sources"]);
   assert.ok(!fs.existsSync(path.join(root, "final.json")));
   write("candidate.md", withValue("20") + "\n结果的范围限于样例。\n");
   await file(reviewer, "read", "candidate.md");
   await assert.rejects(flow(reviewer, "review", { checks: [c1, c2] }), /当前候选的六项/);
-  await assess(reviewer, { ...qualityChecks, ...proofArgs, revise: ["sources"] });
+  await assess(reviewer, { ...qualityChecks, ...proofArgs, revise: ["sources"], revisions: [{ field: "sources", change: "候选标明合成数据边界", requirement: { file: "overview.md", start: 2, end: 2 } }] });
   assert.deepEqual((await flow(reviewer, "review", { checks: [c1, c2] })).qualityRejected, ["sources"]);
   assert.equal((await flow("root", "advance")).childId, worker);
   await file(worker, "read", "candidate.md");
-  await assert.rejects(flow(worker, "submit", { quality }), /退回的质量项 sources 没有修订/);
+  await file(worker, "read", "overview.md");
+  await assert.rejects(flow(worker, "submit", { quality }), /质量退回须落实到候选正文/);
+  await file(worker, "write", "candidate.md", { content: withValue("20")+"\n数据来自合成样例，生产代表性未核。\n", note: "落实来源边界" });
+  await file(worker,"read","candidate.md");
+  await assert.rejects(flow(worker,"submit",{quality}), /退回的质量项 sources 没有修订/);
   await flow(worker, "submit", { quality: { ...quality, sources: "用户提供的合成 CSV，生产代表性未核" } });
   await flow("root", "advance");
-  for (const name of ["candidate.md", "functional.csv", "timing.csv"]) await file(reviewer, "read", name);
+  for (const name of ["candidate.md", "functional.csv", "timing.csv", "overview.md"]) await file(reviewer, "read", name);
   qualityChecks.sources = "报告区分合成数据和未核实的生产效果";
   const assessment = await assess(reviewer, { ...qualityChecks, ...proofArgs, revise: [] });
   assert.deepEqual(assessment.observedSources.map(row => row.file), ["functional.csv", "timing.csv"]);
@@ -177,11 +105,19 @@ test("actual submit handler blocks unchanged and incorrect candidates before fin
   reviewArgs.decisions = current.items.map(item => item.id === "unit-K01"
     ? { id: item.id, outcome: "completed", basis: "本轮独立验收已通过。", evidence: { file: "final.json", start: 1, end: 6 } }
     : item.id === "old-collector"
-      ? { id: item.id, outcome: "covered", basis: "当前总纲确认旧方案已被当前样例覆盖。", evidence: { file: "overview.md", start: 2, end: 2 } }
+      ? { id: item.id, outcome: "covered", coveredBy: "K01", basis: "当前总纲确认旧方案已被当前样例覆盖。", evidence: { file: "overview.md", start: 2, end: 2 } }
       : { id: item.id, outcome: "keep", basis: "当前只验收小样例，后续采样需求仍有效，待下一轮安排。" });
   write("overview.md", "# 当前项目\n现状已更新，旧采集方案由当前 CSV 样例覆盖。\n");
-  await assert.rejects(ledger("root", "review", reviewArgs), /读取最新项目现状/);
+  await assert.rejects(ledger("root", "review", reviewArgs), /当前目标/);
   await file("root", "read", "overview.md");
+  await assert.rejects(ledger("root", "review", reviewArgs), /当前目标/);
+  assert.equal((await flow("root", "advance")).childId, reviewer);
+  for (const name of ["candidate.md","functional.csv","timing.csv","overview.md"]) await file(reviewer,"read",name);
+  await assess(reviewer, { ...qualityChecks, ...proofArgs, revise: [] });
+  await flow(reviewer,"review", { checks: [c1,c2] });
+  await ledger("root","read");
+  await file("root","read","overview.md");
+  await file("root","read","final.json");
   assert.equal((await ledger("root", "review", { ...reviewArgs, unit: undefined })).phase, "closed");
   assert.equal((await ledger("root", "review", reviewArgs)).replayed, true);
   const history = await ledger("root", "read", { includeClosed: true });
@@ -252,18 +188,26 @@ test("unlisted prose and newly numbered facts cannot escape independent review",
   const { flow, file, assess } = host(root);
   const worker = (await flow("root", "advance")).childId;
   await file(worker, "read", "candidate.md");
+  await file(worker, "read", "overview.md");
   await flow(worker, "submit");
   const reviewer = (await flow("root", "advance")).childId;
-  for (const name of ["candidate.md", "functional.csv", "timing.csv"]) await file(reviewer, "read", name);
+  for (const name of ["candidate.md", "functional.csv", "timing.csv", "overview.md"]) await file(reviewer, "read", name);
   const checks = [{ id: "C1", status: "supported", file: "functional.csv", start: 1, end: 2, basis: "通过数与总数与数据一致" },
     { id: "C2", status: "supported", file: "timing.csv", start: 2, end: 3, basis: "原始两值复算为20%" }];
   const notes = Object.fromEntries(Object.keys(QUALITY).map(key => [key, "本轮已读样例与范围的独立判断。"]));
-  await assess(reviewer, { ...notes, revise: [], sourceRefs: checks.map(({ file, start, end }) => ({ file, start, end })),
+  await assess(reviewer, { ...notes, goalFit: { pass: true, basis: "小样例范围符合项目目标。" }, revise: [], sourceRefs: checks.map(({ file, start, end }) => ({ file, start, end })),
     unverifiedSources: [], unlisted: [{ line: 4, basis: "泛化到所有环境缺少相应采样。" }] });
-  const result = await flow(reviewer, "review", { checks });
+  await assert.rejects(flow(reviewer, "review", { checks }), /核验参数缺少 C3/);
+  assert.equal((await flow("root", "status")).units[0].phase, "first-review");
+  const result = await flow(reviewer, "review", { checks: [...checks, {
+    id: "C3", status: "unsupported", basis: "该条新增结论未提供证据", finding: {
+      kind: "missing-evidence", quote: "另一个未核实的结论", fix: "查证后改为有据的事实并附原文位置",
+    },
+  }] });
   assert.deepEqual(result.unsupported, ["C3"]);
   assert.deepEqual(result.qualityRejected, ["sources"]);
   await flow("root", "advance");
   await file(worker, "read", "candidate.md");
+  await file(worker, "read", "overview.md");
   await assert.rejects(flow(worker, "submit", { quality: notes }), /未登记事实仍未修订/);
 }));
