@@ -267,7 +267,8 @@ test("late user messages reopen ledger review and classification uses the origin
     return h.ledger("root","review",{note:"本轮逐项确认",decisions});
   };
   await finish();
-  await h.ledger("root","record",{id:"old-faq",kind:"temporary",title:"单独的 FAQ",note:"重复登记不能复活已覆盖事项"});
+  const previous = (await h.ledger("root","read",{includeClosed:true})).items.find(i=>i.id==="old-faq");
+  await h.ledger("root","record",{id:"old-faq",kind:"temporary",title:"单独的 FAQ",note:"修改说明不能复活已覆盖事项",expectedItemSha256:previous.itemSha256});
   assert.equal((await h.ledger("root","read",{includeClosed:true})).items.find(i=>i.id==="old-faq").status,"covered");
   h.user("root",9,"后续检查来源链接");h.user("root",9,"后续检查来源链接");
   const view=await h.ledger("root","read");

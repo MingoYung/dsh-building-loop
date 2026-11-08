@@ -1,5 +1,7 @@
 import { digest, keyOf, readBytes } from "./policy.mjs";
 import { lineList, plainLastIssues } from "./preflight.mjs";
+import { sourceVersionCurrent } from "./evidence.mjs";
+import { requireStoredCalculations } from "./coverage.mjs";
 
 /** All evidence used by either reviewer stays pinned through final ledger closure.
  * This reads host proof metadata only; it does not grant the coordinator source access.
@@ -11,19 +13,11 @@ function requireProofSources(frame, id, active) {
       const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
         ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
       for (const ref of refs) {
-        const bytes = readBytes(frame.root, ref.file);
-        if (!bytes || digest(bytes) !== ref.sha256) throw new Error("验收后来源已经变化，须重新判断，不能用旧证明关单：" + ref.file);
-      }
-      const calculation = part.inference?.calculation;
-      if (calculation?.sourceHash) {
-        const source = frame.policy.units[id]?.calculations?.[calculation.id]?.source;
-        const bytes = source && readBytes(frame.root, source);
-        if (source && (!bytes || digest(bytes) !== calculation.sourceHash)) throw new Error("验收后复算来源已经变化");
+        if (!sourceVersionCurrent(frame.root, ref)) throw new Error("验收后来源已经变化（原文或获取回执），须重新判断，不能用旧证明关单：" + ref.file);
       }
     }
     for (const quote of coverage.quotations ?? []) for (const ref of quote.refs) {
-      const bytes = readBytes(frame.root, ref.file);
-      if (!bytes || digest(bytes) !== ref.sha256) throw new Error("验收后引文来源已经变化");
+      if (!sourceVersionCurrent(frame.root, ref)) throw new Error("验收后引文来源或获取回执已经变化");
     }
   }
 }
@@ -76,6 +70,10 @@ export function acceptedVersion(frame, id, active) {
     throw new Error("当前候选与通过回执不一致，请总控 advance 重新独立验收");
   }
   requireProofSources(frame, id, active);
+  requireStoredCalculations(frame, frame.policy.units[id], [active.proof.reviewerCoverage, active.proof.auditorCoverage], candidate);
+  for (const ref of [...(receipt.checks ?? []), ...(receipt.observedSources ?? [])]) {
+    if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) throw new Error("验收后编号证据或获取回执已经变化：" + ref.file);
+  }
   for (const calculation of receipt.calculations ?? []) {
     const source = frame.policy.units[id].calculations[calculation.id]?.source;
     const sourceBytes = source && readBytes(frame.root, source);
@@ -96,17 +94,18 @@ export function needsRevalidation(frame, id, active) {
     const pending = active.pendingReceipt;
     const candidate = readBytes(frame.root, frame.policy.units[id].candidate);
     if (!pending || !candidate || pending.candidateSha256 !== digest(candidate)) return true;
+    for (const ref of [...(pending.checks ?? []), ...(pending.observedSources ?? [])]) {
+      if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) return true;
+    }
     for (const record of pending.coverage?.records ?? []) for (const part of record.parts) {
       const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
         ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
       for (const ref of refs) {
-        const source = readBytes(frame.root, ref.file);
-        if (!source || digest(source) !== ref.sha256) return true;
+        if (!sourceVersionCurrent(frame.root, ref)) return true;
       }
     }
     for (const quote of pending.coverage?.quotations ?? []) for (const ref of quote.refs) {
-      const source = readBytes(frame.root,ref.file);
-      if (!source || digest(source) !== ref.sha256) return true;
+      if (!sourceVersionCurrent(frame.root, ref)) return true;
     }
   }
   // Old rejected fingerprints cannot describe text after a citation. Rebuild them

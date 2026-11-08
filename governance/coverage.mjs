@@ -1,6 +1,6 @@
-import { digest, readBytes } from "./policy.mjs";
+import { digest, keyOf, readBytes } from "./policy.mjs";
 import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseline } from "./preflight.mjs";
-import { evidenceReference } from "./evidence.mjs";
+import { evidenceReference, UnobservedExcerptError } from "./evidence.mjs";
 
 export const COVERAGE_VERSION = 1;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
@@ -50,14 +50,65 @@ function sourceQuote(frame, active, spec, value) {
   if (typeof value.quote !== "string" || !value.quote.trim() || value.quote.length > 2000 || !original.includes(value.quote)) {
     throw new Error("证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替");
   }
+  // An acquisition receipt registers independent excerpts, not a continuous page.
+  // Preserve per-line citations instead of inventing a bridge between excerpts.
+  if (ref.origin?.observation && /[\r\n]/u.test(value.quote)) throw new Error("登记的独立来源摘录不能用跨行 quote 拼成连续原话，请逐行分别引用");
   return { ...ref, quote: value.quote };
+}
+
+/** Bind arithmetic to the exact reviewed span and the CSV rows actually used.
+ * A passing C-number elsewhere is not evidence for this part. The second probe
+ * reuses only this physical claim line's verified locator, so splitting a label
+ * or citation into another part does not force the author to rewrite the line.
+ * This checks arithmetic identity, not the semantic scope of a numerical claim.
+ */
+function configuredCalculation(frame, spec, id, lines, assertion, premises) {
+  const calculation = spec.calculations[id];
+  if (!calculation || calculation.kind === "source-number") throw new Error("推导 calculation 须绑定实际计算规则，数值转述不是换算证明");
+  const row = claimRow(lines, id);
+  if (!row || row.line !== assertion.line) throw new Error("当前推导断言须绑定 " + id + " 的唯一事实行，不能借用别处通过的计算编号");
+  const actual = lines[assertion.line - 1];
+  if (!Number.isSafeInteger(assertion.start) || !Number.isSafeInteger(assertion.end)
+    || assertion.start < 0 || assertion.end <= assertion.start || actual.slice(assertion.start, assertion.end) !== assertion.quote) {
+    throw new Error("当前复算断言的原文片段与宿主行位置不一致");
+  }
+  const calculationSpec = { ...spec, calculations: { [id]: calculation } };
+  const result = numericChecks(frame.root, calculationSpec, lines, frame.reads)[0];
+  if (!result?.ok) throw new Error("所绑定计算未通过脚本复算");
+  const cited = citation(row.body, result.source);
+  // This is an arithmetic probe, not a candidate edit or invented source claim:
+  // use the exact part's numbers and the already-verified same-line locator.
+  const scopedLine = id + "：" + assertion.quote + "（出处：" + result.source + " 第 " + cited.start + "-" + cited.end + " 行）";
+  const scoped = numericChecks(frame.root, calculationSpec, [scopedLine], frame.reads)[0];
+  if (!scoped?.ok) throw new Error("当前断言片段本身须包含该复算结果，不能借用同行其他片段的数字：" + scoped?.issue);
+  if (!premises.length || premises.some(ref => keyOf(ref.file) !== keyOf(result.source) || ref.sha256 !== result.sourceHash)) {
+    throw new Error("复算前提须全部来自实际计算的当前原始数据文件 " + result.source);
+  }
+  const sourceLines = lineList(readBytes(frame.root, result.source));
+  // A broad locator is not enough: the quotation itself must cover both complete
+  // data rows. Separate before/after refs and harmless outer whitespace are valid.
+  for (const rawRow of [result.before.line, result.after.line]) {
+    const covered = premises.some(ref => {
+      if (ref.start > rawRow || ref.end < rawRow) return false;
+      const excerpt = sourceLines.slice(ref.start - 1, ref.end).join("\n");
+      const original = sourceLines[rawRow - 1], content = original.trim();
+      const offset = sourceLines.slice(ref.start - 1, rawRow - 1).reduce((sum, line) => sum + line.length + 1, 0) + original.indexOf(content);
+      let at = -1;
+      while ((at = excerpt.indexOf(ref.quote, at + 1)) !== -1) {
+        if (at <= offset && at + ref.quote.length >= offset + content.length) return true;
+      }
+      return false;
+    });
+    if (!covered) throw new Error("复算前提的逐字引句须覆盖实际原始数据第 " + rawRow + " 行，不能只扩大引用范围或引用无关行");
+  }
+  return { ...result, assertion: { line: assertion.line, start: assertion.start, end: assertion.end, quoteSha256: digest(assertion.quote) } };
 }
 
 /** Validate the supplied finite proof, including its scope and counterexample test.
  * The source-to-proposition interpretation is still semantic and is checked again
  * by a separate blind auditor; these structural checks never certify it by themselves.
  */
-function inferenceProof(frame, active, spec, value, lines) {
+function inferenceProof(frame, active, spec, value, lines, assertion) {
   if (!value || !["source-warrant", "modus-ponens", "equality-transitive", "configured-calculation"].includes(value.rule)) {
     throw new Error("推导需明确 rule：source-warrant、modus-ponens、equality-transitive 或 configured-calculation");
   }
@@ -83,11 +134,7 @@ function inferenceProof(frame, active, spec, value, lines) {
     if (!Array.isArray(value.warrant) || !value.warrant.length || value.warrant.length > 8) throw new Error("自然语言推导须 warrant 指出原文中的桥接关系，不能仅重复结论");
     proof.warrant = value.warrant.map(ref => sourceQuote(frame, active, spec, ref));
   } else if (value.rule === "configured-calculation") {
-    const calculation = spec.calculations[value.calculation];
-    if (!calculation || calculation.kind === "source-number") throw new Error("推导 calculation 须绑定实际计算规则，数值转述不是换算证明");
-    const result = numericChecks(frame.root, spec, lines, frame.reads).find(row => row.id === value.calculation);
-    if (!result?.ok) throw new Error("所绑定计算未通过脚本复算");
-    proof.calculation = result;
+    proof.calculation = configuredCalculation(frame, spec, value.calculation, lines, assertion, premises);
   } else {
     const form = value.formal;
     if (premises.length !== 2 || !form || !Array.isArray(form.premises) || form.premises.length !== 2) throw new Error('形式推导须两条原始前提及 formal.premises；modus-ponens 结构示例：{"premises":[{"relation":"implies","left":"P","right":"Q"},{"relation":"asserts","left":"P"}],"conclusion":{"relation":"asserts","left":"Q"}}。把P/Q替换为同一对象的具体命题；若仅转述原文单向规则，可用 source-warrant 和逐字关系引句。');
@@ -187,7 +234,8 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
         if (!Array.isArray(part.evidence) || !part.evidence.length || part.evidence.length > 12) throw new Error("直接事实须给 evidence 原文及逐字 quote");
         result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
       } else {
-        result.inference = inferenceProof(frame, active, spec, part.inference, lines);
+        result.inference = inferenceProof(frame, active, spec, part.inference, lines,
+          { line: block.line, start: block.start + start, end: block.start + cursor, quote });
         if (result.inference.counterexample.possible) {
           result.status = "uncertain";
           result.repair = "存在前提成立而结论不成立的反例，补充排除它的依据或收窄结论";
@@ -229,7 +277,7 @@ export function coverageAction(frame, active, spec, args, options = {}) {
     }
     const offset = args.offset ?? 0, count = args.count ?? 8;
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(count) || count < 1 || count > 24) throw new Error("覆盖分页 offset/count 无效，每页最多 24 块");
-    const invalidated = retireStaleProofs(frame, active, spec, bytes);
+    const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest);
     const pending = manifest.blocks.filter(b => !Object.hasOwn(active.coverage.records, b.id)).map(b => b.id);
     const result = { candidateSha256: manifest.candidateSha256, total: manifest.blocks.length,
       pending: options.maxBytes ? pending.slice(0,24) : pending, pendingCount: pending.length,
@@ -264,7 +312,7 @@ export function coverageAction(frame, active, spec, args, options = {}) {
   // A source change can invalidate more blocks than fit in one record call.
   // Retire them before incremental repair, so an untouched stale block cannot
   // roll back eleven newly checked proofs. Completion still rechecks every ref.
-  const invalidated = retireStaleProofs(frame, active, spec, bytes);
+  const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest);
   const records = { ...active.coverage.records }, supplied = new Set(), invalid = [];
   for (const entry of args.entries) {
     const block = manifest.blocks.find(row => row.id === entry.block);
@@ -292,10 +340,49 @@ export function coverageAction(frame, active, spec, args, options = {}) {
     invalidated, total: result.total, pending: result.pending, rejected: result.rejected };
 }
 
+/** Reuse one binding check for active reviews and already accepted host proofs. */
+function validateCalculationPart(frame, spec, part, lines, block) {
+  const previous = part.inference?.calculation;
+  if (!previous) {
+    if (part.inference?.rule === "configured-calculation") throw new Error("宿主缺少已绑定的计算结果，须重新核验");
+    return;
+  }
+  if (!block) throw new Error("推导绑定的当前正文块已失效");
+  const current = configuredCalculation(frame, spec, previous.id, lines,
+    { line: block.line, start: block.start + part.start, end: block.start + part.end, quote: part.quote }, part.inference.premises ?? []);
+  // Older receipts have no assertion field: recheck their actual record/part
+  // under the same gate without inventing a historical binding or rewriting it.
+  if (current.sourceHash !== previous.sourceHash || current.expected !== previous.expected
+    || JSON.stringify(current.before) !== JSON.stringify(previous.before) || JSON.stringify(current.after) !== JSON.stringify(previous.after)
+    || (previous.assertion && JSON.stringify(current.assertion) !== JSON.stringify(previous.assertion))) {
+    throw new Error("推导绑定的脚本计算或原文片段已失效");
+  }
+}
+
+/** Host-only closure check, including old receipts that predate span bindings.
+ * The caller has already pinned proof/source versions. Recompute from the unit's
+ * authorized review material without granting coordinator tools, claiming a new
+ * model read, returning private evidence, or rewriting the historical receipt.
+ */
+export function requireStoredCalculations(frame, spec, coverages, bytes) {
+  const lines = lineList(bytes), manifest = documentCoverage(bytes);
+  const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
+  const hostFrame = { root: frame.root, reads: spec.phases["final-review"].read };
+  try {
+    for (const coverage of coverages) for (const record of coverage.records) {
+      for (const part of record.parts) validateCalculationPart(hostFrame, spec, part, lines, blocks.get(record.block));
+    }
+  } catch {
+    // Detailed arithmetic diagnostics belong to the authorized review session,
+    // not the coordinator's closure tool response.
+    throw new Error("已验收计算证明失效，须重新核验");
+  }
+}
+
 /** The same strict version/read/pin checks serve both progress and acceptance.
  * Retiring a stale proof means pending, never a verdict about the new source.
  */
-function validateRecordSources(frame, active, spec, record, bytes) {
+function validateRecordSources(frame, active, spec, record, lines, block) {
   for (const part of record.parts) {
     const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
       ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
@@ -303,18 +390,17 @@ function validateRecordSources(frame, active, spec, record, bytes) {
       const current = sourceQuote(frame, active, spec, ref);
       if (ref.sha256 !== current.sha256) throw new Error("覆盖证据版本已经变化，须重新判断该块而非仅重读文件");
     }
-    if (part.inference?.calculation) {
-      const current = numericChecks(frame.root, spec, lineList(bytes), frame.reads).find(r => r.id === part.inference.calculation.id);
-      if (!current?.ok || current.sourceHash !== part.inference.calculation.sourceHash) throw new Error("推导绑定的脚本计算已失效");
-    }
+    validateCalculationPart(frame, spec, part, lines, block);
   }
 }
 
 /** Keep independent unaffected blocks; explicitly expose every invalidation. */
-function retireStaleProofs(frame, active, spec, bytes) {
+function retireStaleProofs(frame, active, spec, bytes, manifest) {
   const invalidated = [];
+  const lines = lineList(bytes);
+  const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
   for (const [id, record] of Object.entries(active.coverage.records)) {
-    try { validateRecordSources(frame, active, spec, record, bytes); }
+    try { validateRecordSources(frame, active, spec, record, lines, blocks.get(id)); }
     catch (error) {
       delete active.coverage.records[id];
       invalidated.push({ block: id, reason: error.message });
@@ -340,14 +426,15 @@ export function coverageSummary(frame, active, spec, complete = true) {
       throw new Error("必核断言 " + id + " 不能全部分类成非事实或假设后跳过核验");
     }
   }
-  for (const record of records) validateRecordSources(frame, active, spec, record, bytes);
+  const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
+  for (const record of records) validateRecordSources(frame, active, spec, record, lines, blocks.get(record.block));
   const rejected = records.flatMap(record => record.parts.filter(part => ["direct", "inference"].includes(part.kind) && part.status !== "supported")
     .map(part => {
       const finding={block:record.block,line:record.line,text:part.quote,lineText:record.lineText,
         basis:part.basis,repair:part.repair,finding:part.finding,status:part.status};
       const refs=[...(part.evidence??[]),...(part.inference?.premises??[]),...(part.inference?.warrant??[]),
         ...(part.inference?.assumptions??[]).map(item=>item.evidence)];
-      const contextStart=manifest.blocks.find(block=>block.id===record.block).start+part.start;
+      const contextStart=blocks.get(record.block).start+part.start;
       return {...finding,repairBaseline:repairBaseline(frame.root,spec,lines,{...finding,contextStart},frame.reads,active.seen,refs)};
     }));
   const quotations = complete ? quotationChecks(frame, active, spec, manifest) : [];
@@ -376,10 +463,27 @@ function quotationChecks(frame, active, spec, manifest) {
         return cited?.start ? [{file,start:cited.start,end:cited.end}] : [];
       });
       if (!locators.length) continue; // No invented cross-reference; the reviewer must resolve it.
-      const refs = locators.map(ref => evidenceReference(frame,active,spec,ref));
-      const matches = refs.some(ref => normalize(lineList(readBytes(frame.root,ref.file)).slice(ref.start-1,ref.end).join("\n")).includes(normalize(match[1])));
+      const refs = [];
+      const excludedLocators = [];
+      for (const locator of locators) {
+        try { refs.push(evidenceReference(frame, active, spec, locator)); }
+        catch (error) {
+          // A verified receipt can establish a wrong locator in the manuscript.
+          // An unread range or broken receipt still blocks the reviewer instead.
+          if (!(error instanceof UnobservedExcerptError)) throw error;
+          excludedLocators.push(locator);
+        }
+      }
+      const matches = refs.some(ref => {
+        const excerpt = lineList(readBytes(frame.root,ref.file)).slice(ref.start-1,ref.end);
+        // Observed excerpts remain independent even when Markdown whitespace is
+        // normalized; ordinary continuous local sources retain multi-line quotes.
+        return ref.origin?.observation ? excerpt.some(line => normalize(line).includes(normalize(match[1])))
+          : normalize(excerpt.join("\n")).includes(normalize(match[1]));
+      });
       results.push({block:manifest.blocks.find(b=>b.line===index+1&&b.start<=match.index&&b.end>match.index)?.id ?? "Q"+(index+1),
-        line:index+1,text:match[0],lineText:line,contextStart:match.index,refs,matches});
+        line:index+1,text:match[0],lineText:line,contextStart:match.index,refs,matches,
+        ...(excludedLocators.length ? { excludedLocators } : {}) });
     }
   }
   return results;

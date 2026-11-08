@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
+import { acceptedVersion, goalSnapshot, needsRevalidation } from "../governance/goals.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
 import { coverageAction, coverageSummary, documentCoverage, classificationDisagreements, requireDisputedProof } from "../governance/coverage.mjs";
 
@@ -195,6 +196,129 @@ test("calculated proof binds the configured script and its real raw data",async(
   const put=inference=>e.invoke("record",{entries:[{block,parts:[{kind:"inference",status:"supported",sourceRelation:"supports",basis:"由已配置百分比规则复算。",inference}]}]});
   put(proof);assert.equal(e.finish().records[0].parts[0].inference.calculation.expected,"20%");
   assert.throws(()=>put({...proof,calculation:"not-registered"}),/实际计算规则/);
+}));
+
+/** The registered C2 calculation may justify only its own exact numerical part. */
+function configuredProof(premises=[{file:"timing.csv",start:2,end:3,quote:"before,120\nafter,96"}]) {
+  return {rule:"configured-calculation",calculation:"C2",premises,scope:"只复算本例两条原始耗时数据的相对降幅。",
+    assumptions:[],counterexample:{possible:false,reason:"按同一配置对120与96复算，得到20%的相对降幅。"}};
+}
+function calculatedPart(inference=configuredProof(),quote) {
+  return {kind:"inference",status:"supported",sourceRelation:"supports",basis:"按配置复算这段实际数字。",inference,...(quote===undefined?{}:{quote})};
+}
+function calculationEnvironment(root) {
+  const e=environment(root);e.spec.calculations=authority(root).units.K01.calculations;return e;
+}
+
+test("configured calculation cannot lend another claim's passed result to an unrelated line",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。\n因此所有项目必定成功。\n");
+  const e=calculationEnvironment(root),blocks=e.invoke("inventory").blocks;
+  assert.throws(()=>e.invoke("record",{entries:[{block:blocks[1].id,parts:[calculatedPart()]}]}),/当前.*断言|绑定.*事实行/);
+}));
+
+test("configured calculation checks the actual part rather than another percentage on its line",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。因此所有项目必定成功。\n");
+  const e=calculationEnvironment(root),blocks=e.invoke("inventory").blocks;
+  assert.throws(()=>e.invoke("record",{entries:[{block:blocks[1].id,parts:[calculatedPart()]}]}),/当前.*断言|当前.*片段|当前.*复算/);
+}));
+
+test("configured calculation premises must quote both actual raw rows in the calculated source",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。\n");
+  const e=calculationEnvironment(root),block=e.invoke("inventory").blocks[0].id;
+  for(const premises of [
+    [{file:"functional.csv",start:2,end:2,quote:"19,20"}],
+    [{file:"timing.csv",start:1,end:1,quote:"phase,mean_ms"}],
+    [{file:"timing.csv",start:1,end:3,quote:"phase,mean_ms"}],
+    [{file:"timing.csv",start:2,end:3,quote:"before,120"}],
+    [{file:"timing.csv",start:2,end:3,quote:"120\nafter,96"}],
+  ])assert.throws(()=>e.invoke("record",{entries:[{block,parts:[calculatedPart(configuredProof(premises))]}]}),/复算.*前提|前提.*复算|原始.*行/);
+}));
+
+test("configured calculation preserves split parts, Markdown claim labels and separate raw-row refs",async()=>fixture(async(root,write)=>{
+  write("timing.csv","phase,mean_ms\r\n  before,120  \r\nunused,777\r\n after,96 \r\n");
+  const numeric="因此下降 ２０．００％",locator="（出处：timing.csv #L2-L4）。";
+  const candidate="# 摘要\r\n  2) **C2** : 本例口径；"+numeric+locator+"\r\n";
+  write("candidate.md",candidate);
+  const e=calculationEnvironment(root),blocks=e.invoke("inventory").blocks;
+  const raw=[{file:"timing.csv",start:2,end:2,quote:"before,120"},{file:"timing.csv",start:4,end:4,quote:"after,96"}];
+  e.invoke("record",{entries:blocks.map(block=>({block:block.id,parts:block.text.startsWith(numeric)
+    ?[calculatedPart(configuredProof(raw),numeric),{...nonfact,quote:locator}]:[nonfact]}))});
+  const checked=e.finish(),part=checked.records.at(-1).parts[0];
+  assert.equal(part.inference.calculation.expected,"20%");
+  assert.deepEqual(part.inference.calculation.assertion,{line:2,start:candidate.split("\r\n")[1].indexOf(numeric),
+    end:candidate.split("\r\n")[1].indexOf(numeric)+numeric.length,quoteSha256:digest(numeric)});
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),candidate);
+  assert.equal(part.inference.calculation.before.line,2);assert.equal(part.inference.calculation.after.line,4);
+}));
+
+test("legacy calculated records remain readable but cannot retain mismatched raw premises",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。\n");
+  const e=calculationEnvironment(root),block=e.invoke("inventory").blocks[0].id;
+  e.invoke("record",{entries:[{block,parts:[calculatedPart()]}]});
+  const stored=e.active.coverage.records[block].parts[0];
+  delete stored.inference.calculation.assertion;
+  const before=JSON.stringify(stored);
+  assert.equal(e.finish().rejected.length,0);assert.equal(JSON.stringify(stored),before);
+  stored.inference.premises=[{...ref,sha256:digest(fs.readFileSync(path.join(root,"functional.csv")))}];
+  assert.throws(e.finish,/复算前提/);
+}));
+
+test("completion rechecks the exact calculation binding instead of trusting old passing records",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。\n因此所有项目必定成功。\n");
+  const e=calculationEnvironment(root),blocks=e.invoke("inventory").blocks;
+  e.invoke("record",{entries:[{block:blocks[0].id,parts:[calculatedPart()]},{block:blocks[1].id,parts:[nonfact]}]});
+  const saved=e.active.coverage.records[blocks[0].id].parts[0];
+  saved.inference.calculation.assertion.quoteSha256=digest("别的断言");
+  assert.throws(e.finish,/原文片段已失效/);
+  delete saved.inference.calculation.assertion;
+  const other=e.active.coverage.records[blocks[1].id].parts[0];
+  Object.assign(other,{kind:"inference",sourceRelation:"supports",inference:structuredClone(saved.inference)});
+  assert.throws(e.finish,/当前.*断言|绑定.*事实行/);
+}));
+
+/** Replay the exact persisted host boundary used by ledger review and closed units. */
+function acceptedCalculationState(e,write,coverage,phase) {
+  const receipt={decision:"accept",reviewer:"reviewer",candidateSha256:coverage.candidateSha256,
+    goal:goalSnapshot(e.frame),goalFit:{pass:true},coverage:{version:1,pending:[],rejected:[]},
+    independentAudit:{auditor:"auditor",coverage:{version:1,pending:[],rejected:[]}}};
+  const raw=JSON.stringify(receipt);write("final.json",raw);
+  const frame={...e.frame,reads:[...e.frame.policy.coordinator.read]};
+  const active={phase,executor:"executor",receipt:"final.json",receiptHash:digest(raw),
+    proof:{reviewerCoverage:structuredClone(coverage),auditorCoverage:structuredClone(coverage)}};
+  return {frame,active};
+}
+
+test("ledger review and closed units reject old calculation records bound to another assertion or raw source",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。\n因此所有项目必定成功。\n");
+  const e=calculationEnvironment(root),blocks=e.invoke("inventory").blocks;
+  e.invoke("record",{entries:[{block:blocks[0].id,parts:[calculatedPart()]},{block:blocks[1].id,parts:[nonfact]}]});
+  const saved=e.finish();delete saved.records[0].parts[0].inference.calculation.assertion;
+  for(const phase of ["ledger-review","closed"])for(const role of ["reviewerCoverage","auditorCoverage"])for(const wrong of ["assertion","source"]) {
+    const {frame,active}=acceptedCalculationState(e,write,saved,phase),coverage=active.proof[role];
+    const prior=coverage.records[0].parts[0],other=coverage.records[1].parts[0];
+    if(wrong==="assertion")Object.assign(other,{kind:"inference",sourceRelation:"supports",inference:structuredClone(prior.inference)});
+    else prior.inference.premises=[{...ref,sha256:digest(fs.readFileSync(path.join(root,"functional.csv")))}];
+    assert.throws(()=>acceptedVersion(frame,"K01",active),error=>{
+      assert.equal(error.message,"已验收计算证明失效，须重新核验");return true;
+    });
+    assert.equal(needsRevalidation(frame,"K01",active),true);
+    assert.deepEqual(frame.reads,e.frame.policy.coordinator.read);
+  }
+}));
+
+test("correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads",async()=>fixture(async(root,write)=>{
+  write("candidate.md","- C2：下降 20%（出处：timing.csv 第 2-3 行）。\n");
+  const e=calculationEnvironment(root),block=e.invoke("inventory").blocks[0].id;
+  e.invoke("record",{entries:[{block,parts:[calculatedPart()]}]});
+  const coverage=e.finish();delete coverage.records[0].parts[0].inference.calculation.assertion;
+  for(const phase of ["ledger-review","closed"]) {
+    const {frame,active}=acceptedCalculationState(e,write,coverage,phase),before=JSON.stringify(active);
+    const receipt=fs.readFileSync(path.join(root,"final.json"));
+    assert.equal(acceptedVersion(frame,"K01",active).decision,"accept");
+    assert.equal(needsRevalidation(frame,"K01",active),false);
+    assert.equal(JSON.stringify(active),before);assert.deepEqual(fs.readFileSync(path.join(root,"final.json")),receipt);
+    assert.deepEqual(frame.reads,e.frame.policy.coordinator.read);assert.equal(active.seen,undefined);
+  }
 }));
 
 test("classification disagreement is distinct from a proven false claim",()=>{

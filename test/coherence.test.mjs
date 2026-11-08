@@ -107,6 +107,42 @@ async function closeReady(h) {
   return {book,decisions};
 }
 
+test("recording an observed unit interruption returns its existing host ledger item", async () => fixture(async (root, write) => {
+  configure(write, { ledger: true });
+  const h = host(root);
+  const executor = (await h.flow("root", "advance")).childId;
+  h.interrupt(executor);
+  const before = await h.ledger("root", "read");
+  const linked = await h.ledger("root", "record", { id: "duplicated-interruption", kind: "interrupted", unit: "K01",
+    title: "重记同一单元中断", note: "执行已中断，等待按原单元恢复。" });
+  assert.equal(linked.id, "unit-K01");
+  assert.equal(linked.alreadyRecorded, true);
+  assert.equal(linked.lastInterruption.phase, "intake");
+  assert.deepEqual(await h.ledger("root", "read"), before);
+  h.coordinator("other");
+  await assert.rejects(h.ledger("other", "record", { kind: "interrupted", unit: "K01" }), /原总控持有/);
+  await h.ledger("root", "export");
+  const snapshot = fs.readFileSync(path.join(root, "ledger.md"), "utf8");
+  assert.match(snapshot, /宿主最近中断：intake/);
+  assert.doesNotMatch(snapshot, /duplicated-interruption/);
+}));
+
+test("a repeated stable ledger ID needs a fresh item version to change its content", async () => fixture(async (root, write) => {
+  configure(write);
+  const h = host(root);
+  const original = { id: "paused-quiz", kind: "interrupted", title: "课堂测验互动", note: "曾搁置，等待当前目标复盘。" };
+  const probe = { id: original.id, kind: "temporary", title: "测试", note: "测试登记" };
+  await h.ledger("root", "record", original);
+  const before = await h.ledger("root", "read");
+  await h.ledger("root", "record", original);
+  await assert.rejects(h.ledger("root", "record", probe), /编号已经存在/);
+  assert.deepEqual(await h.ledger("root", "read"), before);
+  const update = { ...original, note: "按新目标复核后更新说明。", expectedItemSha256: before.items[0].itemSha256 };
+  assert.equal((await h.ledger("root", "record", update)).note, update.note);
+  await assert.rejects(h.ledger("root", "record", { ...probe, expectedItemSha256: update.expectedItemSha256 }), /编号已经存在/);
+  assert.equal((await h.ledger("root", "read")).items[0].title, original.title);
+}));
+
 test("canonical ledger exports every current item including a late request and blocks model rewrites",async()=>fixture(async(root,write)=>{
   configure(write,{ledger:true});write("ledger.md","# 原先的文档\n");const h=host(root);
   for(let i=1;i<=4;i++)await h.ledger("root","record",{id:"plan-"+i,kind:"planned",title:"后续计划"+i,note:"核验完成后再评估是否执行。"});

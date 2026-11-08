@@ -935,8 +935,9 @@ export function apply(ctx, config = {}) {
     unlisted: { type: "array", description: "仅当前coverage中仍被拒绝且有finding的未编号事实，不能填已核标题/假设/错例/支持项。混合行须用quote限定真实缺口；无遗漏填[]。", items: { type: "object", properties: { line: number, quote: string, basis: string }, required: ["line", "basis"], additionalProperties: false } },
   }, assess, [...qualityNames, "revise", "sourceRefs", "unverifiedSources", "unlisted", "goalFit"]), {when:visible(["reviewer"])});
   ctx.tools.register(tool(LEDGER, "总控登记后续计划、临时需求和搁置事项。每轮事实验收后read最新账本和项目现状，再逐项review。配置ledgerDocument时，review成功会由宿主生成完整当前账本；export也可生成阻塞时的当前快照，不改变验收状态。不要手写该文件。"+LEDGER_BASIS_RULE, ["read", "record", "review", "export"], {
-    unit: string, id: string, kind: { type: "string", enum: ["planned", "temporary", "interrupted"] },
+    unit: { ...string, description: "复盘时指定单元；record(kind=interrupted) 指明已有宿主中断的单元时，返回原 unit-账项，勿重复登记。独立搁置任务可省略。" }, id: string, kind: { type: "string", enum: ["planned", "temporary", "interrupted"] },
     title: string, note: string, originId: string, includeClosed: { type: "boolean" },
+    expectedItemSha256: { ...string, description: "显式修改已有独立账项时必填；取最近 ledger read 对应项目的 itemSha256。新增项目和原请求归类不填。" },
     decisions: { type: "array", items: { type: "object", properties: {
       id: string, outcome: { type: "string", enum: ["keep", "resume", "defer", "completed", "covered", "obsolete"] },
       basis: {...string,description:LEDGER_BASIS_RULE}, evidence: referenceSchema, coveredBy: string,

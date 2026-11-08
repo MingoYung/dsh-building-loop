@@ -104,6 +104,7 @@ export function exportLedger(frame) {
     if(coverage)lines.push("覆盖关系："+literal(coverage.unit)+"；验收回执 "+literal(coverage.receipt)+"；回执 SHA-256 "+literal(coverage.receiptHash)
       +"；候选 SHA-256 "+literal(coverage.candidateSha256)+"；目标 SHA-256 "+literal(coverage.goal?.sha256));
     if(item.origin)lines.push("原始请求："+literal(item.origin.session)+"；事件 "+item.origin.event+"；SHA-256 "+literal(item.origin.sha256));
+    if(item.lastInterruption)lines.push("宿主最近中断："+literal(item.lastInterruption.phase)+"；"+literal(item.lastInterruption.reason));
     if(item.updatedAt)lines.push("最近登记时间："+literal(item.updatedAt));
   }
   const content=lines.join("\n")+"\n";
@@ -158,12 +159,31 @@ export function ledgerAction(frame, args) {
   if (args.action === "record") {
     const linked = args.originId && ledger.items[args.originId];
     if (args.originId && (!linked?.origin || linked.owner !== frame.agent.id)) throw new Error("originId 须指向本总控已有的自动请求记录");
+    // A recorded interruption of a known unit already has an authoritative item.
+    // Reuse it so completion follows the unit's acceptance, not an unrelated plan.
+    if (!linked && args.kind === "interrupted" && typeof args.unit === "string") {
+      const existing = ledger.items["unit-" + args.unit];
+      if (existing?.lastInterruption) {
+        if (existing.owner !== frame.agent.id) throw new Error("中断账项由该工作单元的原总控持有");
+        return { ...existing, alreadyRecorded: true };
+      }
+    }
     const id = linked?.id ?? args.id;
     if (!linked && (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id ?? "") || id.startsWith("unit-") || id.startsWith("request-"))) throw new Error("已有请求请用 originId 关联；独立计划须使用稳定编号");
     if (!["planned", "temporary", "interrupted"].includes(args.kind)) throw new Error("账本分类须为 planned、temporary 或 interrupted");
     const title = reason(args.title, 300), note = reason(args.note);
     const previous = ledger.items[id];
     if (previous && previous.owner !== frame.agent.id) throw new Error("账目由其他总控持有");
+    if (previous && !linked) {
+      if (previous.kind === args.kind && previous.title === title && previous.note === note) return previous;
+      // A stable ID is not permission to overwrite a different task's content.
+      // Explicit amendments use the last item version returned by ledger read.
+      if (args.expectedItemSha256 !== digest(JSON.stringify(previous))) {
+        throw new Error("账目编号已经存在。修改该项须先读最新账本并提供 expectedItemSha256；新事项使用新编号");
+      }
+    } else if (args.expectedItemSha256 !== undefined) {
+      throw new Error("指定了已有账项版本，但当前没有可修改的独立账项");
+    }
     const duplicate = Object.values(ledger.items).find(item => item.owner === frame.agent.id && item.id !== id
       && item.title.normalize("NFKC").replace(/\s/g, "") === title.normalize("NFKC").replace(/\s/g, ""));
     if (duplicate) throw new Error("同名事项已登记 " + duplicate.id + "，请沿用原编号或 originId");
@@ -186,7 +206,8 @@ export function ledgerAction(frame, args) {
     // item IDs through the shared state slot or imply it is this caller's book.
     const projection=frame.state.ledgerProjection?.owner===frame.agent.id
       &&frame.state.ledgerProjection.path===frame.policy.ledgerDocument?frame.state.ledgerProjection:null;
-    return { ...view, context: [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])],
+    return { ...view, items: view.items.map(item => ({ ...item, itemSha256: digest(JSON.stringify(item)) })),
+      context: [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])],
       document:frame.policy.ledgerDocument?{path:frame.policy.ledgerDocument,managedBy:"host",projection}
         :{configured:false,authority:"host-state",next:"维护者可配置 ledgerDocument；不会按文件名自动覆盖现有叙事文档。"},
       coverage: active ? frame.policy.units[unitId].covers.map(id => ({ id,coveredBy:unitId })) : [],

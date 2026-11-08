@@ -247,17 +247,29 @@ export function authority(root) {
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
     const file = relativeName(path);
-    object(entry, "来源凭据", ["sha256", "kind", "locator"]);
+    object(entry, "来源凭据", ["sha256", "kind", "locator", "observation"]);
     if (!/^[a-f0-9]{64}$/.test(entry.sha256 ?? "") || !["primary", "secondary", "synthetic"].includes(entry.kind)
       || typeof entry.locator !== "string" || !entry.locator.trim() || entry.locator.length > 1000) throw new Error("来源凭据需要原始摘要、类型和可追查位置");
     if (sourcePins[keyOf(file)]) throw new Error("来源凭据路径重复");
-    sourcePins[keyOf(file)] = { sha256: entry.sha256, kind: entry.kind, locator: entry.locator.trim() };
+    let observation;
+    if (entry.observation !== undefined) {
+      object(entry.observation, "获取回执凭据", ["file", "sha256"]);
+      const receipt = relativeName(entry.observation.file);
+      if (entry.kind === "synthetic" || !/^https?:\/\//i.test(entry.locator.trim())
+        || keyOf(receipt) === keyOf(file) || receiptsSeen.has(keyOf(receipt))
+        || Object.values(units).some(unit => keyOf(unit.candidate) === keyOf(receipt))
+        || !/^[a-f0-9]{64}$/.test(entry.observation.sha256 ?? "")) {
+        throw new Error("获取回执须为独立登记的只读文件，提供 SHA-256，不能由候选或验收回执自证");
+      }
+      observation = { file: receipt, sha256: entry.observation.sha256 };
+    }
+    sourcePins[keyOf(file)] = { sha256: entry.sha256, kind: entry.kind, locator: entry.locator.trim(), ...(observation ? { observation } : {}) };
   }
   for (const unit of Object.values(units)) {
     if (unit.requireSourcePins && ["first-review", "final-review"].some(phase =>
       unit.phases[phase].evidence.some(file => !sourcePins[keyOf(file)]))) throw new Error("本单元要求每份原始证据登记来源凭据");
   }
-  const protectedFiles = [...instructions, ...Object.values(units).flatMap(unit => [
+  const protectedFiles = [...instructions, ...Object.values(sourcePins).flatMap(pin => pin.observation ? [pin.observation.file] : []), ...Object.values(units).flatMap(unit => [
     unit.phases["first-review"].receipt, unit.phases["final-review"].receipt,
     ...unit.phases["first-review"].evidence, ...unit.phases["final-review"].evidence,
   ])];
