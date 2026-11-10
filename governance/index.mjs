@@ -267,7 +267,12 @@ export function apply(ctx, config = {}) {
         if (!(error instanceof CoverageRecordError) || !frame.changed) throw error;
         invalidation = error;
       }
-      if (frame.changed) commitWorkspaceState(stateHome,frame,buffer(frame.state));
+      if (frame.changed) {
+        // A projection can be regenerated without changing any ledger item.
+        // Give each actual publication a distinct authoritative commit point.
+        if (frame.ledgerWrites?.length) frame.state.ledgerCommit = randomUUID();
+        commitWorkspaceState(stateHome,frame,buffer(frame.state));
+      }
       if (invalidation) throw invalidation;
       return result;
     });

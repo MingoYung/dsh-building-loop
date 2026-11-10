@@ -117,14 +117,16 @@ export function recoverLedgerJournal(home, file, root, policy) {
     throw new Error("未完成账本事务的授权清单或日志不匹配，需维护者核对");
   }
   const isDigest = value => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
-  if (!isDigest(journal.after) || journal.before !== null && !isDigest(journal.before) || journal.before === journal.after ||
+  if (!isDigest(journal.after) || journal.before !== null && !isDigest(journal.before) ||
       !Array.isArray(journal.writes) || journal.writes.length < 2 || journal.writes.length > 4) {
     throw new Error("未完成账本事务的版本记录无效，需维护者核对");
   }
   const managed = historyPaths(journal.ledger);
   const allowed = new Set([journal.ledger, managed.log, managed.backup, managed.logBackup]);
   const state = stateDigest(readBytes(home, file, STATE_LIMIT));
-  const committed = state === journal.after;
+  // Older publications could have identical state bytes on both sides. With
+  // no durable commit point, restore their known before images for a safe retry.
+  const committed = journal.before !== journal.after && state === journal.after;
   if (!committed && state !== journal.before) throw new Error("未完成账本事务的宿主状态已变化，需维护者核对");
   const targets = journal.writes.map(item => {
     if (!item || !allowed.delete(item.file) || !isDigest(item.after)) throw new Error("未完成账本事务的写入范围无效，需维护者核对");

@@ -320,6 +320,16 @@ test("plain-language closing rejects appended examples including Markdown bullet
   assert.deepEqual(plainLastIssues({plainLast:false},["machine-only output"]),[]);
 });
 
+test("plain-language closing can follow a top-level block that ends a blockquote", () => {
+  const check = body => plainLastIssues({ plainLast: true }, body.split("\n"));
+  assert.deepEqual(check("> 参考摘要\n# 大白话\n按实际记录看结果。"), []);
+  assert.deepEqual(check("> 参考摘要\n```text\n示例\n```\n大白话：按实际记录看结果。"), []);
+  assert.equal(check("> 参考摘要\n大白话：仍是引用的延续。").length, 1);
+  assert.equal(check("> # 大白话\n> 仍在引用中。").length, 1);
+  assert.equal(check("> 参考摘要\n```text\n# 大白话\n这仍然是代码。\n```").length, 1);
+  assert.equal(check("> 参考摘要\n<!--\n# 大白话\n这仍然是注释。\n-->").length, 1);
+});
+
 test("plainLast defaults on and cannot pass by a model saying quality is supported",async()=>fixture(async(root,write)=>{
   single(write,{plainLast:true,body:"- C1：通过19/20（出处：functional.csv 第 2 行）。\n\n大白话：按记录看结果。\n\n附录文字。\n"});
   assert.equal(authority(root).units.K01.plainLast,true);

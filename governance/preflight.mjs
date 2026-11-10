@@ -141,6 +141,12 @@ function footnoteProse(lines) {
   return rows;
 }
 
+/** A lazy blockquote can continue a paragraph, but not a new heading or fence. */
+function interruptsLazyBlockquote(line, marker) {
+  return /^ {0,3}#{1,6}(?:[ \t]|$)/u.test(line)
+    || Boolean(marker && (marker[1][0] === "~" || !marker[2].includes("`")));
+}
+
 /** Bound required literals and authority fences to unambiguous live rows.
  * Preserve physical offsets, including wholly hidden rows for duplicate tests.
  * This conservatively excludes HTML, quotations and indented code rather
@@ -158,9 +164,11 @@ export function requiredLineMarkdown(lines) {
       }
       return "";
     }
-    if(!line.trim())quoted=false;
+    if(!line.trim()||quoted&&!comment&&!tags.length&&interruptsLazyBlockquote(line,marker))quoted=false;
     if(!comment&&!tags.length&&/^ {0,3}>/u.test(line))quoted=true;
-    if(quoted)return "";
+    // Keep tracking a bare HTML opener even while suppressing a possible lazy
+    // quote. A later heading or fence inside it cannot become visible prose.
+    if(quoted&&!comment&&!tags.length&&!/^ {0,3}<(?:!--|[A-Za-z][A-Za-z0-9-]*(?=[\s/>]))/u.test(line))return "";
     if(!comment&&!tags.length&&marker){
       fence={marker:marker[1]};
       if(!line.startsWith(" ")&&/^building-loop-required-lines\b/u.test(marker[2].trim())){
@@ -184,7 +192,7 @@ export function requiredLineMarkdown(lines) {
       if(token.startsWith("</")){if(tag===top)tags.pop();}
       else if(!/\/>$/u.test(token)&&!/^(?:br|hr|img|input|meta|link|wbr|source|area|base|col|embed|param|track)$/u.test(tag))tags.push(tag);
     }
-    return hidden?"":line;
+    return hidden||quoted?"":line;
   });
   const visible=footnoteProse(prose);
   return {fences,live:visible.map(line=>!!line.trim()),visible};
@@ -632,6 +640,7 @@ export function plainLastIssues(spec, lines) {
   let fence=null,html=0,comment=false,quoted=false,last=-1,section=false;
   for(const [index,line] of lines.entries()){
     const marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+    if(!fence&&!html&&!comment&&quoted&&interruptsLazyBlockquote(line,marker))quoted=false;
     if(marker){
       if(!fence)fence=marker[1];
       else if(marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;

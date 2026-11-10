@@ -85,6 +85,30 @@ test("configured intake fails closed on missing, malformed or duplicate active p
   assert.equal(requiredLineCheck(frame, "K01", Buffer.from(literal)).proof.passed, true);
 }));
 
+test("a top-level goal fence and required prose can interrupt a blockquote without a blank line", async () => fixture(async (root, write) => {
+  configure(write, configured);
+  write("overview.md", "> 项目背景\n" + fence(JSON.stringify(configured)));
+  write("candidate.md", "> 参考摘要\n# 正文\n" + literal + "\n" + c1 + "\n");
+  const h = host(root), executor = await intake(h);
+  assert.equal((await h.flow(executor, "submit")).phase, "review-ready");
+
+  const frame = { root, policy: authority(root) };
+  const check = body => requiredLineCheck(frame, "K01", Buffer.from(body));
+  for (const hidden of [
+    "> 参考摘要\n" + literal,
+    "> 参考摘要\n> " + literal,
+    "> 参考摘要\n<details>\n# 折叠内容\n" + literal + "\n</details>",
+    "> 参考摘要\n<!--\n# 注释标题\n" + literal + "\n-->",
+  ]) {
+    assert.equal(check(hidden).proof.passed, false, hidden);
+  }
+  const quotedContract = fence(JSON.stringify(configured)).trimEnd().split("\n").map(line => "> " + line).join("\n");
+  write("overview.md", quotedContract + "\n");
+  assert.throws(() => check(literal), /requiredLinesGoal/);
+  write("overview.md", "> 项目背景\n<!--\n# 注释标题\n" + fence(JSON.stringify(configured)) + "-->\n");
+  assert.throws(() => check(literal), /requiredLinesGoal/);
+}));
+
 test("G2 preflight and submit enforce exact once on live physical lines while allowing movement and CRLF", async () => fixture(async (root, write) => {
   configure(write);
   write("candidate.md", wrong + "\n");

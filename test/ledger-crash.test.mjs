@@ -44,10 +44,10 @@ async function scenario(root, write) {
 }
 
 /** Terminate a separate real Node process on an exact production rename. */
-function crashAt(root, fixture, target, phase) {
+function crashAt(root, fixture, target, phase, action = "review") {
   const source = `import fs from "node:fs"; import path from "node:path";
 import { host } from ${JSON.stringify(new URL("./helpers.mjs", import.meta.url).href)};
-const [root,target,phase,decisions] = process.argv.slice(1);
+const [root,target,phase,decisions,action] = process.argv.slice(1);
 const h=host(root),rename=fs.renameSync;
 fs.renameSync=(from,to)=>{
   if(path.resolve(to)!==target)return rename(from,to);
@@ -55,10 +55,10 @@ fs.renameSync=(from,to)=>{
   fs.writeSync(1,"terminated before returning from "+phase+" rename\\n");
   process.kill(process.pid,"SIGKILL");
 };
-await h.ledger("root","review",{decisions:JSON.parse(decisions)});
+await h.ledger("root",action,{decisions:JSON.parse(decisions)});
 throw new Error("crash point was not reached");`;
   const result = spawnSync(process.execPath, ["--input-type=module", "--eval", source, root, target, phase,
-    JSON.stringify(fixture.decisions)], { env: process.env, encoding: "utf8", timeout: 10_000 });
+    JSON.stringify(fixture.decisions), action], { env: process.env, encoding: "utf8", timeout: 10_000 });
   assert.ifError(result.error);
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, new RegExp("terminated before returning from " + phase + " rename"), result.stderr);
@@ -106,6 +106,86 @@ test("hard exit after committed state keeps the published matching projection an
   assert.deepEqual(fs.readFileSync(f.statePath + ".bak"), f.stateBefore);
   assert.deepEqual(files.map(file => readBytes(root, file)), published);
   assert.equal(fs.existsSync(f.statePath + ".ledger-txn"), false);
+}));
+
+test("hard exit before unchanged-revision ledger regeneration commits restores pre-export bytes", async () => fixture(async (root, write) => {
+  const f = await scenario(root, write);
+  // The snapshot may be locally restored or removed while its authoritative
+  // projection and ledger revision remain current. Export regenerates it.
+  write("ledger.md", "# 先前保留的账本副本\n");
+  const previous = files.map(file => readBytes(root, file));
+  crashAt(root, f, f.statePath, "before", "export");
+  const journal = JSON.parse(fs.readFileSync(f.statePath + ".ledger-txn", "utf8"));
+  assert.equal(journal.before, digest(f.stateBefore));
+  assert.deepEqual(readBytes(root, "ledger.md"), f.before[0]);
+  assert.deepEqual(fs.readFileSync(f.statePath), f.stateBefore);
+  const restarted = host(root);
+  const status = await restarted.flow("root", "status");
+  assert.equal(status.blocked, undefined, `Recovery rejected journal ${journal.before} → ${journal.after}`);
+  assert.equal(status.units[0].phase, "ledger-review");
+  assert.notEqual(journal.before, journal.after);
+  assert.deepEqual(files.map(file => readBytes(root, file)), previous);
+  assert.deepEqual(fs.readFileSync(f.statePath + ".bak"), f.backupBefore);
+  assert.equal(fs.existsSync(f.statePath + ".ledger-txn"), false);
+  assert.equal((await restarted.ledger("root", "export")).changed, true);
+  assert.deepEqual(readBytes(root, "ledger.md"), f.before[0]);
+}));
+
+test("hard exit after unchanged-revision ledger regeneration commits keeps the regenerated snapshot", async () => fixture(async (root, write) => {
+  const f = await scenario(root, write);
+  write("ledger.md", "# 先前保留的账本副本\n");
+  crashAt(root, f, f.statePath, "after", "export");
+  const journal = JSON.parse(fs.readFileSync(f.statePath + ".ledger-txn", "utf8"));
+  const published = files.map(file => readBytes(root, file));
+  const committed = fs.readFileSync(f.statePath);
+  assert.equal(journal.before, digest(f.stateBefore));
+  assert.equal(journal.after, digest(committed));
+  assert.deepEqual(JSON.parse(committed).ledger, JSON.parse(f.stateBefore).ledger);
+  assert.deepEqual(published[0], f.before[0]);
+  const restarted = host(root);
+  const status = await restarted.flow("root", "status");
+  assert.equal(status.blocked, undefined, `Recovery rejected journal ${journal.before} → ${journal.after}`);
+  assert.equal(status.units[0].phase, "ledger-review");
+  assert.notEqual(journal.before, journal.after);
+  assert.equal((await restarted.ledger("root", "export")).changed, false);
+  assert.deepEqual(files.map(file => readBytes(root, file)), published);
+  assert.deepEqual(fs.readFileSync(f.statePath), committed);
+  assert.deepEqual(fs.readFileSync(f.statePath + ".bak"), f.stateBefore);
+  assert.equal(fs.existsSync(f.statePath + ".ledger-txn"), false);
+}));
+
+test("a legacy equal-hash regeneration journal restores only known before bytes", async () => fixture(async (root, write) => {
+  const f = await scenario(root, write);
+  write("ledger.md", "# 先前保留的账本副本\n");
+  const previous = files.map(file => readBytes(root, file));
+  assert.equal((await f.h.ledger("root", "export")).changed, true);
+  const published = files.map(file => readBytes(root, file));
+
+  // Model the old residue after all projection files were published. The
+  // legacy writer stored identical state bytes on both sides of the rename.
+  const legacy = JSON.parse(f.stateBefore);
+  delete legacy.ledgerCommit;
+  const legacyState = Buffer.from(JSON.stringify(legacy, null, 2) + "\n");
+  fs.writeFileSync(f.statePath, legacyState);
+  fs.writeFileSync(f.statePath + ".bak", legacyState);
+  const stateHash = digest(legacyState);
+  const journalPath = f.statePath + ".ledger-txn";
+  fs.writeFileSync(journalPath, JSON.stringify({
+    spec: "building-loop-ledger-transaction/1", policy: legacy.policy, ledger: "ledger.md",
+    before: stateHash, after: stateHash, backupBefore: f.backupBefore.toString("base64"),
+    writes: [1, 0].map(i => ({ file: files[i], before: previous[i].toString("base64"), after: digest(published[i]) })),
+  }));
+
+  const restarted = host(root);
+  const status = await restarted.flow("root", "status");
+  assert.equal(status.blocked, undefined);
+  assert.equal(status.units[0].phase, "ledger-review");
+  assert.deepEqual(files.map(file => readBytes(root, file)), previous);
+  assert.deepEqual(fs.readFileSync(f.statePath), legacyState);
+  assert.deepEqual(fs.readFileSync(f.statePath + ".bak"), f.backupBefore);
+  assert.equal(fs.existsSync(journalPath), false);
+  assert.equal((await restarted.ledger("root", "export")).changed, true);
+  assert.deepEqual(readBytes(root, "ledger.md"), f.before[0]);
 }));
 
 test("a second hard exit during recovery resumes from already restored byte pairs", async () => fixture(async (root, write) => {
