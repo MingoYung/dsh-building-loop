@@ -175,13 +175,24 @@ test("supplement preflight and submit block wrong compound stats and expose actu
     "行号定位 2 行：带 functional.csv 的行号定位为第 1,3 行；同带 [模拟] 2 行：第 1,3 行。");
   await h.file(executor,"write","candidate.md",{content:wrong,note:"把统计移到收尾说明之前。"});
   const beforeRead=await h.flow(executor,"preflight");
+  assert.equal(beforeRead.ok,false,"A stale full read cannot make current preflight ready.");
+  assert.deepEqual(beforeRead.pendingRead,{file:"candidate.md",reason:"current-candidate-read-required"});
+  assert.match(beforeRead.issues[0],/完整读回当前候选文件/);
   assert.equal(beforeRead.citationLineCounts,undefined,"The changed draft must be read before measuring.");
   assert.equal(beforeRead.citationProfileChecks,undefined);
+  await h.file(executor,"read","candidate.md",{start:2,count:3});
+  const partial=await h.flow(executor,"preflight");
+  assert.equal(partial.ok,false);
+  assert.deepEqual(partial.pendingRead,beforeRead.pendingRead);
+  assert.equal(partial.citationProfileChecks,undefined,"A partial current read cannot authorize measurement.");
+  await assert.rejects(h.flow(executor,"submit",{quality:quality()}),/请先完整读回当前候选文件/);
+  assert.equal((await h.flow(executor,"status")).phase,"supplement");
   await h.flow(executor,"prepare");
   await assert.rejects(h.flow(executor,"submit",{quality:quality()}),/第 5 行组合稿件统计不符.*物理行号为 1、2、3/);
   assert.equal((await h.flow(executor,"status")).phase,"supplement");
   const bad=await h.flow(executor,"preflight");
   assert.equal(bad.ok,false);
+  assert.equal(bad.pendingRead,undefined);
   assert.equal(bad.citationProfileChecks.candidateSha256,digest(wrong));
   assert.deepEqual(bad.citationProfileChecks.clauses.filter(row=>!row.matches).map(row=>[row.profileClause,row.actual,row.lines]),[
     ["citation-lines",3,[1,2,3]],["marked-citation-lines",2,[2,3]],
@@ -196,6 +207,7 @@ test("supplement preflight and submit block wrong compound stats and expose actu
   await h.flow(executor,"prepare");
   const good=await h.flow(executor,"preflight");
   assert.equal(good.ok,true);
+  assert.equal(good.pendingRead,undefined);
   assert.equal(good.citationProfileChecks.candidateSha256,digest(corrected));
   assert.ok(good.citationProfileChecks.clauses.length===4&&good.citationProfileChecks.clauses.every(row=>row.matches));
   assert.equal((await h.flow(executor,"submit",{quality:quality()})).phase,"final-review-ready");
@@ -305,6 +317,11 @@ test("plainLast defaults on and cannot pass by a model saying quality is support
   const result=await h.flow(reviewer,"review",{checks});assert.equal(result.phase,"supplement-ready");assert.deepEqual(result.qualityRejected,["plain"]);
   const executor=(await h.flow("root","advance")).childId;await h.flow(executor,"prepare");
   assert.equal((await h.flow(executor,"preflight")).ok,false);
+  await h.file(executor,"write","candidate.md",{content:"- C1：通过19/20（出处：functional.csv 第 2 行）。\n\n附录仍在末尾。\n",note:"改变正文但暂未补收尾。"});
+  const pending=await h.flow(executor,"preflight");
+  assert.equal(pending.ok,false);
+  assert.equal(pending.pendingRead.file,"candidate.md");
+  assert.ok(pending.issues.some(issue=>issue.includes("正文末尾须有")),"Existing format issues remain available while the current read is pending.");
   await h.file(executor,"write","candidate.md",{content:"- C1：通过19/20（出处：functional.csv 第 2 行）。\n\n附录文字。\n\n大白话：按记录看结果。\n",note:"将解释放在最后，保留正确正文。"});
   await h.flow(executor,"prepare");
   const checked=await h.flow(executor,"preflight");

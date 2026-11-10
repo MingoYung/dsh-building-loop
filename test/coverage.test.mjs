@@ -707,6 +707,123 @@ const countList020834Z=[
 ].join("\n");
 const synthetic020834Z="# 合成逻辑样例；不是外部研究、生产日志或真实效果数据\n记录 A：status=completed，conclusion=failure。\n模拟观测组：训练时长与分数正相关；没有随机分配，也没有排除其他共同影响因素。\n本例分级规则：如果一个样本是 A 级，则该样本应送复核。\n本例对象：样本 X 是 A 级。\n";
 
+const scope063221Z="[模拟] 按本例规则只能由 A 级推出应送复核，不能反推，所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级（出处：sources/synthetic.md 第 4-5 行）。";
+const draft063221Z=[
+  "# 检查结果与观测说明",
+  "- C1：GitHub 的 completed 状态可以对应 failure 结论（出处：sources/github-checks.md 第 6-8 行）。",
+  "- C2：NIST 指出，相关不必然说明因果（出处：sources/nist-scatter.md 第 6 行）；该页原文写“association does NOT imply causality.”，含义同此（出处：sources/nist-scatter.md 第 6 行）。",
+  "- C3：按本例规则，样本 X 是 A 级，因此样本 X 应送复核（出处：sources/synthetic.md 第 4-5 行）。",
+  "[模拟] completed 只表示状态字段已完成，对应的 conclusion 可能是 failure，也可能是 success，不能由完成状态推出成功（出处：sources/synthetic.md 第 2 行；sources/github-checks.md 第 6-8 行）。",
+  "[模拟] 模拟观测组只能报告正相关；该记录没有随机分配、也没有排除其他共同影响因素，因此不能确定训练导致分数提高（出处：sources/synthetic.md 第 3 行）。",
+  scope063221Z,
+  "[模拟] 就 sources/synthetic.md 的模拟观测记录而言，只能报告相关，不能单凭该记录确定因果（出处：sources/synthetic.md 第 3 行；sources/nist-scatter.md 第 6 行）。",
+  "[推测] 后续可以考虑通过更合适的研究设计检验原因。",
+  "- C4：GitHub 登记摘录中，completed 状态下的 conclusion 举例列有 failure 和 success（出处：sources/github-checks.md 第 6-8 行）。",
+  "- [摘录范围] 本轮登记的 sources/nist-scatter.md 含 1 条 NIST 页面短摘录。",
+  "错例：记录 A 已完成，所以记录 A 必定成功（出处：sources/synthetic.md 第 2 行）。",
+  "- [稿件自述] 行号定位 6 行：带 sources/synthetic.md 的行号定位为第 4,5,6,7,8,12 行；同带 [模拟] 4 行：第 5,6,7,8 行。",
+  "大白话：把完成状态、实际结果和证据能说明的范围分开看。", "",
+].join("\n");
+const caseFile="sources/synthetic.md";
+const boundedPart={kind:"inference",status:"supported",sourceRelation:"supports",basis:"同一规则只规定分类能推出复核，其他复核对象仍有不同分类的可能。"};
+
+/** Use a current pinned synthetic source and the normal inventory/record entry. */
+function caseFixture(root,write,body,source=synthetic020834Z,firstOnly=false) {
+  const e=objectEnvironment(root,write,body,{sources:{[caseFile]:source}});
+  e.frame.policy.sourcePins[keyOf(caseFile)]={kind:"synthetic",locator:"synthetic:bounded-test",sha256:digest(source)};
+  if(firstOnly) {
+    e.active.phase="first-review";
+    e.frame.reads=e.spec.phases["first-review"].read;
+    e.active.seen={};
+    delete e.active.coverage;
+    for(const file of e.frame.reads)e.read(file);
+  }
+  const target=e.invoke("inventory",{count:24}).blocks.find(b=>b.text.includes("按本例规则只能由"));
+  const record=(...parts)=>e.invoke("record",{entries:[{block:target.id,parts}]});
+  const saved=()=>e.invoke("status",{block:target.id}).record;
+  return {...e,target,record,saved};
+}
+
+test("063221Z preserves the original valid rule non-entailment and retires its false author finding",async()=>fixture(async(root,write)=>{
+  assert.equal(digest(draft063221Z),"75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f");
+  const e=caseFixture(root,write,draft063221Z),{target}=e;
+  assert.equal(target.id,"B10-1aa3ca1c");
+  assert.equal(target.line,7);
+  const tail="，所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级";
+  assert.equal(target.inferenceHint.quote,tail);
+  assert.deepEqual(target.inferenceHint.source,{file:caseFile,start:4,end:5});
+  const prefix={...fact,quote:target.text.slice(0,target.text.indexOf(tail)),evidence:[{
+    file:caseFile,start:4,end:4,quote:synthetic020834Z.split("\n")[3],
+  }]};
+  const locator={...nonfact,quote:target.text.slice(target.text.indexOf(tail)+tail.length)};
+  const old={...boundedPart,quote:tail,status:"unsupported",sourceRelation:"insufficient",finding:{
+    kind:"invalid-inference",quote:tail.slice(1),fix:"删除‘所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级’。",
+  }};
+  assert.throws(()=>e.record(prefix,old,locator),/‘不能说明’成立.*只改核验状态/);
+  assert.equal(e.invoke("status").rejected.length,0);
+  assert.throws(()=>e.record(prefix,{...nonfact,quote:tail},locator),/须以 inference 连续覆盖/);
+  e.record(prefix,{...boundedPart,quote:tail},locator);
+  const record=e.saved(),proof=record.parts[1].inference;
+  assert.equal(proof.rule,"bounded-non-entailment");
+  assert.equal(proof.nonEntailment.kind,"non-entailment");
+  assert.equal(proof.nonEntailment.holds,true);
+  assert.deepEqual(proof.nonEntailment.witnesses,[{otherAntecedent:false,otherConsequent:true,otherObservedAction:true},
+    {otherAntecedent:true,otherConsequent:true,otherObservedAction:true}]);
+  assert.deepEqual(proof.premises.map(r=>[r.file,r.start,r.end,r.quote]),[4,5].map(i=>[caseFile,i,i,synthetic020834Z.split("\n")[i-1]]));
+  assert.equal(proof.nonEntailment.assertion.quoteSha256,digest(tail));
+  assert.equal(e.invoke("status").rejected.length,0);
+  requireStoredObjectChecks(e.frame,e.spec,[{records:[record]}],Buffer.from(draft063221Z));
+  write(caseFile,synthetic020834Z.replace("样本 X 是 A 级","样本 Y 是 A 级"));
+  assert.throws(()=>requireStoredObjectChecks(e.frame,e.spec,[{records:[record]}],Buffer.from(draft063221Z)),/证明失效/);
+}));
+
+test("same one-way premises cannot establish the affirmative opposite and preserve the exact finding",async()=>fixture(async(root,write)=>{
+  const opposite="就能说明其他送复核的样本都不是 A 级";
+  const body=scope063221Z.replace("并不能说明其他送复核的样本也是 A 级",opposite)+"\n";
+  const e=caseFixture(root,write,body,synthetic020834Z,true);
+  assert.equal(e.target.inferenceHint.rule,"bounded-non-entailment");
+  assert.throws(()=>e.record(boundedPart),/前提无法支持‘其他都不是’/);
+  const wrong={...boundedPart,status:"unsupported",sourceRelation:"insufficient",
+    finding:{kind:"invalid-inference",quote:opposite,fix:"把肯定否定结论改成不能由本例材料确定其他对象分类。"}};
+  assert.throws(()=>e.record({...wrong,sourceRelation:"contradicts"}),/并未证明现实中的其他对象/);
+  assert.throws(()=>e.record({...wrong,finding:{...wrong.finding,quote:"不能反推"}}),/不能退回前面正确的单向规则/);
+  e.record(wrong);
+  const rejected=e.finish().rejected;
+  assert.equal(rejected.length,1);
+  assert.equal(rejected[0].finding.quote,opposite);
+  assert.equal(rejected[0].boundedNonEntailment.kind,"opposite");
+  assert.equal(rejected[0].boundedNonEntailment.holds,false);
+  assert.deepEqual(rejected[0].repairBaseline.refs.map(ref=>[ref.start,ref.end]),[[4,4],[5,5],[4,5]]);
+}));
+
+test("bounded inference requires the same cited rule, classification, action, object and current reads",async()=>fixture(async(root,write)=>{
+  const alternate=scope063221Z.replaceAll("A 级","B 类").replaceAll("样本","申请").replaceAll(" X "," R7 ").replaceAll("送复核","进入审核");
+  const alternateSource=synthetic020834Z.replaceAll("A 级","B 类").replaceAll("样本","申请").replaceAll(" X "," R7 ").replaceAll("送复核","进入审核");
+  let e=caseFixture(root,write,alternate,alternateSource);
+  assert.ok(e.target.inferenceHint);
+  delete e.active.seen[keyOf(caseFile)];
+  assert.throws(()=>e.record(boundedPart),/本轮实际读过的当前原文行/);
+  e.read(caseFile);e.record(boundedPart);
+  assert.equal(e.saved().parts[0].inference.nonEntailment.object,"R7");
+  for(const invalidSource of [
+    alternateSource.replace("申请 R7 是 B 类","申请 R8 是 B 类"),
+    alternateSource.replace("应进入审核","应进入复查"),
+    alternateSource.replace("，则该申请应进入审核。","，则该申请应进入审核；反之亦然。"),
+  ]) {
+    e=caseFixture(root,write,alternate,invalidSource);
+    assert.throws(()=>e.record(boundedPart),/推导需明确 rule/);
+  }
+  for(const changed of [
+    alternate.replace("其他进入审核","其他进入复查"),
+    alternate.replace("也是 B 类","也是 B 类并且更安全"),
+    alternate.replace("第 4-5 行","第 4-6 行"),
+  ]) {
+    e=caseFixture(root,write,changed,alternateSource);
+    assert.equal(e.target.inferenceHint,undefined);
+    assert.throws(()=>e.record(boundedPart),/推导需明确 rule/);
+  }
+}));
+
 // Immutable draft from 053234Z; line 13 produced two separate review blocks.
 const profile053234Z=[
   "# 检查结果与观测说明",

@@ -48,13 +48,14 @@ const RULES = {
   "final-audit": "修订稿独立反证复核。重新核全文与逐项推导，正确内容保留，证据不足写明确最小修正。核完用 building_loop audit 提交。",
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
-const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选中实际存在的原句片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后 review 逐条 checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
+const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选编号行内实际有问题的逐字正文片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后 review 逐条 checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
 const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
 const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据；候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
 // Semantic alignment is an explicit review duty, not a host claim that quote
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
 const OBJECT_RULE="区分三个证据对象：外部事实用实际原文 evidence；已登记摘录的数量、成员或逐字范围用 direct.objectCheck 的 registered-excerpts；当前稿引用行数或逐处标记用 direct.objectCheck 的 candidate。inventory 给出 objectCheckHint 时，按原样作为该块 direct.objectCheck，只填提示里的 kind/check/source。组合统计的两块分别提交，宿主从当前原句逐项核数量、完整行号、错例注记和同源标记子集。已登记摘录无某字面不证明完整网页没有该内容，稿件自述也不能用外部标题证明。纯定位、编号和格式边界不另作事实；错例后说明及大白话若含事实仍逐项核。";
+const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
 const EXAMPLE_RULE = '原句明确以“误读：”“错例：”“错误推理：”或 [误读]/[错例] 开头时，按 error-example 单列：sourceRelation 核其中展示的推理是 contradicts 或 insufficient，evidence 给实际反证或不足依据。宿主保留它作为已标注的错例，不作为已证前提；不要求作者为了核验换一个同义标签。没有显式标签绝不能用此分类。';
 const LITERAL_RULE = '每个事实段还须 sourceRelation=supports|contradicts|insufficient，单独判断原文对这句话字面含义的关系。不得猜测作者有意举反例、在做测试或暗含否定；正文没有明确标注错误，就当成作者提出的断言。识别到原文与断言相反必须退回，不能一边说矛盾一边 supported。inventory 标 requiresInference 的块中有明确推导关系，推导片段用 inference 并交证明；不能把两个前提的组合叫直接转述来省证明。原文引句须逐字，但候选可以忠实翻译或同义转述，不要求字字相同。';
 const NEUTRAL_SPAN_RULE = "清单的 neutralSpans 是宿主从当前原文识别的纯标签或有限读者提示。仍须逐字覆盖这些范围，用 nonfactual + supported + 具体 basis；不为格式或阅读动作找外部引句。只按给出的字符范围处理，标签后未覆盖的数量、条件、事实和推导照常核验。 行首 [模拟] 是来源范围声明。把该标签本身用 direct 核对同一引用来源的模拟声明或已核对的合成来源凭据，余下断言按 direct/inference 各自举证。";
@@ -800,9 +801,8 @@ export function apply(ctx, config = {}) {
   /** Attach bounded manuscript measurements after this actor has read the current version. */
   function candidateMeasurements(frame,active,spec,bytes) {
     const lines=lineList(bytes);
-    const observed=active.seen?.[keyOf(spec.candidate)];
     const selfClaims=lines.filter(line=>/\[稿件自述\]/u.test(line));
-    if(selfClaims.length&&observed?.hash===digest(bytes)&&observed.ranges.some(([a,b])=>a===1&&b>=lines.length)) {
+    if(selfClaims.length&&candidateReadComplete(active,spec.candidate,bytes,lines.length)) {
       // These are current manuscript counts from an authorized candidate read.
       // They do not certify any other part of the author's claim or the source.
       const evidence=spec.phases[active.phase].evidence??spec.phases["final-review"].evidence;
@@ -834,8 +834,15 @@ export function apply(ctx, config = {}) {
    * authorized source names. These results create no new stored review debt.
    */
   function preflightCandidate(frame,active,spec,bytes) {
+    const lines=lineList(bytes);
+    const result=supplementChecks(frame.root,spec,lines,frame.reads,active);
+    if(!candidateReadComplete(active,spec.candidate,bytes,lines.length)) {
+      // Repair diagnostics can already be useful, but current-draft statistics
+      // and submit both require an observed full read of these exact bytes.
+      return {...result,ok:false,issues:["请先完整读回当前候选文件 "+spec.candidate,...result.issues],
+        pendingRead:{file:spec.candidate,reason:"current-candidate-read-required"}};
+    }
     const counts=candidateMeasurements(frame,active,spec,bytes);
-    const result=supplementChecks(frame.root,spec,lineList(bytes),frame.reads,active);
     if(!counts.length)return result;
     const profiles=candidateCitationProfiles(bytes,counts.map(row=>row.source),spec.candidate);
     if(!profiles.length)return {...result,citationLineCounts:counts};
@@ -866,8 +873,7 @@ export function apply(ctx, config = {}) {
       } else if (args.action === "submit" && frame.role === "executor") {
         const bytes = readBytes(frame.root, spec.candidate);
         if (!bytes) throw new Error("候选文件尚未交付");
-        const seen = active.seen[keyOf(spec.candidate)];
-        if (seen?.hash !== digest(bytes) || !seen.ranges.some(([a, b]) => a === 1 && b >= lineList(bytes).length)) {
+        if (!candidateReadComplete(active,spec.candidate,bytes)) {
           throw new Error("请先完整读回当前候选文件");
         }
         if (active.phase === "supplement") {
@@ -1107,7 +1113,8 @@ export function apply(ctx, config = {}) {
         end: { ...number, description: "supported 或 contradiction 必填。原文结束行，1 起计，与 id/status 同级。" },
         basis: { ...string, description: "为何支持或为何不足" },
         finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence","contradiction","scope"] },
-          quote: string, fix: string }, required: ["kind","quote","fix"], additionalProperties: false },
+          quote: { ...string, description: "从当前候选的对应编号行逐字复制有问题的正文片段，优先只填正文。" },
+          fix: string }, required: ["kind","quote","fix"], additionalProperties: false },
       }, required: ["id", "status", "basis"], additionalProperties: false,
     } },
     quality: { type: "object", properties: qualityFields, required: qualityNames, additionalProperties: false },
@@ -1150,7 +1157,7 @@ export function apply(ctx, config = {}) {
         return [descriptor, rule, "本阶段先 building_loop prepare 获取真实可见读包和参数契约；pending仍有页就继续prepare或按行read。已读且版本未变不需重复读。交付后宿主结束本轮，不额外收尾或通知。",
           ...(frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
           ...(frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 完成后最终只提交 building_loop {"action":"audit"}，unit可省略；不要重复发送 checks、quality、note 或全文。宿主从已落盘证明生成回执。'] : []),
-          ...(["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, OBJECT_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
+          ...(["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
           ...(phase === "supplement" || frame.role === "reviewer" ? [QUALITY_RULE] : []),
           ...(assignment && unitOf(frame,assignment[0]).plainLast ? ["正文最后一个实质段须明确标为大白话或直白说明，错例、出处和附录放在它之前。"] : []),
           "文件与阶段用 building_loop 和 building_loop_file。" + (frame.role === "reviewer" ? "质量判断用 building_loop_quality。" : ""),
@@ -1177,11 +1184,16 @@ function mergeRanges(ranges) {
   return merged;
 }
 
+/** A partial read or a complete read of stale bytes cannot establish readiness. */
+function candidateReadComplete(active,file,bytes,lineCount=lineList(bytes).length) {
+  const seen=active.seen?.[keyOf(file)];
+  return seen?.hash===digest(bytes)&&seen.ranges.some(([start,end])=>start===1&&end>=lineCount);
+}
+
 /** 验收必须完整读过当前候选，禁止沿用旧版本阅读记录。 */
 function reviewCandidate(frame, active, spec) {
   const bytes = readBytes(frame.root, spec.candidate);
-  const seen = active.seen[keyOf(spec.candidate)];
-  if (!bytes || seen?.hash !== digest(bytes) || !seen.ranges.some(([a, b]) => a === 1 && b >= lineList(bytes).length)) {
+  if (!bytes || !candidateReadComplete(active,spec.candidate,bytes)) {
     throw new Error("验收前须完整读取当前候选正文");
   }
   return bytes;
@@ -1238,6 +1250,29 @@ function validateRevisions(frame, active, revisions, fields) {
   return results;
 }
 
+/** Bind a rejection to literal bytes of the currently read row. A copied
+ * Markdown/ID prefix is removable only when it exactly starts that unique row.
+ */
+function reviewFinding(id, finding, row, numberedText) {
+  const context = () => row
+    ? "。候选第 " + row.line + " 行正文" + (row.body.length > 240 ? "（前 240 个字符）" : "")
+      + "为 " + JSON.stringify(row.body.slice(0, 240)) + "，从该行复制实际有问题的片段"
+    : "。请用当前候选的唯一编号或实际候选行号定位";
+  if (!finding || !["missing-evidence", "contradiction", "scope"].includes(finding.kind)) {
+    throw new Error(id + " 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope" + context());
+  }
+  let quote = finding.quote;
+  if (typeof quote === "string" && numberedText && !row.body.includes(quote) && numberedText.startsWith(quote)) {
+    // claimRow has already selected the unique numbered row. Strip only the
+    // actual prefix, retaining the exact reported span and its punctuation.
+    quote = quote.slice(numberedText.length - row.body.length);
+  }
+  if (typeof quote !== "string" || !quote.trim() || !row?.body.includes(quote)) {
+    throw new Error(id + " 的 finding.quote 未绑定当前候选正文" + context() + "。请在原核验阶段更正参数");
+  }
+  return { kind: finding.kind, quote, fix: requireText(finding.fix, "事实最小修正") };
+}
+
 /** 覆盖项目最低断言与候选新增编号，再核每项原始出处。 */
 function reviewChecks(frame, active, spec, grant, checks, candidate) {
   if (!Array.isArray(checks) || checks.length > 64) throw new Error("核验须逐条提交检查结果");
@@ -1255,20 +1290,17 @@ function reviewChecks(frame, active, spec, grant, checks, candidate) {
     const check = byId.get(id);
     if (!check) throw new Error("核验参数缺少 " + id + " 的结果，请补齐 checks；未提交结果不等于候选事实错误");
     const basis = requireText(check.basis, "核验依据", 600);
-    const reject = Number.isSafeInteger(check.line) ? { id, status: "unsupported", line: check.line } : { id, status: "unsupported" };
     if (check.status !== "supported") {
-      const finding = check.finding;
-      const row = claimRow(candidate, id) ?? (check.line ? { body: candidate[check.line-1] ?? "" } : null);
-      if (!finding || !["missing-evidence","contradiction","scope"].includes(finding.kind)
-        || typeof finding.quote !== "string" || !finding.quote.trim() || !row?.body.includes(finding.quote)) {
-        throw new Error(id + " 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported");
-      }
-      const fix = requireText(finding.fix, "事实最小修正");
+      const numbered = claimRow(candidate, id);
+      const line = Number.isSafeInteger(check.line) ? check.line : null;
+      if (numbered && line !== null && line !== numbered.line) throw new Error(id + " 的候选行号应为 " + numbered.line + "，请在原核验阶段更正参数");
+      const row = numbered ?? (line >= 1 && line <= candidate.length ? { body: candidate[line - 1], line } : null);
+      const finding = reviewFinding(id, check.finding, row, numbered && candidate[numbered.line - 1]);
       if (finding.kind === "contradiction" && (typeof check.file !== "string" || !Number.isSafeInteger(check.start) || !Number.isSafeInteger(check.end))) {
         throw new Error(id + " 的反证参数不完整：file、start、end 必须与 id/status 同级，不能放在 finding 内；请修正参数后在原核验阶段重试");
       }
       const counterEvidence = finding.kind === "contradiction" ? evidenceReference(frame, active, spec, check) : undefined;
-      return { ...reject, basis, finding: { kind:finding.kind, quote:finding.quote, fix }, ...(counterEvidence ? { counterEvidence } : {}) };
+      return { id, status: "unsupported", line: row.line, basis, finding, ...(counterEvidence ? { counterEvidence } : {}) };
     }
     // A malformed evidence selection belongs to the reviewer. Do not convert it
     // into a factual rejection that forces an already-correct candidate to change.

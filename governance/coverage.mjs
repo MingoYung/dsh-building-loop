@@ -5,7 +5,7 @@ import { evidenceReference, registeredObservation, UnobservedExcerptError } from
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 4;
+export const CLASSIFICATION_VERSION = 5;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -150,6 +150,97 @@ function sourceQuote(frame, active, spec, value) {
   // Preserve per-line citations instead of inventing a bridge between excerpts.
   if (ref.origin?.observation && /[\r\n]/u.test(value.quote)) throw new Error("登记的独立来源摘录不能用跨行 quote 拼成连续原话，请逐行分别引用");
   return { ...ref, quote: value.quote };
+}
+
+// A classification and a review action are different predicates. Restrict the
+// mechanical grammar to those two types, with the same entity, case and verbs
+// throughout. Open-ended terms or extra premises stay with the two reviewers.
+const caseClass = "[A-Za-z0-9]{1,12}\\s*[级类]";
+const caseAction = "(?:送|提交|进入|接受)(?:复核|审核|检查|复查|复审|验收)";
+const caseNoun = "(?:样本|对象|项目|记录|申请)";
+const caseText = new RegExp("^\\s*(?:[-*+]\\s+)?(?:\\[模拟\\]\\s*)?按本例规则只能由\\s*(?<level>"+caseClass+
+  ")\\s*推出\\s*(?<modal>应|需|须)(?<action>"+caseAction+")\\s*[，,]\\s*不能反推(?<tail>[，,]\\s*所以\\s*(?<noun>"+caseNoun+
+  ")\\s*(?<object>[A-Za-z0-9][A-Za-z0-9_-]{0,31})\\s*\\k<modal>\\k<action>(?:(?:并)?不能(?:说明|推出)其他\\s*\\k<action>的\\k<noun>(?:也)?(?:是|为)\\s*\\k<level>|(?<opposite>就能(?:说明|推出)其他\\s*\\k<action>的\\k<noun>都不是\\s*\\k<level>)))(?<locator>\\s*[（(](?:出处|来源)\\s*[:：]\\s*[^（）()\\r\\n]+[）)])\\s*[。.]?$", "du");
+
+/** Match one explicit same-block case and one exact adjacent authorized range.
+ * Retain physical offsets from the original bytes rather than normalized text.
+ */
+function boundedCase(block, grant) {
+  const match=caseText.exec(block?.text??"");
+  if(!match)return null;
+  const locator=match.groups.locator.trim().slice(1,-1).replace(/^(?:出处|来源)\s*[:：]\s*/u,"").trim().replaceAll("\\","/");
+  for(const file of grant.evidence) {
+    const exact=new RegExp("^"+regexLiteral(file)+"\\s*第\\s*\\d+\\s*[-–—至到]\\s*\\d+\\s*行$",process.platform==="win32"?"iu":"u");
+    if(!exact.test(locator)||!includes(grant.read,file))continue;
+    const range=citation(locator,file);
+    if(!range||range.end!==range.start+1)return null;
+    const {level,modal,action,noun,object,opposite}=match.groups;
+    return {file,...range,level,modal,action,noun,object,opposite,kind:opposite?"opposite":"non-entailment",tail:match.indices.groups.tail};
+  }
+  return null;
+}
+
+/** Build the two countermodels only after reading the actual full rule and
+ * instance rows. An extra Y can have the action with or without membership;
+ * both worlds satisfy the cited rule and X fact. Neither membership nor its
+ * opposite follows for Y from that pair of premises alone.
+ */
+function measureBoundedCase(frame,active,spec,block,binding,stored) {
+  const {file,start,end,level,modal,action,noun,object,kind,tail}=binding;
+  const bytes=readBytes(frame.root,file);
+  if(!bytes)return null;
+  const lines=lineList(bytes),rule=lines[start-1],instance=lines[end-1];
+  const predicate=regexLiteral(level.replace(/\s+/gu,""));
+  const ruleText=new RegExp("^(?:本例(?:的)?(?:分级)?规则[:：])?(?:如果|若)(?:一个|任一个|任一|某个)"+noun+
+    "(?:是|为)"+predicate+"[,，](?:则|那么)(?:该|这个|此)"+noun+modal+action+"[。.]?$","u");
+  const factText=new RegExp("^(?:本例对象[:：])?"+noun+regexLiteral(object)+"(?:是|为)"+predicate+"[。.]?$","u");
+  if(!ruleText.test(rule?.replace(/\s+/gu,"")??"")||!factText.test(instance?.replace(/\s+/gu,"")??""))return null;
+  const original=[{file,start,end:start,quote:rule},{file,start:end,end,quote:instance}];
+  // Closure already checked acquisition/source versions for these persisted
+  // quotes. Recompute against those authenticated refs without forging reads.
+  const premises=stored??original.map(ref=>sourceQuote(frame,active,spec,ref));
+  if(premises.length!==2||premises.some((ref,i)=>ref.file!==file||ref.start!==original[i].start||ref.end!==original[i].end||
+      ref.quote!==original[i].quote||ref.sha256!==digest(bytes)))throw new Error("有界推导的规则、样本或来源版本已失效");
+  const holds=kind==="non-entailment";
+  const assertion={line:block.line,start:block.start+tail[0],end:block.start+tail[1],quoteSha256:digest(block.text.slice(...tail))};
+  return {rule:"bounded-non-entailment",premises,scope:"仅据同行两条明确前提及同一例内的单向规则判断，假设的其他对象不代表真实观测。",
+    assumptions:[],counterexample:{possible:!holds,reason:holds?"可假设其他对象既符合动作要求也已执行该动作，而分类分别为真、假；两种假设均与给定前提相容。":"存在同样符合要求且已执行该动作、也属于该分类的假设对象，足以否定声称可推出其他对象均不属于该分类。"},
+    nonEntailment:{assertion,kind,holds,source:{file,start,end,sha256:premises[0].sha256},entity:noun,object,antecedent:level,consequent:modal+action,
+      // Normative requirement and observed action are independent predicates.
+      // Set both for Y in the hypothetical worlds; assert neither as real data.
+      witnesses:[{otherAntecedent:false,otherConsequent:true,otherObservedAction:true},
+        {otherAntecedent:true,otherConsequent:true,otherObservedAction:true}]}};
+}
+
+/** Force the literal logical claim to be decided together. Splitting it into
+ * punctuation, a neutral prefix or an asserted opposite cannot drop a premise.
+ */
+function requireBoundedPart(block,part,binding,proof) {
+  const [start,end]=binding.tail;
+  if(part.end<=start||part.start>=end)return false;
+  if((part.start>start&&block.text.slice(start,part.start).replace(/[，,\s]/gu,""))||part.end<end||part.kind!=="inference") {
+    throw new Error("[coverage-non-entailment] 单向规则的结论须以 inference 连续覆盖实际后段，不能拆开‘不能说明’与其对象。quote="+JSON.stringify(block.text.slice(start,end)));
+  }
+  if((part.status==="supported")!==proof.nonEntailment.holds) {
+    const relation=proof.nonEntailment.holds
+      ?"两种其他对象均与引用前提相容，‘不能说明’成立。只改核验状态，不要求作者删改正确正文。"
+      :"其他对象满足复核时仍可能属于该分类。前提无法支持‘其他都不是’，请按实际原句提交未支持判断及 finding。";
+    throw new Error("[coverage-non-entailment] "+relation);
+  }
+  return true;
+}
+
+/** Recompute saved host proof from the actual bound span and source version. */
+function validateBoundedRecord(frame,active,spec,block,parts,{host=false}={}) {
+  const saved=parts.filter(part=>part.inference?.rule==="bounded-non-entailment");
+  // Earlier accepted records had no dedicated format. Preserve that historical
+  // shape at closure; any newly presented or resumed record is checked below.
+  if(host&&!saved.length)return;
+  const binding=boundedCase(block,spec.phases[active.phase]);
+  const proof=binding&&measureBoundedCase(frame,active,spec,block,binding,host?saved[0].inference.premises:undefined);
+  if(!proof&&!saved.length)return;
+  if(!proof||saved.length!==1||!requireBoundedPart(block,saved[0],binding,proof)||
+      JSON.stringify(proof)!==JSON.stringify(saved[0].inference))throw new Error("已保存的有界推导证明失效，须重新核验该块");
 }
 
 /** Object-check failures distinguish a review-parameter/read problem from a
@@ -496,11 +587,14 @@ export function requireStoredObjectChecks(frame,spec,coverages,bytes,phase="fina
   try {
     if(!["first-review","final-review"].includes(phase))throw new Error("invalid review authority");
     for(const coverage of coverages)for(const record of coverage.records) {
-      requireProfileProof(blocks.get(record.block),spec.phases[phase],spec.candidate,record.parts);
-      validateSimulationScope(frame,{phase},spec,blocks.get(record.block),record.parts);
+      const block=blocks.get(record.block);
+      requireProfileProof(block,spec.phases[phase],spec.candidate,record.parts);
+      validateSimulationScope(frame,{phase},spec,block,record.parts);
+      validateBoundedRecord(frame,{phase},spec,block,record.parts,{host:true});
       for(const part of record.parts) {
-      validateObjectPart(frame,{phase},spec,part,lines,blocks.get(record.block),bytes,{host:true});
+      validateObjectPart(frame,{phase},spec,part,lines,block,bytes,{host:true});
       if(part.objectCheck&&(!part.objectCheck.result.matches||part.status!=="supported"))throw new Error("object not accepted");
+      if(part.inference?.nonEntailment&&(!part.inference.nonEntailment.holds||part.status!=="supported"))throw new Error("bounded case not accepted");
       }
     }
   }catch{throw new Error("已验收的证据对象或解释证明失效，须重新核验");}
@@ -641,6 +735,8 @@ function spanError(block, part, cursor, quote, reason) {
 function reviewBlock(frame, active, spec, block, parts, lines) {
   if (!Array.isArray(parts) || !parts.length || parts.length > 20) throw new Error(block.id + " 需 parts，复合句请拆出各独立判断");
   let cursor = 0;const neutral=neutralMask(block.text);
+  const binding=boundedCase(block,spec.phases[active.phase]);
+  const bounded=binding&&measureBoundedCase(frame,active,spec,block,binding);
   const reviewed = parts.map((part, index) => {
     const quote = part.quote ?? (parts.length === 1 ? block.text : undefined);
     if (typeof quote !== "string" || !quote.trim()) throw spanError(block,index+1,cursor,quote,"missing-quote");
@@ -652,6 +748,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
     if (!KINDS.includes(part.kind) || !STATUSES.includes(part.status)) throw new Error("每段须声明 kind 与 supported/unsupported/uncertain");
     const basis = explanation(part.basis, "该段的判断依据");
     const result = { quote, start, end: cursor, kind: part.kind, status: part.status, basis };
+    const boundedPart=bounded&&requireBoundedPart(block,result,binding,bounded);
     const scope=simulationMarker(block.text);
     if(scope&&start<scope.end-1&&cursor>scope.start+1&&!["direct","inference"].includes(part.kind))throw scopeFailure("[模拟] 是来源范围断言，不能作为无事实标签",block,scope);
     if(["direct","inference"].includes(part.kind)&&[...quote].some(char=>/[\p{L}\p{N}]/u.test(char))
@@ -696,6 +793,16 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
         &&(["citations-marked","citations-leading-marked","citation-profile"].includes(result.objectCheck.check)||candidateCountClaim(quote,result.objectCheck.source,{}).fullyBound)) {
         throw objectFailure("parameter","完整绑定的稿件对象谓词已实测成立，不能将同一事实填 unsupported 制造作者债；独立后半句请按原文拆分并另给真实 finding",{...result.objectCheck.result,next:"保留正确正文，只修核验状态/分段；不能用已证真对象代替另一断言的反证。"});
       }
+    } else if (boundedPart) {
+      // This is a host-measured proof, not an interpretation of the model's
+      // counterexample text. Both roles still supply a current verdict and basis.
+      if(binding.opposite&&part.sourceRelation!=="insufficient") {
+        throw new Error("[coverage-non-entailment] 此处是前提不足以推出‘其他都不是’，并未证明现实中的其他对象属于哪类。填 sourceRelation=insufficient，保留实际 finding。");
+      }
+      if(binding.opposite&&(typeof part.finding?.quote!=="string"||!part.finding.quote.includes(binding.opposite))) {
+        throw new Error("[coverage-non-entailment] finding.quote 须引用实际‘其他都不是’断言，不能退回前面正确的单向规则");
+      }
+      result.inference=bounded;
     } else if (part.status === "supported") {
       if (part.kind === "direct") {
         if (!Array.isArray(part.evidence) || !part.evidence.length || part.evidence.length > 12) throw new Error("直接事实须给 evidence 原文及逐字 quote");
@@ -771,6 +878,10 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       const {lineText,...block}=row;
       const hint=profileHint(row,spec.phases[active.phase],spec.candidate);
       if(hint)block.objectCheckHint=hint;
+      const bounded=boundedCase(row,spec.phases[active.phase]);
+      if(bounded)block.inferenceHint={rule:"bounded-non-entailment",kind:"inference",quote:row.text.slice(...bounded.tail),
+        source:{file:bounded.file,start:bounded.start,end:bounded.end},
+        note:"读同行原文后独立判断 status、sourceRelation、basis；宿主复算有界反例，不需另填 inference。前提不足以推出肯定结论时用 insufficient + 实际 finding。不能把‘无法推出’当成已证现实反面。"};
       // prepare has a separate response budget. Never stamp blocks removed by
       // that budget as shown; the explicit next page remains unobserved.
       if (options.maxBytes && Buffer.byteLength(JSON.stringify({...result,blocks:[...result.blocks,block]}))>options.maxBytes-400) break;
@@ -870,6 +981,7 @@ export function requireStoredCalculations(frame, spec, coverages, bytes) {
  */
 function validateRecordSources(frame, active, spec, record, lines, block, bytes) {
   requireProfileProof(block,spec.phases[active.phase],spec.candidate,record.parts);
+  validateBoundedRecord(frame,active,spec,block,record.parts);
   // Syntax is neutral only while its locator remains authorized, read and pinned.
   // Keep the same ordinary refs for host closure to check without exposing text.
   for(const ref of record.syntaxSources??[]) {
@@ -926,7 +1038,8 @@ export function coverageSummary(frame, active, spec, complete = true) {
   const rejected = records.flatMap(record => record.parts.filter(part => ["direct", "inference"].includes(part.kind) && part.status !== "supported")
     .map(part => {
       const finding={block:record.block,line:record.line,text:part.quote,lineText:record.lineText,
-        basis:part.basis,repair:part.repair,finding:part.finding,status:part.status};
+        basis:part.basis,repair:part.repair,finding:part.finding,status:part.status,
+        ...(part.inference?.nonEntailment?{boundedNonEntailment:part.inference.nonEntailment}:{})};
       const refs=[...(part.evidence??[]),...(part.inference?.premises??[]),...(part.inference?.warrant??[]),
         ...(part.inference?.assumptions??[]).map(item=>item.evidence)];
       const contextStart=blocks.get(record.block).start+part.start;
@@ -1124,7 +1237,7 @@ export function coverageSchema() {
         description: "direct/inference 给事实判定；nonfactual 用 supported；hypothesis 宿主固定 uncertain，不能成为已证前提。" }, basis: string, repair: string,
       sourceRelation: { type: "string", enum: ["supports", "contradicts", "insufficient"], description: "direct/inference 必填：原始证据对该断言字面含义的关系。error-example 核展示的错误推理，只能 contradicts/insufficient，并提供 evidence；明确错例的状态由宿主固定，不作为已证前提。" },
       finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence", "contradiction", "scope", "invalid-inference"] }, quote: string, fix: string }, required: ["kind", "quote", "fix"], additionalProperties: false },
-      evidence: { type: "array", items: ref }, inference, objectCheck,
+      evidence: { type: "array", items: ref }, inference: {...inference,description:"常规推导填结构证据；inventory 明示 bounded-non-entailment inferenceHint 的同源段只填事实判定与依据，宿主复算并保存推导；未支持仍给实际 finding。"}, objectCheck,
     }, required: ["kind", "status", "basis"], additionalProperties: false } },
   }, required: ["block", "parts"], additionalProperties: false } } };
 }

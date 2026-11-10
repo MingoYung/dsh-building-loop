@@ -4161,6 +4161,941 @@
       "data": "/** Read-only replay of the original 053234Z statistical clauses. */\nimport assert from \"node:assert/strict\";\nimport fs from \"node:fs\";\nimport path from \"node:path\";\nimport readline from \"node:readline\";\nimport { fileURLToPath, pathToFileURL } from \"node:url\";\nimport * as current from \"../building-loop/governance/coverage.mjs\";\nimport { authority, digest, keyOf } from \"../building-loop/governance/policy.mjs\";\nimport { lineList } from \"../building-loop/governance/preflight.mjs\";\n\nconst priorRun=\"20261110T053234Z\";\nconst root=fileURLToPath(new URL(\"../../outputs/building-loop-efficiency-audit/\"+priorRun+\"/\",import.meta.url));\nconst priorModule=path.join(root,\"isolated-home/profiles/web/node_modules/dsh-building-loop/governance/coverage.mjs\");\nconst prior=await import(pathToFileURL(priorModule));\nconst workspace=path.join(root,\"reuse/workspace\"),candidate=path.join(workspace,\"module/candidate.md\");\nconst bytes=fs.readFileSync(candidate),candidateSha256=digest(bytes);\nassert.equal(candidateSha256,\"cbf93253b49e4685c103411d459db079c6f0bb845aa5216911c239313439c971\");\n\n/** Instantiate only the proof contract in memory over the frozen source files. */\nfunction replay(module,actor) {\n  const phase=\"final-review\",policy=authority(workspace),spec=policy.units.K01,reads=spec.phases[phase].read;\n  const seen={};\n  for(const file of reads) {\n    const target=path.join(workspace,file);\n    if(!fs.existsSync(target)||!fs.statSync(target).isFile())continue;\n    const observed=fs.readFileSync(target);\n    seen[keyOf(file)]={hash:digest(observed),ranges:[[1,lineList(observed).length]]};\n  }\n  const active={phase,seen},frame={root:workspace,policy,reads,agent:{id:actor}};\n  const call=(action,args={})=>module.coverageAction(frame,active,spec,{action,...args});\n  const blocks=call(\"inventory\",{count:24}).blocks.filter(row=>row.line===13);\n  assert.equal(blocks.length,2);\n  assert.equal(blocks[0].id,\"B16-68820bbd\");\n  return {call,frame,spec,blocks};\n}\n\nconst input={kind:\"direct\",status:\"supported\",sourceRelation:\"supports\",basis:\"核对本稿的实际引用行和同行标记。\"};\nconst source=\"sources/synthetic.md\";\nconst old=replay(prior,\"prior-review\");\nconst updated=replay(current,\"updated-review\");\nconst record=(r,block,part)=>r.call(\"record\",{entries:[{block:r.blocks[block].id,parts:[part]}]});\nconst errorOf=action=>{try{action();assert.fail(\"expected an error\");}catch(error){if(error.code===\"ERR_ASSERTION\")throw error;return error.message;}};\n\n// Use exact past model calls, not a reconstruction of what the model might have\n// sent. The archived tool errors also check our replay has the same boundary.\nasync function readEvents(directory,eventLines) {\n  const selected=new Map();\n  const stream=readline.createInterface({input:fs.createReadStream(path.join(directory,\"events.jsonl\")),crlfDelay:Infinity});\n  let eventLine=0;\n  for await(const line of stream) {\n    eventLine++;\n    if(eventLines.includes(eventLine))selected.set(eventLine,JSON.parse(line));\n    if(eventLine===eventLines.at(-1))break;\n  }\n  return selected;\n}\nconst selected=await readEvents(root,[1067,1145,1146]);\nconst readArgs=line=>JSON.parse(selected.get(line).data.arguments);\nconst firstArgs=readArgs(1145),wrongDomainArgs=readArgs(1067);\nconst priorHeadError=errorOf(()=>old.call(\"record\",firstArgs));\nassert.equal(\"Error: \"+priorHeadError,selected.get(1146).data.message.content[0].text);\nassert.match(priorHeadError,/只证明当前稿件的明确结构/);\nconst priorWholeBlock=record(old,0,{...input,objectCheck:{kind:\"candidate\",check:\"citation-count\",source,expected:6}});\nassert.deepEqual(priorWholeBlock.recorded,[old.blocks[0].id]);\nconst incompleteLegacy=old.call(\"status\",{block:old.blocks[0].id}).record.parts[0].objectCheck.result;\nassert.equal(incompleteLegacy.matches,true);\nassert.equal(incompleteLegacy.claimedLines,undefined);\nassert.ok(old.call(\"record\",wrongDomainArgs).recorded.includes(old.blocks[1].id));\nconst wrongDomainReplay=updated.call(\"record\",wrongDomainArgs);\nconst updatedWrongDomainError=wrongDomainReplay.invalid.find(row=>row.block===updated.blocks[1].id)?.error;\nassert.match(updatedWrongDomainError,/objectCheckHint/);\n\nfor(const [index,block] of updated.blocks.entries()) {\n  assert.deepEqual(block.objectCheckHint,{kind:\"candidate\",check:\"citation-profile\",source});\n  const args=index===0?structuredClone(firstArgs):structuredClone(wrongDomainArgs);\n  args.entries=args.entries.filter(entry=>entry.block===block.id);\n  const part=args.entries[0].parts.at(-1);\n  delete part.evidence;\n  part.objectCheck=block.objectCheckHint;\n  assert.deepEqual(updated.call(\"record\",args).recorded,[block.id]);\n}\nconst accepted=updated.blocks.map(block=>updated.call(\"status\",{block:block.id}).record);\ncurrent.requireStoredObjectChecks(updated.frame,updated.spec,[{records:accepted}],bytes);\nconst proofs=accepted.map(record=>({block:record.block,proof:record.parts.at(-1).objectCheck}));\nassert.deepEqual(proofs.map(row=>row.proof.result.lines),[[4,5,6,7,8,10],[5,6,7,8]]);\nassert.equal(digest(fs.readFileSync(candidate)),candidateSha256);\n\n// An initial 0.7.5 paid draft actually submitted shifted ordinals. The shared\n// preflight predicate must report both issues on its unchanged recorded bytes.\nconst preliminaryRun=\"20261110T062547Z\",writeLine=338;\nconst preliminaryRoot=fileURLToPath(new URL(\"../../outputs/building-loop-efficiency-audit/\"+preliminaryRun+\"/\",import.meta.url));\nconst preliminaryWrite=(await readEvents(preliminaryRoot,[writeLine])).get(writeLine);\nassert.equal(preliminaryWrite.type,\"tool/call\");\nassert.equal(preliminaryWrite.data.name,\"building_loop_file\");\nconst write=JSON.parse(preliminaryWrite.data.arguments);\nassert.equal(write.action,\"write\");assert.equal(write.path,\"module/candidate.md\");\nconst preliminaryBytes=Buffer.from(write.content);\nconst preflight=current.candidateCitationProfiles(preliminaryBytes,[source],write.path);\nassert.deepEqual(preflight.map(row=>row.matches),[false,false]);\nassert.deepEqual(preflight.map(row=>row.lines),[[7,9,10,11,12,14],[9,10,11,12]]);\nassert.deepEqual(preflight.map(row=>row.claimedLines),[[6,8,9,10,11,13],[8,9,10,11]]);\n\nconsole.log(JSON.stringify({run:priorRun,candidateSha256,physicalLine:13,originalCandidateUnchanged:true,\n  priorRuntimeSha256:digest(fs.readFileSync(priorModule)),updatedRuntimeSha256:digest(fs.readFileSync(new URL(\"../building-loop/governance/coverage.mjs\",import.meta.url))),\n  before:{events:{markerBlockCall:1067,headCall:1145,headError:1146},headError:priorHeadError,\n    wholeBlockLegacyPartialMeasurement:incompleteLegacy,markerBlockWrongDomainAccepted:true},\n  after:{markerBlockWrongDomainError:updatedWrongDomainError,closureObjectRecheck:true,proofs},\n  preliminaryPreflightReplay:{run:preliminaryRun,writeEventLine:writeLine,candidateSha256:digest(preliminaryBytes),checks:preflight}},null,2));\n"
     },
     {
+      "path": "building-loop-efficiency-index-validation/r076-bounded-non-entailment-replay.mjs",
+      "kind": "text",
+      "originalSha256": "7b2a23e364a360064251200f85923a144fad93d5a47e4b4e7a2ab05994d6c091",
+      "publishedSha256": "a771606dd19b918ba541a24fa66e79650ca5516d8c55aa2704b867dbd67add20",
+      "data": "import assert from \"node:assert/strict\";\nimport { createHash } from \"node:crypto\";\nimport { execFileSync } from \"node:child_process\";\nimport fs from \"node:fs\";\nimport os from \"node:os\";\nimport path from \"node:path\";\nimport { pathToFileURL } from \"node:url\";\n\nconst workspace = path.resolve(process.argv[2] ?? process.cwd());\nconst resultFile = process.argv[3];\nconst repo = path.join(workspace, \"work/building-loop\");\nconst run = path.join(workspace, \"outputs/building-loop-efficiency-audit/20261110T063221Z\");\nconst rawEvents = fs.readFileSync(path.join(run, \"events.jsonl\"));\nconst events = rawEvents.toString(\"utf8\").trimEnd().split(/\\r?\\n/u).map(line => JSON.parse(line));\nconst digest = bytes => createHash(\"sha256\").update(bytes).digest(\"hex\");\nconst candidateSha256 = \"75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f\";\nconst blockId = \"B10-1aa3ca1c\";\nconst baseline = \"ebe0b0cc05c64a2fec2be074b4e601d1b2e5c963\";\nconst write = events[333];\nconst call = events[489];\nassert.equal(write.data.name, \"building_loop_file\");\nassert.equal(call.data.name, \"building_loop_coverage\");\nassert.equal(events[508].type, \"tool/result\");\nconst draft = JSON.parse(write.data.arguments).content;\nconst entries = JSON.parse(call.data.arguments).entries;\nconst oldEntry = entries.find(entry => entry.block === blockId);\nassert.equal(digest(draft), candidateSha256);\nassert.ok(oldEntry.parts.some(part => part.finding?.kind === \"invalid-inference\" && part.status === \"unsupported\"));\n\nconst temporaryParent = fs.realpathSync(os.tmpdir());\nconst temp = fs.mkdtempSync(path.join(temporaryParent, \"r076-bounded-\"));\ntry {\n  const historical = path.join(temp, \"historical\");\n  const candidate = path.join(temp, \"case\");\n  fs.mkdirSync(historical);\n  // Keep the historical runtime separate from the current module graph so the\n  // same archived candidate and actual old input exercise both entry points.\n  for (const name of fs.readdirSync(path.join(repo, \"governance\")).filter(name => name.endsWith(\".mjs\"))) {\n    const bytes = execFileSync(\"git\", [\"-C\", repo, \"show\", `${baseline}:governance/${name}`]);\n    fs.writeFileSync(path.join(historical, name), bytes);\n  }\n  fs.cpSync(path.join(run, \"fresh/workspace\"), candidate, { recursive: true });\n  fs.writeFileSync(path.join(candidate, \"module/candidate.md\"), draft);\n\n  async function setup(directory) {\n    const code = await import(pathToFileURL(path.join(directory, \"coverage.mjs\")).href);\n    const policy = await import(pathToFileURL(path.join(directory, \"policy.mjs\")).href);\n    const { lineList } = await import(pathToFileURL(path.join(directory, \"preflight.mjs\")).href);\n    const authority = policy.authority(candidate);\n    const spec = authority.units.K01;\n    const frame = { root: candidate, policy: authority, agent: { id: call.sid }, reads: spec.phases[\"final-review\"].read };\n    const active = { phase: \"final-review\", seen: {} };\n    for (const file of frame.reads) {\n      const bytes = fs.readFileSync(path.join(candidate, file));\n      active.seen[policy.keyOf(file)] = { hash: digest(bytes), ranges: [[1, lineList(bytes).length]] };\n    }\n    const invoke = (action, args = {}) => code.coverageAction(frame, active, spec, { action, ...args });\n    const inventory = invoke(\"inventory\", { count: 24 });\n    assert.equal(inventory.candidateSha256, candidateSha256);\n    return { invoke, inventory };\n  }\n\n  const old = await setup(historical);\n  const oldResult = old.invoke(\"record\", { entries: [oldEntry] });\n  assert.equal(oldResult.rejected.length, 1);\n  assert.equal(oldResult.rejected[0].block, blockId);\n\n  const current = await setup(path.join(repo, \"governance\"));\n  let rejection;\n  try {\n    current.invoke(\"record\", { entries: [oldEntry] });\n  } catch (error) {\n    rejection = error.message;\n  }\n  assert.match(rejection, /coverage-non-entailment.*不能说明.*只改核验状态/u);\n  assert.equal(current.invoke(\"status\").rejected.length, 0);\n\n  const reviewed = structuredClone(oldEntry);\n  const part = reviewed.parts.find(row => row.finding?.kind === \"invalid-inference\");\n  part.status = \"supported\";\n  part.sourceRelation = \"supports\";\n  part.basis = \"同一有界单向规则与样本事实允许其他复核对象属于该类别，也允许不属于。\";\n  delete part.finding;\n  delete part.inference;\n  const newResult = current.invoke(\"record\", { entries: [reviewed] });\n  const saved = current.invoke(\"status\", { block: blockId }).record.parts.find(row => row.inference?.nonEntailment);\n  assert.deepEqual(newResult.recorded, [blockId]);\n  assert.equal(newResult.rejected.length, 0);\n  assert.ok(saved.inference.nonEntailment.holds);\n  assert.equal(digest(fs.readFileSync(path.join(candidate, \"module/candidate.md\"))), candidateSha256);\n\n  const output = {\n    passed: true, run: \"20261110T063221Z\", candidateSha256, eventsSha256: digest(rawEvents), blockId,\n    historical: { commit: baseline, candidateWriteCallLine: 334, candidateWriteResultLine: 335, actualToolCallLine: 490, originalRejectResultLine: 509,\n      argumentsSha256: digest(call.data.arguments), rejected: oldResult.rejected[0] },\n    current: { moduleSha256: digest(fs.readFileSync(path.join(repo, \"governance/coverage.mjs\"))),\n      unchangedInputError: rejection, debtAfterFalseReturn: 0, correctedReviewOnly: newResult.recorded,\n      originalDraftUnchanged: true, proof: saved.inference },\n  };\n  if (resultFile) fs.writeFileSync(resultFile, JSON.stringify(output, null, 2) + \"\\n\");\n  process.stdout.write(JSON.stringify({ passed: true, blockId, oldRejected: 1, currentRejected: 0 }) + \"\\n\");\n} finally {\n  assert.equal(path.dirname(fs.realpathSync(temp)), temporaryParent);\n  assert.ok(path.basename(temp).startsWith(\"r076-bounded-\"));\n  fs.rmSync(temp, { recursive: true, force: true });\n}\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r076-numbered-finding-replay-result.json",
+      "kind": "json",
+      "originalSha256": "b3cd6b6de345bccdff0cbb59f336c41a8b0bb97eae84717aa82a0cdcf91b460e",
+      "publishedSha256": "b3cd6b6de345bccdff0cbb59f336c41a8b0bb97eae84717aa82a0cdcf91b460e",
+      "data": {
+        "passed": true,
+        "historicalRun": "20261110T063219Z",
+        "eventsSha256": "32085a1de0b5b7244dfa28172045a107eb208f64934eb82f21a321477b5d35d6",
+        "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+        "historicalRuntimeSha256": "1d7d2902b014fd55bcbece9532d40f0719d90e21caf5d93cd053ca87aaa4ae3e",
+        "currentRuntimeSha256": "3b8c1c1fccc235d19071a22b2c97c701b0be3a65bba01f2b284fb5a1a56b84e5",
+        "successfulHistoricalCoverageCallsReplayed": 8,
+        "attempts": 10,
+        "exactCopiedHeadingsAccepted": 7,
+        "missingFindingsStillRejected": 3,
+        "rows": [
+          {
+            "callLine": 149,
+            "resultLine": 150,
+            "callId": "call_00_REGSWWVN7j0OjUGyZCrm1552",
+            "inputSha256": "c5336e13d6e33bb4c928059a9d7fd1e822afb4a9c52b94f194b00ab3060dbd47",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 信息归给 NIST 散点图页面原文，但 nist-scatter.md 已登记注释仅为 association does NOT imply causality.，不含任何 GitHub 内容；属写错出处，不能私自换源通过（DISPATCH.md 第 4 行）。",
+              "finding": {
+                "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项"
+              },
+              "id": "C4",
+              "line": 13,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选把 GitHub 列表的 failure/success 信息归给 NIST 散点图页面原文，但 nist-scatter.md 已登记注释仅为 association does NOT imply causality.，不含任何 GitHub 内容；属写错出处，不能私自换源通过（DISPATCH.md 第 4 行）。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                  "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          },
+          {
+            "callLine": 155,
+            "resultLine": 156,
+            "callId": "call_00_aZYMISiNz9ZX0LQIQVMs7954",
+            "inputSha256": "490f8245e7c8fb7e35e151e60a982405abf1c191950199ed7aa3a14e8df39339",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 信息归给 NIST 散点图页面原文，但 nist-scatter.md 已登记注释仅为 association does NOT imply causality.，不含任何 GitHub 内容；属写错出处，不能私自换源通过。",
+              "finding": {
+                "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项"
+              },
+              "id": "C4",
+              "line": 13,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选把 GitHub 列表的 failure/success 信息归给 NIST 散点图页面原文，但 nist-scatter.md 已登记注释仅为 association does NOT imply causality.，不含任何 GitHub 内容；属写错出处，不能私自换源通过。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                  "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          },
+          {
+            "callLine": 161,
+            "resultLine": 162,
+            "callId": "call_00_4WWOYPA3zDLCc64YOMfG5003",
+            "inputSha256": "8364b13de68cb33d9a834b41989640ebef12e349d9366329e111cf2c9e36a506",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 信息归给 NIST 散点图页面原文，但 nist-scatter.md 已登记注释仅为 association does NOT imply causality.，不含任何 GitHub 内容；属写错出处，按 DISPATCH.md 第 4 行不能私自换源通过。",
+              "file": "sources/nist-scatter.md",
+              "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。",
+              "id": "C4",
+              "kind": "missing-evidence",
+              "line": 13,
+              "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+              "start": 6,
+              "end": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": false,
+              "error": "C4 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope。候选第 13 行正文为 \"NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项（出处：sources/nist-scatter.md 第 4 行）。\"，从该行复制实际有问题的片段",
+              "phase": "first-review",
+              "receiptCreated": false
+            }
+          },
+          {
+            "callLine": 185,
+            "resultLine": 186,
+            "callId": "call_00_wIEWNjMbZHHDQaPjaRKl1728",
+            "inputSha256": "07fdfb8ff186ee112815c54289859457238915ed8d76affddfd828d8297c21fa",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 归给 NIST 散点图页面原文，但 nist-scatter.md 已登记短摘录仅 association does NOT imply causality.，无 GitHub/failure/success 内容，属写错出处，不能私换出处通过。",
+              "end": 6,
+              "file": "sources/nist-scatter.md",
+              "finding": {
+                "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                "sourceRelation": "insufficient"
+              },
+              "id": "C4",
+              "kind": "missing-evidence",
+              "line": 13,
+              "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项（出处：sources/nist-scatter.md 第 4 行）。",
+              "start": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选把 GitHub 列表的 failure/success 归给 NIST 散点图页面原文，但 nist-scatter.md 已登记短摘录仅 association does NOT imply causality.，无 GitHub/failure/success 内容，属写错出处，不能私换出处通过。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                  "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          },
+          {
+            "callLine": 197,
+            "resultLine": 198,
+            "callId": "call_00_vIBWDS4ZOdOQsTk4jtqj9381",
+            "inputSha256": "99347dc67fce5afc81a45b09d87843446d964e0d2af8c966aaddcf2d8d47b8ea",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 归给 NIST 散点图页面原文，但 nist-scatter.md 已登记短摘录仅 association does NOT imply causality.，无 GitHub/failure/success 内容，属写错出处，不能私换出处通过。",
+              "end": 6,
+              "file": "sources/nist-scatter.md",
+              "finding": {
+                "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项"
+              },
+              "id": "C4",
+              "line": 13,
+              "start": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选把 GitHub 列表的 failure/success 归给 NIST 散点图页面原文，但 nist-scatter.md 已登记短摘录仅 association does NOT imply causality.，无 GitHub/failure/success 内容，属写错出处，不能私换出处通过。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                  "fix": "删除 C4；如确需该事实，改写为引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          },
+          {
+            "callLine": 264,
+            "resultLine": 265,
+            "callId": "call_00_jfxHtkWMX2MZtuAqwBUy4636",
+            "inputSha256": "0780fd70af8c933da2d046b5e6446d830bb62662e1a273e7058db2d2d37f71a6",
+            "submittedC4": {
+              "basis": "候选将 NIST 散点图页面原文等同于 GitHub 列表信息，但已登记的 nist-scatter.md 短摘录仅 association does NOT imply causality.，不含 GitHub/failure/success，属写错出处，不可私换出处放行。",
+              "end": 6,
+              "file": "sources/nist-scatter.md",
+              "id": "C4",
+              "line": 13,
+              "start": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": false,
+              "error": "C4 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope。候选第 13 行正文为 \"NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项（出处：sources/nist-scatter.md 第 4 行）。\"，从该行复制实际有问题的片段",
+              "phase": "first-review",
+              "receiptCreated": false
+            }
+          },
+          {
+            "callLine": 270,
+            "resultLine": 271,
+            "callId": "call_00_xEkeLsXyYVdaU4QOtk7D6506",
+            "inputSha256": "d1ebc950b658e040157944d251433cb053355e5812725dbd5a33b613e250b605",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 归到 NIST 散点图页面原文，但 nist-scatter.md 已登记的逐字摘录仅有 association does NOT imply causality.，不含任何 GitHub、failure、success 内容，属写错出处。",
+              "end": 6,
+              "file": "sources/nist-scatter.md",
+              "finding": {
+                "fix": "删除 C4；如确需保留该事实，改写为引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项"
+              },
+              "id": "C4",
+              "line": 13,
+              "start": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选把 GitHub 列表的 failure/success 归到 NIST 散点图页面原文，但 nist-scatter.md 已登记的逐字摘录仅有 association does NOT imply causality.，不含任何 GitHub、failure、success 内容，属写错出处。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                  "fix": "删除 C4；如确需保留该事实，改写为引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          },
+          {
+            "callLine": 276,
+            "resultLine": 277,
+            "callId": "call_00_Iuc044aNo7BZJNqWC3zc1981",
+            "inputSha256": "3964b055c5b11e248757c8f4ec36208f04e11099d764edf1a53602e1c9fcc8a2",
+            "submittedC4": {
+              "basis": "候选将 GitHub 列表的 failure/success 归为 NIST 散点图页面原文，但 nist-scatter.md 登记摘录仅 association does NOT imply causality.，无 GitHub 内容，写错出处即缺源。",
+              "end": 6,
+              "file": "sources/nist-scatter.md",
+              "fix": "删除 C4；如保留该事实，改引 sources/github-checks.md 第 7-8 行。",
+              "id": "C4",
+              "kind": "missing-evidence",
+              "line": 13,
+              "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+              "start": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": false,
+              "error": "C4 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope。候选第 13 行正文为 \"NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项（出处：sources/nist-scatter.md 第 4 行）。\"，从该行复制实际有问题的片段",
+              "phase": "first-review",
+              "receiptCreated": false
+            }
+          },
+          {
+            "callLine": 288,
+            "resultLine": 289,
+            "callId": "call_00_HG2U1a3rtDa58YQUGw8D6666",
+            "inputSha256": "98c1f072414bbd229441642d59032a5ec16166355af6c7a01425d528c2624f5f",
+            "submittedC4": {
+              "basis": "候选将 GitHub 列表的 failure/success 归为 NIST 散点图页面原文，但 nist-scatter.md 登记摘录仅 association does NOT imply causality.，无 GitHub 内容，写错出处即缺源。",
+              "end": 6,
+              "file": "sources/nist-scatter.md",
+              "finding": {
+                "fix": "删除 C4；如保留该事实，改引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项（出处：sources/nist-scatter.md 第 4 行）。"
+              },
+              "id": "C4",
+              "line": 13,
+              "start": 6,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选将 GitHub 列表的 failure/success 归为 NIST 散点图页面原文，但 nist-scatter.md 登记摘录仅 association does NOT imply causality.，无 GitHub 内容，写错出处即缺源。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项（出处：sources/nist-scatter.md 第 4 行）。",
+                  "fix": "删除 C4；如保留该事实，改引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          },
+          {
+            "callLine": 355,
+            "resultLine": 356,
+            "callId": "call_00_vGYbmBVNSLnkyuwYRUgy3106",
+            "inputSha256": "c17fef0c454e96a871f026de8fec0b1ad40138bf755bee10c8044c56ffe7e8e7",
+            "submittedC4": {
+              "basis": "候选把 GitHub 列表的 failure/success 写成 NIST 散点图页面原文，但 nist-scatter.md 登记摘录仅 association does NOT imply causality.，无 GitHub 内容；写错出处即缺源，不能私换出处通过。",
+              "finding": {
+                "fix": "删除 C4；如保留该事实，改引 sources/github-checks.md 第 7-8 行。",
+                "kind": "missing-evidence",
+                "quote": "- C4：NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项"
+              },
+              "id": "C4",
+              "line": 13,
+              "status": "unsupported"
+            },
+            "before": {
+              "passedParameterGate": false,
+              "error": "C4 的事实退回须 finding.kind、候选中真实存在的 quote 和最小 fix；表达建议不能填 unsupported",
+              "phase": "first-review",
+              "receiptCreated": false
+            },
+            "after": {
+              "passedParameterGate": true,
+              "phase": "supplement-ready",
+              "candidateSha256": "014b17f71c70766da054909f6c98b89dfc6ad52b8c17f813d902d492fa28048e",
+              "pendingCoverage": [],
+              "check": {
+                "id": "C4",
+                "status": "unsupported",
+                "line": 13,
+                "basis": "候选把 GitHub 列表的 failure/success 写成 NIST 散点图页面原文，但 nist-scatter.md 登记摘录仅 association does NOT imply causality.，无 GitHub 内容；写错出处即缺源，不能私换出处通过。",
+                "finding": {
+                  "kind": "missing-evidence",
+                  "quote": "NIST 散点图页面原文举了 GitHub 列表中的 failure 和 success 两项",
+                  "fix": "删除 C4；如保留该事实，改引 sources/github-checks.md 第 7-8 行。"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r076-numbered-finding-replay.mjs",
+      "kind": "text",
+      "originalSha256": "4f8ec109a3fa44f02f268aee02ee9566e358c0f1ccd356ce20266df7fc0bb1b9",
+      "publishedSha256": "cfd44ac2c4a83fa95e6475341a0b4214582380efaa36b80fb021a32d0c427576",
+      "data": "import assert from \"node:assert/strict\";\nimport fs from \"node:fs\";\nimport path from \"node:path\";\nimport { createHash } from \"node:crypto\";\nimport { fileURLToPath, pathToFileURL } from \"node:url\";\n\nconst here = path.dirname(fileURLToPath(import.meta.url));\nconst workspace = path.resolve(here, \"../..\");\nconst repo = path.join(workspace, \"work/building-loop\");\nconst run = path.join(workspace, \"outputs/building-loop-efficiency-audit/20261110T063219Z\");\nconst original = path.join(run, \"reuse/workspace\");\nconst prior = path.join(run, \"isolated-home/profiles/web/node_modules/dsh-building-loop\");\nconst sourceNames = [\"AGENTS.md\", \"DISPATCH.md\", \"BUILDING-LOOP.json\", \"module/INDEX.md\",\n  \"sources/github-checks.md\", \"sources/nist-scatter.md\", \"sources/synthetic.md\", \"sources/source-checks.json\"];\nconst hash = value => createHash(\"sha256\").update(value).digest(\"hex\");\nconst read = file => fs.readFileSync(file);\nconst seed = read(path.join(run, \"seed-candidate.md\"));\nconst raw = read(path.join(run, \"events.jsonl\"));\nconst events = raw.toString(\"utf8\").trimEnd().split(/\\r?\\n/u).map((line, i) => ({ ...JSON.parse(line), line: i + 1 }));\nconst calls = new Map(events.filter(event => event.type === \"tool/call\").map(event => [event.data.callId, event]));\nconst rawErrors = events.filter(event => event.type === \"tool/result\"\n  && event.data.message.content.some(block => block.text?.includes(\"C4 的事实退回须 finding.kind\")));\nassert.equal(rawErrors.length, 10);\nconst history = rawErrors.map(event => {\n  const call = calls.get(event.data.message.toolCallId);\n  assert.ok(call && call.sid === event.sid && call.data.name === \"building_loop\");\n  const args = JSON.parse(call.data.arguments);\n  const check = args.checks.find(row => row.id === \"C4\");\n  assert.equal(args.action, \"review\");\n  return { callLine: call.line, resultLine: event.line, callId: call.data.callId, inputSha256: hash(call.data.arguments), args, check };\n});\nconst firstAttempt = history[0];\nconst reviewerSid = calls.get(firstAttempt.callId).sid;\nconst priorProofs = events.filter(event => event.sid === reviewerSid && event.line < firstAttempt.callLine && event.type === \"tool/result\"\n  && !event.data.message.isError).flatMap(event => {\n  const call = calls.get(event.data.message.toolCallId);\n  if (call?.data.name !== \"building_loop_coverage\") return [];\n  const args = JSON.parse(call.data.arguments);\n  return args.action === \"record\" ? [args] : [];\n});\n\n/** Use the real registered handlers from both exact source snapshots. Every\n * historical request is replayed against the same initial phase and proofs. */\nasync function replay(packageRoot, attempt) {\n  const { fixture, host } = await import(pathToFileURL(path.join(packageRoot, \"test/helpers.mjs\")));\n  let result;\n  await fixture(async (root, write) => {\n    for (const name of sourceNames) {\n      fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });\n      write(name, read(path.join(original, name)));\n    }\n    write(\"module/candidate.md\", seed);\n    write(\"PROJECT.md\", read(path.join(run, \"goal-before.md\")));\n    fs.mkdirSync(path.join(root, \"records\"));\n    const h = host(root, { automaticCoverage: false });\n    await h.flow(\"root\", \"prepare\");\n    const executor = (await h.flow(\"root\", \"advance\")).childId;\n    await h.flow(executor, \"prepare\");\n    await h.flow(executor, \"submit\");\n    const reviewer = (await h.flow(\"root\", \"advance\")).childId;\n    await h.flow(reviewer, \"prepare\");\n    const inventory = await h.coverage(reviewer, \"inventory\", { count: 24 });\n    assert.equal(inventory.blocks.length, inventory.total);\n    for (const args of priorProofs) await h.coverage(reviewer, args.action, args);\n    assert.deepEqual((await h.coverage(reviewer, \"status\")).pending, []);\n    try {\n      const decision = await h.flow(reviewer, \"review\", attempt.args);\n      const receipt = JSON.parse(read(path.join(root, \"records/audit-first.json\")));\n      result = { passedParameterGate: true, phase: decision.phase, candidateSha256: receipt.candidateSha256,\n        pendingCoverage: receipt.coverage.pending, check: receipt.checks.find(row => row.id === \"C4\") };\n    } catch (error) {\n      result = { passedParameterGate: false, error: error.message,\n        phase: (await h.flow(\"root\", \"status\")).units[0].phase, receiptCreated: fs.existsSync(path.join(root, \"records/audit-first.json\")) };\n    }\n  });\n  return result;\n}\n\nconst rows = [];\nfor (const attempt of history) {\n  const before = await replay(prior, attempt);\n  const after = await replay(repo, attempt);\n  assert.equal(before.phase, \"first-review\");\n  assert.match(before.error, /C4 的事实退回须/u);\n  if (attempt.check.finding) {\n    assert.equal(after.phase, \"supplement-ready\");\n    assert.deepEqual(after.pendingCoverage, []);\n    assert.equal(after.candidateSha256, hash(seed));\n    assert.equal(after.check.finding.quote, attempt.check.finding.quote.slice(\"- C4：\".length));\n    assert.equal(after.check.line, 13);\n  } else {\n    assert.equal(after.phase, \"first-review\");\n    assert.equal(after.receiptCreated, false);\n    assert.match(after.error, /unsupported 须提供 finding\\.kind.*候选第 13 行正文/u);\n  }\n  rows.push({ callLine: attempt.callLine, resultLine: attempt.resultLine, callId: attempt.callId,\n    inputSha256: attempt.inputSha256, submittedC4: attempt.check, before, after });\n}\nconst report = { passed: true, historicalRun: path.basename(run), eventsSha256: hash(raw), candidateSha256: hash(seed),\n  historicalRuntimeSha256: hash(read(path.join(prior, \"governance/index.mjs\"))),\n  currentRuntimeSha256: hash(read(path.join(repo, \"governance/index.mjs\"))),\n  successfulHistoricalCoverageCallsReplayed: priorProofs.length, attempts: rows.length,\n  exactCopiedHeadingsAccepted: rows.filter(row => row.after.passedParameterGate).length,\n  missingFindingsStillRejected: rows.filter(row => !row.after.passedParameterGate).length, rows };\nassert.equal(report.exactCopiedHeadingsAccepted, 7);\nassert.equal(report.missingFindingsStillRejected, 3);\nfs.writeFileSync(path.join(here, \"r076-numbered-finding-replay-result.json\"), JSON.stringify(report, null, 2) + \"\\n\", \"utf8\");\nprocess.stdout.write(JSON.stringify({ passed: report.passed, attempts: rows.length,\n  accepted: report.exactCopiedHeadingsAccepted, rejected: report.missingFindingsStillRejected }) + \"\\n\");\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r076-preflight-replay.json",
+      "kind": "json",
+      "originalSha256": "5bb0a67b45e27f36ee4bb1b8ddd81c9147d99f833bead685a97883f9ee7e13f4",
+      "publishedSha256": "5bb0a67b45e27f36ee4bb1b8ddd81c9147d99f833bead685a97883f9ee7e13f4",
+      "data": {
+        "passed": true,
+        "runtime": "registered building_loop tools in isolated host fixtures, no model calls",
+        "sourceRun": "20261110T063219Z",
+        "eventsSha256": "32085a1de0b5b7244dfa28172045a107eb208f64934eb82f21a321477b5d35d6",
+        "trace": {
+          "wrongWrite": [
+            553,
+            554
+          ],
+          "wrongUnreadPreview": [
+            559,
+            560
+          ],
+          "fullRead": [
+            565,
+            566
+          ],
+          "wrongSubmit": [
+            571,
+            572
+          ],
+          "wrongReadPreview": [
+            583,
+            584
+          ],
+          "correctedWrite": [
+            589,
+            590
+          ],
+          "correctedUnreadPreview": [
+            595,
+            596
+          ],
+          "unreadSubmit": [
+            601,
+            602
+          ],
+          "correctedFullRead": [
+            607,
+            608
+          ],
+          "acceptedSubmit": [
+            613,
+            615
+          ]
+        },
+        "before": {
+          "indexSha256": "1d7d2902b014fd55bcbece9532d40f0719d90e21caf5d93cd053ca87aaa4ae3e",
+          "wrongBeforeRead": {
+            "ok": true,
+            "issues": []
+          },
+          "wrongAfterRead": {
+            "ok": false,
+            "profileChecks": {
+              "candidateSha256": "831857a5188ca71534337a7b07aa1a0bc9edc77aefb33e7cc3d04ac81193181a",
+              "clauses": [
+                {
+                  "line": 13,
+                  "block": "B13-7b77f3f4",
+                  "source": "sources/synthetic.md",
+                  "matches": false,
+                  "profileClause": "citation-lines",
+                  "expected": 7,
+                  "actual": 6,
+                  "unit": "candidate-citation-lines",
+                  "lines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "claimedLines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "lineListMatches": false,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": []
+                },
+                {
+                  "line": 13,
+                  "block": "B14-a96f38b1",
+                  "source": "sources/synthetic.md",
+                  "matches": true,
+                  "profileClause": "marked-citation-lines",
+                  "expected": 3,
+                  "actual": 3,
+                  "unit": "candidate-marked-citation-lines",
+                  "lines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "claimedLines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": [],
+                  "marker": "[模拟]",
+                  "markerPosition": "any"
+                }
+              ]
+            }
+          },
+          "correctedBeforeRead": {
+            "ok": true,
+            "issues": []
+          },
+          "correctedAfterRead": {
+            "ok": true,
+            "profileChecks": {
+              "candidateSha256": "5ce4a93c658fa66373548f1259d3e750e8b095ce4edd9d9898cd06678bfe3d97",
+              "clauses": [
+                {
+                  "line": 13,
+                  "block": "B13-e493f3e3",
+                  "source": "sources/synthetic.md",
+                  "matches": true,
+                  "profileClause": "citation-lines",
+                  "expected": 6,
+                  "actual": 6,
+                  "unit": "candidate-citation-lines",
+                  "lines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "claimedLines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": []
+                },
+                {
+                  "line": 13,
+                  "block": "B14-a96f38b1",
+                  "source": "sources/synthetic.md",
+                  "matches": true,
+                  "profileClause": "marked-citation-lines",
+                  "expected": 3,
+                  "actual": 3,
+                  "unit": "candidate-marked-citation-lines",
+                  "lines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "claimedLines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": [],
+                  "marker": "[模拟]",
+                  "markerPosition": "any"
+                }
+              ]
+            },
+            "phase": "final-review-ready"
+          }
+        },
+        "after": {
+          "indexSha256": "3b8c1c1fccc235d19071a22b2c97c701b0be3a65bba01f2b284fb5a1a56b84e5",
+          "wrongBeforeRead": {
+            "ok": false,
+            "pendingRead": {
+              "file": "module/candidate.md",
+              "reason": "current-candidate-read-required"
+            },
+            "issues": [
+              "请先完整读回当前候选文件 module/candidate.md"
+            ]
+          },
+          "wrongAfterRead": {
+            "ok": false,
+            "profileChecks": {
+              "candidateSha256": "831857a5188ca71534337a7b07aa1a0bc9edc77aefb33e7cc3d04ac81193181a",
+              "clauses": [
+                {
+                  "line": 13,
+                  "block": "B13-7b77f3f4",
+                  "source": "sources/synthetic.md",
+                  "matches": false,
+                  "profileClause": "citation-lines",
+                  "expected": 7,
+                  "actual": 6,
+                  "unit": "candidate-citation-lines",
+                  "lines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "claimedLines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "lineListMatches": false,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": []
+                },
+                {
+                  "line": 13,
+                  "block": "B14-a96f38b1",
+                  "source": "sources/synthetic.md",
+                  "matches": true,
+                  "profileClause": "marked-citation-lines",
+                  "expected": 3,
+                  "actual": 3,
+                  "unit": "candidate-marked-citation-lines",
+                  "lines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "claimedLines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": [],
+                  "marker": "[模拟]",
+                  "markerPosition": "any"
+                }
+              ]
+            }
+          },
+          "correctedBeforeRead": {
+            "ok": false,
+            "pendingRead": {
+              "file": "module/candidate.md",
+              "reason": "current-candidate-read-required"
+            },
+            "issues": [
+              "请先完整读回当前候选文件 module/candidate.md"
+            ]
+          },
+          "correctedAfterRead": {
+            "ok": true,
+            "profileChecks": {
+              "candidateSha256": "5ce4a93c658fa66373548f1259d3e750e8b095ce4edd9d9898cd06678bfe3d97",
+              "clauses": [
+                {
+                  "line": 13,
+                  "block": "B13-e493f3e3",
+                  "source": "sources/synthetic.md",
+                  "matches": true,
+                  "profileClause": "citation-lines",
+                  "expected": 6,
+                  "actual": 6,
+                  "unit": "candidate-citation-lines",
+                  "lines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "claimedLines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": []
+                },
+                {
+                  "line": 13,
+                  "block": "B14-a96f38b1",
+                  "source": "sources/synthetic.md",
+                  "matches": true,
+                  "profileClause": "marked-citation-lines",
+                  "expected": 3,
+                  "actual": 3,
+                  "unit": "candidate-marked-citation-lines",
+                  "lines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "claimedLines": [
+                    5,
+                    6,
+                    7
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": [],
+                  "marker": "[模拟]",
+                  "markerPosition": "any"
+                }
+              ]
+            },
+            "phase": "final-review-ready"
+          }
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r076-preflight-replay.mjs",
+      "kind": "text",
+      "originalSha256": "42423b143c46e6895d1e718345531c5e4650fe26c83a3cfbb75d5bfc0cf90435",
+      "publishedSha256": "37f92d87cd4ed5759fff7e350ac5daf35516630147b609d2b12708cd944e29c7",
+      "data": "import assert from \"node:assert/strict\";\nimport fs from \"node:fs\";\nimport path from \"node:path\";\nimport { createHash } from \"node:crypto\";\nimport { pathToFileURL } from \"node:url\";\n\n// Replay the exact two model-written candidate versions through each runtime's\n// registered tools. The synthetic intake only establishes the supplement role.\nconst root = process.cwd();\nconst run = path.join(root, \"outputs/building-loop-efficiency-audit/20261110T063219Z\");\nconst current = path.join(root, \"work/building-loop\");\nconst baseline = path.join(run, \"isolated-home/profiles/web/node_modules/dsh-building-loop\");\nconst eventBytes = fs.readFileSync(path.join(run, \"events.jsonl\"));\nconst events = eventBytes.toString(\"utf8\").trimEnd().split(/\\r?\\n/u).map(JSON.parse);\nconst event = line => events[line - 1];\nconst args = line => JSON.parse(event(line).data.arguments);\nconst resultText = line => event(line).data.message.content[0].text;\nconst result = line => JSON.parse(resultText(line));\nconst sha256 = bytes => createHash(\"sha256\").update(bytes).digest(\"hex\");\nconst wrong = args(553);\nconst corrected = args(589);\nconst candidate = \"module/candidate.md\";\nconst source = \"sources/synthetic.md\";\nassert.equal(wrong.path, candidate);\nassert.equal(corrected.path, candidate);\nassert.equal(sha256(wrong.content), result(554).sha256);\nassert.equal(sha256(corrected.content), result(590).sha256);\nassert.equal(result(560).ok, true);\nassert.equal(result(596).ok, true);\nassert.equal(result(560).citationProfileChecks, undefined);\nassert.equal(result(596).citationProfileChecks, undefined);\nassert.equal(result(566).sha256, result(554).sha256);\nassert.equal(result(566).lines.length, result(566).totalLines);\nassert.match(resultText(572), /组合稿件统计不符/u);\nassert.equal(result(584).citationProfileChecks.candidateSha256, result(554).sha256);\nassert.match(resultText(602), /完整读回当前候选/u);\nassert.equal(result(608).sha256, result(590).sha256);\nassert.equal(result(608).lines.length, result(608).totalLines);\nassert.equal(result(615).phase, \"final-review-ready\");\n\nasync function replay(repo, expectedPending) {\n  const { fixture, host, policy } = await import(pathToFileURL(path.join(repo, \"test/helpers.mjs\")));\n  const { QUALITY } = await import(pathToFileURL(path.join(repo, \"governance/preflight.mjs\")));\n  const observation = { indexSha256: sha256(fs.readFileSync(path.join(repo, \"governance/index.mjs\"))) };\n  await fixture(async (workspace, write) => {\n    fs.mkdirSync(path.join(workspace, \"module\"));\n    fs.mkdirSync(path.join(workspace, \"sources\"));\n    write(source, fs.readFileSync(path.join(run, \"reuse/workspace\", source)));\n    write(candidate, \"- C1：通过19/20（出处：functional.csv 第 2 行）。\\n\\n大白话：看实际记录。\\n\\n附录。\\n\");\n    const authority = structuredClone(policy);\n    const unit = authority.units.K01;\n    unit.candidate = candidate;\n    unit.claims = [\"C1\"];\n    unit.calculations = {};\n    unit.plainLast = true;\n    for (const phase of Object.values(unit.phases)) {\n      for (const grant of [\"read\", \"write\"]) {\n        if (phase[grant]) phase[grant] = phase[grant].map(file => file === \"candidate.md\" ? candidate : file);\n      }\n    }\n    unit.phases.supplement.read.push(source);\n    unit.phases[\"final-review\"].read.push(source);\n    unit.phases[\"final-review\"].evidence.push(source);\n    write(\"BUILDING-LOOP.json\", JSON.stringify(authority));\n    const h = host(workspace);\n    const intake = (await h.flow(\"root\", \"advance\")).childId;\n    await h.flow(intake, \"prepare\");\n    await h.flow(intake, \"submit\");\n    const reviewer = (await h.flow(\"root\", \"advance\")).childId;\n    await h.flow(reviewer, \"prepare\");\n    const check = { id: \"C1\", status: \"supported\", file: \"functional.csv\", start: 2, end: 2,\n      basis: \"源记录明确写明通过19项，总数20项。\" };\n    await h.assess(reviewer, { ...Object.fromEntries(Object.keys(QUALITY).map(key => [key, \"按授权数据复核实际样例并给出读者说明。\"])),\n      sourceRefs: [{ file: \"functional.csv\", start: 2, end: 2, quote: \"19,20\" }], unverifiedSources: [], unlisted: [],\n      revise: [], goalFit: { pass: true, basis: \"只核对本例记录。\" } });\n    assert.equal((await h.flow(reviewer, \"review\", { checks: [check] })).phase, \"supplement-ready\");\n    const executor = (await h.flow(\"root\", \"advance\")).childId;\n    await h.flow(executor, \"prepare\");\n\n    const preview = async (record, callLine) => {\n      await h.file(executor, \"write\", candidate, { content: record.content, note: record.note });\n      const output = await h.flow(executor, \"preflight\", args(callLine));\n      assert.equal(output.ok, !expectedPending);\n      assert.deepEqual(output.pendingRead, expectedPending ? { file: candidate, reason: \"current-candidate-read-required\" } : undefined);\n      assert.equal(output.citationLineCounts, undefined);\n      assert.equal(output.citationProfileChecks, undefined);\n      return { ok: output.ok, pendingRead: output.pendingRead, issues: output.issues };\n    };\n    observation.wrongBeforeRead = await preview(wrong, 559);\n    await h.file(executor, \"read\", candidate, { start: 1, count: 5 });\n    const partial = await h.flow(executor, \"preflight\");\n    assert.equal(partial.ok, !expectedPending);\n    assert.equal(partial.citationProfileChecks, undefined);\n    await assert.rejects(h.flow(executor, \"submit\", args(571)), /请先完整读回当前候选文件/u);\n    await h.file(executor, \"read\", candidate);\n    await assert.rejects(h.flow(executor, \"submit\", args(571)), /组合稿件统计不符/u);\n    const wrongRead = await h.flow(executor, \"preflight\", args(583));\n    assert.equal(wrongRead.ok, false);\n    assert.deepEqual(wrongRead.citationProfileChecks, result(584).citationProfileChecks);\n    observation.wrongAfterRead = { ok: wrongRead.ok, profileChecks: wrongRead.citationProfileChecks };\n    observation.correctedBeforeRead = await preview(corrected, 595);\n    await assert.rejects(h.flow(executor, \"submit\", args(601)), /请先完整读回当前候选文件/u);\n    await h.file(executor, \"read\", candidate);\n    const correctRead = await h.flow(executor, \"preflight\");\n    assert.equal(correctRead.ok, true);\n    assert.equal(correctRead.pendingRead, undefined);\n    assert.equal(correctRead.citationProfileChecks.candidateSha256, result(590).sha256);\n    assert.ok(correctRead.citationProfileChecks.clauses.every(row => row.matches));\n    const submitted = await h.flow(executor, \"submit\", args(613));\n    assert.equal(submitted.phase, result(615).phase);\n    observation.correctedAfterRead = { ok: correctRead.ok, profileChecks: correctRead.citationProfileChecks, phase: submitted.phase };\n  });\n  return observation;\n}\n\nconsole.log(JSON.stringify({ passed: true, runtime: \"registered building_loop tools in isolated host fixtures, no model calls\",\n  sourceRun: path.basename(run), eventsSha256: sha256(eventBytes),\n  trace: { wrongWrite: [553,554], wrongUnreadPreview: [559,560], fullRead: [565,566], wrongSubmit: [571,572], wrongReadPreview: [583,584],\n    correctedWrite: [589,590], correctedUnreadPreview: [595,596], unreadSubmit: [601,602], correctedFullRead: [607,608], acceptedSubmit: [613,615] },\n  before: await replay(baseline, false), after: await replay(current, true) }, null, 2));\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r076-rule-scope-replay.json",
+      "kind": "json",
+      "originalSha256": "bf3ccb75ef7a547738551d725debbee7bcfc8f74d51223fce5bec7956d7ec79e",
+      "publishedSha256": "bf3ccb75ef7a547738551d725debbee7bcfc8f74d51223fce5bec7956d7ec79e",
+      "data": {
+        "passed": true,
+        "run": "20261110T063221Z",
+        "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+        "eventsSha256": "20bdd55183eab9b95975685a0d6e9e9cb4b01fae19928676e41e977eb3da46d1",
+        "blockId": "B10-1aa3ca1c",
+        "historical": {
+          "commit": "ebe0b0cc05c64a2fec2be074b4e601d1b2e5c963",
+          "candidateWriteCallLine": 334,
+          "candidateWriteResultLine": 335,
+          "actualToolCallLine": 490,
+          "originalRejectResultLine": 509,
+          "argumentsSha256": "ba427406dae8faace34c50215fcc483a2ef15c672f1bfb4d7357e3aa33471c07",
+          "rejected": {
+            "block": "B10-1aa3ca1c",
+            "line": 7,
+            "text": "，所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级",
+            "lineText": "[模拟] 按本例规则只能由 A 级推出应送复核，不能反推，所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级（出处：sources/synthetic.md 第 4-5 行）。",
+            "basis": "反例可构造：设另一对象 Y 因任何非 A 级理由被送复核，则“其他送复核的样本”不必是 A 级，“不能说明……也是 A 级”在逻辑上仅重复了单向规则，未获新证据；但本句把“不能反推”当理由推出了一个关于其他样本的否定性结论，而原文只给单向规则足以支撑的就是“不能反推”本身。该串接缺少桥接原文，故证据不足。",
+            "repair": "原位收窄为规则本身允许的范围：只写“按本例规则只能由 A 级推出应送复核，不能反推”（已由第 4 行单向规则直接支撑），删除“所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级”这一未经原文桥接的延伸结论。",
+            "finding": {
+              "kind": "invalid-inference",
+              "quote": "所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级",
+              "fix": "原位收窄为规则本身允许的范围：只写“按本例规则只能由 A 级推出应送复核，不能反推”（已由第 4 行单向规则直接支撑），删除“所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级”这一未经原文桥接的延伸结论。"
+            },
+            "status": "unsupported",
+            "repairBaseline": {
+              "version": 1,
+              "quote": "所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级",
+              "line": 7,
+              "start": 29,
+              "end": 59,
+              "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+              "kind": "invalid-inference",
+              "scopeMarkers": [],
+              "refs": [
+                {
+                  "file": "sources/synthetic.md",
+                  "start": 4,
+                  "end": 5,
+                  "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+                  "rangeHash": "aec4a550f5623cd33def7ce3519d0851ccaf54335ba054a057dadf9153cd3d2a",
+                  "lineHashes": [
+                    "979917c947a0b324fe494171a39dc2aa8a949be5811ac2814ad62c99c6a8e3ef",
+                    "1ea34a0fa9c4a45d565389c9479d4db6e5f0691ebb72d3c02fef54cad92fcdb3"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "current": {
+          "moduleSha256": "cf9378fc43ee2d18df4a405a81bd82ac65b9901a856f97b4d0c4b1272ecaa2d5",
+          "unchangedInputError": "B10-1aa3ca1c: [coverage-non-entailment] 两种其他对象均与引用前提相容，‘不能说明’成立。只改核验状态，不要求作者删改正确正文。",
+          "debtAfterFalseReturn": 0,
+          "correctedReviewOnly": [
+            "B10-1aa3ca1c"
+          ],
+          "originalDraftUnchanged": true,
+          "proof": {
+            "rule": "bounded-non-entailment",
+            "premises": [
+              {
+                "file": "sources/synthetic.md",
+                "start": 4,
+                "end": 4,
+                "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+                "origin": {
+                  "kind": "synthetic",
+                  "locator": "synthetic:bounded-logic-fixture",
+                  "integrity": "matches-pin"
+                },
+                "quote": "本例分级规则：如果一个样本是 A 级，则该样本应送复核。"
+              },
+              {
+                "file": "sources/synthetic.md",
+                "start": 5,
+                "end": 5,
+                "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+                "origin": {
+                  "kind": "synthetic",
+                  "locator": "synthetic:bounded-logic-fixture",
+                  "integrity": "matches-pin"
+                },
+                "quote": "本例对象：样本 X 是 A 级。"
+              }
+            ],
+            "scope": "仅据同行两条明确前提及同一例内的单向规则判断，假设的其他对象不代表真实观测。",
+            "assumptions": [],
+            "counterexample": {
+              "possible": false,
+              "reason": "可假设其他对象既符合动作要求也已执行该动作，而分类分别为真、假；两种假设均与给定前提相容。"
+            },
+            "nonEntailment": {
+              "assertion": {
+                "line": 7,
+                "start": 28,
+                "end": 59,
+                "quoteSha256": "b75d072b3042e964a054be658ce282e57e9c2769aa8f8a6005546779c68052c4"
+              },
+              "kind": "non-entailment",
+              "holds": true,
+              "source": {
+                "file": "sources/synthetic.md",
+                "start": 4,
+                "end": 5,
+                "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd"
+              },
+              "entity": "样本",
+              "object": "X",
+              "antecedent": "A 级",
+              "consequent": "应送复核",
+              "witnesses": [
+                {
+                  "otherAntecedent": false,
+                  "otherConsequent": true,
+                  "otherObservedAction": true
+                },
+                {
+                  "otherAntecedent": true,
+                  "otherConsequent": true,
+                  "otherObservedAction": true
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "path": "building-loop-efficiency-index-validation/r18-final-review.json",
       "kind": "json",
       "originalSha256": "1f702f343d417b6bd1ba2467a87e461aed686ec1dd413176fc149608972a5734",
@@ -5671,6 +6606,81 @@
       "originalSha256": "d56bfb9f4d9b76354ba5635fa4d433d1fe53b8ff96253df06ddca540f6f1ddca",
       "publishedSha256": "bc5bb0b949ff09ca98013eb18dd9b6e76e8112a1ed31f91dd9aa66156d4a6900",
       "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (353.0764ms)\n✔ a real unsupported factual heading remains valid repair debt (290.6871ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (370.7775ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.8513ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (270.531ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (479.6918ms)\n✔ recording an observed unit interruption returns its existing host ledger item (110.6319ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (70.4328ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (869.3965ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (913.7748ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (766.1264ms)\n✔ host ledger labels registration text separately before any model disposition exists (50.5394ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (678.529ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (776.1982ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (19.5391ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (171.8127ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (4.7402ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (21.9403ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (35.75ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (16.0392ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (17.9194ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (22.694ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (19.6395ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (63.8711ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (25.9594ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.6841ms)\n✔ inventory pagination never drops trailing blocks (25.6227ms)\n✔ equality transitivity requires a shared middle concept (35.6887ms)\n✔ calculated proof binds the configured script and its real raw data (38.5343ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (13.1081ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (17.7714ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (34.7047ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (33.2644ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (27.7028ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (32.7668ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (162.1735ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (64.8806ms)\n✔ classification disagreement is distinct from a proven false claim (0.7863ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.6948ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (12.5555ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (640.2786ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (4.4483ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (9.9086ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (38.6243ms)\n✔ visible error examples need counterevidence but are not endorsed facts (19.8099ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (201.3342ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (35.1118ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (38.6056ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (47.5553ms)\n✔ registered object counts and line membership have their own verified source object (40.7658ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (25.418ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (44.4176ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (31.1117ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (31.0089ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (34.0616ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (20.9889ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (29.6135ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (48.2916ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.6459ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (16.8379ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (15.247ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (12.4977ms)\n✔ 053234Z blocked compound statistics verify both original spans without rewriting a byte (36.7392ms)\n✔ compound counts, each ordinal set, and explicit error-example annotations reject independently (124.0661ms)\n✔ a compound statistic needs the current full read, its own source and exact proof for both clauses (45.0776ms)\n✔ compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text (41.1626ms)\n✔ unbounded or attached additional statistics do not borrow the recognized exact proof (34.1266ms)\n✔ an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows (61.8465ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (18.8324ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (20.4197ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (82.2474ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (26.2364ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (59.3402ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (131.8343ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (28.3727ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (36.8959ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (21.2458ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (22.4223ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.2236ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (9.7414ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.556ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (43.5404ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (30.3478ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (10.8607ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (33.473ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (72.4653ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (22.6769ms)\n✔ a following coverage block's source cannot change the simulation marker's source (31.8164ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (42.0977ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.2545ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (507.249ms)\n✔ search observations survive same-role interruption but flag changed material (368.8045ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (175.1504ms)\n✔ search retention is bounded and reports omitted successful observations (640.374ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (189.0183ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (263.0425ms)\n✔ prepare pagination never stamps undisclosed lines as read (94.3046ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (171.9055ms)\n✔ supplement preflight exposes current citation lines and only the requested literal marker subsets (408.0458ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (227.1593ms)\n✔ the prepare byte budget never marks an omitted long block as presented (232.7779ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (261.7702ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (254.028ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (235.5567ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (74.8709ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (655.8613ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (0.988ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (424.908ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (358.2456ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (902.9105ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (783.3506ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (797.0075ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1816.6839ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (499.1633ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (389.9367ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (370.1116ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (479.5927ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (284.0837ms)\n✔ below-threshold and unconfigured continuations retain the original executor (473.7144ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (101.7943ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (249.1927ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (218.9562ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (556.9861ms)\n✔ rejects glob, escape and Windows path aliases (1.0027ms)\n✔ rejects an explicitly listed link, hard link or junction (3.5189ms)\n✔ keeps one byte-exact backup per file and same-phase retries (97.333ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (6.7144ms)\n✔ test\\helpers.mjs (75.665ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (3230.7582ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (10.1556ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (17.4379ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (12.4148ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (513.2519ms)\n✔ a bare first source mention cannot hide its later actual locator (0.7365ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (0.5763ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.4872ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (10.3085ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (469.8451ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (723.4558ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1727.5583ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (2126.407ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (1040.7532ms)\n✔ an example label or denial does not exempt a second unchanged assertion (586.9682ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (794.7499ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (842.4842ms)\n✔ a true source-only repair can return unchanged prose for independent verification (355.1341ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.722ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (3.335ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.1525ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.1605ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (24.1296ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (6.7577ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (330.4831ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (15.5207ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (16.7362ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (11.0882ms)\n✔ presentation cannot be submitted as a factual defect and optional advice does not block (762.6065ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (623.5376ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (794.4906ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (790.9805ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (831.078ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (765.5891ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (275.8988ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (651.3463ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (696.9203ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (730.942ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1228.2618ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (768.9416ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (426.9816ms)\n✔ changed facts with evidence only in a later table are blocked before final review (449.9472ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (779.7793ms)\n✔ observation files cannot be given to a model as writable or generated from its review (6.7084ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (249.431ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (295.0549ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (289.3508ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (321.0559ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1160.1419ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (634.6098ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (590.8499ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (888.7754ms)\nℹ tests 180\nℹ suites 0\nℹ pass 180\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 12843.736\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6-diagnostic.stderr.txt",
+      "kind": "text",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSha256": "bd85bcdb8d4e613a79cb62d0903946ad10c83e63dc75f67614c159c0dbf4d184",
+      "data": ""
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6-diagnostic.stdout.txt",
+      "kind": "text",
+      "originalSha256": "529144610de5dbf5fed8e20c53566b5138186996ed4d4938815b16e2dd804bc1",
+      "publishedSha256": "acf0fe3558275cd94b2bec956230d92484dd9b27fb464c7df69ff4211873cba3",
+      "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (450.7791ms)\n✔ a real unsupported factual heading remains valid repair debt (314.7014ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (409.4636ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.9434ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (921.1035ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (555.7605ms)\n✔ recording an observed unit interruption returns its existing host ledger item (97.3135ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (72.1639ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (939.9815ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (935.8415ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (770.9024ms)\n✔ host ledger labels registration text separately before any model disposition exists (63.5563ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (632.2719ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (756.4403ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (20.6148ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (171.7186ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (5.1235ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (22.4693ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (61.4826ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (27.7465ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (37.0918ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (37.5476ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (26.8168ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (74.2155ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (28.6173ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.5069ms)\n✔ inventory pagination never drops trailing blocks (20.769ms)\n✔ equality transitivity requires a shared middle concept (24.8901ms)\n✔ calculated proof binds the configured script and its real raw data (39.2686ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (12.6998ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (13.0474ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (40.0869ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (30.9929ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (31.2188ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (32.7419ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (175.7285ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (66.1013ms)\n✔ classification disagreement is distinct from a proven false claim (0.608ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.6053ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (15.7981ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (1349.487ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (6.6957ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (17.9765ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (44.9569ms)\n✔ visible error examples need counterevidence but are not endorsed facts (19.0516ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (240.5026ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (45.2159ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (36.7594ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (39.868ms)\n✔ registered object counts and line membership have their own verified source object (36.7378ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (24.234ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (38.4875ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (27.7387ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (26.4514ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (20.902ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (15.736ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (22.7224ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (44.6471ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.3964ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (23.1021ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (13.4871ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (19.234ms)\n✔ 063221Z preserves the original valid rule non-entailment and retires its false author finding (83.8338ms)\n✔ same one-way premises cannot establish the affirmative opposite and preserve the exact finding (60.2757ms)\n✔ bounded inference requires the same cited rule, classification, action, object and current reads (93.2749ms)\n✔ 053234Z blocked compound statistics verify both original spans without rewriting a byte (29.5802ms)\n✔ compound counts, each ordinal set, and explicit error-example annotations reject independently (118.6789ms)\n✔ executor preflight measures the same current candidate profiles as review, using only its approved sources (29.8864ms)\n✔ a compound statistic needs the current full read, its own source and exact proof for both clauses (44.163ms)\n✔ compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text (49.144ms)\n✔ unbounded or attached additional statistics do not borrow the recognized exact proof (53.2701ms)\n✔ an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows (68.8453ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (20.7643ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (21.2536ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (100.6793ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (32.9548ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (67.7131ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (158.4624ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (30.9516ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (39.1027ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (21.3181ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (27.8058ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.3301ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (15.0986ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.8262ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (44.7051ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (22.4228ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (10.4758ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (36.3696ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (68.9449ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (22.5268ms)\n✔ a following coverage block's source cannot change the simulation marker's source (31.9952ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (33.2347ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.2886ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (614.6897ms)\n✔ search observations survive same-role interruption but flag changed material (434.7495ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (195.8256ms)\n✔ search retention is bounded and reports omitted successful observations (1355.3132ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (180.0848ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (259.0779ms)\n✔ prepare pagination never stamps undisclosed lines as read (112.3403ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (175.9834ms)\n✔ supplement preflight and submit block wrong compound stats and expose actual marker subsets (679.8796ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (241.2098ms)\n✔ the prepare byte budget never marks an omitted long block as presented (228.4458ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (268.0411ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (260.5093ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (238.9521ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (66.8082ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (645.2087ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (0.7851ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (436.4829ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (377.062ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (815.4445ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (742.6454ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (757.1626ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1894.4877ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (670.7862ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (411.7126ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (436.7917ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (524.8873ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (347.5232ms)\n✔ below-threshold and unconfigured continuations retain the original executor (514.0481ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (109.4861ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (254.4583ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (295.0877ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (597.6539ms)\n✔ rejects glob, escape and Windows path aliases (1.118ms)\n✔ rejects an explicitly listed link, hard link or junction (6.4174ms)\n✔ keeps one byte-exact backup per file and same-phase retries (128.0393ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (10.3094ms)\n✔ test\\helpers.mjs (81.6962ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (4217.1755ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (9.3963ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (16.5586ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (10.8644ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (517.2291ms)\n✔ a bare first source mention cannot hide its later actual locator (0.7086ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (0.4798ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.4504ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (11.9528ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (584.4792ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (1442.1241ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1863.1822ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (2135.1357ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (1032.898ms)\n✔ an example label or denial does not exempt a second unchanged assertion (545.4555ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (735.3405ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (807.8284ms)\n✔ a true source-only repair can return unchanged prose for independent verification (373.5671ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.661ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (1.7561ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.184ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.1519ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (28.9694ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (12.8642ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (425.723ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (23.3955ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (14.2546ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (7.8947ms)\n✖ presentation cannot be submitted as a factual defect and optional advice does not block (399.1995ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (1357.4828ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (816.0877ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (922.9086ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (845.2586ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (741.0353ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (251.092ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (640.1036ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (703.1534ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (693.5357ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1160.7855ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (800.4933ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (434.7407ms)\n✔ changed facts with evidence only in a later table are blocked before final review (468.2846ms)\n✔ a C4 finding accepts exact prefix and partial body and persists the current body span (339.401ms)\n✔ a C4 finding accepts entire exact Markdown row and persists the current body span (271.4252ms)\n✔ a C4 finding accepts literal body without heading and persists the current body span (251.369ms)\n✔ missing C4 findings, heading-only, wrong IDs and nonliteral text remain parameter errors (314.1887ms)\n✔ an exact heading grants neither stale candidate bytes nor unauthorized counterevidence (871.0009ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (900.0702ms)\n✔ observation files cannot be given to a model as writable or generated from its review (14.725ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (904.0962ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (325.2335ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (370.7109ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (289.8881ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1292.4635ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (643.882ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (606.8766ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (842.1426ms)\nℹ tests 189\nℹ suites 0\nℹ pass 188\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 14407.7652\n\n✖ failing tests:\n\ntest at test\\repairs.test.mjs:151:1\n✖ presentation cannot be submitted as a factual defect and optional advice does not block (399.1995ms)\n  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /真实存在/. Input:\n  \n  'Error: C1 的 finding.quote 未绑定当前候选正文。候选第 2 行正文为 \"通过 19/20（出处：functional.csv 第 2 行）。\"，从该行复制实际有问题的片段。请在原核验阶段更正参数'\n  \n      at async file:///$WORKSPACE/work/building-loop/test/repairs.test.mjs:154:3\n      at async file:///$WORKSPACE/work/building-loop/test/repairs.test.mjs:147:5\n      at async fixture (file:///$WORKSPACE/work/building-loop/test/helpers.mjs:50:5)\n      at async acceptedFixture (file:///$WORKSPACE/work/building-loop/test/repairs.test.mjs:129:3)\n      at async Test.run (node:internal/test_runner/test:1313:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: Error: C1 的 finding.quote 未绑定当前候选正文。候选第 2 行正文为 \"通过 19/20（出处：functional.csv 第 2 行）。\"，从该行复制实际有问题的片段。请在原核验阶段更正参数\n        at reviewFinding (file:///$WORKSPACE/work/building-loop/governance/index.mjs:1271:11)\n        at file:///$WORKSPACE/work/building-loop/governance/index.mjs:1298:23\n        at Array.map (<anonymous>)\n        at reviewChecks (file:///$WORKSPACE/work/building-loop/governance/index.mjs:1289:14)\n        at file:///$WORKSPACE/work/building-loop/governance/index.mjs:906:23\n        at change (file:///$WORKSPACE/work/building-loop/governance/index.mjs:253:22)\n        at report (file:///$WORKSPACE/work/building-loop/governance/index.mjs:856:12)\n        at workflow (file:///$WORKSPACE/work/building-loop/governance/index.mjs:999:35)\n        at Object.execute (file:///$WORKSPACE/work/building-loop/governance/index.mjs:104:46)\n        at invoke (file:///$WORKSPACE/work/building-loop/test/helpers.mjs:91:54),\n    expected: /真实存在/,\n    operator: 'rejects',\n    diff: 'simple'\n  }\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6-initial.stderr.txt",
+      "kind": "text",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSha256": "bd85bcdb8d4e613a79cb62d0903946ad10c83e63dc75f67614c159c0dbf4d184",
+      "data": ""
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6-initial.stdout.txt",
+      "kind": "text",
+      "originalSha256": "99f9b9dafc572094069e0d006f260c2cda30657802e198cbd1e35085480f2eaa",
+      "publishedSha256": "0be0bd2c3e8a9f8682201ab0fbda293bda79543634ba1f6e9ce74d292636271f",
+      "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (399.9598ms)\n✔ a real unsupported factual heading remains valid repair debt (312.7913ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (424.196ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.7138ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (322.7995ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (504.2978ms)\n✔ recording an observed unit interruption returns its existing host ledger item (105.4665ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (84.0044ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (911.4767ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (991.0319ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (820.0057ms)\n✔ host ledger labels registration text separately before any model disposition exists (62.1668ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (624.3066ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (783.9187ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (16.3385ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (172.3138ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (5.4679ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (18.8107ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (44.4611ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (17.1542ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (23.9217ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (31.1948ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (15.1381ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (69.6576ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (26.1593ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.6169ms)\n✔ inventory pagination never drops trailing blocks (22.2791ms)\n✔ equality transitivity requires a shared middle concept (26.8174ms)\n✔ calculated proof binds the configured script and its real raw data (38.6879ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (9.7243ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (16.8234ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (31.8877ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (29.2858ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (30.0016ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (29.581ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (169.6709ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (70.155ms)\n✔ classification disagreement is distinct from a proven false claim (0.8501ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.4259ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (14.2643ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (746.4683ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (4.1942ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (13.5494ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (43.9558ms)\n✔ visible error examples need counterevidence but are not endorsed facts (21.8846ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (231.8894ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (38.4715ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (40.6848ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (47.4809ms)\n✔ registered object counts and line membership have their own verified source object (47.9723ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (24.8457ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (46.1526ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (24.5871ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (32.1964ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (27.6634ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (16.6922ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (28.3804ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (50.5549ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.4253ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (19.4049ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (14.8465ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (16.6985ms)\n✔ 063221Z preserves the original valid rule non-entailment and retires its false author finding (85.5485ms)\n✔ same one-way premises cannot establish the affirmative opposite and preserve the exact finding (61.0774ms)\n✔ bounded inference requires the same cited rule, classification, action, object and current reads (94.3145ms)\n✔ 053234Z blocked compound statistics verify both original spans without rewriting a byte (29.0639ms)\n✔ compound counts, each ordinal set, and explicit error-example annotations reject independently (131.3014ms)\n✔ executor preflight measures the same current candidate profiles as review, using only its approved sources (28.3167ms)\n✔ a compound statistic needs the current full read, its own source and exact proof for both clauses (39.1498ms)\n✔ compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text (39.8023ms)\n✔ unbounded or attached additional statistics do not borrow the recognized exact proof (30.9793ms)\n✔ an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows (59.103ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (18.5015ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (19.2265ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (88.1655ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (29.2414ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (62.3795ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (149.2946ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (28.082ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (39.6762ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (22.642ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (33.8128ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.4074ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (12.9058ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.6282ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (49.9607ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (25.5946ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (12.3614ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (43.4674ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (81.9215ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (28.1259ms)\n✔ a following coverage block's source cannot change the simulation marker's source (35.3593ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (37.7202ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.3226ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (601.2925ms)\n✔ search observations survive same-role interruption but flag changed material (437.6514ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (200.2779ms)\n✔ search retention is bounded and reports omitted successful observations (703.9213ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (206.8569ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (278.5474ms)\n✔ prepare pagination never stamps undisclosed lines as read (103.7595ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (178.8191ms)\n✔ supplement preflight and submit block wrong compound stats and expose actual marker subsets (618.0716ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (260.5538ms)\n✔ the prepare byte budget never marks an omitted long block as presented (267.2471ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (258.926ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (274.0474ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (237.1221ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (80.6973ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (655.6257ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (0.8171ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (457.5717ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (375.3356ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (852.582ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (741.4872ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (707.4508ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1738.0428ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (470.3676ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (402.5876ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (388.8304ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (560.5682ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (312.7563ms)\n✔ below-threshold and unconfigured continuations retain the original executor (471.1366ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (102.4807ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (244.4207ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (255.4002ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (623.4158ms)\n✔ rejects glob, escape and Windows path aliases (1.1489ms)\n✔ rejects an explicitly listed link, hard link or junction (5.5467ms)\n✔ keeps one byte-exact backup per file and same-phase retries (92.2693ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (7.584ms)\n✔ test\\helpers.mjs (71.2865ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (3625.5277ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (8.3167ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (16.324ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (13.3045ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (531.0781ms)\n✔ a bare first source mention cannot hide its later actual locator (0.4845ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (0.3246ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.275ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (11.7408ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (536.6566ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (847.9904ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1810.6114ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (2268.8822ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (1054.2677ms)\n✔ an example label or denial does not exempt a second unchanged assertion (547.5933ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (721.1667ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (750.6745ms)\n✔ a true source-only repair can return unchanged prose for independent verification (354.8838ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.6214ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (1.5238ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.1277ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.9599ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (18.9223ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (9.027ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (384.3218ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (15.7758ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (15.8575ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (9.1544ms)\n✖ presentation cannot be submitted as a factual defect and optional advice does not block (347.635ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (736.9983ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (846.3025ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (889.2099ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (871.1356ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (812.1332ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (240.4422ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (649.8559ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (713.777ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (686.3148ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1150.0574ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (786.0206ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (405.5017ms)\n✔ changed facts with evidence only in a later table are blocked before final review (446.0657ms)\n✔ a C4 finding accepts exact prefix and partial body and persists the current body span (286.5406ms)\n✔ a C4 finding accepts entire exact Markdown row and persists the current body span (251.7666ms)\n✔ a C4 finding accepts literal body without heading and persists the current body span (250.0133ms)\n✔ missing C4 findings, heading-only, wrong IDs and nonliteral text remain parameter errors (316.8658ms)\n✔ an exact heading grants neither stale candidate bytes nor unauthorized counterevidence (274.5723ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (888.9271ms)\n✔ observation files cannot be given to a model as writable or generated from its review (10.6223ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (265.0013ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (332.3704ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (337.376ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (320.2454ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1264.7375ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (656.6762ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (659.3712ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (854.8272ms)\nℹ tests 189\nℹ suites 0\nℹ pass 188\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 13337.795\n\n✖ failing tests:\n\ntest at test\\repairs.test.mjs:151:1\n✖ presentation cannot be submitted as a factual defect and optional advice does not block (347.635ms)\n  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /事实退回/. Input:\n  \n  'Error: C1 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope。候选第 2 行正文为 \"通过 19/20（出处：functional.csv 第 2 行）。\"，从该行复制实际有问题的片段'\n  \n      at async file:///$WORKSPACE/work/building-loop/test/repairs.test.mjs:153:3\n      at async file:///$WORKSPACE/work/building-loop/test/repairs.test.mjs:147:5\n      at async fixture (file:///$WORKSPACE/work/building-loop/test/helpers.mjs:50:5)\n      at async acceptedFixture (file:///$WORKSPACE/work/building-loop/test/repairs.test.mjs:129:3)\n      at async Test.run (node:internal/test_runner/test:1313:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: Error: C1 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope。候选第 2 行正文为 \"通过 19/20（出处：functional.csv 第 2 行）。\"，从该行复制实际有问题的片段\n        at reviewFinding (file:///$WORKSPACE/work/building-loop/governance/index.mjs:1262:11)\n        at file:///$WORKSPACE/work/building-loop/governance/index.mjs:1298:23\n        at Array.map (<anonymous>)\n        at reviewChecks (file:///$WORKSPACE/work/building-loop/governance/index.mjs:1289:14)\n        at file:///$WORKSPACE/work/building-loop/governance/index.mjs:906:23\n        at change (file:///$WORKSPACE/work/building-loop/governance/index.mjs:253:22)\n        at report (file:///$WORKSPACE/work/building-loop/governance/index.mjs:856:12)\n        at workflow (file:///$WORKSPACE/work/building-loop/governance/index.mjs:999:35)\n        at Object.execute (file:///$WORKSPACE/work/building-loop/governance/index.mjs:104:46)\n        at invoke (file:///$WORKSPACE/work/building-loop/test/helpers.mjs:91:54),\n    expected: /事实退回/,\n    operator: 'rejects',\n    diff: 'simple'\n  }\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6.json",
+      "kind": "json",
+      "originalSha256": "02853238b4e0f5483d6891e58b6c47a8cbe0b48430e6085bd6c174ed111ca833",
+      "publishedSha256": "02853238b4e0f5483d6891e58b6c47a8cbe0b48430e6085bd6c174ed111ca833",
+      "data": {
+        "command": "node --test",
+        "node": "v24.16.0",
+        "stats": {
+          "tests": 189,
+          "pass": 189,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "stdoutSha256": "c1a8e3eacf789104e473eab0485605cdce111aeb2e5f7b6b0bf37878e92ae4fa",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtimeHashes": {
+          "cordis.patch.yml": "e7703cd5235393ffaa1b821738a8f423b2ad7d4d89b158f7aff3140f28d9de55",
+          "governance/index.mjs": "3b8c1c1fccc235d19071a22b2c97c701b0be3a65bba01f2b284fb5a1a56b84e5",
+          "governance/policy.mjs": "639a8fc6bbd413419b651358cf9e824135de2a03a8a3e855372810f56f81eab9",
+          "governance/preflight.mjs": "70f400ee74af7f4a822def885e47fd5bc317f164909864e7cb743e72a51603dd",
+          "governance/evidence.mjs": "afbcdf67f0aa29055b6c6e9120d1ac89adadede8c83e1984633a663bad49ac6a",
+          "governance/ledger.mjs": "f8540f55c8ba1c75cf116fb54bd7d84133e391916dc39520fd94f7f03e07af62",
+          "governance/goals.mjs": "9cee460386fbb44151c76f72cd40a361feedd7aba4b4f81cebd6ce013c4eb935",
+          "governance/coverage.mjs": "cf9378fc43ee2d18df4a405a81bd82ac65b9901a856f97b4d0c4b1272ecaa2d5",
+          "turn-resume/index.mjs": "470e16ecc8a5e3292779c0f258aaff74a2b81e686b161336ceecb8c4b90847ce",
+          "skills/dispatch-protocol/SKILL.md": "0cdfdc0acece22825bc88bc40d2e6e1f5626a94d767a9f9825a4653d49f9a97a"
+        },
+        "priorDiagnosticRuns": "Two outdated rejection-message assertions from one test updated; real rejection remained in both captures."
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6.stderr.txt",
+      "kind": "text",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSha256": "bd85bcdb8d4e613a79cb62d0903946ad10c83e63dc75f67614c159c0dbf4d184",
+      "data": ""
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.6.stdout.txt",
+      "kind": "text",
+      "originalSha256": "c1a8e3eacf789104e473eab0485605cdce111aeb2e5f7b6b0bf37878e92ae4fa",
+      "publishedSha256": "a9a02c6d8ebf7f786df45399fde73354249086b5fde56d7ee9052e3ec729168d",
+      "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (388.8954ms)\n✔ a real unsupported factual heading remains valid repair debt (301.0383ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (412.8575ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.7161ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (309.7152ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (455.0522ms)\n✔ recording an observed unit interruption returns its existing host ledger item (103.1107ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (69.0532ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (897.4257ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (955.3489ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (781.6913ms)\n✔ host ledger labels registration text separately before any model disposition exists (57.0122ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (614.8429ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (740.2077ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (22.3819ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (148.7569ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (4.2453ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (16.9386ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (42.8002ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (19.4339ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (14.3994ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (22.5552ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (17.1124ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (77.0587ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (32.935ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.6443ms)\n✔ inventory pagination never drops trailing blocks (25.0441ms)\n✔ equality transitivity requires a shared middle concept (40.9953ms)\n✔ calculated proof binds the configured script and its real raw data (38.7316ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (17.612ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (16.2954ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (38.0382ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (25.7761ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (32.9113ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (33.902ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (154.188ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (63.2795ms)\n✔ classification disagreement is distinct from a proven false claim (0.6737ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.4037ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (14.2341ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (717.4539ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (3.7963ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (11.5349ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (37.1479ms)\n✔ visible error examples need counterevidence but are not endorsed facts (19.0431ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (201.3908ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (39.8956ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (32.8379ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (42.1455ms)\n✔ registered object counts and line membership have their own verified source object (37.1284ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (22.7744ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (38.9719ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (24.7648ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (28.4892ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (22.1711ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (18.1298ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (22.4648ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (47.4255ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.6564ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (14.9326ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (11.2493ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (12.5265ms)\n✔ 063221Z preserves the original valid rule non-entailment and retires its false author finding (79.2168ms)\n✔ same one-way premises cannot establish the affirmative opposite and preserve the exact finding (53.349ms)\n✔ bounded inference requires the same cited rule, classification, action, object and current reads (84.6046ms)\n✔ 053234Z blocked compound statistics verify both original spans without rewriting a byte (30.0231ms)\n✔ compound counts, each ordinal set, and explicit error-example annotations reject independently (121.836ms)\n✔ executor preflight measures the same current candidate profiles as review, using only its approved sources (30.7877ms)\n✔ a compound statistic needs the current full read, its own source and exact proof for both clauses (36.8857ms)\n✔ compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text (44.5478ms)\n✔ unbounded or attached additional statistics do not borrow the recognized exact proof (32.3884ms)\n✔ an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows (60.9257ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (17.9201ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (21.8308ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (94.6191ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (27.5142ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (56.8965ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (148.7495ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (27.694ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (36.947ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (24.0175ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (31.1542ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.5141ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (14.9239ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.4903ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (44.8545ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (25.4894ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (14.1813ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (36.1388ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (70.3675ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (27.7788ms)\n✔ a following coverage block's source cannot change the simulation marker's source (30.6205ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (45.5089ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.369ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (571.5075ms)\n✔ search observations survive same-role interruption but flag changed material (390.2872ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (189.0119ms)\n✔ search retention is bounded and reports omitted successful observations (634.2977ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (177.6773ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (248.5769ms)\n✔ prepare pagination never stamps undisclosed lines as read (108.6448ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (155.2931ms)\n✔ supplement preflight and submit block wrong compound stats and expose actual marker subsets (621.8071ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (238.1087ms)\n✔ the prepare byte budget never marks an omitted long block as presented (234.0243ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (256.8501ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (267.2111ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (240.8363ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (81.2682ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (635.0736ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (0.7632ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (454.9077ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (338.8422ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (797.7124ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (747.7796ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (720.9547ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1796.4859ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (502.3742ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (416.9609ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (384.4387ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (491.4221ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (292.4946ms)\n✔ below-threshold and unconfigured continuations retain the original executor (482.8568ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (97.808ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (253.8274ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (233.8021ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (571.5335ms)\n✔ rejects glob, escape and Windows path aliases (0.6908ms)\n✔ rejects an explicitly listed link, hard link or junction (3.4282ms)\n✔ keeps one byte-exact backup per file and same-phase retries (98.8063ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (7.6991ms)\n✔ test\\helpers.mjs (88.1168ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (3347.4185ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (9.5239ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (13.37ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (15.6219ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (528.0761ms)\n✔ a bare first source mention cannot hide its later actual locator (0.5236ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (0.3555ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.4128ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (10.8452ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (524.2091ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (800.9928ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1726.3395ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (2127.2927ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (976.5601ms)\n✔ an example label or denial does not exempt a second unchanged assertion (542.8339ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (745.5896ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (761.9568ms)\n✔ a true source-only repair can return unchanged prose for independent verification (333.4078ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.4272ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (1.6078ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.1254ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.0812ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (18.2193ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (9.3008ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (370.0527ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (18.0517ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (12.6995ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (15.4702ms)\n✔ presentation cannot be submitted as a factual defect and optional advice does not block (851.7687ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (631.3935ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (771.7036ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (884.7047ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (871.5699ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (699.5858ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (293.9969ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (581.746ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (626.8563ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (702.5805ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1136.6507ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (780.5358ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (418.5658ms)\n✔ changed facts with evidence only in a later table are blocked before final review (459.4613ms)\n✔ a C4 finding accepts exact prefix and partial body and persists the current body span (286.0238ms)\n✔ a C4 finding accepts entire exact Markdown row and persists the current body span (235.7068ms)\n✔ a C4 finding accepts literal body without heading and persists the current body span (242.2259ms)\n✔ missing C4 findings, heading-only, wrong IDs and nonliteral text remain parameter errors (291.5826ms)\n✔ an exact heading grants neither stale candidate bytes nor unauthorized counterevidence (236.0262ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (840.0484ms)\n✔ observation files cannot be given to a model as writable or generated from its review (6.2103ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (264.0063ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (299.6386ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (303.8193ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (296.1221ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1223.2125ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (639.9612ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (597.5803ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (880.0229ms)\nℹ tests 189\nℹ suites 0\nℹ pass 189\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 12969.9243\n"
     },
     {
       "path": "building-loop-efficiency-index-validation/regression-0f0e8b32458c.json",

@@ -150,8 +150,8 @@ async function acceptedFixture(run) {
 
 test("presentation cannot be submitted as a factual defect and optional advice does not block",async()=>acceptedFixture(async({h,reviewer,readReview,assessment,check})=>{
   await readReview();
-  await assert.rejects(h.flow(reviewer,"review",{checks:[{...check,status:"unsupported",finding:{kind:"presentation",quote:"通过 19/20",fix:"写得更详细"}}]}),/事实退回/);
-  await assert.rejects(h.flow(reviewer,"review",{checks:[{...check,status:"unsupported",finding:{kind:"missing-evidence",quote:"27.3",fix:"补写精确值"}}]}),/真实存在/);
+  await assert.rejects(h.flow(reviewer,"review",{checks:[{...check,status:"unsupported",finding:{kind:"presentation",quote:"通过 19/20",fix:"写得更详细"}}]}),/kind 须为 missing-evidence、contradiction 或 scope/);
+  await assert.rejects(h.flow(reviewer,"review",{checks:[{...check,status:"unsupported",finding:{kind:"missing-evidence",quote:"27.3",fix:"补写精确值"}}]}),/finding\.quote 未绑定当前候选正文/);
   await assert.rejects(h.assess(reviewer,{...assessment,revise:["detail"]}),/revisions/);
   await h.assess(reviewer,assessment);
   assert.equal((await h.flow(reviewer,"review",{checks:[check]})).phase,"ledger-review");
