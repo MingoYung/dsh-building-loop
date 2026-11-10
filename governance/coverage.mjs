@@ -241,7 +241,12 @@ function validateAttribution(frame,active,spec,block,parts,visible) {
   if(!spec.requireSourcePins)return null;
   const grant=spec.phases[active.phase],bound=listedAttribution(block,grant.evidence)??explicitAttribution(block,grant.evidence);
   if(!bound||[...verbatimQuotes(block.text)].length||!visible(block.line))return null;
-  const facts=parts.filter(part=>part.start<bound.start&&["direct","inference"].includes(part.kind)&&!part.objectCheck);
+  const marker=simulationMarker(block.text);
+  // An isolated [模拟] proof establishes the cited file's scope. Its header can
+  // live outside the cited substantive rows. A part with any narrative text
+  // still has to bind that narrative to its exact attribution below.
+  const scopeOnly=part=>marker&&part.start<=marker.start&&part.end>=marker.end&&!block.text.slice(marker.end,part.end).trim();
+  const facts=parts.filter(part=>part.start<bound.start&&["direct","inference"].includes(part.kind)&&!part.objectCheck&&!scopeOnly(part));
   const supported=facts.some(part=>part.status==="supported");
   if(!supported) {
     // An explicit claim of provenance is still attributable when both models

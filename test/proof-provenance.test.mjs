@@ -18,13 +18,13 @@ const rejecting={kind:"direct",status:"unsupported",sourceRelation:"insufficient
 const numbered=(id,ref)=>({id,status:"supported",file:ref.file,start:ref.start,end:ref.end,basis:"已读取匹配的原文行。"});
 const quality=Object.fromEntries(Object.entries(QUALITY).map(([key,label])=>[key,"本用例核对 " + label]));
 
-async function setup(root,write,body) {
+async function setup(root,write,body,{secondSource=secondRef.quote+"\n",secondKind="primary"}={}) {
   const p=structuredClone(policy),spec=p.units.K01;
   spec.claims=body.includes("C2：")?["C1","C2"]:["C1"];
   spec.calculations={};
   spec.requireSourcePins=true;
-  p.sourcePins=Object.fromEntries([[firstRef.file,"passed,total\n19,20\n"],[secondRef.file,secondRef.quote+"\n"]]
-    .map(([file,bytes])=>{write(file,bytes);return [file,{kind:"primary",locator:"内部项目原始记录 "+file,sha256:digest(bytes)}];}));
+  p.sourcePins=Object.fromEntries([[firstRef.file,"passed,total\n19,20\n","primary"],[secondRef.file,secondSource,secondKind]]
+    .map(([file,bytes,kind])=>{write(file,bytes);return [file,{kind,locator:"内部项目原始记录 "+file,sha256:digest(bytes)}];}));
   for(const phase of ["first-review","final-review"]) {
     spec.phases[phase].read=["candidate.md","overview.md",firstRef.file,secondRef.file];
     spec.phases[phase].evidence=[firstRef.file,secondRef.file];
@@ -81,6 +81,33 @@ test("a real but different source cannot replace the explicit supported prose lo
   const ref=(await h.coverage(reviewer,"status",{block:packet.coverage.blocks[0].id})).record.parts[0].evidence[0];
   assert.equal(ref.provenance,"maintainer-pinned-local-material");
   assert.match(ref.evidenceSpan,/^[a-f0-9]{64}$/u);
+}));
+
+const scopeHeader="# 合成逻辑样例；不是外部研究、生产日志或真实效果数据";
+const syntheticSource=[scopeHeader,"记录 A：status=completed，conclusion=failure。","模拟观测组：训练时长与分数正相关。",
+  "本例分级规则：如果一个样本是 A 级，则该样本应送复核。","本例对象：样本 X 是 A 级。",""].join("\n");
+const scopeRef={file:secondRef.file,start:1,end:1,quote:scopeHeader};
+const marker="[模拟] ";
+
+test("an independently proved simulation label does not block an unsupported substantive deduction",()=>fixture(async(root,write)=>{
+  const wrong="就能说明其他送复核的样本都不是 A 级";
+  const tail="按本例规则只能由 A 级推出应送复核，不能反推，所以样本 X 应送复核"+wrong+"（出处：deployment.md 第 4-5 行）。";
+  const {h,reviewer,packet}=await setup(root,write,c1+"\n"+marker+tail+"\n",{secondSource:syntheticSource,secondKind:"synthetic"});
+  const inferred={quote:tail,kind:"inference",status:"unsupported",sourceRelation:"insufficient",basis:"单向规则没有排除其他 A 级样本也送复核。",
+    finding:{kind:"invalid-inference",quote:wrong,fix:"撤回由单向规则推出其他对象类别的反推。"}};
+  const result=await h.coverage(reviewer,"record",{entries:packet.coverage.blocks.map(block=>({block:block.id,
+    parts:block.line===1?[supporting(firstRef)]:[{...supporting(scopeRef),quote:marker},inferred]}))});
+  assert.deepEqual(result.pending,[]);
+  assert.equal(result.rejected.length,1);
+  assert.equal(result.rejected[0].finding.quote,wrong);
+}));
+
+test("a simulation label joined to narrative cannot use its header as narrative evidence",()=>fixture(async(root,write)=>{
+  const body=marker+"所有生产环境都通过（出处：deployment.md 第 4-5 行）。";
+  const {h,reviewer,packet}=await setup(root,write,c1+"\n"+body+"\n",{secondSource:syntheticSource,secondKind:"synthetic"});
+  const result=await record(h,reviewer,packet,block=>supporting(block.line===1?firstRef:scopeRef));
+  assert.equal(result.invalid.length,1);
+  assert.match(result.invalid[0].error,/coverage-attribution/);
 }));
 
 const plain={kind:"nonfactual",status:"supported",basis:"这是结构标题，无可核的事实内容。"};
