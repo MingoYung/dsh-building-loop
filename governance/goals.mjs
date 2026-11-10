@@ -1,7 +1,22 @@
 import { digest, keyOf, readBytes } from "./policy.mjs";
 import { lineList, plainLastIssues } from "./preflight.mjs";
 import { sourceVersionCurrent } from "./evidence.mjs";
-import { requireStoredCalculations } from "./coverage.mjs";
+import { requireStoredCalculations, requireStoredObjectChecks } from "./coverage.mjs";
+
+/** Include source-backed structural locators alongside semantic and object proofs. */
+function* proofSources(coverage) {
+  for(const record of coverage?.records??[]) {
+    yield* record.syntaxSources??[];
+    for(const part of record.parts) {
+      yield* part.evidence??[];
+      yield* part.inference?.premises??[];
+      yield* part.inference?.warrant??[];
+      yield* (part.inference?.assumptions??[]).map(row=>row.evidence);
+      yield* part.objectCheck?.sources??[];
+    }
+  }
+  for(const quote of coverage?.quotations??[])yield* quote.refs;
+}
 
 /** All evidence used by either reviewer stays pinned through final ledger closure.
  * This reads host proof metadata only; it does not grant the coordinator source access.
@@ -9,15 +24,8 @@ import { requireStoredCalculations } from "./coverage.mjs";
 function requireProofSources(frame, id, active) {
   for (const coverage of [active.proof?.reviewerCoverage, active.proof?.auditorCoverage]) {
     if (!coverage?.records) throw new Error("宿主缺少完整核验证明，需重新验收");
-    for (const record of coverage.records) for (const part of record.parts) {
-      const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
-        ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
-      for (const ref of refs) {
-        if (!sourceVersionCurrent(frame.root, ref)) throw new Error("验收后来源已经变化（原文或获取回执），须重新判断，不能用旧证明关单：" + ref.file);
-      }
-    }
-    for (const quote of coverage.quotations ?? []) for (const ref of quote.refs) {
-      if (!sourceVersionCurrent(frame.root, ref)) throw new Error("验收后引文来源或获取回执已经变化");
+    for (const ref of proofSources(coverage)) {
+      if (!sourceVersionCurrent(frame.root, ref)) throw new Error("验收后来源已经变化（原文或获取回执），须重新判断，不能用旧证明关单：" + ref.file);
     }
   }
 }
@@ -71,6 +79,7 @@ export function acceptedVersion(frame, id, active) {
   }
   requireProofSources(frame, id, active);
   requireStoredCalculations(frame, frame.policy.units[id], [active.proof.reviewerCoverage, active.proof.auditorCoverage], candidate);
+  requireStoredObjectChecks(frame, frame.policy.units[id], [active.proof.reviewerCoverage, active.proof.auditorCoverage], candidate, receipt.phase);
   for (const ref of [...(receipt.checks ?? []), ...(receipt.observedSources ?? [])]) {
     if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) throw new Error("验收后编号证据或获取回执已经变化：" + ref.file);
   }
@@ -97,14 +106,7 @@ export function needsRevalidation(frame, id, active) {
     for (const ref of [...(pending.checks ?? []), ...(pending.observedSources ?? [])]) {
       if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) return true;
     }
-    for (const record of pending.coverage?.records ?? []) for (const part of record.parts) {
-      const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
-        ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
-      for (const ref of refs) {
-        if (!sourceVersionCurrent(frame.root, ref)) return true;
-      }
-    }
-    for (const quote of pending.coverage?.quotations ?? []) for (const ref of quote.refs) {
+    for (const ref of proofSources(pending.coverage)) {
       if (!sourceVersionCurrent(frame.root, ref)) return true;
     }
   }

@@ -68,6 +68,17 @@ test("prepare pagination never stamps undisclosed lines as read",async()=>fixtur
   assert.equal(b.complete,true);assert.equal((await h.flow(executor,"submit")).phase,"review-ready");
 }));
 
+test("prepare measures only the current authorized manuscript, not the asserted count",async()=>fixture(async(root,write)=>{
+  const body="- C1：通过19/20（出处：functional.csv 第 2 行）。\n- [稿件自述] 本稿有 9 行带 functional.csv 的行号定位。\n";
+  single(write,{body});
+  const h=host(root,{automaticCoverage:false});
+  assert.equal((await h.flow("root","prepare")).citationLineCounts,undefined);
+  const {reviewer}=await reviewStage(h);
+  assert.deepEqual((await h.flow(reviewer,"prepare")).citationLineCounts,[{source:"functional.csv",count:1,lines:[1]}]);
+  write("candidate.md",body+"同一资料又有一行定位（出处：functional.csv 第 2 行）。\n");
+  assert.deepEqual((await h.flow(reviewer,"prepare")).citationLineCounts,[{source:"functional.csv",count:2,lines:[1,3]}]);
+}));
+
 test("prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments",async()=>fixture(async(root,write)=>{
   single(write,{body:Array.from({length:27},(_,i)=>"# 结构分块"+(i+1)).join("\n")});
   const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
@@ -190,7 +201,7 @@ test("blind auditor has a different method, cannot read first verdict, and still
 }));
 
 /** Create a real classifier disagreement after both roles have fully reviewed. */
-async function classificationLoop(root,write,{deliverAudit=true,instructions=false}={}) {
+async function classificationLoop(root,write,{deliverAudit=true,instructions=false,partialAudit=false}={}) {
   single(write,{body:"# 说明\n- C1：通过19/20（出处：functional.csv 第 2 行）。\n本例记录通过19项，总计20项（出处：functional.csv 第 2 行）。\n"});
   if(instructions) {
     const p=JSON.parse(fs.readFileSync(path.join(root,"BUILDING-LOOP.json"),"utf8"));
@@ -205,8 +216,10 @@ async function classificationLoop(root,write,{deliverAudit=true,instructions=fal
   await h.assess(reviewer,quality());await h.flow(reviewer,"review",{checks});
   const auditor=(await h.flow("root","advance")).childId;
   await h.flow(auditor,"prepare");
+  const split="本例记录通过19项，";
+  const auditParts=partialAudit?[{...fact,quote:split},{...nonfact,quote:disputed.text.slice(split.length)}]:[fact];
   await h.coverage(auditor,"record",{entries:[{block:title.id,parts:[{...nonfact,basis:"独立反证自身检查的标题结构。"}]},
-    {block:claim.id,parts:[fact]},{block:disputed.id,parts:[fact]}]});
+    {block:claim.id,parts:[fact]},{block:disputed.id,parts:auditParts}]});
   if(deliverAudit)assert.equal((await h.flow(auditor,"audit")).phase,"review-ready");
   return {h,reviewer,auditor,title,claim,disputed};
 }
@@ -230,18 +243,34 @@ test("classification disputes require factual proof and restore only each role's
   await assert.rejects(h.flow(reviewer,"review",{checks}),/未核块/);
   await h.coverage(reviewer,"record",{entries:[{block:disputed.id,parts:[fact]}]});
   // The unchanged, version-bound quality assessment is also this same reviewer's.
-  await h.flow(reviewer,"review",{checks});
+  await h.flow(reviewer,"review");
   assert.equal((await h.flow("root","advance")).childId,auditor);
-  const second=await h.flow(auditor,"prepare");assert.deepEqual(second.files,[]);assert.deepEqual(second.coverage.pending,[disputed.id]);
+  const second=await h.flow(auditor,"prepare");assert.deepEqual(second.files,[]);assert.deepEqual(second.coverage.pending,[]);
   assert.match((await h.coverage(auditor,"status",{block:title.id})).record.parts[0].basis,/独立反证自身/);
-  await assert.rejects(h.coverage(auditor,"record",{entries:[{block:disputed.id,parts:[nonfact]}]}),/reconciliation/);
-  await h.coverage(auditor,"record",{entries:[{block:disputed.id,parts:[fact]}]});
   const accepted=await h.flow(auditor,"audit");assert.equal(accepted.phase,"ledger-review");assert.equal(accepted.reason,undefined);
   assert.equal((await h.flow("root","status")).units[0].reason,undefined);
   assert.equal((await h.flow("root","prepare")).reason,undefined);
   assert.doesNotMatch(JSON.stringify(h.notifications.at(-1)),/classification-reconciliation/);
   assert.match(h.prompt("root"),/全文块数不是行数/);
   assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),original);
+}));
+
+test("a new classification mismatch after the targeted pass blocks without reusing an acceptance",async()=>fixture(async(root,write)=>{
+  const {h,reviewer,auditor,disputed}=await classificationLoop(root,write,{partialAudit:true});
+  await h.flow("root","advance");await h.flow(reviewer,"prepare");
+  await h.coverage(reviewer,"record",{entries:[{block:disputed.id,parts:[fact]}]});
+  await h.flow(reviewer,"review",{checks});
+  await h.flow("root","advance");await h.flow(auditor,"prepare");
+  const stopped=await h.flow(auditor,"audit");
+  assert.equal(stopped.phase,"blocked");assert.equal(stopped.reason,"classification-reconciliation-unresolved");
+  assert.equal((await h.flow("root","status")).units[0].next,null);
+  await assert.rejects(h.flow("root","advance"),/定向重核已结束/);
+  await assert.rejects(h.ledger("root","review",{decisions:[]}),/复核阶段/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root,"first.json"),"utf8")).decision,"pending-audit");
+  write("overview.md","# 当前目标\n明确两项数值均需要按来源核验。\n");
+  assert.equal((await h.flow("root","advance")).childId,reviewer);
+  const changed=await h.flow(reviewer,"prepare");
+  assert.equal(changed.reconciliation,undefined);assert.equal(changed.coverage.pendingCount,changed.coverage.total);
 }));
 
 test("changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse",async()=>{

@@ -1,6 +1,6 @@
-import { digest, keyOf, readBytes } from "./policy.mjs";
+import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseline } from "./preflight.mjs";
-import { evidenceReference, UnobservedExcerptError } from "./evidence.mjs";
+import { evidenceReference, registeredObservation, UnobservedExcerptError } from "./evidence.mjs";
 
 export const COVERAGE_VERSION = 1;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
@@ -54,6 +54,230 @@ function sourceQuote(frame, active, spec, value) {
   // Preserve per-line citations instead of inventing a bridge between excerpts.
   if (ref.origin?.observation && /[\r\n]/u.test(value.quote)) throw new Error("登记的独立来源摘录不能用跨行 quote 拼成连续原话，请逐行分别引用");
   return { ...ref, quote: value.quote };
+}
+
+/** Object-check failures distinguish a review-parameter/read problem from a
+ * measured manuscript contradiction. Only the latter creates author repair debt. */
+function objectFailure(category,message,details={}) {
+  return new Error("[coverage-object] "+JSON.stringify({category,message,...details}));
+}
+const objectMarker=value=>/^\s*(?:[-*+]\s+|\d+[.)]\s+)?\[(摘录范围|稿件自述)\]/u.exec(value)?.[1];
+const explanationTail=value=>{
+  const match=/(?:——|—|--)\s*(?:不成立\s*[:：]|错在\s*[:：]?|错误在于\s*[:：]?)/u.exec(value);
+  return match&&value.slice(match.index+match[0].length).trim()?match.index+match[0].indexOf(match[0].replace(/^(?:——|—|--)\s*/u,"")):-1;
+};
+
+/** One pure counting primitive serves review and post-read execution preflight.
+ * Each source counts physical lines with a recognized inline locator, not blocks,
+ * examples, bare filename mentions, or multiple occurrences on the same line.
+ * Callers decide how many line numbers to show; internal results remain complete.
+ */
+export function citationLineCounts(bytes,files) {
+  const lines=lineList(bytes),seen=new Set();
+  return files.flatMap(value=>{
+    const source=relativeName(value),key=keyOf(source);if(seen.has(key))return [];seen.add(key);
+    const matched=lines.flatMap((line,index)=>citation(line,source)?.start?[index+1]:[]);
+    return [{source,count:matched.length,lines:matched}];
+  });
+}
+
+/** Small, kind-specific parameter examples repair the call, never its evidence.
+ * Preserve a supplied valid numeric type as an example; it is still checked
+ * against the original sentence, and zero is explicitly only a template value.
+ */
+function objectGuide(input,spec,assertion,phase) {
+  const targets=spec.phases[phase].evidence.filter(file=>keyOf(file)!==keyOf(spec.candidate)&&citation(assertion.quote,file));
+  const target=targets.length===1?targets[0]:"原句引用的授权来源.md";
+  const expected=Number.isSafeInteger(input?.expected)&&input.expected>=0?input.expected:0;
+  const examples={
+    candidate:[{kind:"candidate",check:"citation-count",source:target,expected},{kind:"candidate",check:"citations-marked",source:target,marker:"原句声明的确切标记"}],
+    "registered-excerpts":[{kind:"registered-excerpts",check:"count",file:target,expected},{kind:"registered-excerpts",check:"contains",file:target,quote:"原句中要核对的单行原文"},
+      {kind:"registered-excerpts",check:"excludes",file:target,quote:"原句中明确说未见的单行文本"},{kind:"registered-excerpts",check:"line-status",file:target,line:1,expected:"registered"}],
+  };
+  return {templates:examples[input?.kind]??examples,next:"只按原句选择一个模板并替换示例值；删除其他模板的字段，再提交同一块。不要为参数错误改作者正文。",
+    parameterRules:["candidate 不支持 count：用 citation-count；source 是本句引用目标，不能填候选文件 "+spec.candidate+"，也没有 sources 数组字段。",
+      "expected 必须是原句明确声称的数量；示例0不是实测值。registered-excerpts/count 统计已登记摘录条目，结论类别或举例数量不能当摘录总数。",
+      "file 与 source 按模板二选一；contains/excludes 用 quote，line-status 用 line/expected，citations-marked 用 marker，不混字段。",
+      "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 仅核明确正向全称标记句，如‘本稿所有 来源.md 引用行都含[模拟]标记’，不能替数量、未全标或完全没标作证。"]};
+}
+function objectMismatchNext(value) {
+  if(value.kind==="candidate")return value.check==="citation-count"
+    ?"核对 source 是否为原句引用目标，并按实际物理引用行数复核；有完整行号表时还须逐项核对 claimedLines、missingLines、extraLines、duplicateLines。若只是填错参数，改参数；若原句精确数量或行号表确错，提交 unsupported 与指向实际错处的 finding，保留此 objectCheck 作反证。"
+    :"逐项复核 missingLines 是否缺少原句声明的字面标记。确实缺标才提交 unsupported 与实际 finding；若原句指全局说明而非逐行标记，当前谓词不能代证，应改核验方式。";
+  if(value.check==="count")return "actual 是登记摘录条目总数，不是其中举例或结论类别数。先核原句是否在声称这个总数；参数错就改参数，原句总数确错才提交 unsupported 与实际 finding，禁止把 expected 改成 actual 来掩盖原句错误。";
+  return "核对原句限定范围及谓词：contains/excludes 只核登记集合的确切文本，line-status 只核指定快照行是否登记。参数或谓词不符先改调用；确认原句确错后另提交 unsupported 与实际 finding，不把当前结果扩大成网页全文结论。";
+}
+
+const regexLiteral=value=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+const candidateClause=value=>value.normalize("NFKC").trim()
+  .replace(/^(?:[-*+]\s+|\d+[.)]\s+)?(?:\[稿件自述\]\s*)?/u,"")
+  .replace(/[。.!！?？;；]\s*$/u,"").trim();
+const quotedLiteral=value=>{
+  const literal=regexLiteral(value.normalize("NFKC"));
+  return "(?:"+literal+"|`"+literal+"`|\""+literal+"\"|'"+literal+"'|“"+literal+"”|「"+literal+"」|『"+literal+"』)";
+};
+
+/** A finite manuscript count grammar identifies the optional exact ordinal list.
+ * The list is another assertion, not ignorable citation punctuation: every row
+ * is expanded and checked against the full current set below, beyond previews.
+ * Unrecognized/oversize list syntax stays a parameter error, not author debt.
+ */
+function candidateCountClaim(quote,source,guide) {
+  const clause=candidateClause(quote),path=quotedLiteral(source),number="(?:\\d+|[零〇一二两三四五六七八九十]+)",subject="(?:本稿|本文|本节|稿件|候选稿?|当前文档)(?:中)?";
+  const bound=new RegExp("^"+subject+"\\s*(?:对\\s*"+path+"\\s*有\\s*"+number+"\\s*行可识别同行引用|有\\s*"+number+"\\s*行带\\s*"+path+"\\s*的行号定位|带\\s*"+path+"\\s*行号定位的共\\s*"+number+"\\s*行)$","u");
+  const suffix=/(?:\(\s*第\s*([^()]+?)\s*行\s*\)|,\s*(?:即|分别为)\s*第\s*([^()]+?)\s*行)$/u.exec(clause);
+  if(!suffix) {
+    if(/第\s*\d+\s*[,、]\s*\d/u.test(clause))throw objectFailure("parameter","行号清单须是同一计数句末尾完整的（第2、4-6行）或‘，即第2、4-6行’，不能忽略未核列表",guide);
+    return {quantityQuote:quote,fullyBound:bound.test(clause)};
+  }
+  const quantityQuote=clause.slice(0,suffix.index).trim(),list=(suffix[1]??suffix[2]).trim();
+  if(!bound.test(quantityQuote))throw objectFailure("parameter","带行号表的 citation-count 只核明确稿件计数句；请拆开外部行号、标记或其他独立断言，保留作者原文",{...guide,countForms:["本稿有6行带 "+source+" 的行号定位（第2、4-8行）","本稿对 "+source+" 有2行可识别同行引用（第2、4行）"]});
+  const claimedLines=[];
+  for(const item of list.split(/[,、]/u)) {
+    const match=/^\s*(?:第\s*)?([1-9]\d*)(?:\s*[-–—至到]\s*(?:第\s*)?([1-9]\d*))?\s*$/u.exec(item);
+    if(!match)throw objectFailure("parameter","完整行号表仅支持正整数及递增范围，以顿号/逗号分隔；不接受省略号、‘等’或附加断言",guide);
+    const first=Number(match[1]),last=Number(match[2]??match[1]);
+    if(!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||last<first||last-first+1>256-claimedLines.length)throw objectFailure("parameter","完整行号表每次最多256项，须为安全正整数及递增范围；超出范围请单独核验，不能截断清单",guide);
+    for(let line=first;line<=last;line++)claimedLines.push(line);
+  }
+  return {quantityQuote,claimedLines,fullyBound:true};
+}
+
+/** This predicate has only a positive, universal, literal-label meaning.
+ * Anchor the whole clause, so a filename/count, a negative claim, or a genuine
+ * extra assertion cannot borrow the accidental presence of a marker as proof.
+ * Not-all and none are distinct predicates and are deliberately unsupported.
+ */
+function candidateMarkClaim(quote,source,marker,guide) {
+  if(typeof marker!=="string"||!marker.trim()||marker.length>80||/[\r\n]/u.test(marker)||!quote.includes(marker))throw objectFailure("parameter","marker 须是本句声明的明确单行标记，最长80字符",guide);
+  if(source.normalize("NFKC").includes(marker.normalize("NFKC")))throw objectFailure("parameter","引用来源路径及其片段不能充当 marker；文件名的出现不证明已标记",guide);
+  const subject="(?:本稿|本文|本节|稿件|候选稿?|当前文档)(?:中)?",target=quotedLiteral(source),label=quotedLiteral(marker);
+  const action="(?:含有?|带有|标有|标注(?:为|了)?|标记(?:为|了)?|标了)\\s*"+label+"(?:\\s*标记)?";
+  const contract=new RegExp("^"+subject+"\\s*(?:(?:所有|全部)\\s*"+target+"\\s*(?:的)?引用行(?:都|均)\\s*"+action+"|引用\\s*"+target+"\\s*的每(?:一)?行(?:都|均)\\s*"+action+"|(?:带|有)\\s*"+target+"\\s*(?:的)?行号定位的每(?:一)?行(?:都|均)\\s*"+action+")$","u");
+  if(!contract.test(candidateClause(quote)))throw objectFailure("parameter","citations-marked 须绑定完整正向全称标记句、同一来源和明确标记动作；数量/行号表请用 citation-count，‘未全标’与‘完全没标’均不能用此谓词代证",{...guide,claimForm:"本稿所有 "+source+" 引用行都含"+marker+"标记。",next:"只修核验参数；若同句另有数量、否定或独立后半句，请按实际原文拆分核验，不要求作者改写正确句子。"});
+}
+
+/** Bind a count parameter to the same visible quantity, not a C-number or locator. */
+function countAssertion(quote,expected,unit,guide={}) {
+  const normalized=quote.normalize("NFKC").replace(/第\s*\d+(?:\s*[-–—、至到]\s*\d+)?\s*行|#L\d+(?:-L?\d+)?/gu,""),values=[];
+  if(/至少|至多|超过|少于|多于|不低于|不超过|不到|小于|大于|并非|不是|不为|约\s*\d|[≥≤<>]/u.test(normalized))throw objectFailure("parameter","count 只核精确等值，不能替范围、近似或否定数量作证",guide);
+  const chinese=value=>{
+    if(/^\d+$/u.test(value))return Number(value);
+    const digits="零一二三四五六七八九";value=value.replaceAll("两","二").replaceAll("〇","零");
+    if(value==="十")return 10;
+    if(/^[一二三四五六七八九]?十[一二三四五六七八九]?$/u.test(value)) {
+      const [a,b]=value.split("十");return (a?digits.indexOf(a):1)*10+(b?digits.indexOf(b):0);
+    }
+    return value.length===1?digits.indexOf(value):NaN;
+  };
+  for(const match of normalized.matchAll(/(\d+|[零〇一二两三四五六七八九十]+)\s*(条|句|项|行)/gu)) {
+    if(/第\s*$/u.test(normalized.slice(0,match.index)))continue;
+    if(unit==="candidate-citation-lines"&&match[2]!=="行")continue;
+    values.push(chinese(match[1]));
+  }
+  if(values.length!==1||values[0]!==expected) {
+    // A unique literal in the current sentence can repair the example parameter;
+    // this never substitutes the measured total for the author's stated number.
+    const templates=values.length===1&&Number.isSafeInteger(values[0])&&Array.isArray(guide.templates)
+      ?guide.templates.map(row=>typeof row.expected==="number"?{...row,expected:values[0]}:row):guide.templates;
+    throw objectFailure("parameter","count 的 expected 须对应当前片段唯一明确数量及单位；请拆分复合断言，不能用参数替原句补数量",{...guide,templates,unit,claimedQuantities:values,expectedReceived:expected});
+  }
+}
+
+/** Finite predicates over a real registered set or the current manuscript.
+ * These checks do not establish arbitrary natural-language entailment, external
+ * page completeness, or labels hidden behind implicit/paraphrased references. */
+function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
+  const guide=objectGuide(input,spec,assertion,active.phase);
+  if(!input||typeof input!=="object"||Array.isArray(input))throw objectFailure("parameter","objectCheck 需要对象参数",guide);
+  const allowed={"registered-excerpts":{
+    count:["file","expected"],contains:["file","quote"],excludes:["file","quote"],"line-status":["file","line","expected"]},
+    candidate:{"citation-count":["source","expected"],"citations-marked":["source","marker"]}};
+  const fields=allowed[input.kind]?.[input.check];
+  if(!fields||fields.some(key=>input[key]===undefined)||Object.keys(input).some(key=>!["kind","check",...fields].includes(key)))throw objectFailure("parameter","objectCheck 的 kind/check 或字段不匹配",{...guide,receivedKind:input.kind??null,receivedCheck:input.check??null,allowedFields:fields?["kind","check",...fields]:[],receivedFields:Object.keys(input)});
+  const candidateSha256=digest(bytes),lines=lineList(bytes);
+  if(lines[assertion.line-1]?.slice(assertion.start,assertion.end)!==assertion.quote)throw objectFailure("parameter","对象核对的实际断言位置不匹配");
+  const result={...input,assertion:{line:assertion.line,start:assertion.start,end:assertion.end,quoteSha256:digest(assertion.quote)},candidateSha256,sources:[]};
+  if(input.check==="count"||input.check==="citation-count") {
+    if(!Number.isSafeInteger(input.expected)||input.expected<0)throw objectFailure("parameter","expected 须为非负整数，单位由 check 固定",guide);
+    if(input.kind!=="candidate")countAssertion(assertion.quote,input.expected,"registered-excerpts",guide);
+  }
+  if(input.kind==="registered-excerpts") {
+    if(!/(?:登记|摘录|快照|registered|excerpt)/iu.test(assertion.quote))throw objectFailure("unverifiable","登记集合只能证明明确限定的摘录范围，不能证明整页或外部世界没有该内容");
+    const file=relativeName(input.file);
+    if(!citation(assertion.quote,file))throw objectFailure("parameter","摘录对象必须绑定当前断言中明确出现的同一来源路径，不能借其他来源的同值结果");
+    let observed;
+    try { observed=registeredObservation(frame,active,spec,file,{host}); }
+    catch(error){throw objectFailure("unverifiable",error.message);}
+    result.file=observed.source.file;result.sources=[observed.source];
+    if(input.check==="count")result.result={matches:input.expected===observed.registered.length,actual:observed.registered.length,unit:"registered-excerpts",lines:observed.registered.slice(0,24).map(row=>row.line)};
+    else if(input.check==="line-status") {
+      if(!Number.isSafeInteger(input.line)||input.line<1||input.line>observed.lines.length||!["registered","unregistered"].includes(input.expected))throw objectFailure("parameter","line-status 需现有快照行及 expected=registered|unregistered");
+      const located=citation(assertion.quote,file);
+      if(located?.start!==input.line||located?.end!==input.line)throw objectFailure("parameter","line-status 的 line 须对应当前断言明确定位的同一单行");
+      const actual=observed.registered.some(row=>row.line===input.line)?"registered":"unregistered";
+      result.result={matches:actual===input.expected,actual,unit:"snapshot-line-membership",lines:[input.line],lineText:observed.lines[input.line-1].slice(0,1200)};
+    } else {
+      if(typeof input.quote!=="string"||!input.quote.trim()||input.quote.length>2000||/[\r\n]/u.test(input.quote)||!assertion.quote.includes(input.quote))throw objectFailure("parameter","contains/excludes 的 quote 须为当前断言内的确切单行文本，不能自行换成别的主题");
+      const matching=observed.registered.filter(row=>row.quote.includes(input.quote));
+      const actual=matching.length>0;
+      result.result={matches:input.check==="contains"?actual:!actual,actual,unit:"registered-excerpt-literal",lines:matching.slice(0,24).map(row=>row.line)};
+    }
+  } else {
+    if(!/(?:本稿|本文|本节|稿件|候选|当前文档|this (?:draft|document))/iu.test(assertion.quote))throw objectFailure("unverifiable","candidate 检查只证明当前稿件的明确结构，不能替外部事实作证");
+    const source=relativeName(input.source),grant=spec.phases[active.phase],seen=active.seen?.[keyOf(spec.candidate)];
+    if(keyOf(source)===keyOf(spec.candidate))throw objectFailure("parameter","source 是该句引用目标，不能填候选自身 "+spec.candidate,guide);
+    if(!citation(assertion.quote,source))throw objectFailure("parameter","稿件自述必须明确写出所检查的同一来源路径，不能借别的引用对象作证",guide);
+    if(!includes(grant.evidence,source)||!includes(grant.read,spec.candidate))throw objectFailure("unverifiable","稿件引用对象不在当前单元授权内");
+    if(!host&&(seen?.hash!==candidateSha256||!seen.ranges.some(([a,b])=>a===1&&b>=lines.length)))throw objectFailure("unverifiable","核全稿自述前须实际完整读取当前候选版本");
+    result.source=source;
+    const counted=citationLineCounts(bytes,[source])[0];
+    const cited=counted.lines.map(line=>({line,text:lines[line-1]}));
+    if(input.check==="citation-count") {
+      const claim=candidateCountClaim(assertion.quote,source,guide);
+      countAssertion(claim.quantityQuote,input.expected,"candidate-citation-lines",guide);
+      result.result={matches:cited.length===input.expected,actual:cited.length,unit:"candidate-citation-lines",lines:cited.slice(0,24).map(row=>row.line)};
+      if(claim.claimedLines) {
+        const declared=new Set(claim.claimedLines),actual=new Set(counted.lines),seenLines=new Set(),duplicates=new Set();
+        for(const line of claim.claimedLines){if(seenLines.has(line))duplicates.add(line);seenLines.add(line);}
+        const missing=counted.lines.filter(line=>!declared.has(line)),extra=[...declared].filter(line=>!actual.has(line));
+        const lineListMatches=claim.claimedLines.length===input.expected&&!missing.length&&!extra.length&&!duplicates.size;
+        result.result={...result.result,matches:result.result.matches&&lineListMatches,claimedLines:claim.claimedLines,lineListMatches,
+          missingLines:missing.slice(0,24),missingCount:missing.length,extraLines:extra.slice(0,24),extraCount:extra.length,duplicateLines:[...duplicates]};
+      }
+    }
+    else {
+      candidateMarkClaim(assertion.quote,source,input.marker,guide);
+      if(!cited.length)throw objectFailure("unverifiable","当前稿无该来源的可识别同行定位，不能用空集合证明逐处已标记");
+      const missing=cited.filter(row=>!row.text.includes(input.marker));
+      result.result={matches:missing.length===0,actual:cited.length,unit:"candidate-citation-lines",lines:cited.slice(0,24).map(row=>row.line),missingLines:missing.slice(0,24).map(row=>row.line),missingCount:missing.length};
+    }
+  }
+  return result;
+}
+
+/** Restore only the original input fields; host outputs cannot become input authority. */
+function objectInput(value) {
+  const {assertion,candidateSha256,sources,result,...input}=value;return input;
+}
+function validateObjectPart(frame,active,spec,part,lines,block,bytes,{host=false}={}) {
+  if(part.kind==="error-example"&&explanationTail(part.quote)>=0)throw objectFailure("parameter","显式错例解释尾部须另以 direct/inference 给实际证明，不能沿用仅核错例的反证");
+  if(!part.objectCheck)return;
+  if(!block)throw objectFailure("unverifiable","对象证明所在的当前正文块已失效");
+  const current=checkObject(frame,active,spec,objectInput(part.objectCheck),{line:block.line,start:block.start+part.start,end:block.start+part.end,quote:part.quote},bytes,{host});
+  if(JSON.stringify(current)!==JSON.stringify(part.objectCheck))throw objectFailure("unverifiable","对象版本、实际范围或计算结果已变化，须重新核验该块");
+}
+
+/** Recheck typed objects at ledger closure without new coordinator access/reads. */
+export function requireStoredObjectChecks(frame,spec,coverages,bytes,phase="final-review") {
+  const lines=lineList(bytes),blocks=new Map(documentCoverage(bytes).blocks.map(block=>[block.id,block]));
+  try {
+    if(!["first-review","final-review"].includes(phase))throw new Error("invalid review authority");
+    for(const coverage of coverages)for(const record of coverage.records)for(const part of record.parts) {
+      validateObjectPart(frame,{phase},spec,part,lines,blocks.get(record.block),bytes,{host:true});
+      if(part.objectCheck&&(!part.objectCheck.result.matches||part.status!=="supported"))throw new Error("object not accepted");
+    }
+  }catch{throw new Error("已验收的证据对象或解释证明失效，须重新核验");}
 }
 
 /** Bind arithmetic to the exact reviewed span and the CSV rows actually used.
@@ -202,6 +426,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
     if (!KINDS.includes(part.kind) || !STATUSES.includes(part.status)) throw new Error("每段须声明 kind 与 supported/unsupported/uncertain");
     const basis = explanation(part.basis, "该段的判断依据");
     const result = { quote, start, end: cursor, kind: part.kind, status: part.status, basis };
+    if(part.objectCheck&&(part.kind!=="direct"||part.evidence!==undefined||part.inference!==undefined))throw objectFailure("parameter","objectCheck 仅用于 direct，且不能与外部 evidence/inference 混用");
     if (errorExample(quote) && part.kind !== "error-example") throw new Error("正文已明确标为误读/错例，请用 error-example 核验它的反证，不要把展示错误误当成作者认可该结论。这是核验分类修正，不是正文返工。");
     if (part.kind === "direct" && explicitInference(quote)) throw new Error("该段含明确推导连接词，不能用 direct 跳过推导。改用 inference；这只是核验分类修正，不要求作者改正文。若来源本身已写明关系，可用 source-warrant。不要把未明确标注的错误断言解释成教学反例。");
     if (["direct", "inference"].includes(part.kind)) {
@@ -218,6 +443,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
       if (!Array.isArray(part.evidence) || !part.evidence.length) throw new Error("错例须给实际已读的 evidence 反证或推理依据及逐字引句");
       result.sourceRelation = part.sourceRelation;
       result.evidence = part.evidence.map(ref => sourceQuote(frame,active,spec,ref));
+      if(explanationTail(quote)>=0)throw objectFailure("parameter","显式错例解释尾部须拆成 direct/inference 并分别证明；只改核验参数，不改正文",{tail:quote.slice(explanationTail(quote),explanationTail(quote)+240)});
       result.inputStatus = part.status;
       result.status = "illustrated-error"; // Never becomes an established premise.
     } else if (part.kind === "hypothesis") {
@@ -229,6 +455,15 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
       result.status = "uncertain";
     } else if (part.kind === "nonfactual") {
       if (part.status !== "supported") throw new Error("非事实分类须明确 supported；含事实的标题或说明按 direct/inference 核验");
+    } else if (part.objectCheck) {
+      result.objectCheck=checkObject(frame,active,spec,part.objectCheck,{line:block.line,start:block.start+start,end:block.start+cursor,quote},readBytes(frame.root,spec.candidate));
+      if(part.status==="supported"&&!result.objectCheck.result.matches)throw objectFailure("parameter","提交的 supported 与对象实测谓词冲突；先核对参数和原句范围。确属事实错误时另提交 unsupported 与实际 finding，宿主不代作者造退回项",{...result.objectCheck.result,next:objectMismatchNext(result.objectCheck)});
+      // Only these fully bound candidate clauses have a mechanically determined
+      // truth value. A real independent suffix must be split and proved itself.
+      if(part.status==="unsupported"&&result.objectCheck.result.matches&&result.objectCheck.kind==="candidate"
+        &&(result.objectCheck.check==="citations-marked"||candidateCountClaim(quote,result.objectCheck.source,{}).fullyBound)) {
+        throw objectFailure("parameter","完整绑定的稿件对象谓词已实测成立，不能将同一事实填 unsupported 制造作者债；独立后半句请按原文拆分并另给真实 finding",{...result.objectCheck.result,next:"保留正确正文，只修核验状态/分段；不能用已证真对象代替另一断言的反证。"});
+      }
     } else if (part.status === "supported") {
       if (part.kind === "direct") {
         if (!Array.isArray(part.evidence) || !part.evidence.length || part.evidence.length > 12) throw new Error("直接事实须给 evidence 原文及逐字 quote");
@@ -255,14 +490,28 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
         }
         result.finding = { kind: finding.kind, quote: finding.quote, fix: explanation(finding.fix, "事实最小修正") };
         result.repair = result.finding.fix;
-        if (finding.kind === "contradiction" && !part.evidence?.length) throw new Error("矛盾退回须 evidence 给实际原文反证及逐字引句");
+        if (finding.kind === "contradiction" && !part.evidence?.length && result.objectCheck?.result.matches!==false) throw new Error("矛盾退回须 evidence 给实际原文反证及逐字引句，或已验证为 false 的 objectCheck");
       }
       if (part.evidence?.length) result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
     }
     return result;
   });
   if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
-  return { block: block.id, line: block.line, text: block.text, lineText: block.lineText, parts: reviewed };
+  const marker=objectMarker(block.text),expected=marker==="摘录范围"?"registered-excerpts":marker==="稿件自述"?"candidate":null;
+  if(expected) {
+    const facts=reviewed.filter(part=>["direct","inference"].includes(part.kind));
+    if(!facts.length||facts.some(part=>part.status==="supported"&&(part.kind!=="direct"||part.objectCheck?.kind!==expected))) {
+      throw objectFailure("parameter","显式 ["+marker+"] 事实须用对应 objectCheck 支持，不能全部 nonfactual；依据不足可用真实 finding 退回");
+    }
+  }
+  const files=spec.phases[active.phase].evidence,syntaxSources=[];
+  const syntax=syntaxSpans(block.text,files,ref=>{
+    try{syntaxSources.push(evidenceReference(frame,active,spec,ref));return true;}catch{return false;}
+  });
+  const possible=syntaxSpans(block.text,files);
+  const substantiveOutside=spans=>block.text.split("").some((char,index)=>/[\p{L}\p{N}]/u.test(char)&&!spans.some(([a,b])=>a<=index&&index<b));
+  if(!substantiveOutside(possible)&&substantiveOutside(syntax)&&reviewed.every(part=>part.kind==="nonfactual"))throw objectFailure("unverifiable","纯出处块的定位尚未通过已读/实际范围/登记校验，不能按合法语法略过；先读正确范围，实际错引须明确 finding");
+  return { block: block.id, line: block.line, text: block.text, lineText: block.lineText, parts: reviewed,syntaxSpans:syntax,syntaxSources };
 }
 
 /** Inventory and per-block decisions are incremental, bounded calls under the host lock. */
@@ -382,7 +631,13 @@ export function requireStoredCalculations(frame, spec, coverages, bytes) {
 /** The same strict version/read/pin checks serve both progress and acceptance.
  * Retiring a stale proof means pending, never a verdict about the new source.
  */
-function validateRecordSources(frame, active, spec, record, lines, block) {
+function validateRecordSources(frame, active, spec, record, lines, block, bytes) {
+  // Syntax is neutral only while its locator remains authorized, read and pinned.
+  // Keep the same ordinary refs for host closure to check without exposing text.
+  for(const ref of record.syntaxSources??[]) {
+    const current=evidenceReference(frame,active,spec,ref);
+    if(current.sha256!==ref.sha256||JSON.stringify(current.origin)!==JSON.stringify(ref.origin))throw new Error("合法定位的来源或获取回执版本已变化，须重新核验");
+  }
   for (const part of record.parts) {
     const refs = [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
       ...(part.inference?.assumptions ?? []).map(row => row.evidence)];
@@ -391,6 +646,7 @@ function validateRecordSources(frame, active, spec, record, lines, block) {
       if (ref.sha256 !== current.sha256) throw new Error("覆盖证据版本已经变化，须重新判断该块而非仅重读文件");
     }
     validateCalculationPart(frame, spec, part, lines, block);
+    validateObjectPart(frame, active, spec, part, lines, block, bytes);
   }
 }
 
@@ -400,7 +656,7 @@ function retireStaleProofs(frame, active, spec, bytes, manifest) {
   const lines = lineList(bytes);
   const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
   for (const [id, record] of Object.entries(active.coverage.records)) {
-    try { validateRecordSources(frame, active, spec, record, lines, blocks.get(id)); }
+    try { validateRecordSources(frame, active, spec, record, lines, blocks.get(id), bytes); }
     catch (error) {
       delete active.coverage.records[id];
       invalidated.push({ block: id, reason: error.message });
@@ -427,7 +683,7 @@ export function coverageSummary(frame, active, spec, complete = true) {
     }
   }
   const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
-  for (const record of records) validateRecordSources(frame, active, spec, record, lines, blocks.get(record.block));
+  for (const record of records) validateRecordSources(frame, active, spec, record, lines, blocks.get(record.block), bytes);
   const rejected = records.flatMap(record => record.parts.filter(part => ["direct", "inference"].includes(part.kind) && part.status !== "supported")
     .map(part => {
       const finding={block:record.block,line:record.line,text:part.quote,lineText:record.lineText,
@@ -489,46 +745,76 @@ function quotationChecks(frame, active, spec, manifest) {
   return results;
 }
 
-/** Separate a new unsupported finding from a reviewer classification disagreement. */
-export function classificationDisagreements(first, second) {
-  return first.records.flatMap(record => {
-    const other = second.records.find(row => row.block === record.block);
-    if(!other)return [];
-    const factual=row=>{
-      const mask=new Uint8Array(record.text.length);
-      for(const part of row.parts.filter(value=>["direct","inference"].includes(value.kind))) {
-        const start=Number.isSafeInteger(part.start)?part.start:0,end=Number.isSafeInteger(part.end)?part.end:record.text.length;
-        mask.fill(1,Math.max(0,start),Math.min(mask.length,end));
-      }
-      return mask;
-    };
-    const a=factual(record),b=factual(other),factualSpans=[];
-    for(let i=0;i<record.text.length;i++)if(record.text[i].trim()&&a[i]!==b[i]) {
-      const prior=factualSpans.at(-1);
-      if(prior&&!record.text.slice(prior[1],i).trim())prior[1]=i+1;
-      else factualSpans.push([i,i+1]);
+/** Only explicit syntax is neutral: words in explanations/headings remain facts.
+ * Authorized inline locators may be a separate block without becoming a claim. */
+function syntaxSpans(value,files=[],validate=()=>true) {
+  const mask=new Uint8Array(value.length),escape=text=>text.replace(/[|\{}()[\]^$+*?.-]/g,"\\$&");
+  const leading=/^\s*(?:(?:[-*+>]\s+|\d+[.)]\s+|#{1,6}\s+))?(?:\*\*)?(?:C\d+)(?:\*\*)?\s*[:：]\s*/u.exec(value)
+    ??/^\s*(?:[-*+>]\s+|\d+[.)]\s+|#{1,6}\s+)/u.exec(value);
+  if(leading)mask.fill(1,0,leading[0].length);
+  for(const file of files) {
+    const locator=new RegExp("(?:出处|来源|证据)?\\s*[:：]?\\s*"+escape(file)+"\\s*(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)",process.platform==="win32"?"gi":"g");
+    for(const match of value.matchAll(locator)) {
+      const ref=citation(match[0],file);
+      if(ref?.start&&validate({file,...ref}))mask.fill(1,match.index,match.index+match[0].length);
     }
-    // Both reviews may contain some facts while disagreeing about an appended
-    // assertion. Compare factual coverage by span, not one Boolean per block.
-    return factualSpans.length ? [{ block: record.block, line: record.line, text: record.text,factualSpans,
-      basis: "两位核验者对该块是否包含事实判断存在分歧。争议范围须按 direct/inference 实质核证，不能原样 nonfactual 重送；依据不足请 block 说明待维护者裁定，不要求作者改写正确正文。" }] : [];
+  }
+  return maskSpans(mask,value,false);
+}
+function maskSpans(mask,text,substantive=true) {
+  const spans=[];
+  for(let i=0;i<mask.length;i++)if(mask[i]&&(!substantive||text[i]?.trim())) {
+    const prior=spans.at(-1);if(prior&&(!text.slice(prior[1],i).trim()||prior[1]===i))prior[1]=i+1;else spans.push([i,i+1]);
+  }
+  if(substantive)for(const span of spans)while(span[1]<text.length&&/[\s\p{P}]/u.test(text[span[1]]))span[1]++;
+  return spans;
+}
+function factualMask(record) {
+  const mask=new Uint8Array(record.text.length);
+  for(const part of record.parts.filter(part=>["direct","inference"].includes(part.kind))) {
+    mask.fill(1,Math.max(0,part.start??0),Math.min(mask.length,part.end??mask.length));
+  }
+  const files=record.parts.flatMap(part=>[...(part.evidence??[]),...(part.inference?.premises??[])].map(ref=>ref.file));
+  for(const [start,end] of record.syntaxSpans??syntaxSpans(record.text,files))mask.fill(0,start,end);
+  for(let i=0;i<mask.length;i++)if(/[\s\p{P}]/u.test(record.text[i]))mask[i]=0;
+  return mask;
+}
+function objectKind(part) {
+  return part?.objectCheck?JSON.stringify([part.objectCheck.kind,part.objectCheck.file??part.objectCheck.source??null]):"external";
+}
+
+/** Return differing spans and the stable factual union required of both roles. */
+export function classificationDisagreements(first,second) {
+  return first.records.flatMap(record=>{
+    const other=second.records.find(row=>row.block===record.block);if(!other)return [];
+    const a=factualMask(record),b=factualMask(other),different=new Uint8Array(a.length),required=new Uint8Array(a.length),objects=new Uint8Array(a.length);
+    for(let i=0;i<a.length;i++) {
+      required[i]=a[i]||b[i];different[i]=a[i]!==b[i]?1:0;
+      if(a[i]&&b[i]) {
+        const find=row=>row.parts.find(part=>(part.start??0)<=i&&(part.end??row.text.length)>i);
+        if(objectKind(find(record))!==objectKind(find(other))){different[i]=1;objects[i]=1;}
+      }
+    }
+    const factualSpans=maskSpans(different,record.text),requiredSpans=maskSpans(required,record.text);
+    return factualSpans.length?[{block:record.block,line:record.line,text:record.text,factualSpans,requiredSpans,
+      ...(objects.some(Boolean)?{objectSpans:maskSpans(objects,record.text)}:{}),
+      basis:"核验对事实范围或证据对象存在分歧。requiredSpans 是双方事实并集；按真实对象补证，保留正确正文。纯编号/合法定位可等价，解释与大白话中的事实不能跳过；仍无依据时 block 请求裁定。"}]:[];
   });
 }
 
-/** A disputed factual span cannot disappear behind a different category label.
- * Both roles retain their own proof; only candidate spans, never the other
- * role's source mapping or verdict, are exchanged as the work to reconcile.
- */
-export function requireDisputedProof(active, records, complete=false) {
+/** Used by checkpoint restoration and submission; never borrows the other role's proof. */
+export function recordMeetsDispute(record,dispute) {
+  if(!record||record.text!==dispute.text)return false;
+  const mask=factualMask(record),spans=dispute.requiredSpans?.length?dispute.requiredSpans:dispute.factualSpans?.length?dispute.factualSpans:[[0,dispute.text.length]];
+  return spans.every(([a,b])=>{
+    for(let i=a;i<b;i++)if(dispute.text[i]?.trim()&&!/[\s\p{P}]/u.test(dispute.text[i])&&!mask[i])return false;
+    return true;
+  });
+}
+export function requireDisputedProof(active,records,complete=false) {
   for(const dispute of active.reconciliation??[]) {
-    const record=records.find(row=>row.block===dispute.block);
-    if(!record&&!complete)continue;
-    const spans=dispute.factualSpans?.length?dispute.factualSpans:[[0,dispute.text.length]];
-    const missing=!record||spans.some(([a,b])=>Array.from({length:b-a},(_,i)=>a+i)
-      .some(i=>dispute.text[i]?.trim()&&!record.parts.some(part=>["direct","inference"].includes(part.kind)&&part.start<=i&&part.end>i)));
-    if(missing)throw new Error("[building-loop/reconciliation] "+dispute.block+" 的事实分类争议尚未逐项落实。"
-      +"已标记范围必须重新以 direct/inference 提交实际证据和推导，不能原样 nonfactual/hypothesis 再送。"
-      +"不确定或无依据时用 building_loop block 说明需维护者裁定；不要编证据，也不要要求作者改写正确正文。范围="+JSON.stringify(spans));
+    const record=records.find(row=>row.block===dispute.block);if(!record&&!complete)continue;
+    if(!recordMeetsDispute(record,dispute))throw new Error("[building-loop/reconciliation] "+dispute.block+" 的事实分类争议尚未逐项落实。已标记事实并集须以 direct/inference 提交实际证明；依据不足可用真实 finding 或 block，不要要求作者改写正确正文。范围="+JSON.stringify(dispute.requiredSpans??dispute.factualSpans));
   }
 }
 
@@ -547,6 +833,9 @@ export function coverageSchema() {
     counterexample: { type: "object", properties: { possible: { type: "boolean" }, reason: string }, required: ["possible", "reason"], additionalProperties: false },
     formal: { type: "object", description: "modus-ponens 的两项依次为 implies(P,Q)、asserts(P)，结论 asserts(Q)；equality-transitive 为 equals(A,B)、equals(B,C)，结论 equals(A,C)。premises 与原文前提顺序一致。", properties: { premises: { type: "array", minItems: 2, maxItems: 2, items: proposition }, conclusion: proposition }, required: ["premises", "conclusion"], additionalProperties: false }, calculation: string,
   }, required: ["rule", "premises", "scope", "assumptions", "counterexample"], additionalProperties: false };
+  const objectCheck={type:"object",properties:{kind:{type:"string",enum:["registered-excerpts","candidate"]},check:{type:"string",enum:["count","contains","excludes","line-status","citation-count","citations-marked"]},
+    file:string,source:string,line:integer,expected:{anyOf:[integer,{type:"string",enum:["registered","unregistered"]}]},quote:string,marker:string},required:["kind","check"],additionalProperties:false,
+    description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)，只核登记摘录/快照成员关系，不证明网页全文。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding，不自动改判作者。"};
   return { offset: integer, count: integer, block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: 12,
     description: "每次提交1至12块，按 inventory 分页分批提交；不能把全文超过12块塞进一次调用。", items: { type: "object", properties: {
     block: string, parts: { type: "array", items: { type: "object", properties: {
@@ -555,7 +844,7 @@ export function coverageSchema() {
         description: "direct/inference 给事实判定；nonfactual 用 supported；hypothesis 宿主固定 uncertain，不能成为已证前提。" }, basis: string, repair: string,
       sourceRelation: { type: "string", enum: ["supports", "contradicts", "insufficient"], description: "direct/inference 必填：原始证据对该断言字面含义的关系。error-example 核展示的错误推理，只能 contradicts/insufficient，并提供 evidence；明确错例的状态由宿主固定，不作为已证前提。" },
       finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence", "contradiction", "scope", "invalid-inference"] }, quote: string, fix: string }, required: ["kind", "quote", "fix"], additionalProperties: false },
-      evidence: { type: "array", items: ref }, inference,
+      evidence: { type: "array", items: ref }, inference, objectCheck,
     }, required: ["kind", "status", "basis"], additionalProperties: false } },
   }, required: ["block", "parts"], additionalProperties: false } } };
 }

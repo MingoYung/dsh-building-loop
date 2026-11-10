@@ -93,7 +93,8 @@ test("an explicit original quote pointing to editorial metadata can be returned 
   const packet = await h.flow(reviewer, "prepare");
   const finding = { kind: "missing-evidence", quote: "原文为", fix: "删除冒称原文的说明或引用实际登记的摘录。" };
   await h.coverage(reviewer, "record", { entries: packet.coverage.blocks.map((block, index) => ({ block: block.id,
-    parts: [index ? { kind: "nonfactual", status: "supported", basis: "后续为引文尾部的定位说明。" }
+    parts: [index ? { kind: "direct", status: "unsupported", sourceRelation: "insufficient", basis: "这个独立定位尾块指向未登记为原文的编辑说明。",
+      finding: { kind: "missing-evidence", quote: block.text, fix: "把此原文定位改到真实登记摘录，或明确撤回原文声称。" } }
       : { kind: "direct", status: "unsupported", sourceRelation: "insufficient", basis: "指向编辑说明。", finding }] })) });
   const result = await h.flow(reviewer, "review", { checks: [{ id: "C1", status: "unsupported", basis: "说明行不属于外部原文。", finding }] });
   assert.equal(result.phase, "supplement-ready");

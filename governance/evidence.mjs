@@ -15,7 +15,7 @@ export function expectedClaims(spec, lines) {
 }
 
 /** Match an independently acquired excerpt receipt to exact snapshot lines. */
-function observedExcerpt(root, file, bytes, pin, start, end) {
+function observationRegistry(root, file, bytes, pin) {
   const receipt = pin.observation;
   const raw = readBytes(root, receipt.file);
   if (!raw || digest(raw) !== receipt.sha256) throw new Error("资料的获取回执缺失或已变更 " + receipt.file);
@@ -39,12 +39,19 @@ function observedExcerpt(root, file, bytes, pin, start, end) {
   const occurrences = new Map();
   for (const line of lines) if (observed.has(line)) occurrences.set(line, (occurrences.get(line) ?? 0) + 1);
   if (excerpts.some(quote => occurrences.get(quote) !== 1)) throw new Error("逐字摘录在快照中缺失或定位不唯一 " + file);
-  if (lines.slice(start - 1, end).some(line => !observed.has(line))) {
-    const allowed = lines.flatMap((line, index) => observed.has(line) ? [index + 1] : []);
+  return { observation: { ...receipt, fetchedAt: row.fetchedAt, responseSha256: row.responseSha256 },
+    registered: lines.flatMap((quote,index)=>observed.has(quote)?[{line:index+1,quote}]:[]) };
+}
+
+/** External quotations may use only registered lines; registry metadata is a
+ * separate object and must never silently widen this original evidence gate. */
+function observedExcerpt(root, file, bytes, pin, start, end) {
+  const result=observationRegistry(root,file,bytes,pin),allowed=new Set(result.registered.map(row=>row.line));
+  if (Array.from({length:end-start+1},(_,i)=>start+i).some(line=>!allowed.has(line))) {
     throw new UnobservedExcerptError("所引范围含未登记为外部原文的快照行，请使用已登记的逐字摘录行 " + file
-      + "（行号：" + allowed.slice(0, 24).join("、") + (allowed.length > 24 ? "等" : "") + "）。如果正文只引了说明行，需退回实际缺源，不要私自换出处通过。");
+      + "（行号：" + [...allowed].slice(0,24).join("、") + (allowed.size>24?"等":"") + "）。如果正文只引了说明行，需退回实际缺源，不要私自换出处通过。");
   }
-  return { ...receipt, fetchedAt: row.fetchedAt, responseSha256: row.responseSha256 };
+  return result.observation;
 }
 
 /** Recheck both source and optional acquisition receipt before using a saved proof. */
@@ -57,27 +64,41 @@ export function sourceVersionCurrent(root, ref) {
   return !!receipt && digest(receipt) === observation.sha256;
 }
 
+/** The shared source gate always checks authority and pins. Only the private
+ * host revalidation path may omit a new model-read stamp; it never records one. */
+function checkedSource(frame,active,spec,input,{whole=false,host=false}={}) {
+  const file=relativeName(input?.file),grant=spec.phases[active.phase];
+  if(!includes(grant.evidence,file)||!includes(grant.read,file))throw new Error("资料引用不在本轮证据授权中 "+file);
+  const bytes=readBytes(frame.root,file),lines=bytes&&lineList(bytes),seen=active.seen?.[keyOf(file)];
+  const start=whole?1:input.start,end=whole?lines?.length:input.end;
+  if(!bytes||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<1||end<start||end>lines.length
+    ||(!host&&(seen?.hash!==digest(bytes)||!seen.ranges.some(([a,b])=>a<=start&&b>=end)))) {
+    throw new Error("资料引用须对应本轮实际读过的当前原文行 "+file);
+  }
+  const sha256=digest(bytes),pin=frame.policy.sourcePins[keyOf(file)];
+  if(spec.requireSourcePins&&!pin)throw new Error("资料缺少项目维护者登记的来源凭据 "+file);
+  if(pin&&pin.sha256!==sha256)throw new Error("资料与登记的原始版本不符，须重新核验来源 "+file);
+  return {file,bytes,lines,start,end,sha256,pin};
+}
+
 /** Validate a source against actual reads, current bytes and an optional origin pin. */
 export function evidenceReference(frame, active, spec, input) {
-  const file = relativeName(input?.file);
-  const grant = spec.phases[active.phase];
-  if (!includes(grant.evidence, file)) throw new Error("资料引用不在本轮证据授权中 " + file);
-  const bytes = readBytes(frame.root, file);
-  const seen = active.seen[keyOf(file)];
-  const { start, end } = input;
-  if (!bytes || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start
-    || end > lineList(bytes).length || seen?.hash !== digest(bytes)
-    || !seen.ranges.some(([a, b]) => a <= start && b >= end)) {
-    throw new Error("资料引用须对应本轮实际读过的当前原文行 " + file);
-  }
-  const sha256 = digest(bytes);
-  const pin = frame.policy.sourcePins[keyOf(file)];
-  if (spec.requireSourcePins && !pin) throw new Error("资料缺少项目维护者登记的来源凭据 " + file);
-  if (pin && pin.sha256 !== sha256) throw new Error("资料与登记的原始版本不符，须重新核验来源 " + file);
-  const observation = pin?.observation && observedExcerpt(frame.root, file, bytes, pin, start, end);
-  return { file, start, end, sha256, origin: pin
-    ? { kind: pin.kind, locator: pin.locator, integrity: "matches-pin", ...(observation ? { observation } : {}) }
-    : { kind: "unregistered", integrity: "observed-local-bytes" } };
+  const {file,bytes,start,end,sha256,pin}=checkedSource(frame,active,spec,input);
+  const observation=pin?.observation&&observedExcerpt(frame.root,file,bytes,pin,start,end);
+  return {file,start,end,sha256,origin:pin
+    ?{kind:pin.kind,locator:pin.locator,integrity:"matches-pin",...(observation?{observation}:{})}
+    :{kind:"unregistered",integrity:"observed-local-bytes"}};
+}
+
+/** Read the authenticated registered-excerpt set as its own object. Metadata and
+ * unregistered snapshot lines stay distinct from externally quoted evidence. */
+export function registeredObservation(frame,active,spec,file,{host=false}={}) {
+  const checked=checkedSource(frame,active,spec,{file},{whole:true,host});
+  const {bytes,lines,sha256,pin}=checked;
+  if(!pin?.observation)throw new Error("该来源没有登记摘录获取回执，不能证明摘录集合的范围");
+  const result=observationRegistry(frame.root,checked.file,bytes,pin);
+  return {source:{file:checked.file,sha256,origin:{kind:pin.kind,locator:pin.locator,integrity:"matches-pin",observation:result.observation}},
+    lines,registered:result.registered};
 }
 
 /** Build the read inventory from the host's coverage records, never model prose. */

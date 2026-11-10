@@ -8,6 +8,7 @@ from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 import argparse
+import gzip
 import json
 import math
 import re
@@ -362,6 +363,12 @@ def verify(root):
         check(path.is_relative_to(root), "Manifest path escapes the experiment data")
         data = path.read_bytes()
         check(sha256(data).hexdigest() == entry["sha256"], "Bundle digest mismatch: " + entry["path"])
+        if entry.get("encoding") == "gzip":
+            data = gzip.decompress(data)
+            check(len(data) == entry.get("contentBytes") and sha256(data).hexdigest() == entry.get("contentSha256"),
+                  "Uncompressed bundle digest mismatch: " + entry["path"])
+        else:
+            check(entry.get("encoding") is None, "Unsupported bundle encoding: " + entry["path"])
         bundle, artifacts = json.loads(data), {}
         for artifact in bundle["artifacts"]:
             check(artifact["path"] not in artifacts, entry["path"] + ": duplicate artifact path")

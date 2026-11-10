@@ -8,6 +8,7 @@ from collections import Counter
 from hashlib import sha256
 from pathlib import Path
 import argparse
+import gzip
 import json
 import os
 import re
@@ -136,6 +137,15 @@ def collect(run, clean):
                  "governance/preflight.mjs", "governance/evidence.mjs", "governance/ledger.mjs", "governance/goals.mjs", "governance/coverage.mjs"):
         if (runtime / name).is_file():
             files.append(runtime / name)
+    manifest_file = run / "run.json"
+    if manifest_file.is_file():
+        try:
+            skill = "skills/dispatch-protocol/SKILL.md"
+            hashes = json.loads(manifest_file.read_text(encoding="utf-8")).get("runtimeHashes", {})
+            if isinstance(hashes, dict) and skill in hashes and (runtime / skill).is_file():
+                files.append(runtime / skill)
+        except (ValueError, AttributeError):
+            pass  # Preserve malformed historical manifests through artifact().
     for name in ("cordis.patch.yml", "witness.mjs"):
         profile = run / "isolated-home/profiles/web" / name
         if profile.is_file():
@@ -169,10 +179,19 @@ def export(root, destination):
                       "completion": ending, "recordedUsage": usage(artifacts), "artifacts": artifacts}
             name = family.name + "/" + run.name + ".json"
             data = serialize(bundle)
+            metadata = next((a["data"] for a in artifacts if a["path"] == "run.json" and isinstance(a["data"], dict)), {})
+            encoding = {}
+            if metadata.get("reconciliationControls"):
+                # Preserve the complete canonical bundle without crossing Git's
+                # blob limit as repeated real request bodies grow. Old runs keep
+                # their original paths, encoding and SHA values.
+                name += ".gz"
+                encoding = {"encoding": "gzip", "contentSha256": sha256(data).hexdigest(), "contentBytes": len(data)}
+                data = gzip.compress(data, compresslevel=6, mtime=0)
             target = destination / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-            manifest["runs"].append({"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data),
+            manifest["runs"].append({"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), **encoding,
                                      "completion": ending, "recordedUsage": bundle["recordedUsage"]})
     smoke = []
     for directory in sorted((root / "work").glob("building-loop-*")):

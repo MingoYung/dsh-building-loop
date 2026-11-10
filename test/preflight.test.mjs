@@ -4,9 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { apply } from "../governance/index.mjs";
-import { QUALITY, lineList, numericChecks, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
+import { QUALITY, citation, lineList, numericChecks, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
 import { authority, digest } from "../governance/policy.mjs";
-import { evidenceReference, expectedClaims } from "../governance/evidence.mjs";
+import { evidenceReference, expectedClaims, checkSourceNarrative } from "../governance/evidence.mjs";
+import { citationLineCounts } from "../governance/coverage.mjs";
 
 import { fixture, host, policy, seed } from "./helpers.mjs";
 
@@ -220,4 +221,76 @@ test("unlisted prose and newly numbered facts cannot escape independent review",
   await file(worker, "read", "candidate.md");
   await file(worker, "read", "overview.md");
   await assert.rejects(flow(worker, "submit", { quality: notes }), /未登记事实仍未修订/);
+}));
+
+/** Frozen source-bearing lines of 20261110T015854Z, including the original L23. */
+const repeatedMentionRows=[
+  [
+    8,
+    "（下列各行出自 sources/synthetic.md，该文件第 1 行标题声明「合成逻辑样例；不是外部研究、生产日志或真实效果数据」。）"
+  ],
+  [
+    9,
+    "- C3：按本例规则，样本 X 是 A 级，因此样本 X 应送复核（出处：sources/synthetic.md 第 4-5 行）。"
+  ],
+  [
+    10,
+    "- 记录 A 的 completed 状态并不排除 failure 结论（出处：sources/synthetic.md 第 2 行）。"
+  ],
+  [
+    11,
+    "- 该模拟观测只显示训练时长与分数正相关，不能得出延长训练必然提高分数（出处：sources/synthetic.md 第 3 行）。"
+  ],
+  [
+    12,
+    "- 按本例规则，A 级样本应送复核；送复核并不意味着都是 A 级（出处：sources/synthetic.md 第 4-5 行）。"
+  ],
+  [
+    13,
+    "- 就模拟观测记录而言，只能报告相关，不能单凭该记录确定因果（出处：sources/synthetic.md 第 3 行；sources/nist-scatter.md 第 6 行）。"
+  ],
+  [
+    17,
+    "错例：记录 A 已完成，所以记录 A 必定成功（出处：sources/synthetic.md 第 2 行；该行原文为 status=completed 且 conclusion=failure，故这是与原文相反的错例）。"
+  ],
+  [
+    22,
+    "- [稿件自述] 本稿有 6 行带 sources/synthetic.md 的行号定位。"
+  ],
+  [
+    23,
+    "- [稿件自述] 本稿带 sources/synthetic.md 行号定位的共 6 行，即第 9、10、11、12、13、17 行；这 6 行的模拟属性由本稿第 7 行分区标题与 sources/synthetic.md 第 1 行标题声明标明（出处：本稿第 7、9-13、17 行；sources/synthetic.md 第 1 行）。"
+  ]
+];
+
+
+test("a bare first source mention cannot hide its later actual locator",()=>{
+  for(const [locator,expected] of [["第2-3行",{start:2,end:3}],["#L2-L3",{start:2,end:3}],[":2–3",{start:2,end:3}]]) {
+    assert.deepEqual(citation("先提及 sources/example.md ，后附 sources/example.md "+locator+"。","sources/example.md"),expected);
+  }
+  assert.deepEqual(citation("sources/example.md 仅为文件名；sources/example.md 也没有行号。","sources/example.md"),{start:null,end:null});
+  assert.deepEqual(citation("sources/example.md 第2行；sources/example.md 第3行。","sources/example.md"),{start:2,end:2});
+  assert.equal(citation("sources/example.md 第0行；sources/example.md 第3行。","sources/example.md"),null);
+  assert.equal(citation("sources/example.md 第3-2行；sources/example.md 第4行。","sources/example.md"),null);
+  assert.equal(citation("sources/example.md.bak 第2行；other/sources/example.md 第2行。","sources/example.md"),null);
+});
+
+test("the actual L23 is counted once after its leading bare mention and total cited lines become seven",()=>{
+  const frozen=Array.from({length:23},()=>"");for(const [line,text] of repeatedMentionRows)frozen[line-1]=text;
+  assert.deepEqual(citation(frozen[22],"sources/synthetic.md"),{start:1,end:1});
+  const counts=citationLineCounts(Buffer.from(frozen.join("\r\n")),["sources/synthetic.md"]);
+  assert.deepEqual(counts,[{source:"sources/synthetic.md",count:7,lines:[9,10,11,12,13,17,23]}]);
+  assert.deepEqual(citationLineCounts(Buffer.from(frozen[22]),["sources/synthetic.md"]),[{source:"sources/synthetic.md",count:1,lines:[1]}]);
+});
+
+test("numeric and source-narrative consumers retain authorization while finding later locators",async()=>fixture(async(root,write)=>{
+  const spec=authority(root).units.K01;
+  const body="- C2：按 timing.csv 数据，下降20%（出处：timing.csv 第2-3行）。\n";
+  assert.equal(numericChecks(root,spec,lineList(Buffer.from(body)),["timing.csv"])[0].ok,true);
+  assert.equal(numericChecks(root,spec,lineList(Buffer.from(body)),[])[0].ok,false);
+  const frame={root,reads:["timing.csv"],policy:authority(root)},active={seen:{}};
+  assert.throws(()=>checkSourceNarrative(frame,active,"已读 timing.csv，原始值见 timing.csv #L2-L3。"),/未实际读取/);
+  active.seen["timing.csv"]={hash:digest(fs.readFileSync(path.join(root,"timing.csv"))),ranges:[[2,3]]};
+  assert.doesNotThrow(()=>checkSourceNarrative(frame,active,"已读 timing.csv，原始值见 timing.csv #L2-L3。"));
+  assert.doesNotThrow(()=>checkSourceNarrative(frame,active,"只讨论 timing.csv 文件。"));
 }));

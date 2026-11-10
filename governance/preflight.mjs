@@ -26,16 +26,22 @@ export function claimRow(lines, id) {
 /** 识别准确路径及原文行范围，排除同名前缀和备份别名。 */
 export function citation(body, file) {
   const pattern = new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、])" + escape(file)
-    + "(?=$|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "i" : "");
+    + "(?=$|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "gi" : "g");
   const row = body.replaceAll("\\", "/");
-  const match = pattern.exec(row);
-  if (!match) return null;
-  const after = row.slice(match.index + match[0].length);
-  const range = /^\s*(?:\x60\s*)?(?:#L(\d+)(?:-L?(\d+))?|[:：](\d+)(?:[-–—](\d+))?|第\s*(\d+)(?:\s*[-–—、至到]\s*(\d+))?\s*行)/i.exec(after);
-  if (!range) return { start: null, end: null };
-  const start = Number(range[1] ?? range[3] ?? range[5]);
-  const end = Number(range[2] ?? range[4] ?? range[6] ?? start);
-  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start ? { start, end } : null;
+  let mentioned = false;
+  // A filename may first appear as a topic and only later carry its locator.
+  // Prefer the first explicit range, but never hide an invalid explicit range
+  // behind a later good one. Bare mentions retain their existing no-range shape.
+  for (const match of row.matchAll(pattern)) {
+    mentioned = true;
+    const after = row.slice(match.index + match[0].length);
+    const range = /^\s*(?:\x60\s*)?(?:#L(\d+)(?:-L?(\d+))?|[:：](\d+)(?:[-–—](\d+))?|第\s*(\d+)(?:\s*[-–—、至到]\s*(\d+))?\s*行)/i.exec(after);
+    if (!range) continue;
+    const start = Number(range[1] ?? range[3] ?? range[5]);
+    const end = Number(range[2] ?? range[4] ?? range[6] ?? start);
+    return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start ? { start, end } : null;
+  }
+  return mentioned ? { start: null, end: null } : null;
 }
 
 /** Remove only recognized locators. Facts after a citation remain in the comparison. */
