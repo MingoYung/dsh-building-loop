@@ -4,7 +4,8 @@
 // 而 `goal-round-driver` 是故意在这一刻解除自动续轮的（见其 lib/index.js 里
 // `case "turn/end": if (event.data.reason.kind === "max-tokens") { disarm(state); return; }`）。
 // 两件事叠在一起，结果就是一段没写完的活停在半路，要人手打一句「继续」。
-// 本插件补的就是这一句，并且给自己划死边界（见下）。
+// 本插件补这句续写。DeepSeek 坏参数则走宿主的同一步请求重试，
+// 不开启新回合，也不改写未执行的参数。
 //
 // 四条安全边界：
 //   1. 注入消息的 source 必须显式写成 { kind: "plugin", plugin: NAME }。
@@ -15,8 +16,8 @@
 //   2. 连续续轮有上限。触顶就停手并记一条日志，绝不让两个空转的回合互相喂。
 //   3. 任何非 `max-tokens` 的回合结束都清零计数 —— 人来过、活干完了、报错了，
 //      都算「局面变了」，不继承上一段的计数。
-//   4. 只管根代理，不管子代理。子代理被截断由它的父代理读错误后决定怎么办，
-//      不在这里替它做决定（缩小爆炸半径）。
+//   4. 截断续轮只管根代理；已确定未执行的坏参数才在同一步重试，
+//      适用于此预设的根和子会话。
 // 动态导入而不是静态 import：静态导入一旦解析失败，本模块根本不会求值，
 // apply() 也就永远不被调用，整行插件会以「import 失败」告终。动态导入 +
 // 兜底实现让这条链断在哪一环都还能跑。
@@ -29,14 +30,18 @@ try {
 
 export const name = "turn-resume";
 
-/** 取 agent 句柄要走 agents 服务；不依赖别的服务。 */
-export const inject = ["agents"];
+/** 用原生 agent 句柄确定会话，在重试时刷新该会话的运行时提示。 */
+export const inject = ["agents", "systemPrompt"];
 
 const DEFAULT_MAX_CONSECUTIVE = 3;
 
 const DEFAULT_TEXT =
   "上一回合的输出被 token 上限截断了。请从断点继续，不要重复已经写过的内容；" +
   "如果其实已经写完，直接说明完成，不要补写。";
+const MALFORMED_TOOL_INPUT = "DeepSeek Messages stream: tool input is invalid JSON";
+const MALFORMED_RETRIES_PER_TURN = 2;
+const RETRY_TEXT = "该步原响应的工具参数不是有效 JSON，本步的调用没有执行。仅在这次恢复请求中依据已落盘结果" +
+  "重新生成一个当前需要的调用，参数只填契约需要的字段，引号和换行按 JSON 转义。后续已有工具结果时，继续当前阶段。";
 
 // 依赖注入失败时的最小等价实现：DSH 的 createUserMessage 就是
 // { ...input, role: "user", id: <uuid> }。走到这里说明解析链没接上，
@@ -55,14 +60,52 @@ export function apply(ctx, config = {}) {
 
   /** @type {Map<string, number>} 会话 id → 连续被截断的次数 */
   const streaks = new Map();
+  /** 每个原生会话的当前回合预算。一次失败最多重试一次，同回合合计两次。 */
+  const malformed = new WeakMap();
+
+  ctx.systemPrompt.context({
+    name: "building-loop.tool-input-retry", order: 131, interpolate: false,
+    text({ agent }) {
+      const budget = malformed.get(agent);
+      // DSH retains delivered runtime context in history. Pin this instruction
+      // to the failed position so later steps do not treat it as a new failure.
+      return budget?.hintStep ? `坏参数恢复 · 回合 ${budget.turn} 第 ${budget.hintStep} 步。${RETRY_TEXT}` : "";
+    },
+  });
 
   ctx.effect(function* () {
+    ctx.on("agent/request-error", ({ agent, turn, step, provider, failure, signal }, next) => {
+      if (provider !== "deepseek-official" || failure?.code !== "MALFORMED_RESPONSE" ||
+          failure.message !== MALFORMED_TOOL_INPUT || !agent || ctx.agents.get(agent.id) !== agent) return next();
+      if (signal.aborted || !Number.isSafeInteger(turn) || turn < 1 || !Number.isSafeInteger(step) || step < 1) return;
+
+      // DSH has settled a discarded assistant/attempt here and has yet to enter
+      // tools.execute. The native retry re-generates the same step; a failure
+      // thrown by tool execution never comes through this hook.
+      let budget = malformed.get(agent);
+      if (budget?.turn !== turn) {
+        budget = { turn, steps: new Set(), hintStep: null };
+        malformed.set(agent, budget);
+      }
+      if (budget.steps.has(step) || budget.steps.size >= MALFORMED_RETRIES_PER_TURN) return;
+      budget.steps.add(step);
+      budget.hintStep = step;
+      ctx.logger.info(`turn-resume: retrying malformed tool input for ${agent.id}, turn ${turn}, step ${step}`);
+      return { kind: "retry" };
+    });
+
     ctx.on("session/event", (session, event) => {
-      if (event.type !== "turn/end") return;
+      if (!["assistant/message", "step/end", "turn/end"].includes(event.type)) return;
 
       // 只认这个会话自己的 agent：其它树、子代理的树都会冒泡到这里。
       const agent = ctx.agents.get(session.id);
       if (agent === void 0 || agent.session !== session) return;
+      if (event.type !== "turn/end") {
+        const budget = malformed.get(agent);
+        if (budget?.turn === event.data?.turn && budget.hintStep === event.data.step) budget.hintStep = null;
+        return;
+      }
+      malformed.delete(agent);
       if (!ctx.agents.roots().includes(agent)) return;
 
       if (event.data?.reason?.kind !== "max-tokens") {

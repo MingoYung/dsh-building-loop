@@ -6,7 +6,7 @@ import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { acceptedVersion, goalSnapshot, needsRevalidation } from "../governance/goals.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
-import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks } from "../governance/coverage.mjs";
+import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks } from "../governance/coverage.mjs";
 
 /** Raw helpers test the mandatory production gate without auto-generated reviews. */
 function environment(root) {
@@ -706,6 +706,159 @@ const countList020834Z=[
   "","大白话：把完成状态、实际结果和证据能说明的范围分开看。","",
 ].join("\n");
 const synthetic020834Z="# 合成逻辑样例；不是外部研究、生产日志或真实效果数据\n记录 A：status=completed，conclusion=failure。\n模拟观测组：训练时长与分数正相关；没有随机分配，也没有排除其他共同影响因素。\n本例分级规则：如果一个样本是 A 级，则该样本应送复核。\n本例对象：样本 X 是 A 级。\n";
+
+// Immutable draft from 053234Z; line 13 produced two separate review blocks.
+const profile053234Z=[
+  "# 检查结果与观测说明",
+  "- C1：GitHub 的 completed 状态可以对应 failure 结论；原文限定为 completed 状态下 conclusion 可以是 failure 或 success 等任一项（出处：sources/github-checks.md 第 6-8 行）。",
+  "- C2：NIST 指出，相关不必然说明因果（出处：sources/nist-scatter.md 第 6 行）。",
+  "- C3：按本例规则，样本 X 是 A 级，因此样本 X 应送复核；该规则只就本例样本 X 作单向推导，不外推到其他样本（出处：sources/synthetic.md 第 4-5 行）。",
+  "- [模拟] 记录 A 已完成，但 conclusion 为 failure，不能因已完成推出成功（出处：sources/synthetic.md 第 2 行）。",
+  "- [模拟] 模拟观测组的训练时长与分数正相关，但没有随机分配，也没有排除其他共同影响因素，不能由此推出延长训练必然提高每个人的分数（出处：sources/synthetic.md 第 3 行）。",
+  "- [模拟] 本例规则只有 A 级则送复核这一单向方向，不能反过来推出送复核的样本都是 A 级（出处：sources/synthetic.md 第 4-5 行）。",
+  "- [模拟] 就 sources/synthetic.md 的模拟观测记录而言，只能报告相关，不能单凭该记录确定因果（出处：sources/synthetic.md 第 3 行；sources/nist-scatter.md 第 6 行）。",
+  "- [推测] 后续可以考虑通过更合适的研究设计检验原因。",
+  "- 错例：记录 A 已完成，所以记录 A 必定成功（出处：sources/synthetic.md 第 2 行）。",
+  "- C4：completed 状态下 conclusion 不只限于 failure，也可以是 success 等任一项，因此 completed 状态本身不能确定实际结果（出处：sources/github-checks.md 第 6-8 行）。",
+  "- [摘录范围] 本轮登记的 sources/nist-scatter.md 含 1 条 NIST 页面短摘录。",
+  "- [稿件自述] 行号定位 6 行：带 sources/synthetic.md 的行号定位为第 4-8 行及第 10 行错例行；同带 [模拟] 4 行：第 5-8 行。",
+  "- [引文校验] sources/nist-scatter.md 第 6 行逐字为“association does NOT imply causality.”。",
+  "大白话：把完成状态、实际结果和证据能说明的范围分开看。", "",
+].join("\n");
+const profileCheck={kind:"candidate",check:"citation-profile",source:"sources/synthetic.md"};
+const profileFixture=(root,write,body=profile053234Z)=>objectEnvironment(root,write,body,{sources:{"sources/synthetic.md":synthetic020834Z}});
+const profileBlocks=e=>e.invoke("inventory",{count:24}).blocks.filter(block=>block.line===13);
+const profileProof=(e,block)=>e.invoke("status",{block:block.id}).record.parts[0].objectCheck;
+
+test("053234Z blocked compound statistics verify both original spans without rewriting a byte",async()=>fixture(async(root,write)=>{
+  const expectedHash="cbf93253b49e4685c103411d459db079c6f0bb845aa5216911c239313439c971";
+  assert.equal(digest(profile053234Z),expectedHash);
+  const e=profileFixture(root,write),[head,tail]=profileBlocks(e);
+  assert.equal(head.id,"B16-68820bbd");
+  assert.deepEqual(head.objectCheckHint,profileCheck);
+  assert.deepEqual(tail.objectCheckHint,profileCheck);
+  e.put(head.objectCheckHint,{block:head.id});e.put(tail.objectCheckHint,{block:tail.id});
+  const headProof=profileProof(e,head),tailProof=profileProof(e,tail);
+  assert.equal(headProof.candidateSha256,expectedHash);assert.equal(tailProof.candidateSha256,expectedHash);
+  assert.deepEqual(headProof.result,{matches:true,profileClause:"citation-lines",expected:6,actual:6,unit:"candidate-citation-lines",
+    lines:[4,5,6,7,8,10],claimedLines:[4,5,6,7,8,10],lineListMatches:true,missingLines:[],missingCount:0,extraLines:[],extraCount:0,
+    duplicateLines:[],exampleLines:[10],wrongExampleLines:[]});
+  assert.deepEqual(tailProof.result,{matches:true,profileClause:"marked-citation-lines",expected:4,actual:4,unit:"candidate-marked-citation-lines",
+    lines:[5,6,7,8],claimedLines:[5,6,7,8],lineListMatches:true,missingLines:[],missingCount:0,extraLines:[],extraCount:0,duplicateLines:[],
+    exampleLines:[],wrongExampleLines:[],marker:"[模拟]",markerPosition:"any"});
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),profile053234Z);
+  const records=[head,tail].map(block=>e.invoke("status",{block:block.id}).record);
+  requireStoredObjectChecks(e.frame,e.spec,[{records}],Buffer.from(profile053234Z));
+  assert.throws(()=>requireStoredObjectChecks(e.frame,e.spec,[{records}],Buffer.from(profile053234Z.replace("同带 [模拟] 4", "同带 [模拟] 3"))),/失效/);
+}));
+
+test("compound counts, each ordinal set, and explicit error-example annotations reject independently",async()=>fixture(async(root,write)=>{
+  const cases=[
+    ["行号定位 6 行","行号定位 7 行",0,"行号定位 7 行",{expected:7,actual:6}],
+    ["第 4-8 行及第 10 行错例行","第 4-8 行及第 9 行",0,"第 4-8 行及第 9 行",{missingLines:[10],extraLines:[9]}],
+    ["第 4-8 行及第 10 行错例行","第 4-8 行及第 8 行",0,"第 4-8 行及第 8 行",{duplicateLines:[8]}],
+    ["第 4-8 行及第 10 行错例行","第 4-7 行及第 8 行错例行及第 10 行",0,"第 8 行错例行",{wrongExampleLines:[8],lineListMatches:true}],
+    ["同带 [模拟] 4 行","同带 [模拟] 5 行",1,"同带 [模拟] 5 行",{expected:5,actual:4}],
+    ["同带 [模拟] 4 行：第 5-8 行","同带 [模拟] 4 行：第 5-7、10 行",1,"第 5-7、10 行",{missingLines:[8],extraLines:[10]}],
+  ];
+  for(const [oldText,newText,index,finding,expected] of cases) {
+    const e=profileFixture(root,write,profile053234Z.replace(oldText,newText)),block=profileBlocks(e)[index];
+    assert.throws(()=>e.put(profileCheck,{block:block.id}),error=>{
+      const actual=objectDiagnostic(error);assert.equal(actual.matches,false);
+      for(const [key,value] of Object.entries(expected))assert.deepEqual(actual[key],value);
+      return true;
+    });
+    assert.equal(e.invoke("status").rejected.length,0);
+    e.put(profileCheck,{block:block.id,status:"unsupported",finding:objectFinding(finding)});
+    assert.equal(profileProof(e,block).result.matches,false);
+    assert.equal(e.invoke("status").rejected.length,1);
+  }
+}));
+
+test("executor preflight measures the same current candidate profiles as review, using only its approved sources",async()=>fixture(async(root,write)=>{
+  const bytes=Buffer.from(profile053234Z),source=profileCheck.source,candidate="candidate.md";
+  const e=profileFixture(root,write),blocks=profileBlocks(e);
+  const measured=candidateCitationProfiles(bytes,[source],candidate);
+  for(const [index,block] of blocks.entries()) {
+    e.put(profileCheck,{block:block.id});
+    assert.deepEqual(measured[index],{line:13,block:block.id,source,...profileProof(e,block).result});
+  }
+  assert.deepEqual(candidateCitationProfiles(bytes,["snapshot.md"],candidate),[]);
+  assert.deepEqual(candidateCitationProfiles(Buffer.from("\n"),[source],candidate),[]);
+  assert.deepEqual(candidateCitationProfiles(bytes,[source],source),[]);
+  const wrong=Buffer.from(profile053234Z.replace("同带 [模拟] 4 行：第 5-8 行", "同带 [模拟] 4 行：第 5-7、10 行"));
+  const changed=candidateCitationProfiles(wrong,[source],candidate);
+  assert.equal(changed[0].matches,true);assert.equal(changed[1].matches,false);
+  assert.deepEqual(changed[1].missingLines,[8]);assert.deepEqual(changed[1].extraLines,[10]);
+}));
+
+test("a compound statistic needs the current full read, its own source and exact proof for both clauses",async()=>fixture(async(root,write)=>{
+  const e=profileFixture(root,write),[head,tail]=profileBlocks(e);
+  const candidate=e.active.seen[keyOf("candidate.md")];
+  e.active.seen[keyOf("candidate.md")]={...candidate,ranges:[[13,13]]};
+  assert.throws(()=>e.put(profileCheck,{block:head.id}),/实际完整读取/);
+  e.read("candidate.md");
+  assert.throws(()=>e.put({...profileCheck,expected:6},{block:head.id}),/字段不匹配/);
+  assert.throws(()=>e.put({...profileCheck,source:"snapshot.md"},{block:tail.id}),/同一来源/);
+  assert.throws(()=>e.put(profileCheck,{block:tail.id,status:"unsupported",finding:objectFinding("同带 [模拟] 4 行")}),/实测成立/);
+  assert.throws(()=>e.invoke("record",{entries:[{block:tail.id,parts:[nonfact]}]}),/须按本块的 objectCheckHint/);
+  assert.throws(()=>e.invoke("record",{entries:[{block:tail.id,parts:[fact]}]}),/须按本块的 objectCheckHint/);
+  const numberOnly="同带 [模拟] 4 行：";
+  assert.throws(()=>e.invoke("record",{entries:[{block:tail.id,parts:[{...fact,quote:numberOnly,evidence:undefined,objectCheck:profileCheck},
+    {...nonfact,quote:tail.text.slice(numberOnly.length)}]}]}),/完整原句块/);
+  e.put(profileCheck,{block:head.id});e.put(profileCheck,{block:tail.id});
+  const records=[head,tail].map(block=>e.invoke("status",{block:block.id}).record);
+  // Old proof shapes cannot claim closure after the current host identifies the
+  // same marker-count clause as requiring an actual manuscript measurement.
+  records[1]={...records[1],parts:[{...records[1].parts[0],objectCheck:undefined}]};
+  assert.throws(()=>requireStoredObjectChecks(e.frame,e.spec,[{records}],Buffer.from(profile053234Z)),/失效/);
+}));
+
+test("compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text",async()=>fixture(async(root,write)=>{
+  const changed=profile053234Z.replace("- [模拟] 记录 A 已完成", "- 记录 A [模拟] 已完成")
+    .replace("- [推测] 后续可以考虑", "- [推测] [模拟] 后续可以考虑");
+  let e=profileFixture(root,write,changed),tail=profileBlocks(e)[1];
+  e.put(profileCheck,{block:tail.id});assert.deepEqual(profileProof(e,tail).result.lines,[5,6,7,8]);
+  e=profileFixture(root,write,changed.replace("同带 [模拟]", "同行首带 [模拟]"));tail=profileBlocks(e)[1];
+  assert.throws(()=>e.put(profileCheck,{block:tail.id}),error=>{
+    const measured=objectDiagnostic(error);assert.equal(measured.markerPosition,"leading");
+    assert.deepEqual(measured.lines,[6,7,8]);assert.deepEqual(measured.extraLines,[5]);return true;
+  });
+  e=profileFixture(root,write,changed.replace("同带 [模拟] 4 行：第 5-8 行", "同行首带 [模拟] 3 行：第 6-8 行"));tail=profileBlocks(e)[1];
+  e.put(profileCheck,{block:tail.id});assert.deepEqual(profileProof(e,tail).result.lines,[6,7,8]);
+}));
+
+test("unbounded or attached additional statistics do not borrow the recognized exact proof",async()=>fixture(async(root,write)=>{
+  for(const body of [
+    profile053234Z.replace("第 5-8 行。", "第 5-8 等行。"),
+    profile053234Z.replace("第 5-8 行。", "第 1-257 行。"),
+    profile053234Z.replace("第 5-8 行。", "第 5-8 行，且外部已证明新结论。"),
+  ]) {
+    const e=profileFixture(root,write,body),blocks=profileBlocks(e);
+    assert.ok(blocks.every(block=>!block.objectCheckHint));
+    assert.throws(()=>e.put(profileCheck,{block:blocks[0].id}),/完整原句块/);
+  }
+}));
+
+test("an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows",async()=>fixture(async(root,write)=>{
+  for(const delimiter of ["；","。"]) {
+    const body=profile053234Z.replace("第 5-8 行。", "第 5-8 行"+delimiter+"外部已证明新结论。");
+    const e=profileFixture(root,write,body),[head,tail,independent]=profileBlocks(e);
+    assert.deepEqual([head.objectCheckHint,tail.objectCheckHint],[profileCheck,profileCheck]);
+    assert.equal(independent.objectCheckHint,undefined);
+    e.put(profileCheck,{block:head.id});e.put(profileCheck,{block:tail.id});
+    assert.throws(()=>e.put(profileCheck,{block:independent.id}),/完整原句块/);
+    assert.ok(e.invoke("status").pending.includes(independent.id));
+  }
+  const zero=profile053234Z.replaceAll("- [模拟] ","- ").replace("同带 [模拟] 4 行：第 5-8 行","同带 [模拟] 0 行：无")
+    .replace("- [推测] 后续可以考虑","- [推测] [模拟] 后续可以考虑");
+  let e=profileFixture(root,write,zero),tail=profileBlocks(e)[1];
+  e.put(profileCheck,{block:tail.id});assert.deepEqual(profileProof(e,tail).result.lines,[]);
+  e=profileFixture(root,write,zero.replace("- 记录 A 已完成，但", "- [模拟] 记录 A 已完成，但"));tail=profileBlocks(e)[1];
+  assert.throws(()=>e.put(profileCheck,{block:tail.id}),error=>{
+    const measured=objectDiagnostic(error);assert.equal(measured.expected,0);assert.deepEqual(measured.missingLines,[5]);return true;
+  });
+}));
 
 test("020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript",async()=>fixture(async(root,write)=>{
   const e=objectEnvironment(root,write,countList020834Z,{sources:{"sources/synthetic.md":synthetic020834Z}});

@@ -13,7 +13,7 @@ import {
 import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory } from "./evidence.mjs";
 import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requireGoalRead } from "./goals.mjs";
-import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts } from "./coverage.mjs";
+import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles } from "./coverage.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools"];
@@ -24,6 +24,8 @@ const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
 const STATE_LIMIT = 8 * 1024 * 1024;
 const SEARCH_OBSERVATION_LIMIT = 16;
+const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
+const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
 const EMPTY = { read: [], write: [] };
 
 const BEGIN = {
@@ -40,19 +42,19 @@ const LEDGER_BASIS_RULE="账本 basis 只说明本项处置与当前目标或验
 const RULES = {
   intake: "接单。按指定二级索引找到候选，第一轮按任务单保留原稿送审。读回候选后用 submit 交接。来源真伪由独立核验方查，接单阶段缺少来源读权不构成阻塞。仅候选缺失或明确无法执行的任务才 block。宿主通知总控。",
   "first-review": "首次验收。独立打开候选和每条引用的原文，核数字、行号和适用范围。无出处或原文不支持就填 unsupported，不代为补查。",
-  supplement: "补查。先读当前目标和退回回执，旧派单与新目标冲突时以当前目标为准。用 preflight 获取待改项，按原始证据原位修订，保留已证内容及要求的编号。按目标做必要改动；未要求时不要增加新的全稿计数、逐处标注或外部整页声明。无据的额外说法可删或收窄，不把内部修订说明混入成稿。出处路径和原文行写在同行。若保留稿件引用行数，修改后读回再用 preflight 的实测值核对。完整读回后 submit 带六项 quality。",
+  supplement: "补查。先读当前目标和退回回执，旧派单与新目标冲突时以当前目标为准。用 preflight 获取待改项，按原始证据原位修订，保留已证内容及要求的编号。按目标做必要改动；未要求时不要增加新的全稿计数、逐处标注或外部整页声明。无据的额外说法可删或收窄，不把内部修订说明混入成稿。出处路径和原文行写在同行。保留稿件统计时，修改后读回再用 preflight 的实测引用行、对应标记子集核对；截断预览不能当完整清单。完整读回后 submit 带六项 quality。",
   "final-review": "终审。回到修订稿和原始证据，重新核对所有断言与改动。只有所有要求都支持才关单。",
   "first-audit": "独立反证复核。只看当前目标、正文和原始证据，重新逐块判断，不依赖第一核验者的回执。核完全文后用 building_loop audit 提交。",
   "final-audit": "修订稿独立反证复核。重新核全文与逐项推导，正确内容保留，证据不足写明确最小修正。核完用 building_loop audit 提交。",
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
 const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选中实际存在的原句片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后 review 逐条 checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
-const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
+const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
 const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据；候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
 // Semantic alignment is an explicit review duty, not a host claim that quote
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
-const OBJECT_RULE="区分三个证据对象：外部事实用实际原文 evidence；已登记摘录的数量、成员或逐字范围用 direct.objectCheck 的 registered-excerpts；当前稿引用行数或逐处标记用 direct.objectCheck 的 candidate。已登记摘录无某字面不证明完整网页没有该内容，稿件自述也不能用外部标题证明。纯定位、编号和格式边界不另作事实；错例后说明及大白话若含事实仍逐项核。";
+const OBJECT_RULE="区分三个证据对象：外部事实用实际原文 evidence；已登记摘录的数量、成员或逐字范围用 direct.objectCheck 的 registered-excerpts；当前稿引用行数或逐处标记用 direct.objectCheck 的 candidate。inventory 给出 objectCheckHint 时，按原样作为该块 direct.objectCheck，只填提示里的 kind/check/source。组合统计的两块分别提交，宿主从当前原句逐项核数量、完整行号、错例注记和同源标记子集。已登记摘录无某字面不证明完整网页没有该内容，稿件自述也不能用外部标题证明。纯定位、编号和格式边界不另作事实；错例后说明及大白话若含事实仍逐项核。";
 const EXAMPLE_RULE = '原句明确以“误读：”“错例：”“错误推理：”或 [误读]/[错例] 开头时，按 error-example 单列：sourceRelation 核其中展示的推理是 contradicts 或 insufficient，evidence 给实际反证或不足依据。宿主保留它作为已标注的错例，不作为已证前提；不要求作者为了核验换一个同义标签。没有显式标签绝不能用此分类。';
 const LITERAL_RULE = '每个事实段还须 sourceRelation=supports|contradicts|insufficient，单独判断原文对这句话字面含义的关系。不得猜测作者有意举反例、在做测试或暗含否定；正文没有明确标注错误，就当成作者提出的断言。识别到原文与断言相反必须退回，不能一边说矛盾一边 supported。inventory 标 requiresInference 的块中有明确推导关系，推导片段用 inference 并交证明；不能把两个前提的组合叫直接转述来省证明。原文引句须逐字，但候选可以忠实翻译或同义转述，不要求字字相同。';
 const NEUTRAL_SPAN_RULE = "清单的 neutralSpans 是宿主从当前原文识别的纯标签或有限读者提示。仍须逐字覆盖这些范围，用 nonfactual + supported + 具体 basis；不为格式或阅读动作找外部引句。只按给出的字符范围处理，标签后未覆盖的数量、条件、事实和推导照常核验。 行首 [模拟] 是来源范围声明。把该标签本身用 direct 核对同一引用来源的模拟声明或已核对的合成来源凭据，余下断言按 direct/inference 各自举证。";
@@ -403,13 +405,14 @@ export function apply(ctx, config = {}) {
         if (unread.some(line=>line>end)) pending.push({path:file,start:end+1,
           next:returned.length?"再次 prepare 或按行 read":"单行超过读包限额，请用 building_loop_file read 显式读取"});
       }
-      let coverage, manuscriptCounts;
+      let coverage, manuscriptCounts, candidatePositions;
       if(spec&&["reviewer","auditor"].includes(frame.role)) {
         try {
           requireGoalRead(frame,current);
           const bytes=reviewCandidate(frame,current,spec);
           coverage=coverageAction(frame,current,spec,{action:"inventory",count:24},{maxBytes:16*1024});
           manuscriptCounts=candidateMeasurements(frame,current,spec,bytes);
+          candidatePositions=candidatePositionSummary(spec.candidate,bytes);
         } catch(error) { coverage={pendingRead:true,reason:error.message}; }
       }
       const next = frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
@@ -421,6 +424,7 @@ export function apply(ctx, config = {}) {
         ...reconciliationNotice(frame,current),
         ...(coverage?{coverage}:{}),...(spec?{claims:spec.claims,plainLast:spec.plainLast}:{}),next,
         ...(manuscriptCounts?.length?{citationLineCounts:manuscriptCounts}:{}),
+        ...(candidatePositions?{candidatePositions}:{}),
         ...(["reviewer","auditor"].includes(frame.role)&&current.reconciliation?.length?{reconciliation:current.reconciliation}:{}),
         contract:frame.role==="auditor"||frame.role==="reviewer"?{
           direct:{kind:"direct",status:"supported|unsupported|uncertain",sourceRelation:"supports|contradicts|insufficient",basis:"具体判断",
@@ -431,7 +435,7 @@ export function apply(ctx, config = {}) {
           ...(coverage?.blocks?.some(block=>/\[(?:摘录范围|稿件自述)\]/u.test(block.text))?{objectCheckExamples:{
             excerptCount:{kind:"registered-excerpts",check:"count",file:"原句明确写出的来源路径",expected:1},
             citingLineCount:{kind:"candidate",check:"citation-count",source:"原句所说的被引用来源，不是候选文件",expected:6},
-            note:"示例数字须换成待核原句的数量；count 与 citation-count 分属不同对象。这里只核整个登记集合的摘录条数，不能把其中列举的几个例子当全部摘录。"}}:{}),
+            note:"示例数字须换成待核原句的数量。已有 objectCheckHint 的块按原样传提示，不套用计数模板。登记摘录只核整个登记集合的条数。"}}:{}),
           ...(frame.role==="auditor"?{finalSubmission:{action:"audit"},finalSubmissionNote:"全部块已记录后仅提交此动作，unit可省略；checks/quality/note/全文不被audit消费，不要重发。"}:{}),
           ...(current.reconciliationRound?{targetedReview:"只补 pending 中不足的本角色记录；已保存并满足目标范围的证明无需重发。核验方可以用 review 省略 checks，宿主重验本角色同版本编号检查。若真实事实缺证，提交具体退回。"}:{}),
           note:"简单块每次 record 最多12块；复杂推导建议每批2–4块，避免工具参数生成超限，证明字段不可省。非事实用 nonfactual + supported + basis；明确假设用 hypothesis；错例用 error-example + evidence。形式P→Q/P/Q须同一命题，asserts不填right。"
@@ -763,6 +767,8 @@ export function apply(ctx, config = {}) {
     const unsupported = calculations.filter(row => !row.ok).map(row => row.id);
     const decision = coverage.rejected.length || unsupported.length || layout.length ? "reject" : "accept";
     const receipt = { ...pending, decision, calculations, unsupported, coverage: coverageReceipt(pending.coverage),
+      // Recompute for legacy pending receipts too, after matching the exact candidate bytes.
+      candidatePositions:candidatePositionSummary(spec.candidate,bytes),
       ...(active.reconciliationRound?{classificationReview:{targetedRounds:active.reconciliationRound,remainingDisputes:conflicts.length}}:{}),
       qualityRejected: layout.length ? [...new Set([...(pending.qualityRejected??[]),"plain"])] : pending.qualityRejected,
       formatIssues: layout,
@@ -801,17 +807,41 @@ export function apply(ctx, config = {}) {
       // They do not certify any other part of the author's claim or the source.
       const evidence=spec.phases[active.phase].evidence??spec.phases["final-review"].evidence;
       const files=evidence.filter(file=>includes(frame.reads,file)&&selfClaims.some(line=>citation(line,file)));
-      return citationLineCounts(bytes,files).map(({lines,...row})=>({
-        ...row,lines:lines.slice(0,24),...(lines.length>24?{linePreviewTruncated:true}:{})}));
+      return citationLineCounts(bytes,files).map(({source,lines:citedLines})=>{
+        const summary={source,...manuscriptLinePreview(citedLines)};
+        if(frame.role!=="executor")return summary;
+        // Preflight exposes only marker predicates named by this source's
+        // self-report. The same literal matching primitive runs in review.
+        const markers=new Map();
+        for(const claim of selfClaims.filter(line=>citation(line,source))) {
+          for(const [,leading,marker] of claim.matchAll(/(?:(行首)\s*(?:都|均)?\s*)?(?:带有?|含有?|标了|标(?:注|记)(?:为|了)?)\s*(\[[\p{L}\p{N}_-]{1,60}\])/gu)) {
+            const position=leading?"leading":"any";
+            markers.set(`${position}:${marker}`,{marker,position});
+          }
+        }
+        const markedSubsets=[...markers.values()].slice(0,MANUSCRIPT_MARKER_PREVIEW_LIMIT).map(({marker,position})=>({
+          marker,position,...manuscriptLinePreview(citationMarkedLines(lines,citedLines,marker,position==="leading")),
+        }));
+        return {...summary,...(markedSubsets.length?{markedSubsets}:{}),
+          ...(markers.size>MANUSCRIPT_MARKER_PREVIEW_LIMIT?{markerPreviewTruncated:true}:{})};
+      });
     }
     return [];
   }
 
-  /** Preserve the existing repair gates and expose the measurements separately. */
+  /** Check recognized manuscript statistics before sending them to final review.
+   * Measurements already require the executor's current full draft read and
+   * authorized source names. These results create no new stored review debt.
+   */
   function preflightCandidate(frame,active,spec,bytes) {
     const counts=candidateMeasurements(frame,active,spec,bytes);
     const result=supplementChecks(frame.root,spec,lineList(bytes),frame.reads,active);
-    return counts.length?{...result,citationLineCounts:counts}:result;
+    if(!counts.length)return result;
+    const profiles=candidateCitationProfiles(bytes,counts.map(row=>row.source),spec.candidate);
+    if(!profiles.length)return {...result,citationLineCounts:counts};
+    const issues=[...result.issues,...profiles.filter(row=>!row.matches).map(citationProfileIssue)];
+    return {...result,ok:issues.length===0,issues,citationLineCounts:counts,
+      citationProfileChecks:{candidateSha256:digest(bytes),clauses:profiles}};
   }
 
   /** 验收回执由宿主写入，事实通过后还必须完成账本复盘。 */
@@ -891,12 +921,13 @@ export function apply(ctx, config = {}) {
         active.rejected = rejectedClaims(frame.root, spec, lines, checked.filter(check => check.status !== "supported"), frame.reads);
         const receipt = {
           unit: id, phase: active.phase, reviewer: exec.agent.id, decision, candidateSha256: hash,
+          candidatePositions:candidatePositionSummary(spec.candidate,bytes),
           goal: active.goal, goalFit: active.assessment?.goalFit,
           unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage), formatIssues: layout,
           ...(active.quality ? { quality: active.quality } : {}),
           ...(qualityChecks ? { qualityChecks } : {}),
           assessmentProvenance:{quality:"executor-model-assessment",qualityChecks:"reviewer-model-assessment",goalFit:"reviewer-model-assessment",
-            proseVerifiedAsToolExecution:false,toolExecutionSources:["actualReads","searchObservations"]},
+            proseVerifiedAsToolExecution:false,toolExecutionSources:["actualReads","searchObservations"],candidatePositionSource:"candidatePositions"},
           observedSources, actualReads: readInventory(frame, active),
           searchObservations:searchObservations(frame,active,spec),
           ...(qualityChecks ? { unlisted: active.assessment.unlisted, unverifiedSources: active.assessment.unverifiedSources,
@@ -1154,6 +1185,39 @@ function reviewCandidate(frame, active, spec) {
     throw new Error("验收前须完整读取当前候选正文");
   }
   return bytes;
+}
+
+/** Retain the full measured count while bounding physical line previews. */
+function manuscriptLinePreview(lines) {
+  return {count:lines.length,lines:lines.slice(0,MANUSCRIPT_LINE_PREVIEW_LIMIT),
+    ...(lines.length>MANUSCRIPT_LINE_PREVIEW_LIMIT?{linePreviewTruncated:true}:{})};
+}
+
+/** Explain a deterministic mismatch in both explicit preflight and submit. */
+function citationProfileIssue(row) {
+  const subject=row.marker
+    ? row.source+" 引用行的 "+row.marker+(row.markerPosition==="leading"?" 行首":" 字面")+"子集"
+    : row.source+" 的实际引用行";
+  const lines=row.lines.join("、")||"无";
+  const preview=row.actual>row.lines.length?"（仅预览，完整清单须按当前稿核对）":"";
+  const labelIssue=row.wrongExampleLines.length?"错例注记不符的行号为 "+row.wrongExampleLines.join("、")+"。":"";
+  return "第 "+row.line+" 行组合稿件统计不符。"+subject+"实测 "+row.actual+" 行，物理行号为 "+lines+preview
+    +"。"+labelIssue+"请修正原句的数量、完整行号或错例注记后读回。";
+}
+
+/** Derive physical line numbers from the current draft's explicit stance labels.
+ * Reuse coverage classification, since label recognition and the displayed
+ * locators must agree. A label locates a passage; its proof is verified separately.
+ */
+function candidatePositionSummary(file, bytes) {
+  const {candidateSha256,blocks}=documentCoverage(bytes);
+  const errorExampleLines=new Set(),hypothesisLines=new Set();
+  for (const {line,stance} of blocks) {
+    if (stance==="error-example") errorExampleLines.add(line);
+    if (stance==="hypothesis") hypothesisLines.add(line);
+  }
+  return {spec:"building-loop-candidate-positions/1",provenance:"host-derived-explicit-labels",path:file,candidateSha256,
+    errorExampleLines:[...errorExampleLines],hypothesisLines:[...hypothesisLines]};
 }
 
 /** Blocking quality requirements need a current rule locator; optional advice stays advisory. */

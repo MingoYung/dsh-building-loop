@@ -137,13 +137,18 @@ def collect(run, clean):
                  "governance/preflight.mjs", "governance/evidence.mjs", "governance/ledger.mjs", "governance/goals.mjs", "governance/coverage.mjs"):
         if (runtime / name).is_file():
             files.append(runtime / name)
+    hashes = {}
     manifest_file = run / "run.json"
     if manifest_file.is_file():
         try:
-            skill = "skills/dispatch-protocol/SKILL.md"
-            hashes = json.loads(manifest_file.read_text(encoding="utf-8")).get("runtimeHashes", {})
-            if isinstance(hashes, dict) and skill in hashes and (runtime / skill).is_file():
-                files.append(runtime / skill)
+            recorded = json.loads(manifest_file.read_text(encoding="utf-8")).get("runtimeHashes", {})
+            if isinstance(recorded, dict):
+                hashes = recorded
+            # A manifest must opt in to these additional files so existing
+            # public experiment bundles remain byte-for-byte reproducible.
+            for name in ("skills/dispatch-protocol/SKILL.md", "turn-resume/index.mjs"):
+                if name in hashes and (runtime / name).is_file():
+                    files.append(runtime / name)
         except (ValueError, AttributeError):
             pass  # Preserve malformed historical manifests through artifact().
     for name in ("cordis.patch.yml", "witness.mjs"):
@@ -155,6 +160,9 @@ def collect(run, clean):
         installed = run / "isolated-home/profiles/web/building-loop-governance"
         if installed.is_dir():
             files.extend(p for p in installed.iterdir() if p.is_file() and p.suffix == ".mjs")
+            recovery = installed.parent / "turn-resume/index.mjs"
+            if "turn-resume/index.mjs" in hashes and recovery.is_file():
+                files.append(recovery)
     result = []
     for file in sorted(set(files)):
         assert file.resolve().is_relative_to(run.resolve()), "Refusing an artifact outside its isolated run"

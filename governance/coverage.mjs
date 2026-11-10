@@ -195,9 +195,11 @@ function objectGuide(input,spec,assertion,phase) {
     parameterRules:["candidate 不支持 count：用 citation-count；source 是本句引用目标，不能填候选文件 "+spec.candidate+"，也没有 sources 数组字段。",
       "expected 必须是原句明确声称的数量；示例0不是实测值。registered-excerpts/count 统计已登记摘录条目，结论类别或举例数量不能当摘录总数。",
       "file 与 source 按模板二选一；contains/excludes 用 quote，line-status 用 line/expected，citations-marked 用 marker，不混字段。",
-      "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 核明确的全称含标记；原句限定行首则用 citations-leading-marked，两者都不能替数量、未全标或完全没标作证。"]};
+      "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 核明确的全称含标记；原句限定行首则用 citations-leading-marked，两者都不能替数量、未全标或完全没标作证。",
+      "若 inventory 给出 objectCheckHint，按块原样用 citation-profile；只给 kind/check/source，宿主从原句绑定并复算数量、完整行号和同源标记子集。"]};
 }
 function objectMismatchNext(value) {
+  if(value.check==="citation-profile")return "分别核对该块的实测数量、完整行号表及明确声明的错例/标记。若原句确错，保留同一 objectCheck，提交 unsupported 和指向实际错处的 finding；不能改参数迁就原句。";
   if(value.kind==="candidate")return value.check==="citation-count"
     ?"核对 source 是否为原句引用目标，并按实际物理引用行数复核；有完整行号表时还须逐项核对 claimedLines、missingLines、extraLines、duplicateLines。若只是填错参数，改参数；若原句精确数量或行号表确错，提交 unsupported 与指向实际错处的 finding，保留此 objectCheck 作反证。"
     :"逐项复核 missingLines 是否缺少原句声明的字面标记。确实缺标才提交 unsupported 与实际 finding；若原句指全局说明而非逐行标记，当前谓词不能代证，应改核验方式。";
@@ -214,6 +216,28 @@ const quotedLiteral=value=>{
   return "(?:"+literal+"|`"+literal+"`|\""+literal+"\"|'"+literal+"'|“"+literal+"”|「"+literal+"」|『"+literal+"』)";
 };
 
+/** Expand physical line ordinals with a hard cap before allocating ranges.
+ * Profile lists can annotate explicitly marked error examples. Those labels
+ * are assertions to verify later, never ignored punctuation. */
+function ordinalLines(list,profile=false) {
+  const claimedLines=[],exampleLines=[];
+  const items=profile?list.split(/[,、]|\s*(?:及|和|与)\s*(?=第)/u):list.split(/[,、]/u);
+  const itemPattern=profile
+    ? /^\s*(?:第\s*)?([1-9]\d*)(?:\s*[-–—至到]\s*(?:第\s*)?([1-9]\d*))?(?:\s*行(?:\s*(错例行))?)?\s*$/u
+    : /^\s*(?:第\s*)?([1-9]\d*)(?:\s*[-–—至到]\s*(?:第\s*)?([1-9]\d*))?\s*$/u;
+  for(const item of items) {
+    const match=itemPattern.exec(item);
+    if(!match)return {problem:"syntax"};
+    const first=Number(match[1]),last=Number(match[2]??match[1]);
+    if(!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||last<first||last-first+1>256-claimedLines.length)return {problem:"range"};
+    for(let line=first;line<=last;line++) {
+      claimedLines.push(line);
+      if(match[3])exampleLines.push(line);
+    }
+  }
+  return {claimedLines,exampleLines};
+}
+
 /** A finite manuscript count grammar identifies the optional exact ordinal list.
  * The list is another assertion, not ignorable citation punctuation: every row
  * is expanded and checked against the full current set below, beyond previews.
@@ -229,15 +253,116 @@ function candidateCountClaim(quote,source,guide) {
   }
   const quantityQuote=clause.slice(0,suffix.index).trim(),list=(suffix[1]??suffix[2]).trim();
   if(!bound.test(quantityQuote))throw objectFailure("parameter","带行号表的 citation-count 只核明确稿件计数句；请拆开外部行号、标记或其他独立断言，保留作者原文",{...guide,countForms:["本稿有6行带 "+source+" 的行号定位（第2、4-8行）","本稿对 "+source+" 有2行可识别同行引用（第2、4行）"]});
-  const claimedLines=[];
-  for(const item of list.split(/[,、]/u)) {
-    const match=/^\s*(?:第\s*)?([1-9]\d*)(?:\s*[-–—至到]\s*(?:第\s*)?([1-9]\d*))?\s*$/u.exec(item);
-    if(!match)throw objectFailure("parameter","完整行号表仅支持正整数及递增范围，以顿号/逗号分隔；不接受省略号、‘等’或附加断言",guide);
-    const first=Number(match[1]),last=Number(match[2]??match[1]);
-    if(!Number.isSafeInteger(first)||!Number.isSafeInteger(last)||last<first||last-first+1>256-claimedLines.length)throw objectFailure("parameter","完整行号表每次最多256项，须为安全正整数及递增范围；超出范围请单独核验，不能截断清单",guide);
-    for(let line=first;line<=last;line++)claimedLines.push(line);
-  }
+  const {claimedLines,problem}=ordinalLines(list);
+  if(problem==="syntax")throw objectFailure("parameter","完整行号表仅支持正整数及递增范围，以顿号/逗号分隔；不接受省略号、‘等’或附加断言",guide);
+  if(problem==="range")throw objectFailure("parameter","完整行号表每次最多256项，须为安全正整数及递增范围；超出范围请单独核验，不能截断清单",guide);
   return {quantityQuote,claimedLines,fullyBound:true};
+}
+
+/** Recognize a two-clause self-report without changing normal block boundaries.
+ * Both exact spans must be present on the same physical line. The second clause
+ * inherits the first clause's one explicit source; its literal marker and
+ * position come from the text rather than reviewer-supplied parameters. */
+function candidateProfile(line,assertion,source) {
+  if(objectMarker(line)!=="稿件自述")return null;
+  const boundary=line.search(/[；;]/u);
+  if(boundary<0)return null;
+  const following=line.slice(boundary+1),stop=/[。！？；;!?]+/u.exec(following);
+  const tailEnd=stop?boundary+1+stop.index+stop[0].length:line.length;
+  const profileText=value=>candidateClause(value.replace(/[。！？；;!?]+\s*$/u,""));
+  // Any further sentence remains a separate mandatory coverage block, even
+  // when it shares this physical line with the two measured claims.
+  const head=profileText(line.slice(0,boundary)),tailText=line.slice(boundary+1,tailEnd),tail=profileText(tailText);
+  const headPattern=new RegExp("^行号定位\\s*(\\d+)\\s*行\\s*:\\s*带\\s*"+quotedLiteral(source)+"\\s*的行号定位(?:为|是)\\s*(第.+行)$","u");
+  const first=headPattern.exec(head);
+  const second=/^同(行首)?(?:带|含)\s*(\[[\p{L}\p{N}_-]{1,60}\])\s*(\d+)\s*行\s*:\s*(第.+行|无)$/u.exec(tail);
+  if(!first||!second||!tailText.includes(second[2]))return null;
+  const citationOrdinals=ordinalLines(first[2],true);
+  const markerOrdinals=second[4]==="无"?{claimedLines:[],exampleLines:[]}:ordinalLines(second[4],true);
+  const citationExpected=Number(first[1]),markerExpected=Number(second[3]);
+  if(citationOrdinals.problem||markerOrdinals.problem||![citationExpected,markerExpected].every(Number.isSafeInteger))return null;
+  // Compare the whole selected clause after removing presentation syntax. A
+  // model cannot submit just a matching number and leave the list unproved.
+  const clause=profileText(assertion.quote);
+  if(assertion.end<=boundary+1&&clause===head)return {profileClause:"citation-lines",expected:citationExpected,...citationOrdinals};
+  if(assertion.start>boundary&&assertion.end<=tailEnd&&clause===tail)return {profileClause:"marked-citation-lines",expected:markerExpected,...markerOrdinals,
+    marker:second[2],markerPosition:second[1]?"leading":"any"};
+  return null;
+}
+
+/** Recognize only one source already authorized for the current phase. */
+function profileAtBlock(block,sources,candidate) {
+  if(!block||objectMarker(block.lineText)!=="稿件自述")return null;
+  const assertion={start:block.start,end:block.end,quote:block.text};
+  for(const source of sources) {
+    if(keyOf(source)===keyOf(candidate))continue;
+    const profile=candidateProfile(block.lineText,assertion,source);
+    if(profile)return {source,profile};
+  }
+  return null;
+}
+
+/** A hint reveals only the typed input already present in the current block. */
+function profileHint(block,grant,candidate) {
+  const match=profileAtBlock(block,grant.evidence,candidate);
+  return match?{kind:"candidate",check:"citation-profile",source:match.source}:null;
+}
+
+/** Require both recognized statistics to use their measured object, including
+ * the second block which does not repeat the tag or the source name. */
+function requireProfileProof(block,grant,candidate,parts) {
+  const hint=profileHint(block,grant,candidate);
+  if(hint&&!parts.some(part=>part.objectCheck?.check===hint.check&&part.objectCheck.source===hint.source)) {
+    throw objectFailure("parameter","组合稿件统计须按本块的 objectCheckHint 复算；不能用外部出处或 nonfactual 跳过数量、行号或标记",{objectCheckHint:hint});
+  }
+}
+
+/** Compare the complete declared and actual sets before applying display caps. */
+function compareOrdinals(claimedLines,actualLines,expected) {
+  const declared=new Set(claimedLines),actual=new Set(actualLines),seen=new Set(),duplicates=new Set();
+  for(const line of claimedLines){if(seen.has(line))duplicates.add(line);seen.add(line);}
+  const missing=actualLines.filter(line=>!declared.has(line)),extra=[...declared].filter(line=>!actual.has(line));
+  const lineListMatches=claimedLines.length===expected&&!missing.length&&!extra.length&&!duplicates.size;
+  return {claimedLines,lineListMatches,missingLines:missing.slice(0,24),missingCount:missing.length,
+    extraLines:extra.slice(0,24),extraCount:extra.length,duplicateLines:[...duplicates]};
+}
+
+/** Filter actual cited physical rows by a literal label. Markdown list and
+ * heading tokens are presentation for the stricter leading-only mode. */
+export function citationMarkedLines(lines,citedLines,marker,leading=false) {
+  return citedLines.filter(line=>leading
+    ? lines[line-1].trimStart().replace(/^(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)/u,"").startsWith(marker)
+    : lines[line-1].includes(marker));
+}
+
+/** Use the same exact-set and marker semantics at submit and in both reviews. */
+function measureCitationProfile(profile,lines,citedLines) {
+  const {profileClause,expected,claimedLines,exampleLines,marker,markerPosition}=profile;
+  // Use actual cited rows, never the author's declared citation set or every
+  // occurrence of the tag across the draft.
+  const actualLines=marker?citationMarkedLines(lines,citedLines,marker,markerPosition==="leading"):citedLines;
+  const ordinals=compareOrdinals(claimedLines,actualLines,expected);
+  const wrongExampleLines=exampleLines.filter(line=>!errorExample(lines[line-1]??""));
+  const matches=actualLines.length===expected&&ordinals.lineListMatches&&!wrongExampleLines.length;
+  return {matches,profileClause,expected,actual:actualLines.length,unit:marker?"candidate-marked-citation-lines":"candidate-citation-lines",
+    lines:actualLines.slice(0,24),...ordinals,exampleLines,wrongExampleLines,...(marker?{marker,markerPosition}:{})};
+}
+
+/** Preflight computes only recognized clauses in the current candidate bytes.
+ * Source names come from the caller's existing grant; no external file is read.
+ * Reuse the reviewer predicate so a passing executor preflight cannot mean a
+ * weaker measurement than the one the downstream proofs must carry. */
+export function candidateCitationProfiles(bytes,authorizedSources,candidate) {
+  const lines=lineList(bytes);
+  if(!lines.some(line=>objectMarker(line)==="稿件自述"))return [];
+  const counts=new Map();
+  return documentCoverage(bytes).blocks.flatMap(block=>{
+    const matched=profileAtBlock(block,authorizedSources,candidate);
+    if(!matched)return [];
+    const {source,profile}=matched;
+    if(!counts.has(source))counts.set(source,citationLineCounts(bytes,[source])[0].lines);
+    return [{line:block.line,block:block.id,source,...measureCitationProfile(profile,lines,counts.get(source))}];
+  });
 }
 
 /** This predicate has only a positive, universal, literal-label meaning.
@@ -289,7 +414,7 @@ function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
   if(!input||typeof input!=="object"||Array.isArray(input))throw objectFailure("parameter","objectCheck 需要对象参数",guide);
   const allowed={"registered-excerpts":{
     count:["file","expected"],contains:["file","quote"],excludes:["file","quote"],"line-status":["file","line","expected"]},
-    candidate:{"citation-count":["source","expected"],"citations-marked":["source","marker"],"citations-leading-marked":["source","marker"]}};
+    candidate:{"citation-count":["source","expected"],"citations-marked":["source","marker"],"citations-leading-marked":["source","marker"],"citation-profile":["source"]}};
   const fields=allowed[input.kind]?.[input.check];
   if(!fields||fields.some(key=>input[key]===undefined)||Object.keys(input).some(key=>!["kind","check",...fields].includes(key)))throw objectFailure("parameter","objectCheck 的 kind/check 或字段不匹配",{...guide,receivedKind:input.kind??null,receivedCheck:input.check??null,allowedFields:fields?["kind","check",...fields]:[],receivedFields:Object.keys(input)});
   const candidateSha256=digest(bytes),lines=lineList(bytes);
@@ -321,38 +446,33 @@ function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
       result.result={matches:input.check==="contains"?actual:!actual,actual,unit:"registered-excerpt-literal",lines:matching.slice(0,24).map(row=>row.line)};
     }
   } else {
-    if(!/(?:本稿|本文|本节|稿件|候选|当前文档|this (?:draft|document))/iu.test(assertion.quote))throw objectFailure("unverifiable","candidate 检查只证明当前稿件的明确结构，不能替外部事实作证");
     const source=relativeName(input.source),grant=spec.phases[active.phase],seen=active.seen?.[keyOf(spec.candidate)];
+    const profile=input.check==="citation-profile"?candidateProfile(lines[assertion.line-1],assertion,source):null;
+    if(input.check==="citation-profile"&&!profile)throw objectFailure("parameter","citation-profile 须绑定当前稿件自述的完整原句块、同一来源和完整行号表；不能跳过数值、标记或附加断言",guide);
+    if(!profile&&!/(?:本稿|本文|本节|稿件|候选|当前文档|this (?:draft|document))/iu.test(assertion.quote))throw objectFailure("unverifiable","candidate 检查只证明当前稿件的明确结构，不能替外部事实作证");
     if(keyOf(source)===keyOf(spec.candidate))throw objectFailure("parameter","source 是该句引用目标，不能填候选自身 "+spec.candidate,guide);
-    if(!citation(assertion.quote,source))throw objectFailure("parameter","稿件自述必须明确写出所检查的同一来源路径，不能借别的引用对象作证",guide);
+    if(!profile&&!citation(assertion.quote,source))throw objectFailure("parameter","稿件自述必须明确写出所检查的同一来源路径，不能借别的引用对象作证",guide);
     if(!includes(grant.evidence,source)||!includes(grant.read,spec.candidate))throw objectFailure("unverifiable","稿件引用对象不在当前单元授权内");
     if(!host&&(seen?.hash!==candidateSha256||!seen.ranges.some(([a,b])=>a===1&&b>=lines.length)))throw objectFailure("unverifiable","核全稿自述前须实际完整读取当前候选版本");
     result.source=source;
     const counted=citationLineCounts(bytes,[source])[0];
-    const cited=counted.lines.map(line=>({line,text:lines[line-1]}));
-    if(input.check==="citation-count") {
+    if(profile) {
+      result.result=measureCitationProfile(profile,lines,counted.lines);
+    } else if(input.check==="citation-count") {
       const claim=candidateCountClaim(assertion.quote,source,guide);
       countAssertion(claim.quantityQuote,input.expected,"candidate-citation-lines",guide);
-      result.result={matches:cited.length===input.expected,actual:cited.length,unit:"candidate-citation-lines",lines:cited.slice(0,24).map(row=>row.line)};
+      result.result={matches:counted.count===input.expected,actual:counted.count,unit:"candidate-citation-lines",lines:counted.lines.slice(0,24)};
       if(claim.claimedLines) {
-        const declared=new Set(claim.claimedLines),actual=new Set(counted.lines),seenLines=new Set(),duplicates=new Set();
-        for(const line of claim.claimedLines){if(seenLines.has(line))duplicates.add(line);seenLines.add(line);}
-        const missing=counted.lines.filter(line=>!declared.has(line)),extra=[...declared].filter(line=>!actual.has(line));
-        const lineListMatches=claim.claimedLines.length===input.expected&&!missing.length&&!extra.length&&!duplicates.size;
-        result.result={...result.result,matches:result.result.matches&&lineListMatches,claimedLines:claim.claimedLines,lineListMatches,
-          missingLines:missing.slice(0,24),missingCount:missing.length,extraLines:extra.slice(0,24),extraCount:extra.length,duplicateLines:[...duplicates]};
+        const ordinals=compareOrdinals(claim.claimedLines,counted.lines,input.expected);
+        result.result={...result.result,matches:result.result.matches&&ordinals.lineListMatches,...ordinals};
       }
-    }
-    else {
+    } else {
       const leading=input.check==="citations-leading-marked";
       candidateMarkClaim(assertion.quote,source,input.marker,leading,guide);
-      if(!cited.length)throw objectFailure("unverifiable","当前稿无该来源的可识别同行定位，不能用空集合证明逐处已标记");
-      // Markdown list and heading markers are presentation. Quoted or inline
-      // occurrences in the rest of the physical line do not prove a leading tag.
-      const missing=cited.filter(({text})=>leading
-        ? !text.trimStart().replace(/^(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)/u,"").startsWith(input.marker)
-        : !text.includes(input.marker));
-      result.result={matches:missing.length===0,actual:cited.length,unit:"candidate-citation-lines",lines:cited.slice(0,24).map(row=>row.line),missingLines:missing.slice(0,24).map(row=>row.line),missingCount:missing.length};
+      if(!counted.count)throw objectFailure("unverifiable","当前稿无该来源的可识别同行定位，不能用空集合证明逐处已标记");
+      const marked=new Set(citationMarkedLines(lines,counted.lines,input.marker,leading));
+      const missing=counted.lines.filter(line=>!marked.has(line));
+      result.result={matches:missing.length===0,actual:counted.count,unit:"candidate-citation-lines",lines:counted.lines.slice(0,24),missingLines:missing.slice(0,24),missingCount:missing.length};
     }
   }
   return result;
@@ -376,6 +496,7 @@ export function requireStoredObjectChecks(frame,spec,coverages,bytes,phase="fina
   try {
     if(!["first-review","final-review"].includes(phase))throw new Error("invalid review authority");
     for(const coverage of coverages)for(const record of coverage.records) {
+      requireProfileProof(blocks.get(record.block),spec.phases[phase],spec.candidate,record.parts);
       validateSimulationScope(frame,{phase},spec,blocks.get(record.block),record.parts);
       for(const part of record.parts) {
       validateObjectPart(frame,{phase},spec,part,lines,blocks.get(record.block),bytes,{host:true});
@@ -572,7 +693,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
       // Only these fully bound candidate clauses have a mechanically determined
       // truth value. A real independent suffix must be split and proved itself.
       if(part.status==="unsupported"&&result.objectCheck.result.matches&&result.objectCheck.kind==="candidate"
-        &&(["citations-marked","citations-leading-marked"].includes(result.objectCheck.check)||candidateCountClaim(quote,result.objectCheck.source,{}).fullyBound)) {
+        &&(["citations-marked","citations-leading-marked","citation-profile"].includes(result.objectCheck.check)||candidateCountClaim(quote,result.objectCheck.source,{}).fullyBound)) {
         throw objectFailure("parameter","完整绑定的稿件对象谓词已实测成立，不能将同一事实填 unsupported 制造作者债；独立后半句请按原文拆分并另给真实 finding",{...result.objectCheck.result,next:"保留正确正文，只修核验状态/分段；不能用已证真对象代替另一断言的反证。"});
       }
     } else if (part.status === "supported") {
@@ -608,6 +729,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
     return result;
   });
   if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
+  requireProfileProof(block,spec.phases[active.phase],spec.candidate,reviewed);
   validateSimulationScope(frame,active,spec,block,reviewed);
   const marker=objectMarker(block.text),expected=marker==="摘录范围"?"registered-excerpts":marker==="稿件自述"?"candidate":null;
   if(expected) {
@@ -645,7 +767,10 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       invalidated:options.maxBytes?invalidated.slice(0,8).map(row=>({...row,reason:row.reason.slice(0,240),
         ...(row.reason.length>240?{reasonTruncated:true}:{})})):invalidated,
       invalidatedCount:invalidated.length,offset,blocks:[] };
-    for (const {lineText,...block} of manifest.blocks.slice(offset,offset+count)) {
+    for (const row of manifest.blocks.slice(offset,offset+count)) {
+      const {lineText,...block}=row;
+      const hint=profileHint(row,spec.phases[active.phase],spec.candidate);
+      if(hint)block.objectCheckHint=hint;
       // prepare has a separate response budget. Never stamp blocks removed by
       // that budget as shown; the explicit next page remains unobserved.
       if (options.maxBytes && Buffer.byteLength(JSON.stringify({...result,blocks:[...result.blocks,block]}))>options.maxBytes-400) break;
@@ -744,6 +869,7 @@ export function requireStoredCalculations(frame, spec, coverages, bytes) {
  * Retiring a stale proof means pending, never a verdict about the new source.
  */
 function validateRecordSources(frame, active, spec, record, lines, block, bytes) {
+  requireProfileProof(block,spec.phases[active.phase],spec.candidate,record.parts);
   // Syntax is neutral only while its locator remains authorized, read and pinned.
   // Keep the same ordinary refs for host closure to check without exposing text.
   for(const ref of record.syntaxSources??[]) {
@@ -987,9 +1113,9 @@ export function coverageSchema() {
     counterexample: { type: "object", properties: { possible: { type: "boolean" }, reason: string }, required: ["possible", "reason"], additionalProperties: false },
     formal: { type: "object", description: "modus-ponens 的两项依次为 implies(P,Q)、asserts(P)，结论 asserts(Q)；equality-transitive 为 equals(A,B)、equals(B,C)，结论 equals(A,C)。premises 与原文前提顺序一致。", properties: { premises: { type: "array", minItems: 2, maxItems: 2, items: proposition }, conclusion: proposition }, required: ["premises", "conclusion"], additionalProperties: false }, calculation: string,
   }, required: ["rule", "premises", "scope", "assumptions", "counterexample"], additionalProperties: false };
-  const objectCheck={type:"object",properties:{kind:{type:"string",enum:["registered-excerpts","candidate"]},check:{type:"string",enum:["count","contains","excludes","line-status","citation-count","citations-marked","citations-leading-marked"]},
+  const objectCheck={type:"object",properties:{kind:{type:"string",enum:["registered-excerpts","candidate"]},check:{type:"string",enum:["count","contains","excludes","line-status","citation-count","citations-marked","citations-leading-marked","citation-profile"]},
     file:string,source:string,line:integer,expected:{anyOf:[integer,{type:"string",enum:["registered","unregistered"]}]},quote:string,marker:string},required:["kind","check"],additionalProperties:false,
-    description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)，只核登记摘录/快照成员关系，不证明网页全文。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding，不自动改判作者。"};
+    description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)，只核登记摘录/快照成员关系，不证明网页全文。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source，按块照填 inventory 的 objectCheckHint，数量/行号/标记由宿主取原文)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding，不自动改判作者。"};
   return { offset: integer, count: integer, block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: 12,
     description: "每次提交1至12块，按 inventory 分页分批提交；不能把全文超过12块塞进一次调用。", items: { type: "object", properties: {
     block: string, parts: { type: "array", items: { type: "object", properties: {

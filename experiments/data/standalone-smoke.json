@@ -2922,6 +2922,1245 @@
       "data": "import assert from \"node:assert/strict\";\nimport fs from \"node:fs\";\nimport path from \"node:path\";\nimport {fileURLToPath} from \"node:url\";\nimport {fixture,host} from \"../../building-loop/test/helpers.mjs\";\nimport {digest} from \"../../building-loop/governance/policy.mjs\";\nimport {QUALITY} from \"../../building-loop/governance/preflight.mjs\";\n\n// Replay one frozen, actually observed search through the production handler.\n// This is an isolated host-contract replay, not a paid model run or retroactive\n// modification of the original final-review receipt.\nconst run=fileURLToPath(new URL(\"../../../outputs/building-loop-efficiency-audit/20261110T032313Z/\",import.meta.url));\nconst workspace=path.join(run,\"fresh/workspace\");\nconst events=fs.readFileSync(path.join(run,\"events.jsonl\"),\"utf8\").trimEnd().split(/\\r?\\n/);\nconst call=JSON.parse(events[873]),result=JSON.parse(events[874]);\nconst args=JSON.parse(call.data.arguments);\nconst originalResult=JSON.parse(result.data.message.content.find(row=>row.type===\"text\").text);\nconst originalReceipt=JSON.parse(fs.readFileSync(path.join(workspace,\"records/audit-final.json\"),\"utf8\"));\nassert.equal(call.type,\"tool/call\");assert.equal(call.data.name,\"building_loop_file\");\nassert.deepEqual(args,{action:\"search\",path:\"module/candidate.md\",query:\"sources/synthetic.md 第\"});\nconst policy=JSON.parse(fs.readFileSync(path.join(workspace,\"BUILDING-LOOP.json\"),\"utf8\"));\nassert.deepEqual(policy.units.K01.phases[\"first-review\"].read,policy.units.K01.phases[\"final-review\"].read,\n  \"The replay uses first-review activation with exactly the same authorized search scope as the original final-review.\");\nlet output;\nawait fixture(async(root,write)=>{\n  const files=new Set([\"BUILDING-LOOP.json\",...policy.instructions,...policy.ledgerContext,policy.units.K01.candidate,\n    ...Object.values(policy.units.K01.phases).flatMap(p=>p.read)]);\n  for(const pin of Object.values(policy.sourcePins))if(pin.observation?.file)files.add(pin.observation.file);\n  for(const file of files)if(fs.existsSync(path.join(workspace,file))){\n    fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});write(file,fs.readFileSync(path.join(workspace,file)));\n  }\n  const h=host(root,{automaticCoverage:false});\n  const executor=(await h.flow(\"root\",\"advance\")).childId;\n  await h.flow(executor,\"prepare\");await h.flow(executor,\"submit\");\n  const reviewer=(await h.flow(\"root\",\"advance\")).childId;\n  await h.flow(reviewer,\"prepare\");\n  const actual=await h.invoke(reviewer,\"building_loop_file\",args);\n  assert.deepEqual(actual.matches,originalResult.matches);\n  assert.deepEqual(actual.searchObservation.matchLocations.map(row=>row.line),[4,5,6,7,8,10]);\n  const quality=Object.fromEntries(Object.keys(QUALITY).map(field=>[field,\"隔离回放只核已发生的搜索元数据，不签发正文语义验收。\"]));\n  const assessment=await h.assess(reviewer,{...quality,method:originalReceipt.qualityChecks.method.basis,\n    detail:originalReceipt.qualityChecks.detail.basis,revise:[],unlisted:[],unverifiedSources:[],\n    goalFit:{pass:true,basis:\"仅回放工具元数据；不将此合成判断计为原稿语义验收。\"},\n    sourceRefs:[{file:\"sources/github-checks.md\",start:6,end:8},{file:\"sources/nist-scatter.md\",start:6,end:6},\n      {file:\"sources/synthetic.md\",start:1,end:5}]});\n  const observed=assessment.searchObservations.entries[0];\n  assert.equal(observed.query,undefined);assert.equal(observed.querySha256,digest(Buffer.from(args.query,\"utf8\")));\n  assert.deepEqual(observed.requestedPaths,[\"module/candidate.md\"]);\n  assert.equal(observed.returnedMatches,6);assert.equal(observed.complete,true);assert.equal(observed.currentMaterial,true);\n  assert.ok(!JSON.stringify(assessment.searchObservations).includes(args.query));\n  assert.ok(!JSON.stringify(assessment.searchObservations).includes(actual.matches[0].text));\n  output={spec:\"building-loop-search-observation-replay/1\",passed:true,identity:\"review-agent:/root/causal_design\",paidCalls:0,\n    original:{run:\"20261110T032313Z\",arm:\"fresh\",callEventLine:874,resultEventLine:875,callId:call.data.callId,\n      actualArgs:args,candidateSha256:digest(fs.readFileSync(path.join(workspace,args.path))),\n      receiptSha256:digest(fs.readFileSync(path.join(workspace,\"records/audit-final.json\"))),\n      inaccurateModelBasis:{method:originalReceipt.qualityChecks.method.basis,detail:originalReceipt.qualityChecks.detail.basis}},\n    replay:{originalMatchesExactlyEqual:true,searchObservation:actual.searchObservation,\n      exportedSearchObservations:assessment.searchObservations,assessmentProvenance:assessment.assessmentProvenance},\n    boundaries:[\"Uses actual production handler in an isolated host-contract fixture; no real model or DSH SDK process was called.\",\n      \"Original call was final-review; replay uses first-review with identical read scope and final frozen bytes.\",\n      \"No original artifact changed and no semantic acceptance is claimed. Wrong prose remains explicitly model-assessed; host metadata separately proves the actual search path.\",\n      \"Public receipt metadata contains no query literal or matching line text; this isolated validation retains the actual original call for reproduction.\"],\n    code:{indexSha256:digest(fs.readFileSync(fileURLToPath(new URL(\"../../building-loop/governance/index.mjs\",import.meta.url))))}};\n});\nfs.writeFileSync(fileURLToPath(new URL(\"replay-result.json\",import.meta.url)),JSON.stringify(output,null,2)+\"\\n\");\nconsole.log(JSON.stringify({passed:output.passed,actualPath:output.replay.searchObservation.requestedPaths,\n  matches:output.replay.searchObservation.returnedMatches,paidCalls:0}));\n"
     },
     {
+      "path": "building-loop-efficiency-index-validation/r075-compound-submit-replay.json",
+      "kind": "json",
+      "originalSha256": "54f7aa8d27d1a5c722a44fae96132b4c154f9a7a28191dc2330ec4bf7975a95b",
+      "publishedSha256": "0554f9b7debb2e04ef267206e02a367382dae7de2f516de9223ce10a8190e9bb",
+      "data": {
+        "spec": "building-loop-focused-replay/1",
+        "baselineRun": "20261110T062549Z",
+        "baselineIndexSha256": "6aee3190f9b337b9a9d3a6100de76b3488b27f1abceaa15e268d75b635fceed0",
+        "currentIndexSha256": "1d7d2902b014fd55bcbece9532d40f0719d90e21caf5d93cd053ca87aaa4ae3e",
+        "before": {
+          "exitCode": 1,
+          "counts": {
+            "pass": 0,
+            "fail": 1
+          },
+          "stdout": "✖ supplement preflight and submit block wrong compound stats and expose actual marker subsets (346.957ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 455.6305\n\n✖ failing tests:\n\ntest at test\\efficiency.test.mjs:155:1\n✖ supplement preflight and submit block wrong compound stats and expose actual marker subsets (346.957ms)\n  AssertionError [ERR_ASSERTION]: Missing expected rejection.\n      at async file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-compound-submit-replay-shv220il/test/efficiency.test.mjs:181:3\n      at async fixture (file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-compound-submit-replay-shv220il/test/helpers.mjs:50:5)\n      at async Test.run (node:internal/test_runner/test:1313:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /第 5 行组合稿件统计不符.*物理行号为 1、2、3/,\n    operator: 'rejects',\n    diff: 'simple'\n  }\n",
+          "stderr": ""
+        },
+        "after": {
+          "exitCode": 0,
+          "counts": {
+            "pass": 1,
+            "fail": 0
+          },
+          "stdout": "✔ supplement preflight and submit block wrong compound stats and expose actual marker subsets (405.6307ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 497.646\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r075-example-positions-replay.json",
+      "kind": "json",
+      "originalSha256": "704be2b0677689d4a42382dd46cc585a23926a86bdaf8f2475b50f3aee723a50",
+      "publishedSha256": "35851cd0d7454c65ae41940955912ca54d6e0f7c297cc5202dc93e625d039d01",
+      "data": {
+        "spec": "building-loop-focused-replay/1",
+        "fixtureRun": "20261110T055022Z",
+        "baselineCommit": "5bcb8cc975bca2f5ec073b04c54d8c20514bd835",
+        "targetIndexSha256": "6aee3190f9b337b9a9d3a6100de76b3488b27f1abceaa15e268d75b635fceed0",
+        "before": {
+          "exitCode": 1,
+          "counts": {
+            "pass": 0,
+            "fail": 3
+          },
+          "stdout": "✖ supplement preflight exposes current citation lines and only the requested literal marker subsets (401.0707ms)\n✖ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (125.3165ms)\n✖ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (280.5998ms)\nℹ tests 3\nℹ suites 0\nℹ pass 0\nℹ fail 3\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 511.0082\n\n✖ failing tests:\n\ntest at test\\efficiency.test.mjs:155:1\n✖ supplement preflight exposes current citation lines and only the requested literal marker subsets (401.0707ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  ... Skipped lines\n  \n    [\n      {\n        count: 3,\n        lines: [\n          1,\n  ...\n        ],\n  -     markedSubsets: [\n  -       {\n  -         count: 2,\n  -         lines: [\n  -           2,\n  -           3\n  -         ],\n  -         marker: '[模拟]',\n  -         position: 'any'\n  -       },\n  -       {\n  -         count: 1,\n  -         lines: [\n  -           2\n  -         ],\n  -         marker: '[模拟]',\n  -         position: 'leading'\n  -       }\n  -     ],\n        source: 'functional.csv'\n      }\n    ]\n  \n      at file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-positions-replay-_o06x3h9/test/efficiency.test.mjs:176:10\n      at async fixture (file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-positions-replay-_o06x3h9/test/helpers.mjs:50:5)\n      at async Test.run (node:internal/test_runner/test:1313:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { source: 'functional.csv', count: 3, lines: [Array] } ],\n    expected: [ { source: 'functional.csv', count: 3, lines: [Array], markedSubsets: [Array] } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test\\example-positions.test.mjs:46:1\n✖ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (125.3165ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + undefined\n  - {\n  -   candidateSha256: '7aff949a18aee9ba36a03bdf51521eca2c29f689ccfc28f2e903a931e07cffde',\n  -   errorExampleLines: [\n  -     7,\n  -     9,\n  -     10\n  -   ],\n  -   hypothesisLines: [\n  -     12\n  -   ],\n  -   path: 'candidate.md',\n  -   provenance: 'host-derived-explicit-labels',\n  -   spec: 'building-loop-candidate-positions/1'\n  - }\n  \n      at file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-positions-replay-_o06x3h9/test/example-positions.test.mjs:50:10\n      at async fixture (file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-positions-replay-_o06x3h9/test/helpers.mjs:50:5)\n      at async Test.run (node:internal/test_runner/test:1313:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: { spec: 'building-loop-candidate-positions/1', provenance: 'host-derived-explicit-labels', path: 'candidate.md', candidateSha256: '7aff949a18aee9ba36a03bdf51521eca2c29f689ccfc28f2e903a931e07cffde', errorExampleLines: [ 7, 9, 10 ], hypothesisLines: [ 12 ] },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test\\example-positions.test.mjs:65:1\n✖ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (280.5998ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + undefined\n  - 'candidatePositions'\n  \n      at file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-positions-replay-_o06x3h9/test/example-positions.test.mjs:96:10\n      at async fixture (file:///$USERPROFILE/AppData/Local/Temp/dsh-building-loop-positions-replay-_o06x3h9/test/helpers.mjs:50:5)\n      at async Test.run (node:internal/test_runner/test:1313:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: 'candidatePositions',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+          "stderr": ""
+        },
+        "after": {
+          "exitCode": 0,
+          "counts": {
+            "pass": 3,
+            "fail": 0
+          },
+          "stdout": "✔ supplement preflight exposes current citation lines and only the requested literal marker subsets (410.4577ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (171.5269ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (441.8291ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 703.8089\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r075-fresh-063221Z-intermediate-audit-reject.json",
+      "kind": "json",
+      "originalSha256": "4cabf623161782187d6acedacaaa6bc6dbd8e71c0d5c8d31df38693c3a0b4aa1",
+      "publishedSha256": "4cabf623161782187d6acedacaaa6bc6dbd8e71c0d5c8d31df38693c3a0b4aa1",
+      "data": {
+        "unit": "K01",
+        "phase": "final-review",
+        "reviewer": "50dc79fb-bbcf-45b2-bc8c-aa5c5d56a879",
+        "decision": "reject",
+        "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+        "candidatePositions": {
+          "spec": "building-loop-candidate-positions/1",
+          "provenance": "host-derived-explicit-labels",
+          "path": "module/candidate.md",
+          "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+          "errorExampleLines": [
+            12
+          ],
+          "hypothesisLines": [
+            9
+          ]
+        },
+        "goal": {
+          "sha256": "e416bfae079f943815377ad9c4a79a44f8ac4aed11aa0286cddcc0219bf678ad",
+          "files": [
+            {
+              "file": "PROJECT.md",
+              "sha256": "adf65618a3b1600051388bbc77c389d341fefc19aa44921739a5984fce310bd5"
+            }
+          ]
+        },
+        "goalFit": {
+          "pass": true,
+          "basis": "PROJECT.md 第 2-10 行逐项对齐：C1-C4 编号行保留且改为原文可支持的范围（第 8 行）、保留 C1/C2/C3 含义与出处（第 3 行）、区分官方摘录与 [模拟] 记录（第 3、5-8 行）、未写导言/附录/FAQ（第 7 行）、[摘录范围] 与组合 [稿件自述] 用原显式标签且自述按当前稿重算（第 6、10 行）、[推测] 与“错例：”示范句原位保留（第 7、10 行）、大白话用初稿原句并置于末行（第 9 行）。"
+        },
+        "unsupported": [],
+        "qualityRejected": [],
+        "checks": [
+          {
+            "id": "C1",
+            "status": "supported",
+            "file": "sources/github-checks.md",
+            "start": 6,
+            "end": 8,
+            "sha256": "1e7041d8d0c377148cb820a487d9b3b3d20005631646d960f147e8176ccb429b",
+            "origin": {
+              "kind": "primary",
+              "locator": "https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-checks",
+              "integrity": "matches-pin",
+              "observation": {
+                "file": "sources/source-checks.json",
+                "sha256": "1056c2bc2f6f44cf135068ad5d39965005eab264ae954645f52417e0f4a473b0",
+                "fetchedAt": "2026-11-07T13:01:00.140104+00:00",
+                "responseSha256": "2d2229c20d4c1011b18dd1b05caaaa695fa74b31fa588ae6884044c294d2e5af"
+              }
+            },
+            "line": 2,
+            "basis": "原文“If the status is completed, the conclusion can be any of the following:”下登记 failure、success，C1 仍为忠实转述。"
+          },
+          {
+            "id": "C2",
+            "status": "supported",
+            "file": "sources/nist-scatter.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "e314eef5a7aa4f898591737b0c1470960bbf19e9a66e916d48cb237c37d7af8a",
+            "origin": {
+              "kind": "primary",
+              "locator": "https://www.itl.nist.gov/div898/handbook/eda/section3/scatterp.htm",
+              "integrity": "matches-pin",
+              "observation": {
+                "file": "sources/source-checks.json",
+                "sha256": "1056c2bc2f6f44cf135068ad5d39965005eab264ae954645f52417e0f4a473b0",
+                "fetchedAt": "2026-11-07T13:01:03.500952+00:00",
+                "responseSha256": "37363da3588e9933d092de337b6b3bd7ebd9b04a3ba40ee8f0271786903a2adf"
+              }
+            },
+            "line": 3,
+            "basis": "第 3 行 C2 中文转述加同行英文原句均与 nist-scatter.md 第 6 行一致，未越出范围。"
+          },
+          {
+            "id": "C3",
+            "status": "supported",
+            "file": "sources/synthetic.md",
+            "start": 4,
+            "end": 5,
+            "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+            "origin": {
+              "kind": "synthetic",
+              "locator": "synthetic:bounded-logic-fixture",
+              "integrity": "matches-pin"
+            },
+            "line": 4,
+            "basis": "第 4 行规则 A 级→应送复核加第 5 行样本 X 是 A 级，modus ponens 得应送复核，已限定本例。"
+          },
+          {
+            "id": "C4",
+            "status": "supported",
+            "file": "sources/github-checks.md",
+            "start": 6,
+            "end": 8,
+            "sha256": "1e7041d8d0c377148cb820a487d9b3b3d20005631646d960f147e8176ccb429b",
+            "origin": {
+              "kind": "primary",
+              "locator": "https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-checks",
+              "integrity": "matches-pin",
+              "observation": {
+                "file": "sources/source-checks.json",
+                "sha256": "1056c2bc2f6f44cf135068ad5d39965005eab264ae954645f52417e0f4a473b0",
+                "fetchedAt": "2026-11-07T13:01:00.140104+00:00",
+                "responseSha256": "2d2229c20d4c1011b18dd1b05caaaa695fa74b31fa588ae6884044c294d2e5af"
+              }
+            },
+            "line": 10,
+            "basis": "C4 已收窄为“GitHub 登记摘录中，completed 下 conclusion 举例列有 failure 和 success”，与第 6-8 行相符，未复述编辑说明、未称列表仅两项；原错归 NIST 的断言已删除。"
+          }
+        ],
+        "calculations": [],
+        "coverage": {
+          "version": 1,
+          "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+          "total": 19,
+          "pending": [],
+          "rejected": [],
+          "quotations": [],
+          "receiptSha256": "a453e2979ae927a9fb8dc8cfb7e987fa96420c5596bd0db402349783dad098bd"
+        },
+        "formatIssues": [],
+        "quality": {
+          "sources": "实际读到的仅为授权读包：sources/github-checks.md 全文 9 行（GitHub REST checks 指南快照，登记摘录第 6-8 行）、sources/nist-scatter.md 全文 7 行（NIST 散点图页快照，登记摘录仅第 6 行）、sources/synthetic.md 全文 6 行（第 1 行自述为合称逻辑样例，非外部研究），以及 records/audit-first.json 全部 698 行。仍待证：两官方页除登记短句外的整页内容，快照第 4 行自身也声明列表不只有两项，本稿未对此下结论。",
+          "conclusion": "C1/C2/C3 保留原含义、限定与出处；第 5、6、7 行三种无效推导改为同行的限定表述并各附原文反证，不再有“必定成功”“必然提高每个人”“任何送复核的样本都是 A 级”一类结论；第 11 行相反的 success 及其所在重复大白话整行删除，由新第 5 行以“可能是 failure，也可能是 success”陈述字段口径；C4 改为只述 GitHub 登记摘录举例并引第 6-8 行；大白话原句置于最后一行。适用范围仅为本例规则与已登记短摘录。",
+          "method": "逐项对照退回回执的 quote 与 repair 字段原位改写，改后读回全文并重跑 preflight；自述数值不以猜测填数，取其 citationLineCounts 实测（synthetic.md 引用行 4,5,6,7,8,12 共 6 行，[模拟] 字面子集 5,6,7,8 共 4 行）。逐字引句处理经过两轮回退：保留英文原句在引号内时被判定“逐字引句与所引范围不一致”持续未解，最终改为“该页原文写…含义同此”的非逐字转述以满足“改称转述”的修复路径。局限：无法查验整页原文，仅能在登记行内判断。",
+          "alternatives": "可行备选：把那条英文原句整行删除，只留 C2 的中文转述与出处，同样能通过且更短；取舍是保留英文原句可让读者对照原文，故取现行方案。另一备选是把第 5、6、7 行改成与第 12 行同格式的“错例：”示范句；代价是稿中错例变多、与新自述的子集口径纠缠，故取“限定表述+同行反证”的更短做法。",
+          "detail": "摘要：全稿 14 行，依次为标题、C1–C4 四个编号项、四条带 [模拟] 行首标签的模拟记录（含第 8 行的相关不可推因果边界）、一条 [推测]、两条带显式标签的范围与自述、一条“错例：”示范句，最后一行大白话。依据：第 12 行错例仍保留原有标记且出处为 synthetic.md 第 2 行；第 11 行摘录范围说明未改动。",
+          "plain": "完成、失败、相关不是一回事，本文只按原文登记的范围说话，不替原文下它没下的结论。"
+        },
+        "qualityChecks": {
+          "sources": {
+            "pass": true,
+            "basis": "实际读取：sources/github-checks.md 第 1-9 行（登记摘录第 6-8 行）、sources/nist-scatter.md 第 1-7 行（登记摘录仅第 6 行）、sources/synthetic.md 第 1-6 行（自述为合成逻辑样例）。仍待证：两官方页除登记短句外的整页内容；现稿已不再对整页作断言。"
+          },
+          "conclusion": {
+            "pass": true,
+            "basis": "逐项复核后全部成立：C1（github 第 6-8 行）、C2 与同行英文原句（nist 第 6 行）、C3（第 4 行规则加第 5 行对象的 modus ponens）均忠实；第 5 行改写为“可能是 failure 也可能是 success，不能由完成状态推出成功”，与原文及第 2 行记录相符；第 6、7 行把原无效推导改为限定表述并给出依据方向；第 8 行相关与因果边界保留；C4 已收窄为“登记摘录举例列有 failure 和 success”，未复述编辑说明、也未称列表仅两项；[摘录范围] 1 条与 [稿件自述] 6 行/4 行经对象核查与当前稿一致；第 12 行错例保留、第 9 行 [推测] 保留；第 14 行大白话位于正文末尾。本次未发现新的事实错误。"
+          },
+          "method": {
+            "pass": true,
+            "basis": "逐行读回 15 行正文与三份来源全文，对每个事实块拆成单句判断：直接转述比对原文逐字与行号，推导用 modus ponens 与 source-warrant 交前提与反例检查；摘录条数与稿件自述按 objectCheckHint 交宿主按当前稿核，并人工复核 [模拟] 落在第 5-8 行行首、第 4 与 12 行无标记。局限：不能取回整页原文，只能判断登记行范围内是否成立；对象自述的最终数量以宿主 candidate 核查结果为准。"
+          },
+          "alternatives": {
+            "pass": true,
+            "basis": "可行备选：删除第 3 行括号内的英文原句，只留 C2 中文转述与出处，同样有据且更短；保留现方案的理由是让读者能对照原文，代价是同一出处重复标注两次。另一备选是把第 6、7 行合并为一句“相关与单向规则都不能反推”，可更短但与第 8 行重复。取舍：现稿已满足“简短、可追溯、分层”，不再压缩。"
+          },
+          "detail": {
+            "pass": true,
+            "basis": "摘要：修订稿事实层已全通过，建议关单。依据：第 2 行对应 github-checks.md 第 6-8 行逐字成立；第 3 行英文引句与 nist-scatter.md 第 6 行逐字相同；第 4 行由第 4、5 行推出且带本例限定；第 5 行字段口径对应 github 第 6 行加 synthetic 第 2 行，未越出“可能是 failure 也可能是 success”；第 6 行限在组层面且照搬原文“没有随机分配、也没有排除其他共同影响因素”；第 7 行只陈述规则单向性，不肯定逆命题；第 10 行 C4 不再把 GitHub 内容归给 NIST；第 11 行摘录条数为 1；第 13 行自述与当前稿 4,5,6,7,8,12 行引用、5,6,7,8 行 [模拟] 一致；第 14 行是初稿原句且居末。边界：仅核已登记短摘录，未断言两页整页内容，稿中也不再作此断言。"
+          },
+          "plain": {
+            "pass": true,
+            "basis": "大白话：上一轮的错推、写反和挂错出处都改到位了，C1 到 C4 现在都能对上原文，字句也简短，可以定稿。"
+          }
+        },
+        "assessmentProvenance": {
+          "quality": "executor-model-assessment",
+          "qualityChecks": "reviewer-model-assessment",
+          "goalFit": "reviewer-model-assessment",
+          "proseVerifiedAsToolExecution": false,
+          "toolExecutionSources": [
+            "actualReads",
+            "searchObservations"
+          ],
+          "candidatePositionSource": "candidatePositions"
+        },
+        "observedSources": [
+          {
+            "file": "sources/github-checks.md",
+            "start": 6,
+            "end": 8,
+            "sha256": "1e7041d8d0c377148cb820a487d9b3b3d20005631646d960f147e8176ccb429b",
+            "origin": {
+              "kind": "primary",
+              "locator": "https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-checks",
+              "integrity": "matches-pin",
+              "observation": {
+                "file": "sources/source-checks.json",
+                "sha256": "1056c2bc2f6f44cf135068ad5d39965005eab264ae954645f52417e0f4a473b0",
+                "fetchedAt": "2026-11-07T13:01:00.140104+00:00",
+                "responseSha256": "2d2229c20d4c1011b18dd1b05caaaa695fa74b31fa588ae6884044c294d2e5af"
+              }
+            }
+          },
+          {
+            "file": "sources/nist-scatter.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "e314eef5a7aa4f898591737b0c1470960bbf19e9a66e916d48cb237c37d7af8a",
+            "origin": {
+              "kind": "primary",
+              "locator": "https://www.itl.nist.gov/div898/handbook/eda/section3/scatterp.htm",
+              "integrity": "matches-pin",
+              "observation": {
+                "file": "sources/source-checks.json",
+                "sha256": "1056c2bc2f6f44cf135068ad5d39965005eab264ae954645f52417e0f4a473b0",
+                "fetchedAt": "2026-11-07T13:01:03.500952+00:00",
+                "responseSha256": "37363da3588e9933d092de337b6b3bd7ebd9b04a3ba40ee8f0271786903a2adf"
+              }
+            }
+          },
+          {
+            "file": "sources/synthetic.md",
+            "start": 1,
+            "end": 5,
+            "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+            "origin": {
+              "kind": "synthetic",
+              "locator": "synthetic:bounded-logic-fixture",
+              "integrity": "matches-pin"
+            }
+          },
+          {
+            "file": "sources/synthetic.md",
+            "start": 2,
+            "end": 3,
+            "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+            "origin": {
+              "kind": "synthetic",
+              "locator": "synthetic:bounded-logic-fixture",
+              "integrity": "matches-pin"
+            }
+          }
+        ],
+        "actualReads": [
+          {
+            "file": "module/candidate.md",
+            "sha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+            "ranges": [
+              [
+                1,
+                15
+              ]
+            ],
+            "current": true
+          },
+          {
+            "file": "sources/github-checks.md",
+            "sha256": "1e7041d8d0c377148cb820a487d9b3b3d20005631646d960f147e8176ccb429b",
+            "ranges": [
+              [
+                1,
+                9
+              ]
+            ],
+            "current": true
+          },
+          {
+            "file": "sources/nist-scatter.md",
+            "sha256": "e314eef5a7aa4f898591737b0c1470960bbf19e9a66e916d48cb237c37d7af8a",
+            "ranges": [
+              [
+                1,
+                7
+              ]
+            ],
+            "current": true
+          },
+          {
+            "file": "sources/synthetic.md",
+            "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+            "ranges": [
+              [
+                1,
+                6
+              ]
+            ],
+            "current": true
+          },
+          {
+            "file": "AGENTS.md",
+            "sha256": "e6846130ef3fc510af1a339c109e4f02574c38a7939960db850f9a0c096767a5",
+            "ranges": [
+              [
+                1,
+                3
+              ]
+            ],
+            "current": true
+          },
+          {
+            "file": "DISPATCH.md",
+            "sha256": "92de02041d7a3670c1bd34acd3b162ae135c008516d8a83c51ebe80ccef1fc35",
+            "ranges": [
+              [
+                1,
+                6
+              ]
+            ],
+            "current": true
+          },
+          {
+            "file": "PROJECT.md",
+            "sha256": "adf65618a3b1600051388bbc77c389d341fefc19aa44921739a5984fce310bd5",
+            "ranges": [
+              [
+                1,
+                11
+              ]
+            ],
+            "current": true
+          }
+        ],
+        "searchObservations": {
+          "spec": "building-loop-search-observations/1",
+          "provenance": "host-observed-tool-execution",
+          "actor": "50dc79fb-bbcf-45b2-bc8c-aa5c5d56a879",
+          "phase": "final-review",
+          "limit": 16,
+          "omitted": 0,
+          "entries": [],
+          "boundary": "Only successful searches retained in this role's current checkpoint; omitted entries are counted. Search results are not read stamps or semantic verification, and an empty list is not proof that no earlier search occurred."
+        },
+        "unlisted": [],
+        "unverifiedSources": [
+          "GitHub checks 页除第 6-8 行外的完整列表内容",
+          "NIST 散点图页除第 6 行短句外的完整正文"
+        ],
+        "revisions": [],
+        "suggestions": [
+          "第 3 行同一出处出现了两次，可合并为一次括号标注，属排版优化。",
+          "第 6 行与第 8 行结论重叠，可考虑保留一句并删除另一句，属精简建议。"
+        ],
+        "independentAudit": {
+          "auditor": "49a1724d-8ecc-4d46-a796-5c87dc9da8ed",
+          "method": "counterexample-and-concept-mapping",
+          "coverage": {
+            "version": 1,
+            "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+            "total": 19,
+            "pending": [],
+            "rejected": [
+              {
+                "block": "B10-1aa3ca1c",
+                "line": 7,
+                "text": "，所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级",
+                "lineText": "[模拟] 按本例规则只能由 A 级推出应送复核，不能反推，所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级（出处：sources/synthetic.md 第 4-5 行）。",
+                "basis": "反例可构造：设另一对象 Y 因任何非 A 级理由被送复核，则“其他送复核的样本”不必是 A 级，“不能说明……也是 A 级”在逻辑上仅重复了单向规则，未获新证据；但本句把“不能反推”当理由推出了一个关于其他样本的否定性结论，而原文只给单向规则足以支撑的就是“不能反推”本身。该串接缺少桥接原文，故证据不足。",
+                "repair": "原位收窄为规则本身允许的范围：只写“按本例规则只能由 A 级推出应送复核，不能反推”（已由第 4 行单向规则直接支撑），删除“所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级”这一未经原文桥接的延伸结论。",
+                "finding": {
+                  "kind": "invalid-inference",
+                  "quote": "所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级",
+                  "fix": "原位收窄为规则本身允许的范围：只写“按本例规则只能由 A 级推出应送复核，不能反推”（已由第 4 行单向规则直接支撑），删除“所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级”这一未经原文桥接的延伸结论。"
+                },
+                "status": "unsupported",
+                "repairBaseline": {
+                  "version": 1,
+                  "quote": "所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级",
+                  "line": 7,
+                  "start": 29,
+                  "end": 59,
+                  "candidateSha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+                  "kind": "invalid-inference",
+                  "scopeMarkers": [],
+                  "refs": [
+                    {
+                      "file": "sources/synthetic.md",
+                      "start": 4,
+                      "end": 5,
+                      "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+                      "rangeHash": "aec4a550f5623cd33def7ce3519d0851ccaf54335ba054a057dadf9153cd3d2a",
+                      "lineHashes": [
+                        "979917c947a0b324fe494171a39dc2aa8a949be5811ac2814ad62c99c6a8e3ef",
+                        "1ea34a0fa9c4a45d565389c9479d4db6e5f0691ebb72d3c02fef54cad92fcdb3"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "quotations": [],
+            "receiptSha256": "0cd21c47f3c9f3bc9f8c730c15c898570de3a57be8856ab050f67cc2275b43c9"
+          },
+          "actualReads": [
+            {
+              "file": "module/candidate.md",
+              "sha256": "75d74a752b36e5802451aad3104596dd88774433980fef846fbde332d2e1fb3f",
+              "ranges": [
+                [
+                  1,
+                  15
+                ]
+              ],
+              "current": true
+            },
+            {
+              "file": "sources/github-checks.md",
+              "sha256": "1e7041d8d0c377148cb820a487d9b3b3d20005631646d960f147e8176ccb429b",
+              "ranges": [
+                [
+                  1,
+                  9
+                ]
+              ],
+              "current": true
+            },
+            {
+              "file": "sources/nist-scatter.md",
+              "sha256": "e314eef5a7aa4f898591737b0c1470960bbf19e9a66e916d48cb237c37d7af8a",
+              "ranges": [
+                [
+                  1,
+                  7
+                ]
+              ],
+              "current": true
+            },
+            {
+              "file": "sources/synthetic.md",
+              "sha256": "d217a329dc3566793044bea1b6d56fe27bd4f927ff7d1a385b7f07090abd9fcd",
+              "ranges": [
+                [
+                  1,
+                  6
+                ]
+              ],
+              "current": true
+            },
+            {
+              "file": "AGENTS.md",
+              "sha256": "e6846130ef3fc510af1a339c109e4f02574c38a7939960db850f9a0c096767a5",
+              "ranges": [
+                [
+                  1,
+                  3
+                ]
+              ],
+              "current": true
+            },
+            {
+              "file": "DISPATCH.md",
+              "sha256": "92de02041d7a3670c1bd34acd3b162ae135c008516d8a83c51ebe80ccef1fc35",
+              "ranges": [
+                [
+                  1,
+                  6
+                ]
+              ],
+              "current": true
+            },
+            {
+              "file": "PROJECT.md",
+              "sha256": "adf65618a3b1600051388bbc77c389d341fefc19aa44921739a5984fce310bd5",
+              "ranges": [
+                [
+                  1,
+                  11
+                ]
+              ],
+              "current": true
+            }
+          ],
+          "searchObservations": {
+            "spec": "building-loop-search-observations/1",
+            "provenance": "host-observed-tool-execution",
+            "actor": "49a1724d-8ecc-4d46-a796-5c87dc9da8ed",
+            "phase": "final-audit",
+            "limit": 16,
+            "omitted": 0,
+            "entries": [],
+            "boundary": "Only successful searches retained in this role's current checkpoint; omitted entries are counted. Search results are not read stamps or semantic verification, and an empty list is not proof that no earlier search occurred."
+          }
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r075-natural-malformed-retries.json",
+      "kind": "json",
+      "originalSha256": "347a3467945cae865f9cadc649fb773ff20b5855ba1eabe393aa0e1fbf7110f6",
+      "publishedSha256": "347a3467945cae865f9cadc649fb773ff20b5855ba1eabe393aa0e1fbf7110f6",
+      "data": {
+        "spec": "building-loop-natural-malformed-retries/1",
+        "scope": "naturally occurring official DeepSeek native DSH runs, no injected faults",
+        "recordedAt": "2026-11-10T06:42:00.514786+00:00",
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "runtimeSha256": "470e16ecc8a5e3292779c0f258aaff74a2b81e686b161336ceecb8c4b90847ce",
+        "nativeReplayReportSha256": "92573e3b1e68112407548f39e5791ee3e1537ec1c69400297aa7439a53822545",
+        "malformedAttempts": 3,
+        "sameStepRecoveries": 3,
+        "discardedToolIdsExecuted": 0,
+        "runs": [
+          {
+            "run": "20261110T062547Z",
+            "group": "reuse",
+            "dshVersion": "0.2.2-rc.1",
+            "terminalStatus": "observed",
+            "terminalEnd": [
+              "artifacts-present"
+            ],
+            "provenance": {
+              "runJsonSha256": "0deab0650fdf0ddf73bc5c39782951113b2dee37d1d4b0bfcc43580595077169",
+              "eventsJsonlSha256": "b0df2b6b5fb63e129b87983c6b13b4327674d7d257317cb6cc53db4550922ca8",
+              "finishedJsonSha256": "7da2a55e6d8298230adf07ffa784a838c177ae65f332d543ab92396a5691c78c"
+            },
+            "malformedToolInputAttempts": [
+              {
+                "session": "501b2e3e-b687-43a5-b946-f4a210d8f56a",
+                "turn": 1,
+                "step": 2,
+                "failure": {
+                  "code": "MALFORMED_RESPONSE",
+                  "message": "DeepSeek Messages stream: tool input is invalid JSON"
+                },
+                "discardedAttempt": {
+                  "eventsLine": 642,
+                  "seq": 21,
+                  "toolIds": [
+                    "call_00_3Ohw0mYUVjga2hbMKcDS8177"
+                  ],
+                  "executions": 0,
+                  "results": 0,
+                  "usagePresent": false,
+                  "independentlyRejectedJsonBlocks": [
+                    {
+                      "id": "call_00_3Ohw0mYUVjga2hbMKcDS8177",
+                      "tool": "building_loop_coverage",
+                      "bytes": 7095,
+                      "argumentsSha256": "b0d5597e0fbd8cba45b455db05f95d39ae610667a66bdd68fe9e63d24b54b559"
+                    }
+                  ]
+                },
+                "initialRequest": {
+                  "file": "requests/b0859bae6f88b2e1ea06b1421cc4052e54ea64db53ef56db05bffe134bc73422.json",
+                  "sha256": "4cff89430673ff6df5f6431af955ad963017103783e019a4fa9cbe9b0396d0ed",
+                  "requestHash": "b0859bae6f88b2e1ea06b1421cc4052e54ea64db53ef56db05bffe134bc73422",
+                  "systemHash": "4b4d4a03ed0d7bee3c9d06d21d571bac2b4ea02904db4bf839984eca55babbaa",
+                  "toolsHash": "b272805959d64cf6071402d7067b1e245654a6ff5ee7df26f0c12ee0fa69686f",
+                  "role": "auditor",
+                  "phase": "final-audit",
+                  "eventsLine": 638
+                },
+                "retryRequest": {
+                  "file": "requests/1f874af3ad43681de341f8347e862933be84163287217f44280ec217d82c9cb6.json",
+                  "sha256": "caf6bdf7bab44fda1c69702027674e94a5ce70877062f71d7420cb4d144c987e",
+                  "requestHash": "1f874af3ad43681de341f8347e862933be84163287217f44280ec217d82c9cb6",
+                  "systemHash": "4b4d4a03ed0d7bee3c9d06d21d571bac2b4ea02904db4bf839984eca55babbaa",
+                  "toolsHash": "b272805959d64cf6071402d7067b1e245654a6ff5ee7df26f0c12ee0fa69686f",
+                  "role": "auditor",
+                  "phase": "final-audit",
+                  "eventsLine": 644,
+                  "contextSection": "building-loop.tool-input-retry",
+                  "contextTextSha256": "b4019ea9a911e6aeabafbbbff96d936fe41e2f4e27d892133d7bd3241a5cc1bf",
+                  "sameTools": true,
+                  "exactHintAbsentFromInitialRequest": true
+                },
+                "nextOutcome": {
+                  "type": "assistant/message",
+                  "eventsLine": 645,
+                  "seq": 24,
+                  "sameTurnAndStep": true,
+                  "noStepOrTurnBoundaryBeforeOutcome": true,
+                  "source": {
+                    "provider": "deepseek-official",
+                    "model": "deepseek-flash"
+                  }
+                },
+                "newToolCalls": [
+                  {
+                    "tool": "building_loop_coverage",
+                    "id": "call_00_Eb4DIlejXXFXusZfovJ62535",
+                    "callLine": 646,
+                    "resultLine": 647,
+                    "isError": false
+                  }
+                ],
+                "recovered": true
+              }
+            ]
+          },
+          {
+            "run": "20261110T062549Z",
+            "group": "fresh",
+            "dshVersion": "0.2.2-rc.1",
+            "terminalStatus": "observed",
+            "terminalEnd": [
+              "artifacts-present"
+            ],
+            "provenance": {
+              "runJsonSha256": "e4114cf301339cc89e39a9ee8a5b14a46fde8944579c87235de512b3c9bbadb6",
+              "eventsJsonlSha256": "f7ba9d5e19304f00f2f782701dcd0b910d5699a8d1f3d8fb8f20c0aef64c0b83",
+              "finishedJsonSha256": "b6e084744792a9d8dd195a1366c111138c363172e773b1f1de1d88b56301903d"
+            },
+            "malformedToolInputAttempts": [
+              {
+                "session": "07bbd79f-63b9-4a51-85c0-d589252b6c68",
+                "turn": 1,
+                "step": 2,
+                "failure": {
+                  "code": "MALFORMED_RESPONSE",
+                  "message": "DeepSeek Messages stream: tool input is invalid JSON"
+                },
+                "discardedAttempt": {
+                  "eventsLine": 577,
+                  "seq": 21,
+                  "toolIds": [
+                    "call_00_juKc2HpAe8SF0kwprPBR1071"
+                  ],
+                  "executions": 0,
+                  "results": 0,
+                  "usagePresent": false,
+                  "independentlyRejectedJsonBlocks": [
+                    {
+                      "id": "call_00_juKc2HpAe8SF0kwprPBR1071",
+                      "tool": "building_loop_coverage",
+                      "bytes": 4450,
+                      "argumentsSha256": "0e745ad85f6bb18c5704155eedd15d4bd806fd57588afc49bc6c34b0c51109fb"
+                    }
+                  ]
+                },
+                "initialRequest": {
+                  "file": "requests/d07d02e109f36f30ad51112feebf2d10597cd6262bdf5db627270f6d366ee546.json",
+                  "sha256": "3af035c77f5908f39e38ffb9da74e97103ec0c927a2b242ca6663bbe0b650aec",
+                  "requestHash": "d07d02e109f36f30ad51112feebf2d10597cd6262bdf5db627270f6d366ee546",
+                  "systemHash": "40c7b892ea0bc8ede75b7519afe8ddc25241d73f6fce2b83e37235f5f066105b",
+                  "toolsHash": "b272805959d64cf6071402d7067b1e245654a6ff5ee7df26f0c12ee0fa69686f",
+                  "role": "auditor",
+                  "phase": "final-audit",
+                  "eventsLine": 573
+                },
+                "retryRequest": {
+                  "file": "requests/5522e1a4db3ee9d8c477a6a0894a058011b481cb47099ba9ff97421eb0281a41.json",
+                  "sha256": "1bcad9ce929c615aee8203477c5fca76fba43c1dcc7548179fe192c7b9efafcb",
+                  "requestHash": "5522e1a4db3ee9d8c477a6a0894a058011b481cb47099ba9ff97421eb0281a41",
+                  "systemHash": "40c7b892ea0bc8ede75b7519afe8ddc25241d73f6fce2b83e37235f5f066105b",
+                  "toolsHash": "b272805959d64cf6071402d7067b1e245654a6ff5ee7df26f0c12ee0fa69686f",
+                  "role": "auditor",
+                  "phase": "final-audit",
+                  "eventsLine": 579,
+                  "contextSection": "building-loop.tool-input-retry",
+                  "contextTextSha256": "b4019ea9a911e6aeabafbbbff96d936fe41e2f4e27d892133d7bd3241a5cc1bf",
+                  "sameTools": true,
+                  "exactHintAbsentFromInitialRequest": true
+                },
+                "nextOutcome": {
+                  "type": "assistant/message",
+                  "eventsLine": 580,
+                  "seq": 24,
+                  "sameTurnAndStep": true,
+                  "noStepOrTurnBoundaryBeforeOutcome": true,
+                  "source": {
+                    "provider": "deepseek-official",
+                    "model": "deepseek-flash"
+                  }
+                },
+                "newToolCalls": [
+                  {
+                    "tool": "building_loop_coverage",
+                    "id": "call_00_hcNi6chz4EPq8z0EELGS9284",
+                    "callLine": 581,
+                    "resultLine": 582,
+                    "isError": false
+                  }
+                ],
+                "recovered": true
+              }
+            ]
+          },
+          {
+            "run": "20261110T063219Z",
+            "group": "reuse",
+            "dshVersion": "0.2.2-rc.1",
+            "terminalStatus": "observed",
+            "terminalEnd": [
+              "artifacts-present"
+            ],
+            "provenance": {
+              "runJsonSha256": "48fb99c1349e456977103ecf8467d1f6fe527dc8edcbfa5eeb6991e04ffae65f",
+              "eventsJsonlSha256": "32085a1de0b5b7244dfa28172045a107eb208f64934eb82f21a321477b5d35d6",
+              "finishedJsonSha256": "43b8a3addf0f0ae251c5d8a5ceac94d18a1813ecc931e6001bb7341ee0dd9f36"
+            },
+            "malformedToolInputAttempts": []
+          },
+          {
+            "run": "20261110T063221Z",
+            "group": "fresh",
+            "dshVersion": "0.2.2-rc.1",
+            "terminalStatus": "observed",
+            "terminalEnd": [
+              "artifacts-present"
+            ],
+            "provenance": {
+              "runJsonSha256": "9a7ef30708f66c8bf06978d66c5a465e626b9d866436c674bf02cd771242d70b",
+              "eventsJsonlSha256": "20bdd55183eab9b95975685a0d6e9e9cb4b01fae19928676e41e977eb3da46d1",
+              "finishedJsonSha256": "086e4b9269ed67730bafc26c30fe4da70cf6fdb915bd68cc14ffdd3e34d97322"
+            },
+            "malformedToolInputAttempts": [
+              {
+                "session": "50dc79fb-bbcf-45b2-bc8c-aa5c5d56a879",
+                "turn": 1,
+                "step": 2,
+                "failure": {
+                  "code": "MALFORMED_RESPONSE",
+                  "message": "DeepSeek Messages stream: tool input is invalid JSON"
+                },
+                "discardedAttempt": {
+                  "eventsLine": 80,
+                  "seq": 21,
+                  "toolIds": [
+                    "call_00_lRUmURbj7KotmCZbAc4l7820"
+                  ],
+                  "executions": 0,
+                  "results": 0,
+                  "usagePresent": false,
+                  "independentlyRejectedJsonBlocks": [
+                    {
+                      "id": "call_00_lRUmURbj7KotmCZbAc4l7820",
+                      "tool": "building_loop_coverage",
+                      "bytes": 2388,
+                      "argumentsSha256": "e7b849411954d2cec7df98ad5e97775277a1e581494771fa151033915b1945d9"
+                    }
+                  ]
+                },
+                "initialRequest": {
+                  "file": "requests/c51debbc4f4f03c07e4165b3a8bf888337473e44f2a70918530874864f51f73c.json",
+                  "sha256": "3620a4c98a1d4c63428e3fa0426c9036b862cf63e750a5d2d480effad8d2ed87",
+                  "requestHash": "c51debbc4f4f03c07e4165b3a8bf888337473e44f2a70918530874864f51f73c",
+                  "systemHash": "d778c25fb7ca7f318dc96ecb8742dc6498fb95b3960d4d53b3f4841bc2e69bae",
+                  "toolsHash": "464ec75dc6b64734fb9b461b4e0951ca5da5cea0d6cc97820674cf09d2bc80de",
+                  "role": "reviewer",
+                  "phase": "first-review",
+                  "eventsLine": 76
+                },
+                "retryRequest": {
+                  "file": "requests/cc30e81031a33acfa3ccb965fb1c90ea43f85819b8f29ea854d1ea4f0405743c.json",
+                  "sha256": "eeaa932595420f08c15c82a5e80c84ec44758b77fa1d45ee56aa164acba44edb",
+                  "requestHash": "cc30e81031a33acfa3ccb965fb1c90ea43f85819b8f29ea854d1ea4f0405743c",
+                  "systemHash": "d778c25fb7ca7f318dc96ecb8742dc6498fb95b3960d4d53b3f4841bc2e69bae",
+                  "toolsHash": "464ec75dc6b64734fb9b461b4e0951ca5da5cea0d6cc97820674cf09d2bc80de",
+                  "role": "reviewer",
+                  "phase": "first-review",
+                  "eventsLine": 82,
+                  "contextSection": "building-loop.tool-input-retry",
+                  "contextTextSha256": "b4019ea9a911e6aeabafbbbff96d936fe41e2f4e27d892133d7bd3241a5cc1bf",
+                  "sameTools": true,
+                  "exactHintAbsentFromInitialRequest": true
+                },
+                "nextOutcome": {
+                  "type": "assistant/message",
+                  "eventsLine": 83,
+                  "seq": 24,
+                  "sameTurnAndStep": true,
+                  "noStepOrTurnBoundaryBeforeOutcome": true,
+                  "source": {
+                    "provider": "deepseek-official",
+                    "model": "deepseek-flash"
+                  }
+                },
+                "newToolCalls": [
+                  {
+                    "tool": "building_loop_coverage",
+                    "id": "call_00_QkCowBwBA3wWVylOLJgY8131",
+                    "callLine": 84,
+                    "resultLine": 85,
+                    "isError": false
+                  }
+                ],
+                "recovered": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r075-paid-preflight-replay.json",
+      "kind": "json",
+      "originalSha256": "d97838cbf9ee4d37a08a652d21456227df0601d399f986337c8c7284a23f16fc",
+      "publishedSha256": "d97838cbf9ee4d37a08a652d21456227df0601d399f986337c8c7284a23f16fc",
+      "data": {
+        "passed": true,
+        "scope": "Exact first bad compound draft from each official-model run, reevaluated without changing the original. The tool-entry regression separately establishes the blocking action.",
+        "productionSha256": "37aa1a08dd1b1e2a1aa123f43dfb43448ff8a8eb8f9ed14ed485634dd50c2d50",
+        "rows": [
+          {
+            "run": "20261110T062547Z",
+            "eventLine": 293,
+            "callId": "call_00_1l0KDJFq3ij2LnkqwhxA4635",
+            "candidateSha256": "6a10f532aaac3d632b2fa5f7de6487f08f2d4607996f5594f4b4ab139c8ca360",
+            "checks": [
+              {
+                "line": 15,
+                "block": "B16-a8a45f78",
+                "source": "sources/synthetic.md",
+                "matches": false,
+                "profileClause": "citation-lines",
+                "expected": 8,
+                "actual": 6,
+                "unit": "candidate-citation-lines",
+                "lines": [
+                  5,
+                  7,
+                  8,
+                  9,
+                  10,
+                  12
+                ],
+                "claimedLines": [
+                  5,
+                  6,
+                  7,
+                  8,
+                  10,
+                  11,
+                  12,
+                  13
+                ],
+                "lineListMatches": false,
+                "missingLines": [
+                  9
+                ],
+                "missingCount": 1,
+                "extraLines": [
+                  6,
+                  11,
+                  13
+                ],
+                "extraCount": 3,
+                "duplicateLines": [],
+                "exampleLines": [],
+                "wrongExampleLines": []
+              },
+              {
+                "line": 15,
+                "block": "B17-b88696cc",
+                "source": "sources/synthetic.md",
+                "matches": false,
+                "profileClause": "marked-citation-lines",
+                "expected": 6,
+                "actual": 4,
+                "unit": "candidate-marked-citation-lines",
+                "lines": [
+                  7,
+                  8,
+                  9,
+                  10
+                ],
+                "claimedLines": [
+                  5,
+                  6,
+                  7,
+                  8,
+                  10,
+                  11
+                ],
+                "lineListMatches": false,
+                "missingLines": [
+                  9
+                ],
+                "missingCount": 1,
+                "extraLines": [
+                  5,
+                  6,
+                  11
+                ],
+                "extraCount": 3,
+                "duplicateLines": [],
+                "exampleLines": [],
+                "wrongExampleLines": [],
+                "marker": "[模拟]",
+                "markerPosition": "any"
+              }
+            ]
+          },
+          {
+            "run": "20261110T062549Z",
+            "eventLine": 289,
+            "callId": "call_00_1SmSFwKu1VBR1SOwOine1848",
+            "candidateSha256": "925ab5412e71d31780dbe201819f598460cbee0085394e586474ca861af4a4f6",
+            "checks": [
+              {
+                "line": 13,
+                "block": "B16-884eeb88",
+                "source": "sources/synthetic.md",
+                "matches": false,
+                "profileClause": "citation-lines",
+                "expected": 4,
+                "actual": 6,
+                "unit": "candidate-citation-lines",
+                "lines": [
+                  4,
+                  6,
+                  7,
+                  8,
+                  9,
+                  11
+                ],
+                "claimedLines": [
+                  4,
+                  5,
+                  6,
+                  7
+                ],
+                "lineListMatches": false,
+                "missingLines": [
+                  8,
+                  9,
+                  11
+                ],
+                "missingCount": 3,
+                "extraLines": [
+                  5
+                ],
+                "extraCount": 1,
+                "duplicateLines": [],
+                "exampleLines": [],
+                "wrongExampleLines": []
+              },
+              {
+                "line": 13,
+                "block": "B17-231725f4",
+                "source": "sources/synthetic.md",
+                "matches": false,
+                "profileClause": "marked-citation-lines",
+                "expected": 1,
+                "actual": 1,
+                "unit": "candidate-marked-citation-lines",
+                "lines": [
+                  7
+                ],
+                "claimedLines": [
+                  6
+                ],
+                "lineListMatches": false,
+                "missingLines": [
+                  7
+                ],
+                "missingCount": 1,
+                "extraLines": [
+                  6
+                ],
+                "extraCount": 1,
+                "duplicateLines": [],
+                "exampleLines": [],
+                "wrongExampleLines": [],
+                "marker": "[模拟]",
+                "markerPosition": "any"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r075-profile-replay-result.json",
+      "kind": "json",
+      "originalSha256": "ac952cfb29cf26572a7776c5dcf085740a91751d5c9bce57c61e6070fc4bbcad",
+      "publishedSha256": "ac952cfb29cf26572a7776c5dcf085740a91751d5c9bce57c61e6070fc4bbcad",
+      "data": {
+        "run": "20261110T053234Z",
+        "candidateSha256": "cbf93253b49e4685c103411d459db079c6f0bb845aa5216911c239313439c971",
+        "physicalLine": 13,
+        "originalCandidateUnchanged": true,
+        "priorRuntimeSha256": "b6321174bb3232c633ea86f2f9bb6809a54da370434a32ab0c24e8e243e14a31",
+        "updatedRuntimeSha256": "37aa1a08dd1b1e2a1aa123f43dfb43448ff8a8eb8f9ed14ed485634dd50c2d50",
+        "before": {
+          "events": {
+            "markerBlockCall": 1067,
+            "headCall": 1145,
+            "headError": 1146
+          },
+          "headError": "B16-68820bbd: [coverage-object] {\"category\":\"unverifiable\",\"message\":\"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"}",
+          "wholeBlockLegacyPartialMeasurement": {
+            "matches": true,
+            "actual": 6,
+            "unit": "candidate-citation-lines",
+            "lines": [
+              4,
+              5,
+              6,
+              7,
+              8,
+              10
+            ]
+          },
+          "markerBlockWrongDomainAccepted": true
+        },
+        "after": {
+          "markerBlockWrongDomainError": "[coverage-object] {\"category\":\"parameter\",\"message\":\"组合稿件统计须按本块的 objectCheckHint 复算；不能用外部出处或 nonfactual 跳过数量、行号或标记\",\"objectCheckHint\":{\"kind\":\"candidate\",\"check\":\"citation-profile\",\"source\":\"sources/synthetic.md\"}}",
+          "closureObjectRecheck": true,
+          "proofs": [
+            {
+              "block": "B16-68820bbd",
+              "proof": {
+                "kind": "candidate",
+                "check": "citation-profile",
+                "source": "sources/synthetic.md",
+                "assertion": {
+                  "line": 13,
+                  "start": 9,
+                  "end": 65,
+                  "quoteSha256": "33461bed17d0df087c19919ebb56b33eec94ecacbf8aabeed35a0a5e98c969d0"
+                },
+                "candidateSha256": "cbf93253b49e4685c103411d459db079c6f0bb845aa5216911c239313439c971",
+                "sources": [],
+                "result": {
+                  "matches": true,
+                  "profileClause": "citation-lines",
+                  "expected": 6,
+                  "actual": 6,
+                  "unit": "candidate-citation-lines",
+                  "lines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "claimedLines": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    10
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [
+                    10
+                  ],
+                  "wrongExampleLines": []
+                }
+              }
+            },
+            {
+              "block": "B17-d17382e4",
+              "proof": {
+                "kind": "candidate",
+                "check": "citation-profile",
+                "source": "sources/synthetic.md",
+                "assertion": {
+                  "line": 13,
+                  "start": 65,
+                  "end": 85,
+                  "quoteSha256": "d17382e4095fbfe61a951d7dfe263d361a4c18cde743b93a5ea386c08faf90ce"
+                },
+                "candidateSha256": "cbf93253b49e4685c103411d459db079c6f0bb845aa5216911c239313439c971",
+                "sources": [],
+                "result": {
+                  "matches": true,
+                  "profileClause": "marked-citation-lines",
+                  "expected": 4,
+                  "actual": 4,
+                  "unit": "candidate-marked-citation-lines",
+                  "lines": [
+                    5,
+                    6,
+                    7,
+                    8
+                  ],
+                  "claimedLines": [
+                    5,
+                    6,
+                    7,
+                    8
+                  ],
+                  "lineListMatches": true,
+                  "missingLines": [],
+                  "missingCount": 0,
+                  "extraLines": [],
+                  "extraCount": 0,
+                  "duplicateLines": [],
+                  "exampleLines": [],
+                  "wrongExampleLines": [],
+                  "marker": "[模拟]",
+                  "markerPosition": "any"
+                }
+              }
+            }
+          ]
+        },
+        "preliminaryPreflightReplay": {
+          "run": "20261110T062547Z",
+          "writeEventLine": 338,
+          "candidateSha256": "110f58eea4a39a2e8d2b408b650e791081b99219b4e8c5e984e7df83670009ac",
+          "checks": [
+            {
+              "line": 17,
+              "block": "B19-0be9a75b",
+              "source": "sources/synthetic.md",
+              "matches": false,
+              "profileClause": "citation-lines",
+              "expected": 6,
+              "actual": 6,
+              "unit": "candidate-citation-lines",
+              "lines": [
+                7,
+                9,
+                10,
+                11,
+                12,
+                14
+              ],
+              "claimedLines": [
+                6,
+                8,
+                9,
+                10,
+                11,
+                13
+              ],
+              "lineListMatches": false,
+              "missingLines": [
+                7,
+                12,
+                14
+              ],
+              "missingCount": 3,
+              "extraLines": [
+                6,
+                8,
+                13
+              ],
+              "extraCount": 3,
+              "duplicateLines": [],
+              "exampleLines": [],
+              "wrongExampleLines": []
+            },
+            {
+              "line": 17,
+              "block": "B20-b941c2a3",
+              "source": "sources/synthetic.md",
+              "matches": false,
+              "profileClause": "marked-citation-lines",
+              "expected": 4,
+              "actual": 4,
+              "unit": "candidate-marked-citation-lines",
+              "lines": [
+                9,
+                10,
+                11,
+                12
+              ],
+              "claimedLines": [
+                8,
+                9,
+                10,
+                11
+              ],
+              "lineListMatches": false,
+              "missingLines": [
+                12
+              ],
+              "missingCount": 1,
+              "extraLines": [
+                8
+              ],
+              "extraCount": 1,
+              "duplicateLines": [],
+              "exampleLines": [],
+              "wrongExampleLines": [],
+              "marker": "[模拟]",
+              "markerPosition": "any"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/r075-profile-replay.mjs",
+      "kind": "text",
+      "originalSha256": "a6094f90b1118fca939f9a2c4fae3e257641389da814b51724ff9f5038413826",
+      "publishedSha256": "3d159e2b9bf0c22fc7b8ed09f9784728e826e8aff84034d02b46ceee4c418f06",
+      "data": "/** Read-only replay of the original 053234Z statistical clauses. */\nimport assert from \"node:assert/strict\";\nimport fs from \"node:fs\";\nimport path from \"node:path\";\nimport readline from \"node:readline\";\nimport { fileURLToPath, pathToFileURL } from \"node:url\";\nimport * as current from \"../building-loop/governance/coverage.mjs\";\nimport { authority, digest, keyOf } from \"../building-loop/governance/policy.mjs\";\nimport { lineList } from \"../building-loop/governance/preflight.mjs\";\n\nconst priorRun=\"20261110T053234Z\";\nconst root=fileURLToPath(new URL(\"../../outputs/building-loop-efficiency-audit/\"+priorRun+\"/\",import.meta.url));\nconst priorModule=path.join(root,\"isolated-home/profiles/web/node_modules/dsh-building-loop/governance/coverage.mjs\");\nconst prior=await import(pathToFileURL(priorModule));\nconst workspace=path.join(root,\"reuse/workspace\"),candidate=path.join(workspace,\"module/candidate.md\");\nconst bytes=fs.readFileSync(candidate),candidateSha256=digest(bytes);\nassert.equal(candidateSha256,\"cbf93253b49e4685c103411d459db079c6f0bb845aa5216911c239313439c971\");\n\n/** Instantiate only the proof contract in memory over the frozen source files. */\nfunction replay(module,actor) {\n  const phase=\"final-review\",policy=authority(workspace),spec=policy.units.K01,reads=spec.phases[phase].read;\n  const seen={};\n  for(const file of reads) {\n    const target=path.join(workspace,file);\n    if(!fs.existsSync(target)||!fs.statSync(target).isFile())continue;\n    const observed=fs.readFileSync(target);\n    seen[keyOf(file)]={hash:digest(observed),ranges:[[1,lineList(observed).length]]};\n  }\n  const active={phase,seen},frame={root:workspace,policy,reads,agent:{id:actor}};\n  const call=(action,args={})=>module.coverageAction(frame,active,spec,{action,...args});\n  const blocks=call(\"inventory\",{count:24}).blocks.filter(row=>row.line===13);\n  assert.equal(blocks.length,2);\n  assert.equal(blocks[0].id,\"B16-68820bbd\");\n  return {call,frame,spec,blocks};\n}\n\nconst input={kind:\"direct\",status:\"supported\",sourceRelation:\"supports\",basis:\"核对本稿的实际引用行和同行标记。\"};\nconst source=\"sources/synthetic.md\";\nconst old=replay(prior,\"prior-review\");\nconst updated=replay(current,\"updated-review\");\nconst record=(r,block,part)=>r.call(\"record\",{entries:[{block:r.blocks[block].id,parts:[part]}]});\nconst errorOf=action=>{try{action();assert.fail(\"expected an error\");}catch(error){if(error.code===\"ERR_ASSERTION\")throw error;return error.message;}};\n\n// Use exact past model calls, not a reconstruction of what the model might have\n// sent. The archived tool errors also check our replay has the same boundary.\nasync function readEvents(directory,eventLines) {\n  const selected=new Map();\n  const stream=readline.createInterface({input:fs.createReadStream(path.join(directory,\"events.jsonl\")),crlfDelay:Infinity});\n  let eventLine=0;\n  for await(const line of stream) {\n    eventLine++;\n    if(eventLines.includes(eventLine))selected.set(eventLine,JSON.parse(line));\n    if(eventLine===eventLines.at(-1))break;\n  }\n  return selected;\n}\nconst selected=await readEvents(root,[1067,1145,1146]);\nconst readArgs=line=>JSON.parse(selected.get(line).data.arguments);\nconst firstArgs=readArgs(1145),wrongDomainArgs=readArgs(1067);\nconst priorHeadError=errorOf(()=>old.call(\"record\",firstArgs));\nassert.equal(\"Error: \"+priorHeadError,selected.get(1146).data.message.content[0].text);\nassert.match(priorHeadError,/只证明当前稿件的明确结构/);\nconst priorWholeBlock=record(old,0,{...input,objectCheck:{kind:\"candidate\",check:\"citation-count\",source,expected:6}});\nassert.deepEqual(priorWholeBlock.recorded,[old.blocks[0].id]);\nconst incompleteLegacy=old.call(\"status\",{block:old.blocks[0].id}).record.parts[0].objectCheck.result;\nassert.equal(incompleteLegacy.matches,true);\nassert.equal(incompleteLegacy.claimedLines,undefined);\nassert.ok(old.call(\"record\",wrongDomainArgs).recorded.includes(old.blocks[1].id));\nconst wrongDomainReplay=updated.call(\"record\",wrongDomainArgs);\nconst updatedWrongDomainError=wrongDomainReplay.invalid.find(row=>row.block===updated.blocks[1].id)?.error;\nassert.match(updatedWrongDomainError,/objectCheckHint/);\n\nfor(const [index,block] of updated.blocks.entries()) {\n  assert.deepEqual(block.objectCheckHint,{kind:\"candidate\",check:\"citation-profile\",source});\n  const args=index===0?structuredClone(firstArgs):structuredClone(wrongDomainArgs);\n  args.entries=args.entries.filter(entry=>entry.block===block.id);\n  const part=args.entries[0].parts.at(-1);\n  delete part.evidence;\n  part.objectCheck=block.objectCheckHint;\n  assert.deepEqual(updated.call(\"record\",args).recorded,[block.id]);\n}\nconst accepted=updated.blocks.map(block=>updated.call(\"status\",{block:block.id}).record);\ncurrent.requireStoredObjectChecks(updated.frame,updated.spec,[{records:accepted}],bytes);\nconst proofs=accepted.map(record=>({block:record.block,proof:record.parts.at(-1).objectCheck}));\nassert.deepEqual(proofs.map(row=>row.proof.result.lines),[[4,5,6,7,8,10],[5,6,7,8]]);\nassert.equal(digest(fs.readFileSync(candidate)),candidateSha256);\n\n// An initial 0.7.5 paid draft actually submitted shifted ordinals. The shared\n// preflight predicate must report both issues on its unchanged recorded bytes.\nconst preliminaryRun=\"20261110T062547Z\",writeLine=338;\nconst preliminaryRoot=fileURLToPath(new URL(\"../../outputs/building-loop-efficiency-audit/\"+preliminaryRun+\"/\",import.meta.url));\nconst preliminaryWrite=(await readEvents(preliminaryRoot,[writeLine])).get(writeLine);\nassert.equal(preliminaryWrite.type,\"tool/call\");\nassert.equal(preliminaryWrite.data.name,\"building_loop_file\");\nconst write=JSON.parse(preliminaryWrite.data.arguments);\nassert.equal(write.action,\"write\");assert.equal(write.path,\"module/candidate.md\");\nconst preliminaryBytes=Buffer.from(write.content);\nconst preflight=current.candidateCitationProfiles(preliminaryBytes,[source],write.path);\nassert.deepEqual(preflight.map(row=>row.matches),[false,false]);\nassert.deepEqual(preflight.map(row=>row.lines),[[7,9,10,11,12,14],[9,10,11,12]]);\nassert.deepEqual(preflight.map(row=>row.claimedLines),[[6,8,9,10,11,13],[8,9,10,11]]);\n\nconsole.log(JSON.stringify({run:priorRun,candidateSha256,physicalLine:13,originalCandidateUnchanged:true,\n  priorRuntimeSha256:digest(fs.readFileSync(priorModule)),updatedRuntimeSha256:digest(fs.readFileSync(new URL(\"../building-loop/governance/coverage.mjs\",import.meta.url))),\n  before:{events:{markerBlockCall:1067,headCall:1145,headError:1146},headError:priorHeadError,\n    wholeBlockLegacyPartialMeasurement:incompleteLegacy,markerBlockWrongDomainAccepted:true},\n  after:{markerBlockWrongDomainError:updatedWrongDomainError,closureObjectRecheck:true,proofs},\n  preliminaryPreflightReplay:{run:preliminaryRun,writeEventLine:writeLine,candidateSha256:digest(preliminaryBytes),checks:preflight}},null,2));\n"
+    },
+    {
       "path": "building-loop-efficiency-index-validation/r18-final-review.json",
       "kind": "json",
       "originalSha256": "1f702f343d417b6bd1ba2467a87e461aed686ec1dd413176fc149608972a5734",
@@ -4338,6 +5577,100 @@
       "originalSha256": "50cd680584b1f5b2c2a6a043c7ffb7468ebd7abdc467a4fedf27472ba9e929a9",
       "publishedSha256": "646d27a5695f1f8343523fc864aa4b09292f4d082af96eda5f54d2815b6a3291",
       "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (308.5965ms)\n✔ a real unsupported factual heading remains valid repair debt (249.2873ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (369.1833ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.9334ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (280.8494ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (422.1257ms)\n✔ recording an observed unit interruption returns its existing host ledger item (92.6182ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (64.2495ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (841.3953ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (817.9532ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (641.9615ms)\n✔ host ledger labels registration text separately before any model disposition exists (56.169ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (578.5997ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (688.6309ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (11.9122ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (153.2528ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (3.7828ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (18.474ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (38.6433ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (16.0498ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (17.1435ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (16.5933ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (14.1076ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (57.6798ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (19.9307ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.5517ms)\n✔ inventory pagination never drops trailing blocks (21.2962ms)\n✔ equality transitivity requires a shared middle concept (21.5357ms)\n✔ calculated proof binds the configured script and its real raw data (26.8793ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (9.2946ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (10.9251ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (22.7965ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (25.8202ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (23.3873ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (23.8129ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (138.6146ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (55.0094ms)\n✔ classification disagreement is distinct from a proven false claim (0.6449ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.3722ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (11.8863ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (636.0305ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (3.3283ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (13.8552ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (33.7279ms)\n✔ visible error examples need counterevidence but are not endorsed facts (16.4816ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (190.4084ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (31.3395ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (32.3633ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (37.007ms)\n✔ registered object counts and line membership have their own verified source object (31.3648ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (18.8253ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (39.9916ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (19.0689ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (22.4755ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (19.24ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (14.2009ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (25.6318ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (36.1114ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.3941ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (20.6744ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (14.3585ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (10.7097ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (17.4651ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (14.9188ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (67.4424ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (22.7165ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (52.1819ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (130.186ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (28.8678ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (38.5495ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (19.36ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (30.6829ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.6242ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (10.1061ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.01ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (42.4538ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (22.8251ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (14.7455ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (33.4149ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (58.4104ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (21.9603ms)\n✔ a following coverage block's source cannot change the simulation marker's source (28.8632ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (30.6803ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.2177ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (470.6186ms)\n✔ search observations survive same-role interruption but flag changed material (352.8338ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (159.6305ms)\n✔ search retention is bounded and reports omitted successful observations (613.6155ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (161.9781ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (237.5814ms)\n✔ prepare pagination never stamps undisclosed lines as read (96.6696ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (159.6524ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (234.7549ms)\n✔ the prepare byte budget never marks an omitted long block as presented (220.2303ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (225.6521ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (231.8982ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (212.1873ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (60.4953ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (584.6095ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (1.048ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (383.8026ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (317.7965ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (783.6432ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (678.4661ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (673.0477ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1635.3183ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (459.3188ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (366.9834ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (317.0883ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (437.2855ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (257.3235ms)\n✔ below-threshold and unconfigured continuations retain the original executor (408.427ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (87.6149ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (206.6009ms)\n✔ rejects glob, escape and Windows path aliases (1.1854ms)\n✔ rejects an explicitly listed link, hard link or junction (3.2983ms)\n✔ keeps one byte-exact backup per file and same-phase retries (89.296ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (5.327ms)\n✔ test\\helpers.mjs (62.4246ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (3013.4645ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (8.1754ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (12.7548ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (8.2684ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (452.1302ms)\n✔ a bare first source mention cannot hide its later actual locator (0.4866ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (2.5684ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.384ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (10.8776ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (403.9584ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (709.087ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1629.3302ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (1872.4447ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (910.7248ms)\n✔ an example label or denial does not exempt a second unchanged assertion (519.3566ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (656.4859ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (699.2908ms)\n✔ a true source-only repair can return unchanged prose for independent verification (318.9039ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.4207ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (3.6689ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.1277ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.0785ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (19.5055ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (5.5614ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (292.2092ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (12.9441ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (10.8035ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (7.7778ms)\n✔ presentation cannot be submitted as a factual defect and optional advice does not block (755.1122ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (587.2268ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (746.094ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (768.1293ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (711.5064ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (673.8004ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (224.8081ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (566.5848ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (600.9703ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (625.6116ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1062.2972ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (698.7671ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (402.6037ms)\n✔ changed facts with evidence only in a later table are blocked before final review (426.8601ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (701.2449ms)\n✔ observation files cannot be given to a model as writable or generated from its review (6.0308ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (233.2311ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (283.8478ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (290.42ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (288.8774ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1104.3705ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (549.6651ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (511.2845ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (769.3746ms)\nℹ tests 171\nℹ suites 0\nℹ pass 171\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 11180.8119\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.5-final.json",
+      "kind": "json",
+      "originalSha256": "7420dfe12faf802c9ef06e1222a79a34befaa9706a76f2717cadd369e158e82f",
+      "publishedSha256": "7420dfe12faf802c9ef06e1222a79a34befaa9706a76f2717cadd369e158e82f",
+      "data": {
+        "command": "node --test",
+        "node": "v24.16.0",
+        "passed": true,
+        "count": {
+          "tests": 181,
+          "pass": 181,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "stdoutSha256": "d98c4a4acde753333fc93f7a1ffd9a2d901bf6b6181efef5c7efa8d233dbaa1b",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "productionRuntime": {
+          "cordis.patch.yml": "e7703cd5235393ffaa1b821738a8f423b2ad7d4d89b158f7aff3140f28d9de55",
+          "governance/index.mjs": "1d7d2902b014fd55bcbece9532d40f0719d90e21caf5d93cd053ca87aaa4ae3e",
+          "governance/policy.mjs": "639a8fc6bbd413419b651358cf9e824135de2a03a8a3e855372810f56f81eab9",
+          "governance/preflight.mjs": "70f400ee74af7f4a822def885e47fd5bc317f164909864e7cb743e72a51603dd",
+          "governance/evidence.mjs": "afbcdf67f0aa29055b6c6e9120d1ac89adadede8c83e1984633a663bad49ac6a",
+          "governance/ledger.mjs": "f8540f55c8ba1c75cf116fb54bd7d84133e391916dc39520fd94f7f03e07af62",
+          "governance/goals.mjs": "9cee460386fbb44151c76f72cd40a361feedd7aba4b4f81cebd6ce013c4eb935",
+          "governance/coverage.mjs": "37aa1a08dd1b1e2a1aa123f43dfb43448ff8a8eb8f9ed14ed485634dd50c2d50",
+          "turn-resume/index.mjs": "470e16ecc8a5e3292779c0f258aaff74a2b81e686b161336ceecb8c4b90847ce",
+          "skills/dispatch-protocol/SKILL.md": "0cdfdc0acece22825bc88bc40d2e6e1f5626a94d767a9f9825a4653d49f9a97a"
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.5-final.stderr.txt",
+      "kind": "text",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSha256": "bd85bcdb8d4e613a79cb62d0903946ad10c83e63dc75f67614c159c0dbf4d184",
+      "data": ""
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.5-final.stdout.txt",
+      "kind": "text",
+      "originalSha256": "d98c4a4acde753333fc93f7a1ffd9a2d901bf6b6181efef5c7efa8d233dbaa1b",
+      "publishedSha256": "8f454a8a517515e403b0950257927f1e591c47452ed2e0a60986305a3f09a243",
+      "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (343.2909ms)\n✔ a real unsupported factual heading remains valid repair debt (258.8978ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (358.0305ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.6255ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (269.8179ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (443.3987ms)\n✔ recording an observed unit interruption returns its existing host ledger item (105.7165ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (82.4122ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (840.4946ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (900.2748ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (799.0705ms)\n✔ host ledger labels registration text separately before any model disposition exists (55.0375ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (651.608ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (721.1901ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (17.4003ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (162.0958ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (4.876ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (22.3326ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (45.2412ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (16.8197ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (17.6526ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (30.97ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (16.5055ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (71.175ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (26.7014ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.5436ms)\n✔ inventory pagination never drops trailing blocks (21.313ms)\n✔ equality transitivity requires a shared middle concept (25.8173ms)\n✔ calculated proof binds the configured script and its real raw data (32.6046ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (15.8341ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (14.3412ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (34.7175ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (28.5384ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (26.5462ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (29.2552ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (161.6269ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (67.8065ms)\n✔ classification disagreement is distinct from a proven false claim (1.0075ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.4775ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (15.1185ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (624.7731ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (4.5068ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (11.2331ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (36.8023ms)\n✔ visible error examples need counterevidence but are not endorsed facts (16.1372ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (201.9289ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (41.8937ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (39.6058ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (41.031ms)\n✔ registered object counts and line membership have their own verified source object (43.2239ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (23.4733ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (47.0784ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (21.97ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (34.0054ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (22.606ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (23.6811ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (30.188ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (52.5254ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.7435ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (25.37ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (16.5856ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (21.1593ms)\n✔ 053234Z blocked compound statistics verify both original spans without rewriting a byte (35.4074ms)\n✔ compound counts, each ordinal set, and explicit error-example annotations reject independently (122.275ms)\n✔ executor preflight measures the same current candidate profiles as review, using only its approved sources (26.3711ms)\n✔ a compound statistic needs the current full read, its own source and exact proof for both clauses (36.2644ms)\n✔ compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text (42.6979ms)\n✔ unbounded or attached additional statistics do not borrow the recognized exact proof (34.7694ms)\n✔ an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows (58.264ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (16.3771ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (15.3514ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (98.3832ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (34.5637ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (65.5555ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (136.6069ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (28.1724ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (33.1087ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (18.4994ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (27.9709ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.2612ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (10.4586ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.5937ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (40.9145ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (20.7364ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (12.395ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (43.5827ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (75.4948ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (21.4517ms)\n✔ a following coverage block's source cannot change the simulation marker's source (32.0748ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (40.8777ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.3477ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (509.2145ms)\n✔ search observations survive same-role interruption but flag changed material (367.0557ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (165.5238ms)\n✔ search retention is bounded and reports omitted successful observations (619.4387ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (195.893ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (288.6017ms)\n✔ prepare pagination never stamps undisclosed lines as read (108.1774ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (165.6958ms)\n✔ supplement preflight and submit block wrong compound stats and expose actual marker subsets (549.6982ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (243.2803ms)\n✔ the prepare byte budget never marks an omitted long block as presented (232.8524ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (253.15ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (266.9329ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (228.5325ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (82.547ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (640.8206ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (1.346ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (402.1431ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (357.3847ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (890.5226ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (704.8535ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (775.1929ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1875.5468ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (492.6455ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (392.9927ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (358.9605ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (464.4448ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (286.5925ms)\n✔ below-threshold and unconfigured continuations retain the original executor (478.5274ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (110.4711ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (252.2446ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (217.8387ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (533.2419ms)\n✔ rejects glob, escape and Windows path aliases (0.7475ms)\n✔ rejects an explicitly listed link, hard link or junction (4.3542ms)\n✔ keeps one byte-exact backup per file and same-phase retries (92.9715ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (7.8613ms)\n✔ test\\helpers.mjs (69.8806ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (3212.3306ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (8.6113ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (17.7492ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (19.1588ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (505.5924ms)\n✔ a bare first source mention cannot hide its later actual locator (0.735ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (0.477ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.5146ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (10.8038ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (461.9523ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (727.9274ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1750.5924ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (2212.7016ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (992.6314ms)\n✔ an example label or denial does not exempt a second unchanged assertion (566.6634ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (725.8412ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (813.8547ms)\n✔ a true source-only repair can return unchanged prose for independent verification (368.1266ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.6137ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (3.8495ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.17ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.9717ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (25.9782ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (13.3302ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (338.8154ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (17.7404ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (12.299ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (8.8818ms)\n✔ presentation cannot be submitted as a factual defect and optional advice does not block (773.5053ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (604.3613ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (815.5756ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (839.0847ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (842.9496ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (775.2609ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (254.3208ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (610.3955ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (689.8442ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (658.2136ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1245.803ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (780.5741ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (439.6528ms)\n✔ changed facts with evidence only in a later table are blocked before final review (446.3954ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (795.2166ms)\n✔ observation files cannot be given to a model as writable or generated from its review (11.3164ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (231.6833ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (297.3312ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (314.9986ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (326.3798ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1198.6061ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (648.9315ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (637.164ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (841.0722ms)\nℹ tests 181\nℹ suites 0\nℹ pass 181\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 12914.333\n"
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.5.json",
+      "kind": "json",
+      "originalSha256": "5e4d04f7c8a156719ab1c6f5073d547fb6dee15ef799e81229fc501e18723f99",
+      "publishedSha256": "5e4d04f7c8a156719ab1c6f5073d547fb6dee15ef799e81229fc501e18723f99",
+      "data": {
+        "command": "node --test",
+        "node": "v24.16.0",
+        "passed": true,
+        "count": {
+          "tests": 180,
+          "pass": 180,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "stdoutSha256": "d56bfb9f4d9b76354ba5635fa4d433d1fe53b8ff96253df06ddca540f6f1ddca",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "productionRuntime": {
+          "cordis.patch.yml": "e7703cd5235393ffaa1b821738a8f423b2ad7d4d89b158f7aff3140f28d9de55",
+          "governance/index.mjs": "6aee3190f9b337b9a9d3a6100de76b3488b27f1abceaa15e268d75b635fceed0",
+          "governance/policy.mjs": "639a8fc6bbd413419b651358cf9e824135de2a03a8a3e855372810f56f81eab9",
+          "governance/preflight.mjs": "70f400ee74af7f4a822def885e47fd5bc317f164909864e7cb743e72a51603dd",
+          "governance/evidence.mjs": "afbcdf67f0aa29055b6c6e9120d1ac89adadede8c83e1984633a663bad49ac6a",
+          "governance/ledger.mjs": "f8540f55c8ba1c75cf116fb54bd7d84133e391916dc39520fd94f7f03e07af62",
+          "governance/goals.mjs": "9cee460386fbb44151c76f72cd40a361feedd7aba4b4f81cebd6ce013c4eb935",
+          "governance/coverage.mjs": "4efe931901844b15f3ea89c8d4ec3f9bf19aa454db52c7534ee722b04bd092e4",
+          "turn-resume/index.mjs": "470e16ecc8a5e3292779c0f258aaff74a2b81e686b161336ceecb8c4b90847ce",
+          "skills/dispatch-protocol/SKILL.md": "0cdfdc0acece22825bc88bc40d2e6e1f5626a94d767a9f9825a4653d49f9a97a"
+        }
+      }
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.5.stderr.txt",
+      "kind": "text",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSha256": "bd85bcdb8d4e613a79cb62d0903946ad10c83e63dc75f67614c159c0dbf4d184",
+      "data": ""
+    },
+    {
+      "path": "building-loop-efficiency-index-validation/regression-0.7.5.stdout.txt",
+      "kind": "text",
+      "originalSha256": "d56bfb9f4d9b76354ba5635fa4d433d1fe53b8ff96253df06ddca540f6f1ddca",
+      "publishedSha256": "bc5bb0b949ff09ca98013eb18dd9b6e76e8112a1ed31f91dd9aa66156d4a6900",
+      "data": "✔ already classified headings, hypotheses and error examples cannot create unlisted author debt (353.0764ms)\n✔ a real unsupported factual heading remains valid repair debt (290.6871ms)\n✔ unlisted checks exact mixed spans and is revalidated after coverage changes (370.7775ms)\n✔ unlisted preflight diagnostics identify the current text location instead of implying old-line lookup (0.8513ms)\n✔ one rejected factual part does not make its correct prefix author repair debt (270.531ms)\n✔ reviewer and auditor dispatch ignores coordinator answers while executor instructions remain (479.6918ms)\n✔ recording an observed unit interruption returns its existing host ledger item (110.6319ms)\n✔ a repeated stable ledger ID needs a fresh item version to change its content (70.4328ms)\n✔ canonical ledger exports every current item including a late request and blocks model rewrites (869.3965ms)\n✔ optional evidence for keep resume and defer is validated and retained rather than silently discarded (913.7748ms)\n✔ optional disposition evidence must refer to actual read lines and the current version (766.1264ms)\n✔ host ledger labels registration text separately before any model disposition exists (50.5394ms)\n✔ configured ledger export failure keeps the workflow open and leaves dispositions unapplied (678.529ms)\n✔ host-state commit failure restores the generated ledger, history and rolling backups (776.1982ms)\n✔ ledger export requires an explicit safe authorized path and leaves legacy narrative untouched (19.5391ms)\n✔ a shared workspace never returns another coordinator's projection metadata or unit checkpoint (171.8127ms)\n✔ host inventory covers every nonblank character including titles, tables, code and suffixes (4.7402ms)\n✔ empty omissions and partial spans cannot bypass complete coverage (21.9403ms)\n✔ a neighboring sentence cannot be appended to an already covered block and the diagnostic identifies the extra part (35.75ms)\n✔ span diagnostics locate altered characters, missing suffixes and bound long source previews (16.0392ms)\n✔ quoted proof must be real authorized source text and cannot cite the candidate (17.9194ms)\n✔ changed candidate or source bytes invalidate proof even after rereading (22.694ms)\n✔ inferences need quoted premises and a real bridging rule, never a free-text warrant (19.6395ms)\n✔ modus ponens accepts a bounded valid proof and rejects converse or changed concepts (63.8711ms)\n✔ hypotheses require visible labels and cannot disguise mandatory facts (25.9594ms)\n✔ an unchanged unnumbered finding is blocked before review; a real line correction can return (0.6841ms)\n✔ inventory pagination never drops trailing blocks (25.6227ms)\n✔ equality transitivity requires a shared middle concept (35.6887ms)\n✔ calculated proof binds the configured script and its real raw data (38.5343ms)\n✔ configured calculation cannot lend another claim's passed result to an unrelated line (13.1081ms)\n✔ configured calculation checks the actual part rather than another percentage on its line (17.7714ms)\n✔ configured calculation premises must quote both actual raw rows in the calculated source (34.7047ms)\n✔ configured calculation preserves split parts, Markdown claim labels and separate raw-row refs (33.2644ms)\n✔ legacy calculated records remain readable but cannot retain mismatched raw premises (27.7028ms)\n✔ completion rechecks the exact calculation binding instead of trusting old passing records (32.7668ms)\n✔ ledger review and closed units reject old calculation records bound to another assertion or raw source (162.1735ms)\n✔ correct legacy calculation acceptance rechecks without rewriting proof or granting coordinator reads (64.8806ms)\n✔ classification disagreement is distinct from a proven false claim (0.7863ms)\n✔ a factual first part cannot hide a classification dispute in the rest of the same block (0.6948ms)\n✔ presentation advice cannot enter factual repair debt without an actual factual defect (12.5555ms)\n✔ production acceptance requires full coverage and a separate blind audit, with no coordinator bypass (640.2786ms)\n✔ the archived lunar suffix is an obligatory block without astronomy-specific code (4.4483ms)\n✔ explicit deduction cannot masquerade as direct restatement and contradiction cannot be accepted as intent (9.9086ms)\n✔ an inline verbatim quote must match its cited lines; clear paraphrase remains allowed (38.6243ms)\n✔ visible error examples need counterevidence but are not endorsed facts (19.8099ms)\n✔ numbered error labels and Markdown presentation preserve the same counterevidence gate (201.3342ms)\n✔ negated labels, unlabelled assertions and a previous example heading cannot borrow example status (35.1118ms)\n✔ the actual parenthetical-label rejection replays as an evidenced example without rewriting its original block (38.6056ms)\n✔ real numbered-example rejection replays without changing the author's three original examples (47.5553ms)\n✔ registered object counts and line membership have their own verified source object (40.7658ms)\n✔ false object predicates conflict with supported; only explicit factual findings create author debt (25.418ms)\n✔ registered literal membership is finite and cannot substitute another source or a page-wide absence (44.4176ms)\n✔ object parameter errors, approximate counts, unread versions and bad observation receipts are not author findings (31.1117ms)\n✔ candidate count uses actual cited physical lines, and complete marking enumerates every such line (31.0089ms)\n✔ candidate objects reject empty-reference success, partial reads, wrong source binding and mixed external evidence (34.0616ms)\n✔ explicit object markers cannot be dismissed as nonfactual or supported by external titles (20.9889ms)\n✔ typed object proofs invalidate on acquisition changes and preserve the original first-review authority at closure (29.6135ms)\n✔ valid locator-only blocks and claim labels align, while nonexistent or unregistered locators do not disappear (48.2916ms)\n✔ fact union and evidence-object disagreements persist without weakening explanation or plain-language facts (0.6459ms)\n✔ object parameter errors show valid kind-specific templates and never use the candidate as source (16.8379ms)\n✔ wrong expected and measured mismatches name the original quantity and a precise next step (15.247ms)\n✔ citationLineCounts and object checks use identical physical-line counting including duplicate locators (12.4977ms)\n✔ 053234Z blocked compound statistics verify both original spans without rewriting a byte (36.7392ms)\n✔ compound counts, each ordinal set, and explicit error-example annotations reject independently (124.0661ms)\n✔ a compound statistic needs the current full read, its own source and exact proof for both clauses (45.0776ms)\n✔ compound marks are limited to the chosen source, and leading marks cannot be borrowed from inline text (41.1626ms)\n✔ unbounded or attached additional statistics do not borrow the recognized exact proof (34.1266ms)\n✔ an independent trailing block still needs its own proof; an explicit zero marked subset checks all cited rows (61.8465ms)\n✔ 020834Z exact count plus ordinal list proves every claimed physical line without editing the manuscript (18.8324ms)\n✔ 020834Z count and list cannot be certified by using the source path as a marking predicate (20.4197ms)\n✔ an exact count does not certify an incorrect, duplicate or incomplete ordinal list (82.2474ms)\n✔ ordinal ranges compare the complete set beyond the bounded result preview (26.2364ms)\n✔ ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters (59.3402ms)\n✔ marking requires an explicit positive universal action and cannot certify negative or count claims (131.8343ms)\n✔ a marker elsewhere in a citation line cannot support an explicit line-start assertion (28.3727ms)\n✔ a fully bound true candidate predicate cannot itself create unsupported author debt (36.8959ms)\n✔ the unchanged paired seed marking claim measures false and still permits an actual author finding (21.2458ms)\n✔ old correctly bound positive candidate proofs remain readable while the historical path-marker bypass fails closed (22.4223ms)\n✔ 023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting (0.2236ms)\n✔ 023249Z B16 accepts a bounded classification correction and rejects new direct author debt (9.7414ms)\n✔ neutral recognition is limited to explicit structural labels and complete bare-concept directives (1.556ms)\n✔ unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral (43.5404ms)\n✔ a structural label is neutral while its factual explanation still needs actual proof (30.3478ms)\n✔ inventory exposes bounded host ranges without automatically completing neutral blocks (10.8607ms)\n✔ 030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof (33.473ms)\n✔ simulation scope is bound to the same authorized source and does not promote real or unknown material (72.4653ms)\n✔ 032313Z object annotation is neutral, while the full citation-count assertion remains mandatory (22.6769ms)\n✔ a following coverage block's source cannot change the simulation marker's source (31.8164ms)\n✔ scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates (42.0977ms)\n✔ only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged (0.2545ms)\n✔ receipts separate actual search paths from model prose without leaking query or matching text (507.249ms)\n✔ search observations survive same-role interruption but flag changed material (368.8045ms)\n✔ bounded searches expose scan limits and missing files without granting source-read stamps (175.1504ms)\n✔ search retention is bounded and reports omitted successful observations (640.374ms)\n✔ role-visible tools shrink while runtime guards and successful turn conclusion remain (189.0183ms)\n✔ prepare returns actual authorized lines, records their versions and reuses only those reads (263.0425ms)\n✔ prepare pagination never stamps undisclosed lines as read (94.3046ms)\n✔ prepare measures only the current authorized manuscript, not the asserted count (171.9055ms)\n✔ supplement preflight exposes current citation lines and only the requested literal marker subsets (408.0458ms)\n✔ prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments (227.1593ms)\n✔ the prepare byte budget never marks an omitted long block as presented (232.7779ms)\n✔ interrupted same-phase session keeps version-valid reads; changed source still returns (261.7702ms)\n✔ partial proof records preserve valid blocks, expose failed ones, and status does not duplicate the proof (254.028ms)\n✔ a wholly invalid replacement retires old persisted proof before reporting its error (235.5567ms)\n✔ a persisted child result with failed parent notification does not conclude the turn (74.8709ms)\n✔ more than twelve stale shared-source proofs can be replaced incrementally without accepting the remaining old block (655.8613ms)\n✔ plain-language closing rejects appended examples including Markdown bullets (0.988ms)\n✔ plainLast defaults on and cannot pass by a model saying quality is supported (424.908ms)\n✔ blind auditor has a different method, cannot read first verdict, and still covers every block (358.2456ms)\n✔ classification disputes require factual proof and restore only each role's own unaffected records (902.9105ms)\n✔ a new classification mismatch after the targeted pass blocks without reusing an acceptance (783.3506ms)\n✔ an exhausted reconciliation persisted before the classification upgrade can be reviewed again (797.0075ms)\n✔ changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse (1816.6839ms)\n✔ a real factual rejection retires classification-reconciliation notices and private checkpoints (499.1633ms)\n✔ changing a source after memo restoration also retires active nonfactual proof and reads (389.9367ms)\n✔ a blocked auditor redirected by a goal change cannot donate proof to the reviewer (370.1116ms)\n✔ source changes after the blind audit invalidate ledger closure and require re-review (479.5927ms)\n✔ cache-read rotation counts measured unique executor steps and changes session only at a delivered boundary (284.0837ms)\n✔ below-threshold and unconfigured continuations retain the original executor (473.7144ms)\n✔ an interrupted phase resumes the same actor even after its cache-read threshold (101.7943ms)\n✔ cache threshold configuration is explicit and fresh policy remains fresh (249.1927ms)\n✔ the exact 055022Z candidate locates line 10 as an example and line 12 as a hypothesis (218.9562ms)\n✔ a model cannot promote the line 12 hypothesis to a host example in coverage or receipts (556.9861ms)\n✔ rejects glob, escape and Windows path aliases (1.0027ms)\n✔ rejects an explicitly listed link, hard link or junction (3.5189ms)\n✔ keeps one byte-exact backup per file and same-phase retries (97.333ms)\n✔ forbids coordinator writes to candidate and evidence or duplicate receipts (6.7144ms)\n✔ test\\helpers.mjs (75.665ms)\n✔ actual submit handler blocks unchanged and incorrect candidates before final review (3230.7582ms)\n✔ evidence-only repair must cite actually read new data, not cosmetic changes (10.1556ms)\n✔ numeric proof rejects bad scope, ambiguous numerals, bad locators and invalid source rows (17.4379ms)\n✔ new factual IDs are mandatory and origin pins detect replacement after a fresh read (12.4148ms)\n✔ unlisted prose and newly numbered facts cannot escape independent review (513.2519ms)\n✔ a bare first source mention cannot hide its later actual locator (0.7365ms)\n✔ same-line locators after either semicolon are recognized without accepting nested paths (0.5763ms)\n✔ the actual L23 is counted once after its leading bare mention and total cited lines become seven (0.4872ms)\n✔ numeric and source-narrative consumers retain authorization while finding later locators (10.3085ms)\n✔ production submit blocks a changed correct prefix while the rejected suffix and evidence remain unchanged (469.8451ms)\n✔ production submit rejects unchanged assertions across same-paragraph soft line wrapping (723.4558ms)\n✔ wrapped denials, examples and new evidence remain reviewable without joining separate structure blocks (1727.5583ms)\n✔ real removal, correction, explicit denial and labelled teaching examples can return to full review (2126.407ms)\n✔ parenthetical example labels use the shared contract in production repair preflight (1040.7532ms)\n✔ an example label or denial does not exempt a second unchanged assertion (586.9682ms)\n✔ explicit scope restriction repairs only a scope finding and cannot excuse a contradiction (794.7499ms)\n✔ retained assertions require current actually read changed cited content rather than another source line (842.4842ms)\n✔ a true source-only repair can return unchanged prose for independent verification (355.1341ms)\n✔ legacy receipts disclose their limited line fallback and cannot invent new evidence snapshots (0.722ms)\n✔ the real closing immediately after a Markdown list is valid without an extra blank line (3.335ms)\n✔ strict closing fences cannot expose a plain-language label that remains inside code (0.1525ms)\n✔ empty lines and numbered facts cannot become unlisted repair deadlocks (1.1605ms)\n✔ actual failed NASA before/after pair passes repair preflight while unchanged text stays blocked (24.1296ms)\n✔ a wrong percentage after the citation cannot hide from numeric verification (6.7577ms)\n✔ script rejects a falsely supported source number even when another claim is already rejected (330.4831ms)\n✔ document scope checks extra paragraphs but does not claim universal semantic coverage (15.5207ms)\n✔ outside-row numeric repair is accepted without rewriting a correct claim; unrelated edits cannot bypass it (16.7362ms)\n✔ direct document quantities cannot silently become exact values or unregistered conversions (11.0882ms)\n✔ presentation cannot be submitted as a factual defect and optional advice does not block (762.6065ms)\n✔ missing child unit uses its host assignment without granting coordinator or another unit (623.5376ms)\n✔ reviewer citation and omission mistakes do not create candidate repair debt (794.4906ms)\n✔ an unrelated acceptance cannot mark a cancelled standalone plan completed (790.9805ms)\n✔ another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state (831.078ms)\n✔ a blocked unit can still be retired as covered by an actually accepted owned unit (765.5891ms)\n✔ misplaced contradiction evidence gets a precise parameter error without a new stage (275.8988ms)\n✔ conversation ending without a receipt resumes the same actor; delivered stages stay delivered (651.3463ms)\n✔ ledger may summarize validated decisions but cannot invent per-item reasons (696.9203ms)\n✔ goal changes invalidate assessment and force current-goal review in the same reviewer session (730.942ms)\n✔ closure and covered tasks require the current goal, candidate and accepted replacing unit (1228.2618ms)\n✔ late user messages reopen ledger review and classification uses the original request identity (768.9416ms)\n✔ supplement must reread a changed goal before its candidate can be submitted (426.9816ms)\n✔ changed facts with evidence only in a later table are blocked before final review (449.9472ms)\n✔ actual excerpt evidence passes, copied metadata and changed acquisition receipts are blocked (779.7793ms)\n✔ observation files cannot be given to a model as writable or generated from its review (6.7084ms)\n✔ an explicit original quote pointing to editorial metadata can be returned to its author (249.431ms)\n✔ a verbatim quote cannot borrow a different same-line source against its adjacent locator (295.0549ms)\n✔ adjacent quote bindings preserve correct references and distinguish repeated source ranges (289.3508ms)\n✔ a later wrong quote cannot borrow an earlier range of the same source (321.0559ms)\n✔ unambiguous adjacent locator syntax keeps valid quotations without unrelated source proof (1160.1419ms)\n✔ generic multi-source notes and unresolved footnotes keep their legacy quotation scope (634.6098ms)\n✔ an explicit unapproved adjacent path cannot borrow a valid alternate source (590.8499ms)\n✔ an invalid adjacent authorized range creates author evidence debt without reading an invalid range (888.7754ms)\nℹ tests 180\nℹ suites 0\nℹ pass 180\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 12843.736\n"
     },
     {
       "path": "building-loop-efficiency-index-validation/regression-0f0e8b32458c.json",

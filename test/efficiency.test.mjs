@@ -152,6 +152,55 @@ test("prepare measures only the current authorized manuscript, not the asserted 
   assert.deepEqual((await h.flow(reviewer,"prepare")).citationLineCounts,[{source:"functional.csv",count:2,lines:[1,3]}]);
 }));
 
+test("supplement preflight and submit block wrong compound stats and expose actual marker subsets",async()=>fixture(async(root,write)=>{
+  single(write,{plainLast:true,body:"- C1：通过19/20（出处：functional.csv 第 2 行）。\n\n大白话：看实际记录。\n\n附录。\n"});
+  const p=JSON.parse(fs.readFileSync(path.join(root,"BUILDING-LOOP.json"),"utf8"));
+  p.units.K01.phases.supplement.read.push("functional.csv");
+  write("BUILDING-LOOP.json",JSON.stringify(p));
+  const h=host(root);const {reviewer}=await reviewStage(h);
+  await h.flow(reviewer,"prepare");await h.assess(reviewer,quality());
+  assert.equal((await h.flow(reviewer,"review",{checks})).phase,"supplement-ready");
+  const executor=(await h.flow("root","advance")).childId;
+  await h.flow(executor,"prepare");
+  const corrected=[
+    "- C1：通过19/20（出处：functional.csv 第 2 行）。",
+    "- [模拟] 甲（出处：functional.csv 第 2 行）。",
+    "乙提到了 [模拟] 字样（出处：functional.csv 第 2 行）。",
+    "- [模拟] 这里只提到 functional.csv 而未引行。",
+    "- [稿件自述] 行号定位 3 行：带 functional.csv 的行号定位为第 1-3 行；同带 [模拟] 2 行：第 2-3 行。",
+    "- [稿件自述] 行号定位 3 行：带 functional.csv 的行号定位为第 1-3 行；同行首带 [模拟] 1 行：第 2 行。",
+    "大白话：看实际记录。\n",
+  ].join("\n");
+  const wrong=corrected.replace("行号定位 3 行：带 functional.csv 的行号定位为第 1-3 行；同带 [模拟] 2 行：第 2-3 行。",
+    "行号定位 2 行：带 functional.csv 的行号定位为第 1,3 行；同带 [模拟] 2 行：第 1,3 行。");
+  await h.file(executor,"write","candidate.md",{content:wrong,note:"把统计移到收尾说明之前。"});
+  const beforeRead=await h.flow(executor,"preflight");
+  assert.equal(beforeRead.citationLineCounts,undefined,"The changed draft must be read before measuring.");
+  assert.equal(beforeRead.citationProfileChecks,undefined);
+  await h.flow(executor,"prepare");
+  await assert.rejects(h.flow(executor,"submit",{quality:quality()}),/第 5 行组合稿件统计不符.*物理行号为 1、2、3/);
+  assert.equal((await h.flow(executor,"status")).phase,"supplement");
+  const bad=await h.flow(executor,"preflight");
+  assert.equal(bad.ok,false);
+  assert.equal(bad.citationProfileChecks.candidateSha256,digest(wrong));
+  assert.deepEqual(bad.citationProfileChecks.clauses.filter(row=>!row.matches).map(row=>[row.profileClause,row.actual,row.lines]),[
+    ["citation-lines",3,[1,2,3]],["marked-citation-lines",2,[2,3]],
+  ]);
+  assert.deepEqual(bad.citationLineCounts,[{
+    source:"functional.csv",count:3,lines:[1,2,3],markedSubsets:[
+      {marker:"[模拟]",position:"any",count:2,lines:[2,3]},
+      {marker:"[模拟]",position:"leading",count:1,lines:[2]},
+    ],
+  }]);
+  await h.file(executor,"write","candidate.md",{content:corrected,note:"用当前稿的引用物理行和标记子集修正统计。"});
+  await h.flow(executor,"prepare");
+  const good=await h.flow(executor,"preflight");
+  assert.equal(good.ok,true);
+  assert.equal(good.citationProfileChecks.candidateSha256,digest(corrected));
+  assert.ok(good.citationProfileChecks.clauses.length===4&&good.citationProfileChecks.clauses.every(row=>row.matches));
+  assert.equal((await h.flow(executor,"submit",{quality:quality()})).phase,"final-review-ready");
+}));
+
 test("prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments",async()=>fixture(async(root,write)=>{
   single(write,{body:Array.from({length:27},(_,i)=>"# 结构分块"+(i+1)).join("\n")});
   const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
@@ -257,7 +306,10 @@ test("plainLast defaults on and cannot pass by a model saying quality is support
   const executor=(await h.flow("root","advance")).childId;await h.flow(executor,"prepare");
   assert.equal((await h.flow(executor,"preflight")).ok,false);
   await h.file(executor,"write","candidate.md",{content:"- C1：通过19/20（出处：functional.csv 第 2 行）。\n\n附录文字。\n\n大白话：按记录看结果。\n",note:"将解释放在最后，保留正确正文。"});
-  await h.flow(executor,"prepare");assert.equal((await h.flow(executor,"preflight")).ok,true);
+  await h.flow(executor,"prepare");
+  const checked=await h.flow(executor,"preflight");
+  assert.equal(checked.ok,true);
+  assert.equal(checked.citationProfileChecks,undefined,"Unrelated repairs keep the prior preflight contract.");
 }));
 
 test("blind auditor has a different method, cannot read first verdict, and still covers every block",async()=>fixture(async(root,write)=>{

@@ -262,11 +262,9 @@
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
 
-          # 机制：回合被输出上限截断时自动续写。
-          # 本模式的一个回合 = 一件交付；输出撞上 token 上限就会停在半路，
-          # 剩下那一半要人打一句「继续」才动。这个插件把那一句接过去。
-          # 四条边界写在源码注释里：source 显式标 plugin、连轮有上限、
-          # 非截断清零、只管根代理。续轮插件从本包的导出入口加载。
+          # 根会话撞上输出上限时，以明确的插件身份限次续轮。
+          # 根和子会话遇到已丢弃的 DeepSeek 坏工具参数时，限次重生成原步骤。
+          # 两条恢复路径共用本包的导出入口，预算与触发条件分别处理。
           - id: building-loop-turn-resume
             name: 'dsh-building-loop/turn-resume'
             config:

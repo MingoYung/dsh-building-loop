@@ -14,7 +14,7 @@
 | 继续本插件的后续改进 | [本项目任务账本](task-ledger.md) |
 | 派单、接单、复用会话、处理阻塞 | [派单协议](../skills/dispatch-protocol/SKILL.md) |
 | 查询和核对断言出处 | [证据核验约定](../skills/dispatch-protocol/references/evidence.md) |
-| 检查根会话被截断时如何续轮 | [续轮插件](../turn-resume/index.mjs) |
+| 检查根会话截断续轮与 DeepSeek 工具参数重试 | [恢复规则](../governance/efficiency.md) · [运行入口](../turn-resume/index.mjs) |
 | 检查安装、技能根或上游许可 | [包清单](../package.json) · [禁用技能根](../skills-disabled/README.md) · [DeepSeek Harness MIT 许可](../LICENSES/DeepSeek-Harness-MIT.txt) |
 
 例如同一模块需要二次补查，总控根据退回回执推进。宿主把补查权限绑定给原执行会话后唤醒它。正文由执行方修订，核验方回查原始证据，总控凭落盘回执更新进度。
