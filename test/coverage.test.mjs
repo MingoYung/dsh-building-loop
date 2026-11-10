@@ -6,7 +6,7 @@ import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { acceptedVersion, goalSnapshot, needsRevalidation } from "../governance/goals.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
-import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks } from "../governance/coverage.mjs";
+import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks, sourceLineEnumerationChecks, simulationScopeLocatorIssues } from "../governance/coverage.mjs";
 
 /** Raw helpers test the mandatory production gate without auto-generated reviews. */
 function environment(root) {
@@ -25,6 +25,81 @@ function environment(root) {
 const nonfact = {kind:"nonfactual",status:"supported",basis:"这是文档结构标题，没有陈述外部事实。"};
 const ref = {file:"functional.csv",start:2,end:2,quote:"19,20"};
 const fact = {kind:"direct",status:"supported",sourceRelation:"supports",basis:"只转述该样例的通过和总数。",evidence:[ref]};
+
+const enumerationSource = "sources/github-checks.md";
+const enumerationRow = (range, locator = "第 6-8 行") =>
+  "- C4：GitHub 登记原文在第 " + range + " 行列出的结论例子有 failure 与 success 两项（出处：" + enumerationSource + " " + locator + "）。";
+
+/** Replay exact source-line claims with independently registered physical rows. */
+function enumerationEnvironment(root, write, body, rows = ["failure", "success"]) {
+  const p = structuredClone(policy), url = "https://example.test/checks";
+  const registered = ["If the status is completed, the conclusion can be any of the following:", ...rows];
+  const snapshot = ["# 官方页面短摘录", "URL: " + url, "Fetched: 2026-11-07", "以下是编辑说明。", "摘录：", ...registered, ""].join("\n");
+  const receipt = JSON.stringify({sources:[{snapshot:"github-checks.md", snapshotSha256:digest(snapshot), finalUrl:url,
+    status:200, fetchedAt:"2026-11-07T13:01:00Z", responseSha256:"a".repeat(64), exactQuotes:registered}]});
+  fs.mkdirSync(path.join(root,"sources"),{recursive:true});
+  write(enumerationSource,snapshot);write("sources/acquisition.json",receipt);write("candidate.md",body);
+  p.sourcePins = {[enumerationSource]:{kind:"primary",locator:url,sha256:digest(snapshot),
+    observation:{file:"sources/acquisition.json",sha256:digest(receipt)}}};
+  for (const phase of ["first-review","final-review"]) {
+    p.units.K01.phases[phase].read.push(enumerationSource);
+    p.units.K01.phases[phase].evidence.push(enumerationSource);
+  }
+  p.units.K01.phases.supplement.read.push(enumerationSource);
+  write("BUILDING-LOOP.json",JSON.stringify(p));
+  return environment(root);
+}
+
+test("source-line enumeration returns the author error even when a reviewer supports it with neighboring rows",async()=>fixture(async(root,write)=>{
+  const e=enumerationEnvironment(root,write,enumerationRow("6")+"\n"), [block]=e.invoke("inventory").blocks;
+  const adjacentMembers=[{file:enumerationSource,start:7,end:7,quote:"failure"},{file:enumerationSource,start:8,end:8,quote:"success"}];
+  const submitted={...fact,basis:"原文第6行是引导句，第7及8行分别列出这两项。",evidence:adjacentMembers};
+  assert.deepEqual(e.invoke("record",{entries:[{block:block.id,parts:[submitted]}]}).recorded,[block.id]);
+  const {records,rejected}=e.finish();
+  assert.equal(records[0].parts[0].status,"supported");
+  assert.equal(rejected.length,1);
+  const [finding]=rejected;
+  assert.equal(finding.status,"unsupported");assert.equal(finding.finding.kind,"contradiction");
+  assert.equal(finding.finding.quote,"在第 6 行列出的结论例子有 failure 与 success 两项（出处：sources/github-checks.md 第 6-8 行）");
+  assert.deepEqual(finding.sourceLineEnumeration.missing,["failure","success"]);
+  assert.deepEqual([finding.sourceLineEnumeration.source.start,finding.sourceLineEnumeration.source.end],[6,6]);
+  assert.deepEqual([finding.sourceLineEnumeration.locator.start,finding.sourceLineEnumeration.locator.end],[6,8]);
+  assert.equal(finding.repairBaseline.refs[0].sha256,finding.sourceLineEnumeration.source.sha256);
+  assert.deepEqual(finding.repairBaseline.refs.map(row=>[row.start,row.end]),[[6,6],[6,8]]);
+  assert.equal(supplementChecks(root,e.spec,lineList(Buffer.from(enumerationRow("6"))),e.frame.reads,{...e.active,coverageRejections:rejected}).ok,false);
+  assert.equal(supplementChecks(root,e.spec,lineList(Buffer.from(enumerationRow("7-8"))),e.frame.reads,{...e.active,coverageRejections:rejected}).ok,true);
+}));
+
+test("enumeration positive cases are scoped to authorized actual reads and exact literal list items",async()=>fixture(async(root,write)=>{
+  const body=enumerationRow("7-8")+"\n",e=enumerationEnvironment(root,write,body);
+  const checked=(candidate=body,frame=e.frame,active=e.active)=>sourceLineEnumerationChecks(frame,active,e.spec,Buffer.from(candidate));
+  const [correct]=checked();
+  assert.equal(correct.matches,true);assert.deepEqual([correct.source.start,correct.source.end],[7,8]);
+  assert.equal(correct.source.origin.observation.file,"sources/acquisition.json");
+  const first=e.spec.phases.supplement;
+  const author={...e.active,phase:"supplement"},authorFrame={...e.frame,role:"executor",reads:first.read};
+  assert.equal(checked(enumerationRow("6"),authorFrame,author)[0].matches,false);
+  assert.deepEqual(checked(body,{...authorFrame,reads:first.read.filter(file=>file!==enumerationSource)},author),[]);
+  assert.deepEqual(checked(body,authorFrame,{...author,seen:{}}),[]);
+  assert.deepEqual(checked(body,{...e.frame,role:"coordinator"}),[]);
+  assert.deepEqual(checked(enumerationRow("5","第 5-8 行")),[]); // unregistered metadata
+  assert.deepEqual(checked(enumerationRow("6","第 7-8 行")),[]); // incompatible locator
+  const literalSubstring=enumerationEnvironment(root,write,body,["failure-mode","success"]);
+  const [noSubstring]=sourceLineEnumerationChecks(literalSubstring.frame,literalSubstring.active,literalSubstring.spec,Buffer.from(body));
+  assert.equal(noSubstring.matches,false);assert.deepEqual(noSubstring.missing,["failure"]);
+  const punctuated=enumerationEnvironment(root,write,body,["failure.","success."]);
+  assert.equal(sourceLineEnumerationChecks(punctuated.frame,punctuated.active,punctuated.spec,Buffer.from(body))[0].matches,true);
+  const mentions=enumerationEnvironment(root,write,body,["This prose mentions failure and success without listing them.","A second introduction."]);
+  assert.deepEqual(sourceLineEnumerationChecks(mentions.frame,mentions.active,mentions.spec,Buffer.from(body)),[]);
+}));
+
+test("quoted, non-explicit, separately cited and inert line statements stay with independent review",async()=>fixture(async(root,write)=>{
+  const body=enumerationRow("6"),e=enumerationEnvironment(root,write,body);
+  const cases=["“"+body+"”","> "+body,"```text\n"+body+"\n```","<!--\n"+body+"\n-->","<pre>\n"+body+"\n</pre>",
+    "    "+body,body.replace("在第 6 行列出的","随后列出的"),body.replace("两项（出处","两项。另见（出处"),
+    body.replace("第 6-8 行）","第 6-8 行；functional.csv 第 2 行）"),body.replace("有 failure","没有 failure")];
+  for(const candidate of cases)assert.deepEqual(sourceLineEnumerationChecks(e.frame,e.active,e.spec,Buffer.from(candidate)),[],candidate);
+}));
 
 test("host inventory covers every nonblank character including titles, tables, code and suffixes",()=>{
   const body="# 事实标题\n| 项目 | 值 |\n```js\nx = 2; y = 3\n```\n原句（引用），后半句。因此另有结论！\n[^1]: 脚注断言\n";
@@ -535,6 +610,42 @@ test("registered object counts and line membership have their own verified sourc
   assert.throws(()=>e.invoke("record",{entries:[{block:e.blocks[0].id,parts:[{...fact,evidence:[{file:"snapshot.md",start:2,end:2,quote:"编辑说明，不是页面原文。"}]}]}]}),/未登记为外部原文/);
 }));
 
+test("registered local snapshot line ranges bind subset and exact predicates to the current source",async()=>fixture(async(root,write)=>{
+  const shape=(start,end,mode)=>({kind:"registered-excerpts",check:"line-range",file:"snapshot.md",start,end,mode});
+  let e=objectEnvironment(root,write,"- [摘录范围] 本轮 snapshot.md 快照第 3–4 行均已登记。\n");
+  assert.deepEqual(e.blocks[0].objectCheckHint,shape(3,4,"subset"));
+  assert.throws(()=>e.put(shape(3,4,"exact")),/对应当前单一断言/);
+  assert.throws(()=>e.invoke("record",{entries:[{block:e.blocks[0].id,parts:[nonfact]}]}),/须按 objectCheckHint/);
+  e.put(e.blocks[0].objectCheckHint);
+  assert.deepEqual(e.finish().records[0].parts[0].objectCheck.result,
+    {matches:true,actual:[3,4],unit:"snapshot-line-range",claimedLines:[3,4],missingLines:[],extraLines:[]});
+  assert.throws(()=>e.put(shape(3,4,"subset"),{status:"unsupported",finding:objectFinding("快照第 3–4 行均已登记")}),/已实测成立/);
+  e=objectEnvironment(root,write,"[摘录范围] 本轮 snapshot.md 只登记了本地快照第 3–4 行。\n");
+  assert.deepEqual(e.blocks[0].objectCheckHint,shape(3,4,"exact"));
+  e.put(shape(3,4,"exact"));assert.equal(e.finish().records[0].parts[0].objectCheck.result.matches,true);
+  e=objectEnvironment(root,write,"[摘录范围] 本轮 snapshot.md 只登记了本地快照第 3–3 行。\n");
+  const exact=shape(3,3,"exact");
+  assert.throws(()=>e.put(exact),/supported 与对象实测谓词冲突/);
+  e.put(exact,{status:"unsupported",finding:objectFinding("只登记了本地快照第 3–3 行")});
+  assert.deepEqual(e.finish().records[0].parts[0].objectCheck.result.extraLines,[4]);
+  e=objectEnvironment(root,write,"[摘录范围] 本轮 snapshot.md 快照第 2–4 行均已登记。\n");
+  const subset=shape(2,4,"subset");
+  assert.throws(()=>e.put(subset),/supported 与对象实测谓词冲突/);
+  e.put(subset,{status:"unsupported",finding:objectFinding("快照第 2–4 行均已登记")});
+  assert.deepEqual(e.finish().records[0].parts[0].objectCheck.result.missingLines,[2]);
+}));
+
+test("snapshot range does not certify the old page-wide mixed assertion or a new extra tail",async()=>fixture(async(root,write)=>{
+  const old="- [摘录范围] 本轮登记的 snapshot.md 只登记了该页第 6-8 行，其中第 6 行是引导句、第 7 行 failure、第 8 行 success，不表示原页列表只有这两项（见第 4 行）；sources/nist-scatter.md 只登记 1 条，即第 6 行。";
+  const mixed="[摘录范围] 本轮 snapshot.md 快照第 3–4 行均已登记，并且完整网页只有这些行。";
+  for(const body of [old,mixed]){
+    const e=objectEnvironment(root,write,body+"\n");
+    assert.ok(e.blocks.every(row=>!row.objectCheckHint));
+    assert.throws(()=>e.put({kind:"registered-excerpts",check:"line-range",file:"snapshot.md",start:3,end:4,mode:"subset"}),/对应当前单一断言/);
+    assert.equal(e.invoke("status").rejected.length,0);
+  }
+}));
+
 test("false object predicates conflict with supported; only explicit factual findings create author debt",async()=>fixture(async(root,write)=>{
   const e=objectEnvironment(root,write,"[摘录范围] snapshot.md 的登记摘录共3条。\n");
   const check={kind:"registered-excerpts",check:"count",file:"snapshot.md",expected:3};
@@ -760,6 +871,7 @@ test("063221Z preserves the original valid rule non-entailment and retires its f
     kind:"invalid-inference",quote:tail.slice(1),fix:"删除‘所以样本 X 应送复核并不能说明其他送复核的样本也是 A 级’。",
   }};
   assert.throws(()=>e.record(prefix,old,locator),/‘不能说明’成立.*只改核验状态/);
+  assert.throws(()=>e.record(prefix,{...boundedPart,quote:tail,sourceRelation:"insufficient"},locator),/sourceRelation 应为 supports.*外层/);
   assert.equal(e.invoke("status").rejected.length,0);
   assert.throws(()=>e.record(prefix,{...nonfact,quote:tail},locator),/须以 inference 连续覆盖/);
   e.record(prefix,{...boundedPart,quote:tail},locator);
@@ -794,6 +906,43 @@ test("same one-way premises cannot establish the affirmative opposite and preser
   assert.equal(rejected[0].boundedNonEntailment.kind,"opposite");
   assert.equal(rejected[0].boundedNonEntailment.holds,false);
   assert.deepEqual(rejected[0].repairBaseline.refs.map(ref=>[ref.start,ref.end]),[[4,4],[5,5],[4,5]]);
+}));
+
+test("105947Z L16 preserves outer denial of the negative target without permitting the affirmative opposite",async()=>fixture(async(root,write)=>{
+  const tail="也不能说明其他送复核的样本不是 A 级";
+  const exact=scope063221Z.replace("并不能说明其他送复核的样本也是 A 级",tail)+"\n";
+  let e=caseFixture(root,write,exact);
+  assert.ok(e.target.inferenceHint.quote.endsWith(tail));
+  assert.throws(()=>e.record({...boundedPart,status:"unsupported",sourceRelation:"insufficient",finding:{
+    kind:"invalid-inference",quote:tail,fix:"删除未获支持的断言。",
+  }}),/‘不能说明’成立.*只改核验状态/);
+  assert.deepEqual(e.invoke("status").rejected,[]);
+  e.record(boundedPart);
+  const proof=e.saved().parts[0].inference.nonEntailment;
+  assert.equal(proof.holds,true);
+  assert.equal(proof.targetPolarity,"negative");
+  assert.deepEqual(proof.witnesses.map(world=>world.otherAntecedent),[false,true]);
+  assert.deepEqual(e.finish().rejected,[]);
+  e=caseFixture(root,write,exact.replace(tail,"就能说明其他送复核的样本都不是 A 级"));
+  assert.throws(()=>e.record(boundedPart),/前提无法支持‘其他都不是’/);
+}));
+
+test("105949Z L15 binds the outer denial to the rule without inventing a stated object",async()=>fixture(async(root,write)=>{
+  const tail="不能由此反推其他送复核的样本都不是 A 级";
+  const exact=scope063221Z.replace("样本 X 应送复核并不能说明其他送复核的样本也是 A 级",tail)+"\n";
+  let e=caseFixture(root,write,exact);
+  assert.ok(e.target.inferenceHint.quote.endsWith(tail));
+  assert.throws(()=>e.record({...boundedPart,status:"unsupported",sourceRelation:"insufficient",finding:{
+    kind:"invalid-inference",quote:tail,fix:"删除未获支持的断言。",
+  }}),/‘不能说明’成立.*只改核验状态/);
+  e.record(boundedPart);
+  const proof=e.saved().parts[0].inference.nonEntailment;
+  assert.equal(proof.holds,true);
+  assert.equal(proof.object,null);
+  assert.equal(proof.scopeReference,"rule-only");
+  assert.equal(proof.targetPolarity,"negative");
+  e=caseFixture(root,write,exact.replace("其他送复核","其他接受审核"));
+  assert.equal(e.target.inferenceHint,undefined);
 }));
 
 test("bounded inference requires the same cited rule, classification, action, object and current reads",async()=>fixture(async(root,write)=>{
@@ -1175,6 +1324,29 @@ test("neutral recognition is limited to explicit structural labels and complete 
     assert.deepEqual(neutralTextSpans(text),[],text);
 });
 
+test("seventh paid [补充] reconciliation neutralizes only the leading layout label",()=>{
+  const prefix="- [补充] ";
+  const assertion="sources/github-checks.md 第 6 行称 completed 状态下 conclusion 可为下列任一值，第 7 行为 failure、第 8 行为 success，即至少列出 failure 与 success 两个不同取值，故 completed 下 conclusion 不唯一。";
+  const text=prefix+assertion;
+  assert.deepEqual(neutralTextSpans(text),[{start:0,end:prefix.length,kind:"structural-label",rule:"explicit-label-v1"}]);
+  for(const decoration of ["","* ","+ ","1. ","## "]){
+    const leading=decoration+"[补充] ";
+    assert.deepEqual(neutralTextSpans(leading+assertion).map(({start,end})=>[start,end]),[[0,leading.length]]);
+  }
+  const full={block:"B15-32847e16",text,parts:[{...fact,start:0,end:text.length}]};
+  const split={...full,parts:[{...nonfact,start:0,end:prefix.length},{...fact,start:prefix.length,end:text.length}]};
+  assert.deepEqual(classificationDisagreements({records:[full]},{records:[split]}),[]);
+  const omitted={...full,parts:[{...nonfact,start:0,end:text.length}]};
+  const [dispute]=classificationDisagreements({records:[full]},{records:[omitted]});
+  assert.ok(dispute.requiredSpans.every(([start])=>start>=prefix.length));
+  assert.equal(recordMeetsDispute(omitted,dispute),false);
+  for(const inline of ["正文 [补充] ","- [[补充]] ","- “[补充]” ","- [说明 [补充]] ","- 补充："]){
+    assert.deepEqual(neutralTextSpans(inline+assertion),[],inline);
+  }
+  const [marked,next]=documentCoverage(Buffer.from(prefix+"示例有两项；所有结论已核实。\n")).blocks;
+  assert.equal(marked.neutralSpans[0].end,prefix.length);assert.equal(next.neutralSpans,undefined);
+});
+
 test("unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral",async()=>fixture(async(root,write)=>{
   const cases=[
     "请把已经证明有效的方法和无效方法分开看。",
@@ -1282,6 +1454,39 @@ test("a following coverage block's source cannot change the simulation marker's 
   e.put([e.direct]);
   e.invoke("record",{entries:[{block:locator.id,parts:[nonfact]}]});
   assert.equal(e.finish().rejected.length,0);
+}));
+
+test("sixth paid mixed-locator simulation row returns to the author instead of retrying proof parameters",async()=>fixture(async(root,write)=>{
+  const line="[模拟] 记录 A 的 status 为 completed，conclusion 为 failure；由 status=completed 推出 conclusion 必定成功不成立（出处：sources/synthetic.md 第 2 行；sources/github-checks.md 第 6-8 行）。";
+  enumerationEnvironment(root,write,line+"\n");
+  const policyPath=path.join(root,"BUILDING-LOOP.json"),p=JSON.parse(fs.readFileSync(policyPath));
+  const file="sources/synthetic.md",scope="# 合成逻辑样例；不是外部研究、生产日志或真实效果数据",value="记录 A：status=completed，conclusion=failure。";
+  const source=scope+"\n"+value+"\n";write(file,source);
+  p.sourcePins[file]={kind:"synthetic",locator:"synthetic:scope-test",sha256:digest(source)};
+  for(const phase of ["first-review","final-review"]){p.units.K01.phases[phase].read.push(file);p.units.K01.phases[phase].evidence.push(file);}
+  p.units.K01.phases.supplement.read.push(file);
+  write("BUILDING-LOOP.json",JSON.stringify(p));
+  let e=environment(root),[block]=e.invoke("inventory").blocks;
+  const author=(text,reads=e.spec.phases.supplement.read)=>simulationScopeLocatorIssues({...e.frame,role:"executor",reads},
+    {...e.active,phase:"supplement"},e.spec,Buffer.from(text+"\n"));
+  const [issue]=author(line);
+  assert.deepEqual([issue.code,issue.block,issue.line],["ambiguous",block.id,1]);
+  assert.match(issue.issue,/实际陈述块内标明唯一合成来源/);
+  const marker={...fact,quote:"[模拟]",evidence:[{file,start:1,end:1,quote:scope}]};
+  const sentence={...fact,quote:block.text.slice(5),evidence:[{file,start:2,end:2,quote:value}]};
+  const put=parts=>e.invoke("record",{entries:[{block:block.id,parts}]});
+  assert.throws(()=>put([marker,sentence]),/稿件来源归属问题.*重填 supported 参数无法解决.*finding.kind=scope/);
+  const returned=put([{kind:"direct",status:"unsupported",sourceRelation:"insufficient",basis:"模拟陈述块未单独定位合成来源，同行引用两份不同材料。",
+    finding:{kind:"scope",quote:block.text,fix:"在记录 A 这块内引用 synthetic.md 第 2 行，将官方对照另起一行。"}}]);
+  assert.equal(returned.rejected[0].finding.kind,"scope");
+  assert.equal(returned.rejected[0].finding.quote,block.text);
+  const local=line.replace("failure；","failure（出处：sources/synthetic.md 第 2 行）；")
+    .replace("（出处：sources/synthetic.md 第 2 行；sources/github-checks.md","（出处：sources/github-checks.md");
+  const fallback=line.replace("；sources/github-checks.md 第 6-8 行","");
+  assert.deepEqual(author(local),[]);assert.deepEqual(author(fallback),[]);
+  assert.deepEqual(author(local,e.spec.phases.supplement.read.filter(item=>item!==file&&item!==enumerationSource)).map(row=>row.code),["missing"]);
+  write("candidate.md",local+"\n");e=environment(root);[block]=e.invoke("inventory").blocks;
+  assert.deepEqual(put([marker,{...sentence,quote:block.text.slice(5)}]).recorded,[block.id]);
 }));
 
 test("scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates",async()=>fixture(async(root,write)=>{

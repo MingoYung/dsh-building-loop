@@ -1,7 +1,16 @@
-import { digest, keyOf, readBytes } from "./policy.mjs";
-import { lineList, plainLastIssues } from "./preflight.mjs";
+import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
+import { lineList, plainLastIssues, requiredLineMarkdown } from "./preflight.mjs";
 import { sourceVersionCurrent } from "./evidence.mjs";
-import { requireStoredCalculations, requireStoredObjectChecks } from "./coverage.mjs";
+import { candidateCitationProfiles, requireStoredCalculations, requireStoredFootnoteBindings, requireStoredObjectChecks } from "./coverage.mjs";
+
+const REQUIRED_MARKERS = new Set(["[稿件自述]", "[摘录范围]"]);
+const LEADING_MARKER = /^ {0,3}(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)?(\[(?:稿件自述|摘录范围)\])(?!\(|\[|:)/u;
+
+/** A spanning code literal cannot borrow visible prose later on the row. */
+function liveLeadingMarker(raw,visible) {
+  const marker=LEADING_MARKER.exec(raw)?.[1];
+  return marker&&LEADING_MARKER.exec(visible)?.[1]===marker?marker:null;
+}
 
 /** Include source-backed structural locators alongside semantic and object proofs. */
 function* proofSources(coverage) {
@@ -30,15 +39,128 @@ function requireProofSources(frame, id, active) {
   }
 }
 
-/** Bind acceptance to explicit central files; hashes identify versions, not truth. */
-export function goalSnapshot(frame) {
+/** Obtain contract bytes from the same goal read used to calculate its pin. */
+function goalMaterial(frame, captureContract) {
   if (!frame.policy.goalContext.length) throw new Error("请在 goalContext 或 ledgerContext 配置项目目标文件");
+  let contractBytes;
   const files = frame.policy.goalContext.map(file => {
     const bytes = readBytes(frame.root, file);
     if (!bytes) throw new Error("项目目标文件不存在 " + file);
+    if(captureContract&&keyOf(file)===keyOf(frame.policy.requiredLinesGoal))contractBytes=bytes;
     return { file, sha256: digest(bytes) };
   });
-  return { sha256: digest(JSON.stringify(files)), files };
+  return { snapshot:{ sha256: digest(JSON.stringify(files)), files },contractBytes };
+}
+
+/** Bind acceptance to explicit central files; hashes identify versions, not truth. */
+export function goalSnapshot(frame) { return goalMaterial(frame,false).snapshot; }
+
+/** Parse the one explicit maintenance contract. The JSON never enters status,
+ * receipts or state, so a cross-role error cannot disclose draft snippets. */
+function requiredLines(frame, bytes) {
+  const rows=lineList(bytes),{fences}=requiredLineMarkdown(rows);
+  if(fences.length!==1||!fences[0].canonical||fences[0].end===null)
+    throw new Error("requiredLinesGoal 须有且仅有一个有效的顶层 building-loop-required-lines 代码围栏");
+  const {start,end}=fences[0],payload=rows.slice(start+1,end).join("\n");
+  if(Buffer.byteLength(payload)>64*1024)throw new Error("requiredLinesGoal 约束体积超限");
+  let entries;
+  try{entries=JSON.parse(payload);}catch{throw new Error("requiredLinesGoal 约束须为有效 JSON 数组");}
+  if(!Array.isArray(entries)||entries.length>80)throw new Error("requiredLinesGoal 约束须为有界 JSON 数组");
+  // JSON.parse keeps the last duplicate key. Count all raw key tokens and
+  // compare with the accepted required fields and the two opt-in fields.
+  const keys=[...payload.matchAll(/"(?:[^"\\]|\\[^\r\n])*"/gu)]
+    .filter(match=>/^\s*:/u.test(payload.slice(match.index+match[0].length)));
+  const table=new Map();let total=0,expectedKeys=0;
+  for(const row of entries){
+    const hasMarkers=!!row&&Object.hasOwn(row,"requiredMarkers");
+    const hasProfile=!!row&&Object.hasOwn(row,"requiredCitationProfile");
+    const fields=2+Number(hasMarkers)+Number(hasProfile);
+    if(!row||typeof row!=="object"||Array.isArray(row)||Object.keys(row).length!==fields||
+      typeof row.unit!=="string"||!Object.hasOwn(frame.policy.units,row.unit)||table.has(row.unit)||
+      !Array.isArray(row.lines)||row.lines.length<1||row.lines.length>16){
+      throw new Error("requiredLinesGoal 约束须登记已配置且不重复的单元和有界原句清单");
+    }
+    if(hasMarkers&&(!Array.isArray(row.requiredMarkers)||row.requiredMarkers.length>REQUIRED_MARKERS.size||
+      row.requiredMarkers.some(marker=>!REQUIRED_MARKERS.has(marker))||new Set(row.requiredMarkers).size!==row.requiredMarkers.length)){
+      throw new Error("requiredLinesGoal requiredMarkers 须为不重复的 [稿件自述] 或 [摘录范围] 标记清单");
+    }
+    let profileSource;
+    if(hasProfile){
+      const message="requiredLinesGoal requiredCitationProfile 须指定已授权给本单元补查读取及终审证据的来源文件";
+      try{profileSource=relativeName(row.requiredCitationProfile);}catch{throw new Error(message);}
+      const {candidate,phases}=frame.policy.units[row.unit];
+      if(keyOf(candidate)===keyOf(profileSource)||!includes(phases.supplement.read,profileSource)||!includes(phases["final-review"].evidence,profileSource)){
+        throw new Error(message);
+      }
+    }
+    const literals=new Set();
+    for(const literal of row.lines){
+      if(typeof literal!=="string"||!literal.trim()||literal.length>2000||/[\r\n\x00-\x08\x0b-\x1f\p{Surrogate}]/u.test(literal)||
+        literals.has(literal)||total>=128)throw new Error("requiredLinesGoal 单元内原句须为不重复的非空单行文字，且数量和长度有界");
+      literals.add(literal);total++;
+    }
+    table.set(row.unit,{lines:row.lines,markers:row.requiredMarkers,profileSource});
+    expectedKeys+=fields;
+  }
+  if(keys.length!==expectedKeys)throw new Error("requiredLinesGoal 约束字段重复或无效");
+  return table;
+}
+
+/** Check raw physical equality once and require that occurrence to be live.
+ * An identical row hidden elsewhere is still a duplicate, never an escape.
+ */
+export function requiredLineCheck(frame,id,candidate,pinned,observer) {
+  if(!frame.policy.requiredLinesGoal)return {issues:[]};
+  const {snapshot,contractBytes}=goalMaterial(frame,true);
+  if(pinned&&snapshot.sha256!==pinned.sha256)throw new Error("项目目标在原句核对前发生变化，请按当前目标重新验收");
+  const file=frame.policy.requiredLinesGoal,sha256=digest(contractBytes);
+  if(observer){
+    const seen=observer.seen?.[keyOf(file)];
+    if(seen?.hash!==sha256||!seen.ranges.some(([a,b])=>a===1&&b>=lineList(contractBytes).length)){
+      return {issues:["请先完整读取当前目标约束文件 "+file],pendingGoalRead:{file,reason:"current-required-lines-goal-read-required"}};
+    }
+  }
+  // Preview first checks the goal observation even while candidate read-back
+  // is pending, without calculating or returning any candidate detail.
+  if(!candidate)return {issues:[]};
+  const {lines:required=[],markers,profileSource}=requiredLines(frame,contractBytes).get(id)??{};
+  const issues=[];
+  if(required.length){
+    const rows=lineList(candidate),{live,visible}=requiredLineMarkdown(rows);
+    for(const [index,literal] of required.entries()){
+      let count=0,visible=false;
+      for(const [line,row] of rows.entries())if(row===literal){count++;visible||=live[line];}
+      if(count!==1||!visible){
+        const detail=count===0?"缺失":count>1?"重复（含隐藏位置）":"只出现在非正文区域";
+        issues.push("当前目标原句第 "+(index+1)+" 项"+detail+"，须按 "+file+" 的本单元约束逐字保留一次");
+      }
+    }
+    if(markers?.length){
+      const counts=new Map(markers.map(marker=>[marker,0]));
+      for(const [line,row] of rows.entries()){
+        const marker=liveLeadingMarker(row,visible[line]);
+        if(counts.has(marker))counts.set(marker,counts.get(marker)+1);
+      }
+      for(const [marker,count] of counts){
+        if(count!==1)issues.push("当前目标标记 "+marker+(count===0?"缺失":"重复")+"，须按 "+file+" 的本单元约束在可见正文行首保留一次");
+      }
+    }
+    if(profileSource){
+      const clauses=candidateCitationProfiles(candidate,[profileSource],frame.policy.units[id].candidate);
+      const head=clauses.find(clause=>clause.profileClause==="citation-lines");
+      const marked=clauses.find(clause=>clause.profileClause==="marked-citation-lines");
+      // Each existing clause matcher proves both its count and complete list.
+      // They must describe one physical row, not separate substitute claims.
+      if(clauses.length!==2||!head||!marked||head.line!==marked.line||
+        liveLeadingMarker(rows[head.line-1],visible[head.line-1])!=="[稿件自述]"){
+        issues.push("当前目标要求一条可见的组合稿件自述，须完整列出 "+profileSource+" 的定位行总数、完整行号和已标记子集的数量、完整行号");
+      }else if(!head.matches||!marked.matches){
+        issues.push("当前目标的组合稿件自述与当前候选复算不符，须重新核对总数、完整行号和已标记子集");
+      }
+    }
+  }
+  return {issues,proof:{file,sha256,count:required.length,...(markers?{requiredMarkerCount:markers.length}:{}),
+    ...(profileSource?{citationProfileRequired:true}:{}),passed:issues.length===0}};
 }
 
 /** Every review sees the current goal in addition to the unchanged factual evidence. */
@@ -77,9 +199,18 @@ export function acceptedVersion(frame, id, active) {
   if (!candidate || receipt.candidateSha256 !== digest(candidate) || receipt.decision !== "accept") {
     throw new Error("当前候选与通过回执不一致，请总控 advance 重新独立验收");
   }
+  if(active.phase!=="closed"){
+    const preservation=requiredLineCheck(frame,id,candidate,current);
+    if(preservation.issues.length)throw new Error(preservation.issues.join("；"));
+  }
   requireProofSources(frame, id, active);
-  requireStoredCalculations(frame, frame.policy.units[id], [active.proof.reviewerCoverage, active.proof.auditorCoverage], candidate);
-  requireStoredObjectChecks(frame, frame.policy.units[id], [active.proof.reviewerCoverage, active.proof.auditorCoverage], candidate, receipt.phase);
+  const coverages=[active.proof.reviewerCoverage, active.proof.auditorCoverage];
+  const spec=frame.policy.units[id];
+  requireStoredCalculations(frame, spec, coverages, candidate);
+  requireStoredObjectChecks(frame, spec, coverages, candidate, receipt.phase);
+  // Do not retroactively reinterpret a completed historical receipt. Open
+  // units, including accepted units still awaiting their ledger, need it now.
+  if(active.phase!=="closed")requireStoredFootnoteBindings(spec,coverages,candidate,receipt.phase);
   for (const ref of [...(receipt.checks ?? []), ...(receipt.observedSources ?? [])]) {
     if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) throw new Error("验收后编号证据或获取回执已经变化：" + ref.file);
   }
@@ -103,6 +234,8 @@ export function needsRevalidation(frame, id, active) {
     const pending = active.pendingReceipt;
     const candidate = readBytes(frame.root, frame.policy.units[id].candidate);
     if (!pending || !candidate || pending.candidateSha256 !== digest(candidate)) return true;
+    try { requireStoredFootnoteBindings(frame.policy.units[id],[pending.coverage],candidate,pending.phase); }
+    catch { return true; }
     for (const ref of [...(pending.checks ?? []), ...(pending.observedSources ?? [])]) {
       if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) return true;
     }

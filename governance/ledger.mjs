@@ -112,7 +112,7 @@ export function exportLedger(frame) {
   }
   const content=lines.join("\n")+"\n";
   const result=replaceWithHistory(frame.root,file,content,"宿主导出当前账本 revision "+view.revision,
-    frame.agent.id+"/ledger/"+view.revision,frame.state.markers,frame.rollback??=[]);
+    frame.agent.id+"/ledger/"+view.revision,frame.state.markers,writes=>{frame.ledgerWrites=writes;});
   const projection={format:EXPORT_FORMAT,path:file,revision:view.revision,owner:frame.agent.id,sha256:digest(content),itemIds:items.map(item=>item.id)};
   frame.state.ledgerProjection=projection;frame.changed=true;
   return {configured:true,exported:true,...projection,itemCount:items.length,changed:result.changed};
@@ -141,16 +141,25 @@ export function beginLedgerReview(frame, id, active, receiptBytes) {
   trackUnit(frame, id, active);
 }
 
-/** Require a current, authorized context locator for covered or obsolete work. */
-function contextReference(frame, active, value) {
+/** Require an exact current context read and name the item that needs repair. */
+function contextReference(frame, active, decision, currentUnitItem) {
+  const value = decision.evidence;
   const file = value?.file;
-  if (!includes([...frame.policy.ledgerContext, ...frame.policy.goalContext, active.receipt], file ?? "")) throw new Error("账本处置依据须来自本轮授权的项目现状文件或验收回执");
+  const paths = [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext, active.receipt])];
+  const invalid = detail => {
+    // Only surface paths available to this total controller in this checkpoint.
+    const allowed = (currentUnitItem ? [active.receipt] : paths).filter(path => typeof path === "string" && includes(frame.reads, path));
+    return new Error("账项 " + decision.id + "（" + decision.outcome + "）：" + detail
+      + "。请填写 evidence {file,start,end}，本轮可用的 evidence.file：" + JSON.stringify(allowed));
+  };
+  if (typeof file !== "string" || !includes(paths, file)) throw invalid("账本处置依据须来自本轮授权的项目现状文件或验收回执");
   const bytes = readBytes(frame.root, file);
   const seen = active.ledgerSeen?.[keyOf(file)];
   const { start, end } = value;
   if (!bytes || seen?.hash !== digest(bytes) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end)
     || start < 1 || end < start || end > lineList(bytes).length
-    || !seen.ranges.some(([a, b]) => a <= start && b >= end)) throw new Error("请在本轮账本复核中实际读取处置依据的当前原文行");
+    || !seen.ranges.some(([a, b]) => a <= start && b >= end)) throw invalid("请在本轮账本复核中实际读取处置依据的当前原文行");
+  if (currentUnitItem && file !== active.receipt) throw invalid("本轮完成依据须对应本轮验收回执");
   return { file, start, end, sha256: digest(bytes) };
 }
 
@@ -256,7 +265,7 @@ export function ledgerAction(frame, args) {
     // compatible, but an explicitly supplied locator is never silently dropped:
     // it must pass the same authority, exact read range and current-version gate.
     const evidence = FINISHED.has(decision.outcome)||decision.evidence!==undefined
-      ? contextReference(frame, active, decision.evidence) : null;
+      ? contextReference(frame, active, decision, item.id === "unit-" + unitId) : null;
     if (frame.policy.units[unitId].covers.includes(item.id) && !["covered","obsolete"].includes(decision.outcome)) {
       throw new Error(item.id + " 已声明由本轮当前目标下的验收产物替代，请 covered 并填 coveredBy；关系确已失效时引用当前目标标 obsolete");
     }
@@ -276,7 +285,6 @@ export function ledgerAction(frame, args) {
         candidateSha256: proof.candidateSha256, goal: proof.goal };
     }
     if (item.id === "unit-" + unitId && decision.outcome !== "completed") throw new Error("本轮已验收单元须以验收回执登记完成");
-    if (item.id === "unit-" + unitId && evidence?.file !== active.receipt) throw new Error("本轮完成依据须对应本轮验收回执");
     const unit = item.unit && frame.state.units[item.unit];
     if (unit && item.unit !== unitId && FINISHED.has(decision.outcome)
       && (unit.owner !== frame.agent.id || unit.phase !== "blocked")) throw new Error("其他运行中单元的权限和验收由其原总控维护");

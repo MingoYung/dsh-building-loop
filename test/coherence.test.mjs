@@ -174,8 +174,17 @@ test("optional evidence for keep resume and defer is validated and retained rath
   const before=await h.ledger("root","read");
   for(const evidence of [null,{file:"functional.csv",start:2,end:2},{file:"overview.md",start:99,end:99},{file:"overview.md",start:2,end:"2"}]) {
     const bad=structuredClone(decisions);bad.find(row=>row.id==="keep").evidence=evidence;
-    await assert.rejects(h.ledger("root","review",{decisions:bad}),/处置依据|实际读取/);
+    await assert.rejects(h.ledger("root","review",{decisions:bad}),error=>{
+      assert.match(error.message,/账项 keep（keep）：.*处置依据/);
+      assert.match(error.message,/evidence\.file：\["overview\.md","first\.json"\]/);
+      assert.doesNotMatch(error.message,/functional\.csv/);
+      return true;
+    });
     const current=await h.ledger("root","read");assert.equal(current.revision,before.revision);assert.equal(current.current.phase,"ledger-review");
+  }
+  for(const evidence of [undefined,{file:"overview.md",start:2,end:2}]) {
+    const bad=structuredClone(decisions);bad.find(row=>row.id==="unit-K01").evidence=evidence;
+    await assert.rejects(h.ledger("root","review",{decisions:bad}),/账项 unit-K01（completed）：.*evidence\.file：\["first\.json"\]/);
   }
   const result=await h.ledger("root","review",{decisions});assert.equal(result.phase,"closed");
   const items=(await h.ledger("root","read",{includeClosed:true})).items;

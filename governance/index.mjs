@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
-  AUTHORITY, MANAGED, PHASES, authority, digest, includes, keyOf, readBytes, relativeName, replaceBytes,
+  AUTHORITY, MANAGED, PHASES, authority, digest, includes, keyOf, readBytes, relativeName,
   replaceWithHistory, text, workspaceRoot,
 } from "./policy.mjs";
 import {
@@ -12,8 +12,9 @@ import {
 } from "./preflight.mjs";
 import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory } from "./evidence.mjs";
 import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, trackUnit } from "./ledger.mjs";
-import { goalSnapshot, needsRevalidation, requireGoalRead } from "./goals.mjs";
-import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles } from "./coverage.mjs";
+import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
+import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues } from "./coverage.mjs";
+import { STATE_LIMIT, commitWorkspaceState, hasLedgerJournal, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools"];
@@ -22,7 +23,6 @@ const FILE = "building_loop_file";
 const ASSESS = "building_loop_quality";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
-const STATE_LIMIT = 8 * 1024 * 1024;
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
@@ -48,7 +48,7 @@ const RULES = {
   "final-audit": "修订稿独立反证复核。重新核全文与逐项推导，正确内容保留，证据不足写明确最小修正。核完用 building_loop audit 提交。",
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
-const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选编号行内实际有问题的逐字正文片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后 review 逐条 checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
+const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选编号行内实际有问题的逐字正文片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后按 prepare 的实际 claims 提交 review checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
 const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
 const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据；候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
 // Semantic alignment is an explicit review duty, not a host claim that quote
@@ -56,6 +56,7 @@ const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
 const OBJECT_RULE="区分三个证据对象：外部事实用实际原文 evidence；已登记摘录的数量、成员或逐字范围用 direct.objectCheck 的 registered-excerpts；当前稿引用行数或逐处标记用 direct.objectCheck 的 candidate。inventory 给出 objectCheckHint 时，按原样作为该块 direct.objectCheck，只填提示里的 kind/check/source。组合统计的两块分别提交，宿主从当前原句逐项核数量、完整行号、错例注记和同源标记子集。已登记摘录无某字面不证明完整网页没有该内容，稿件自述也不能用外部标题证明。纯定位、编号和格式边界不另作事实；错例后说明及大白话若含事实仍逐项核。";
 const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
+const FOOTNOTE_RULE="逐字引句紧接脚注标记时，读当前稿的同名定义和所指原文。旁边其他出处不能替该脚注证明引句。脚注定义后的事实照常核验。";
 const EXAMPLE_RULE = '原句明确以“误读：”“错例：”“错误推理：”或 [误读]/[错例] 开头时，按 error-example 单列：sourceRelation 核其中展示的推理是 contradicts 或 insufficient，evidence 给实际反证或不足依据。宿主保留它作为已标注的错例，不作为已证前提；不要求作者为了核验换一个同义标签。没有显式标签绝不能用此分类。';
 const LITERAL_RULE = '每个事实段还须 sourceRelation=supports|contradicts|insufficient，单独判断原文对这句话字面含义的关系。不得猜测作者有意举反例、在做测试或暗含否定；正文没有明确标注错误，就当成作者提出的断言。识别到原文与断言相反必须退回，不能一边说矛盾一边 supported。inventory 标 requiresInference 的块中有明确推导关系，推导片段用 inference 并交证明；不能把两个前提的组合叫直接转述来省证明。原文引句须逐字，但候选可以忠实翻译或同义转述，不要求字字相同。';
 const NEUTRAL_SPAN_RULE = "清单的 neutralSpans 是宿主从当前原文识别的纯标签或有限读者提示。仍须逐字覆盖这些范围，用 nonfactual + supported + 具体 basis；不为格式或阅读动作找外部引句。只按给出的字符范围处理，标签后未覆盖的数量、条件、事实和推导照常核验。 行首 [模拟] 是来源范围声明。把该标签本身用 direct 核对同一引用来源的模拟声明或已核对的合成来源凭据，余下断言按 direct/inference 各自举证。";
@@ -133,6 +134,11 @@ function checkpointBinding(frame,spec) {
       .map(file=>{const bytes=readBytes(frame.root,file);return {file,sha256:bytes?digest(bytes):null};})};
 }
 
+/** A finding is reusable only within the same actor, phase and exact material. */
+function findingBinding(frame,active,material) {
+  return digest(buffer({actor:frame.agent.id,phase:active.phase,material}));
+}
+
 /** Report an actual reconciliation transition without exposing either proof.
  * The notice is derived from current disputes, so successful resolution or a
  * version invalidation cannot leave behind a misleading historical fault label.
@@ -184,7 +190,7 @@ export function apply(ctx, config = {}) {
    */
   function restrictVisible(agent) {
     if (!agent?.ctx?.tools || restrictedAgents.has(agent)) return;
-    scope(agent); // Establish the governed identity before changing its tool view.
+    scope(agent,{inspection:true}); // Establish identity without making tool advertisement a write.
     const names = agent.ctx.tools.view(agent).restrictableNames;
     agent.ctx.tools.restrict({ allow: [...names].filter(name => [WORKFLOW,FILE,ASSESS,LEDGER,COVERAGE].includes(name)) });
     restrictedAgents.add(agent);
@@ -198,17 +204,30 @@ export function apply(ctx, config = {}) {
         // Admission runs earlier, so restrict here even on a fresh child's first
         // request; the later context/pre-step calls remain idempotent fallbacks.
         restrictVisible(agent);
-        return roles.includes(scope(agent).role);
+        return roles.includes(scope(agent,{inspection:true}).role);
       } catch { return false; }
     };
   }
 
-  /** 每次操作重新读取清单和持久状态，以真实父子会话确定权限。 */
-  function scope(agent) {
+  /** Resolve only the real workspace identity before attempting its lock. */
+  function coordinates(agent) {
     if (!agent || ctx.agents.get(agent.id) !== agent) throw new Error("只接受当前 DSH 会话的调用");
     const root = workspaceRoot(agent.session.header.cwd, hostHome);
+    return { root, file: digest(keyOf(root)) + ".json" };
+  }
+
+  /** Read the durable authority and settle any unfinished ledger export before
+   * returning operational state. Tool admission itself only inspects identity.
+   */
+  function scope(agent,{lockedFile,inspection=false}={}) {
+    const {root,file}=coordinates(agent);
+    if (lockedFile && lockedFile !== file) throw new Error("工作区在动作前发生变化");
+    if (!inspection && hasLedgerJournal(stateHome,file)) {
+      const settle=()=>recoverLedgerJournal(stateHome,file,root,authority(root));
+      if (lockedFile) settle();
+      else withWorkspaceLock(stateHome,file,settle);
+    }
     const policy = authority(root);
-    const file = digest(keyOf(root)) + ".json";
     const old = readBytes(stateHome, file, STATE_LIMIT);
     let state = old ? JSON.parse(text(old)) : { spec: "building-loop-state/1", policy: policy.hash, units: {}, markers: {} };
     if (state.spec !== "building-loop-state/1") throw new Error("工作台账版本无效");
@@ -235,20 +254,11 @@ export function apply(ctx, config = {}) {
     return { agent, root, policy, file, old, state, role, assignment, reads, writes };
   }
 
-  /** 同工作区状态共用独占锁，操作成功后原子落盘。 */
+  /** Mutations and recovery share one per-workspace lock and commit point. */
   function change(agent, operation) {
-    const info = scope(agent);
-    const lock = path.join(stateHome, info.file + ".lock");
-    let fd;
-    try { fd = fs.openSync(lock, "wx", 0o600); }
-    catch (error) {
-      if (error.code === "EEXIST") throw new Error("工作台账正在更新，请按当前台账重试");
-      throw error;
-    }
-    let frame;
-    try {
-      frame = scope(agent);
-      if (frame.file !== info.file) throw new Error("工作区在动作前发生变化");
+    const {file}=coordinates(agent);
+    return withWorkspaceLock(stateHome,file,()=>{
+      const frame = scope(agent,{lockedFile:file});
       let result, invalidation;
       try { result = operation(frame); }
       catch(error) {
@@ -257,26 +267,10 @@ export function apply(ctx, config = {}) {
         if (!(error instanceof CoverageRecordError) || !frame.changed) throw error;
         invalidation = error;
       }
-      if (frame.changed) {
-        // Workflow and ledger share a rolling pre-edit snapshot as well as the lock.
-        const backup = frame.file + ".bak";
-        if (frame.old) replaceBytes(stateHome, backup, frame.old, readBytes(stateHome, backup, STATE_LIMIT), STATE_LIMIT);
-        replaceBytes(stateHome, frame.file, buffer(frame.state), frame.old, STATE_LIMIT);
-      }
+      if (frame.changed) commitWorkspaceState(stateHome,frame,buffer(frame.state));
       if (invalidation) throw invalidation;
       return result;
-    } catch(error) {
-      // A configured ledger file may already have been published when host-state
-      // persistence fails. Restore its bytes, change log and rolling backups; do
-      // not let an uncommitted closed snapshot survive a reported failed action.
-      const failures=[];
-      for(const undo of [...(frame?.rollback??[])].reverse())try{undo();}catch(failure){failures.push(failure);}
-      if(failures.length)throw new AggregateError([error,...failures],"宿主提交失败，账本文件回滚也未完全成功；当前操作未完成，需要核对宿主台账与导出文件",{cause:error});
-      throw error;
-    } finally {
-      fs.closeSync(fd);
-      fs.unlinkSync(lock);
-    }
+    });
   }
 
   /** 同阶段重试沿用改前备份，跨阶段建立新的改前边界。 */
@@ -406,11 +400,12 @@ export function apply(ctx, config = {}) {
         if (unread.some(line=>line>end)) pending.push({path:file,start:end+1,
           next:returned.length?"再次 prepare 或按行 read":"单行超过读包限额，请用 building_loop_file read 显式读取"});
       }
-      let coverage, manuscriptCounts, candidatePositions;
+      let coverage, manuscriptCounts, candidatePositions, actualClaims;
       if(spec&&["reviewer","auditor"].includes(frame.role)) {
         try {
           requireGoalRead(frame,current);
           const bytes=reviewCandidate(frame,current,spec);
+          if(frame.role==="reviewer")actualClaims=expectedClaims(spec,lineList(bytes));
           coverage=coverageAction(frame,current,spec,{action:"inventory",count:24},{maxBytes:16*1024});
           manuscriptCounts=candidateMeasurements(frame,current,spec,bytes);
           candidatePositions=candidatePositionSummary(spec.candidate,bytes);
@@ -423,7 +418,7 @@ export function apply(ctx, config = {}) {
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付";
       return {role:frame.role,phase,unit:assignment?.[0],files,pending,complete:pending.length===0,
         ...reconciliationNotice(frame,current),
-        ...(coverage?{coverage}:{}),...(spec?{claims:spec.claims,plainLast:spec.plainLast}:{}),next,
+        ...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
         ...(manuscriptCounts?.length?{citationLineCounts:manuscriptCounts}:{}),
         ...(candidatePositions?{candidatePositions}:{}),
         ...(["reviewer","auditor"].includes(frame.role)&&current.reconciliation?.length?{reconciliation:current.reconciliation}:{}),
@@ -727,16 +722,25 @@ export function apply(ctx, config = {}) {
       const [id, active] = frame.assignment;
       requireGoalRead(frame, active);
       const spec = unitOf(frame, id);
-      refreshCheckpoints(frame,active,spec);
+      const binding=refreshCheckpoints(frame,active,spec);
       reviewCandidate(frame, active, spec);
-      return coverageAction(frame, active, spec, args);
+      const result=coverageAction(frame, active, spec, args);
+      if(frame.role==="reviewer"&&args.action==="record") {
+        // Even a finding without a usable original quotation must stay tied
+        // to the source versions that were present when it was recorded.
+        for(const block of result.recorded) {
+          const record=active.coverage.records[block];
+          if(record.parts.some(reusableFinding))record.reviewFindingBinding=findingBinding(frame,active,binding);
+        }
+      }
+      return result;
     });
   }
 
   /** Finalize a blind second opinion. Pending acceptance is never ledger evidence. */
   function audit(frame, id, active, spec) {
     if (frame.role !== "auditor" || active.actor === active.reviewer || active.actor === active.executor) throw new Error("独立反证须使用不同于执行及首次核验的子会话");
-    requireGoalRead(frame, active);
+    const goal = requireGoalRead(frame, active);
     const bytes = reviewCandidate(frame, active, spec);
     const pending = active.pendingReceipt;
     if (!pending || pending.candidateSha256 !== digest(bytes) || pending.goal.sha256 !== active.goal.sha256) throw new Error("待复核回执与当前正文或目标不一致，需重新核验");
@@ -744,12 +748,14 @@ export function apply(ctx, config = {}) {
     const coverage = coverageSummary(frame, active, spec);
     requireDisputedProof(active,coverage.records,true);
     const layout = plainLastIssues(spec,lineList(bytes));
+    const preservation=requiredLineCheck(frame,id,bytes,goal);
+    const formatIssues=[...layout,...preservation.issues];
     // New source reads cannot retroactively validate old quoted proof.
     coverageSummary(frame, { ...active, coverage: { ...pending.coverage,
       records: Object.fromEntries(pending.coverage.records.map(record => [record.block, record])) } }, spec);
     const calculations = numericChecks(frame.root, spec, lineList(bytes), frame.reads);
     const conflicts = classificationDisagreements(pending.coverage, coverage);
-    if (!coverage.rejected.length && !layout.length && conflicts.length && calculations.every(row => row.ok)) {
+    if (!coverage.rejected.length && !formatIssues.length && conflicts.length && calculations.every(row => row.ok)) {
       active.reconciliation = conflicts;
       active.reconciliationBinding=checkpointBinding(frame,spec);
       active.auditorCheckpoint=ownCheckpoint(frame,active,spec);
@@ -766,13 +772,13 @@ export function apply(ctx, config = {}) {
       return;
     }
     const unsupported = calculations.filter(row => !row.ok).map(row => row.id);
-    const decision = coverage.rejected.length || unsupported.length || layout.length ? "reject" : "accept";
+    const decision = coverage.rejected.length || unsupported.length || formatIssues.length ? "reject" : "accept";
     const receipt = { ...pending, decision, calculations, unsupported, coverage: coverageReceipt(pending.coverage),
       // Recompute for legacy pending receipts too, after matching the exact candidate bytes.
       candidatePositions:candidatePositionSummary(spec.candidate,bytes),
       ...(active.reconciliationRound?{classificationReview:{targetedRounds:active.reconciliationRound,remainingDisputes:conflicts.length}}:{}),
       qualityRejected: layout.length ? [...new Set([...(pending.qualityRejected??[]),"plain"])] : pending.qualityRejected,
-      formatIssues: layout,
+      formatIssues, ...(preservation.proof?{requiredLines:preservation.proof}:{}),
        independentAudit: { auditor: frame.agent.id, method: "counterexample-and-concept-mapping", coverage: coverageReceipt(coverage), actualReads: readInventory(frame, active),
          searchObservations:searchObservations(frame,active,spec) } };
     const receiptBytes = buffer(receipt);
@@ -833,14 +839,34 @@ export function apply(ctx, config = {}) {
    * Measurements already require the executor's current full draft read and
    * authorized source names. These results create no new stored review debt.
    */
-  function preflightCandidate(frame,active,spec,bytes) {
+  function preflightCandidate(frame,active,id,spec,bytes,goal) {
     const lines=lineList(bytes);
-    const result=supplementChecks(frame.root,spec,lines,frame.reads,active);
-    if(!candidateReadComplete(active,spec.candidate,bytes,lines.length)) {
+    const observed=candidateReadComplete(active,spec.candidate,bytes,lines.length);
+    const preservation=requiredLineCheck(frame,id,observed?bytes:null,goal,goal?undefined:active);
+    if(preservation.pendingGoalRead)return {ok:false,...preservation};
+    let result=supplementChecks(frame.root,spec,lines,frame.reads,active);
+    if(!observed) {
       // Repair diagnostics can already be useful, but current-draft statistics
       // and submit both require an observed full read of these exact bytes.
       return {...result,ok:false,issues:["请先完整读回当前候选文件 "+spec.candidate,...result.issues],
         pendingRead:{file:spec.candidate,reason:"current-candidate-read-required"}};
+    }
+    if(preservation.proof)result={...result,requiredLines:preservation.proof,
+      ok:result.ok&&preservation.issues.length===0,issues:[...result.issues,...preservation.issues]};
+    // Review cannot certify a scope marker that the draft attaches to more
+    // than one possible source. Report that author repair before the handoff.
+    const simulationIssues=simulationScopeLocatorIssues(frame,active,spec,bytes);
+    if(simulationIssues.length){
+      result={...result,ok:false,issues:[...result.issues,...simulationIssues.map(row=>row.issue)]};
+    }
+    // The caller has observed the current candidate. Check the asserted source
+    // rows themselves before a broader surrounding reference can mask an error.
+    const enumerationFailures=sourceLineEnumerationChecks(frame,active,spec,bytes).filter(row=>!row.matches);
+    if(enumerationFailures.length){
+      const issues=enumerationFailures.map(({line,source,missing})=>"候选第 "+line+" 行声称 "+source.file
+        +" 第 "+(source.start===source.end?source.start:source.start+"-"+source.end)+" 行列出的字面值缺少 "+missing.join("、")
+        +"，请按实际原文位置修正");
+      result={...result,ok:false,issues:[...result.issues,...issues]};
     }
     const counts=candidateMeasurements(frame,active,spec,bytes);
     if(!counts.length)return result;
@@ -858,7 +884,7 @@ export function apply(ctx, config = {}) {
       const [id, active] = frame.assignment;
       if (args.unit !== undefined && args.unit !== id) throw new Error("unit 与本会话授权不匹配，当前单元为 " + id);
       const spec = unitOf(frame, id);
-      refreshCheckpoints(frame,active,spec);
+      const binding=refreshCheckpoints(frame,active,spec);
       if (["reviewer", "auditor"].includes(frame.role) && active.goal?.sha256 !== goalSnapshot(frame).sha256) {
         active.phase = "goal-review-ready";
         active.seen = {};
@@ -877,8 +903,8 @@ export function apply(ctx, config = {}) {
           throw new Error("请先完整读回当前候选文件");
         }
         if (active.phase === "supplement") {
-          requireGoalRead(frame, active, true);
-          const preflight = preflightCandidate(frame,active,spec,bytes);
+          const goal = requireGoalRead(frame, active, true);
+          const preflight = preflightCandidate(frame,active,id,spec,bytes,goal);
           if (!preflight.ok) throw new Error("[building-loop/preflight] " + preflight.issues.join("；"));
           const evidenceOnly=active.qualityRejected?.every(field=>field==="sources")
             &&preflight.repairs.some(item=>item.resolution==="new-evidence-for-review");
@@ -888,12 +914,17 @@ export function apply(ctx, config = {}) {
           active.quality = deliveryQuality(args.quality, active.quality, active.qualityRejected);
           active.phase = "final-review-ready";
         } else {
+          if(frame.policy.requiredLinesGoal){
+            const goal=requireGoalRead(frame,active,true);
+            const preservation=requiredLineCheck(frame,id,bytes,goal);
+            if(preservation.issues.length)throw new Error("[building-loop/preflight] " + preservation.issues.join("；"));
+          }
           active.phase = "review-ready";
         }
       } else if (args.action === "audit") {
         audit(frame, id, active, spec);
       } else if (args.action === "review" && frame.role === "reviewer") {
-        requireGoalRead(frame, active);
+        const goal = requireGoalRead(frame, active);
         const grant = spec.phases[active.phase];
         const bytes = reviewCandidate(frame, active, spec);
         const lines = lineList(bytes);
@@ -903,8 +934,10 @@ export function apply(ctx, config = {}) {
           ? active.pendingReceipt.checks : undefined;
         // Reuse only the assigned reviewer's own numbered checks, then run the
         // normal source, citation and read validation on every check again.
-        let checked = reviewChecks(frame, active, spec, grant, args.checks??previous, lines);
-        const coverage = coverageSummary(frame, active, spec);
+        let coverage;
+        const fullCoverage=()=>coverage??=coverageSummary(frame,active,spec);
+        let checked = reviewChecks(frame, active, spec, grant, args.checks??previous, lines, binding, fullCoverage);
+        coverage=fullCoverage();
         requireDisputedProof(active,coverage.records,true);
         if(active.assessment?.hash===hash)consistentUnlisted(frame,active,spec,bytes,active.assessment.unlisted,coverage);
         // Evaluate each configured number even when another claim has already failed.
@@ -915,6 +948,7 @@ export function apply(ctx, config = {}) {
         const unsupported = checked.filter(check => check.status !== "supported").map(check => check.id);
         const qualityChecks = active.assessment?.hash === hash ? active.assessment.checks : null;
         const layout = plainLastIssues(spec,lines);
+        const preservation=requiredLineCheck(frame,id,bytes,goal);
         if (qualityChecks && layout.length) qualityChecks.plain = {pass:false,basis:layout.join("；")};
         if (!unsupported.length && !qualityChecks) throw new Error("请先用 building_loop_quality 提交当前候选的六项独立质量判断，再执行 review");
         const observedSources = qualityChecks ? active.assessment.refs?.map(ref => evidenceReference(frame, active, spec, ref)) : [];
@@ -923,13 +957,14 @@ export function apply(ctx, config = {}) {
           throw new Error("资料核验须覆盖每份支持结论的实际原文，请重新提交 sourceRefs");
         }
         const qualityRejected = qualityChecks ? Object.keys(qualityChecks).filter(field => !qualityChecks[field].pass) : [];
-        const decision = unsupported.length || qualityRejected.length || coverage.rejected.length ? "reject" : "pending-audit";
+        const decision = unsupported.length || qualityRejected.length || coverage.rejected.length || preservation.issues.length ? "reject" : "pending-audit";
         active.rejected = rejectedClaims(frame.root, spec, lines, checked.filter(check => check.status !== "supported"), frame.reads);
         const receipt = {
           unit: id, phase: active.phase, reviewer: exec.agent.id, decision, candidateSha256: hash,
           candidatePositions:candidatePositionSummary(spec.candidate,bytes),
           goal: active.goal, goalFit: active.assessment?.goalFit,
-          unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage), formatIssues: layout,
+          unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage),
+          formatIssues: [...layout,...preservation.issues], ...(preservation.proof?{requiredLines:preservation.proof}:{}),
           ...(active.quality ? { quality: active.quality } : {}),
           ...(qualityChecks ? { qualityChecks } : {}),
           assessmentProvenance:{quality:"executor-model-assessment",qualityChecks:"reviewer-model-assessment",goalFit:"reviewer-model-assessment",
@@ -994,7 +1029,7 @@ export function apply(ctx, config = {}) {
       const spec = unitOf(frame, assignment[0]);
       const bytes = readBytes(frame.root, spec.candidate);
       if (!bytes) throw new Error("候选文件尚未交付");
-      return preflightCandidate(frame,assignment[1],spec,bytes);
+      return preflightCandidate(frame,assignment[1],assignment[0],spec,bytes);
     }
     const { parent, ...result } = report(args, exec);
     try {
@@ -1157,7 +1192,7 @@ export function apply(ctx, config = {}) {
         return [descriptor, rule, "本阶段先 building_loop prepare 获取真实可见读包和参数契约；pending仍有页就继续prepare或按行read。已读且版本未变不需重复读。交付后宿主结束本轮，不额外收尾或通知。",
           ...(frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
           ...(frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 完成后最终只提交 building_loop {"action":"audit"}，unit可省略；不要重复发送 checks、quality、note 或全文。宿主从已落盘证明生成回执。'] : []),
-          ...(["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
+          ...(["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
           ...(phase === "supplement" || frame.role === "reviewer" ? [QUALITY_RULE] : []),
           ...(assignment && unitOf(frame,assignment[0]).plainLast ? ["正文最后一个实质段须明确标为大白话或直白说明，错例、出处和附录放在它之前。"] : []),
           "文件与阶段用 building_loop 和 building_loop_file。" + (frame.role === "reviewer" ? "质量判断用 building_loop_quality。" : ""),
@@ -1273,8 +1308,45 @@ function reviewFinding(id, finding, row, numberedText) {
   return { kind: finding.kind, quote, fix: requireText(finding.fix, "事实最小修正") };
 }
 
+/** Only an explicit reviewer rejection can supply a missing numbered field.
+ * Positive coverage is not a numbered verdict, and a contradiction still needs
+ * an explicit choice of original counterevidence in the numbered submission.
+ */
+function reusableFinding(part) {
+  return (part.kind==="direct"||part.kind==="inference")&&part.status==="unsupported"
+    &&["missing-evidence","scope"].includes(part.finding?.kind);
+}
+
+/** Use the one same-role current finding after revalidating full coverage. */
+function carryNumberedFinding(frame,active,grant,row,material,fullCoverage) {
+  if(!row)return null;
+  const failures=Object.values(active.coverage?.records??{}).filter(record=>record.line===row.line)
+    .flatMap(record=>record.parts.filter(part=>["direct","inference"].includes(part.kind)&&part.status!=="supported")
+      .map(part=>({record,part})));
+  if(failures.length!==1)return null;
+  const [{record,part}]=failures;
+  if(!reusableFinding(part)||record.reviewFindingBinding!==findingBinding(frame,active,material)
+    ||!row.body.includes(part.finding.quote)||row.body.indexOf(part.finding.quote,row.body.indexOf(part.finding.quote)+1)!==-1
+    ||part.basis.length>600)return null;
+  // Missing evidence can be a real finding even when the cited line is an
+  // editorial note. The actor must have observed the cited bytes regardless.
+  const citations=grant.evidence.flatMap(file=>{
+    const cited=citation(row.body,file);
+    return cited?[{file,...cited}]:[];
+  });
+  if(!citations.length||citations.some(({file,start,end})=>{
+    const seen=active.seen?.[keyOf(file)];
+    const version=material.sources.find(source=>keyOf(source.file)===keyOf(file));
+    return !includes(grant.read,file)||!start||!seen||seen.hash!==version?.sha256
+      ||!seen.ranges.some(([a,b])=>a<=start&&b>=end);
+  }))return null;
+  const coverage=fullCoverage();
+  if(coverage.candidateSha256!==material.candidateSha256||!coverage.records.includes(record))return null;
+  return {finding:part.finding,basis:part.basis,origin:{kind:"same-reviewer-coverage",block:record.block}};
+}
+
 /** 覆盖项目最低断言与候选新增编号，再核每项原始出处。 */
-function reviewChecks(frame, active, spec, grant, checks, candidate) {
+function reviewChecks(frame, active, spec, grant, checks, candidate, material, fullCoverage) {
   if (!Array.isArray(checks) || checks.length > 64) throw new Error("核验须逐条提交检查结果");
   const byId = new Map();
   const declared = expectedClaims(spec, candidate);
@@ -1287,7 +1359,11 @@ function reviewChecks(frame, active, spec, grant, checks, candidate) {
   const ids = declared.length ? declared : [...byId.keys()];
   if (!ids.length) throw new Error("至少需要一项核验结果");
   return ids.map(id => {
-    const check = byId.get(id);
+    const supplied=byId.get(id);
+    const carried=!supplied||supplied.status==="unsupported"&&!Object.hasOwn(supplied,"finding")
+      ? carryNumberedFinding(frame,active,grant,claimRow(candidate,id),material,fullCoverage):null;
+    const check=carried
+      ? {...(supplied??{status:"unsupported",basis:carried.basis}),finding:carried.finding}:supplied;
     if (!check) throw new Error("核验参数缺少 " + id + " 的结果，请补齐 checks；未提交结果不等于候选事实错误");
     const basis = requireText(check.basis, "核验依据", 600);
     if (check.status !== "supported") {
@@ -1300,7 +1376,8 @@ function reviewChecks(frame, active, spec, grant, checks, candidate) {
         throw new Error(id + " 的反证参数不完整：file、start、end 必须与 id/status 同级，不能放在 finding 内；请修正参数后在原核验阶段重试");
       }
       const counterEvidence = finding.kind === "contradiction" ? evidenceReference(frame, active, spec, check) : undefined;
-      return { id, status: "unsupported", line: row.line, basis, finding, ...(counterEvidence ? { counterEvidence } : {}) };
+      return { id, status: "unsupported", line: row.line, basis, finding,
+        ...(carried?{findingOrigin:carried.origin}:{}), ...(counterEvidence ? { counterEvidence } : {}) };
     }
     // A malformed evidence selection belongs to the reviewer. Do not convert it
     // into a factual rejection that forces an already-correct candidate to change.

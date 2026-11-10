@@ -166,7 +166,7 @@ test("supplement preflight and submit block wrong compound stats and expose actu
     "- C1：通过19/20（出处：functional.csv 第 2 行）。",
     "- [模拟] 甲（出处：functional.csv 第 2 行）。",
     "乙提到了 [模拟] 字样（出处：functional.csv 第 2 行）。",
-    "- [模拟] 这里只提到 functional.csv 而未引行。",
+    "这里只提到 functional.csv 和 [模拟] 字样，未引用原文行。",
     "- [稿件自述] 行号定位 3 行：带 functional.csv 的行号定位为第 1-3 行；同带 [模拟] 2 行：第 2-3 行。",
     "- [稿件自述] 行号定位 3 行：带 functional.csv 的行号定位为第 1-3 行；同行首带 [模拟] 1 行：第 2 行。",
     "大白话：看实际记录。\n",
@@ -203,6 +203,16 @@ test("supplement preflight and submit block wrong compound stats and expose actu
       {marker:"[模拟]",position:"leading",count:1,lines:[2]},
     ],
   }]);
+  // A missing locator must not change the statistics, but a leading scope
+  // marker is still a separate factual obligation before final handoff.
+  const missingScope = corrected.replace("这里只提到 functional.csv 和 [模拟] 字样，未引用原文行。",
+    "- [模拟] 这里只提到 functional.csv 而未引行。");
+  await h.file(executor,"write","candidate.md",{content:missingScope,note:"保留无定位的行首范围负例。"});
+  await h.flow(executor,"prepare");
+  const unresolved=await h.flow(executor,"preflight");
+  assert.equal(unresolved.ok,false);
+  assert.ok(unresolved.issues.some(issue=>issue.includes("[模拟]")&&issue.includes("没有可定位")));
+  assert.ok(unresolved.citationProfileChecks.clauses.every(row=>row.matches));
   await h.file(executor,"write","candidate.md",{content:corrected,note:"用当前稿的引用物理行和标记子集修正统计。"});
   await h.flow(executor,"prepare");
   const good=await h.flow(executor,"preflight");

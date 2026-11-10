@@ -11,6 +11,39 @@ import { citationLineCounts } from "../governance/coverage.mjs";
 
 import { fixture, host, policy, seed } from "./helpers.mjs";
 
+test("supplement preflight and submit require one attributable source for a simulation scope", async () => fixture(async (root, write) => {
+  const config = structuredClone(policy);
+  config.units.K01.phases.supplement.read.push("functional.csv");
+  write("BUILDING-LOOP.json",JSON.stringify(config));
+  const { flow, file } = host(root);
+  const worker = (await flow("root", "advance")).childId;
+  await flow(worker, "prepare");
+  await flow(worker, "submit");
+  const reviewer = (await flow("root", "advance")).childId;
+  await flow(reviewer, "prepare");
+  const checks = [
+    { id:"C1", status:"supported", file:"functional.csv", start:2, end:2, basis:"原始 CSV 第 2 行确有 19/20。" },
+    { id:"C2", status:"unsupported", basis:"原稿没有实际耗时出处。", finding:{kind:"missing-evidence",quote:"平均耗时下降 25%",fix:"按两条耗时原始数据复算。"} },
+  ];
+  assert.deepEqual((await flow(reviewer,"review",{checks})).unsupported,["C2"]);
+  assert.equal((await flow("root","advance")).childId,worker);
+  const correctedCalculation = seed.replace("25%。","20%（出处：timing.csv 第 2-3 行）。");
+  const mixed = "[模拟] 样例结果为 19/20；实际耗时另见原始数据（出处：functional.csv 第 2 行；timing.csv 第 2 行）。";
+  const attributed = mixed.replace("19/20；","19/20（出处：functional.csv 第 2 行）；");
+  const draft = row => correctedCalculation.replace("# 摘要", "# 摘要\n" + row);
+  const quality = Object.fromEntries(Object.entries(QUALITY).map(([key,label])=>[key,"本样例具体说明 " + label]));
+  await file(worker,"write","candidate.md",{content:draft(mixed),note:"补查模拟和实际来源的归属"});
+  for (const source of ["candidate.md","overview.md","timing.csv"]) await file(worker,"read",source);
+  const preflight = await flow(worker,"preflight");
+  assert.equal(preflight.ok,false);
+  assert.ok(preflight.issues.some(issue=>issue.includes("[模拟]")&&issue.includes("另起一行")));
+  await assert.rejects(flow(worker,"submit",{quality}), /\[模拟\].*另起一行/u);
+  await file(worker,"write","candidate.md",{content:draft(attributed),note:"在模拟片段内标注其唯一来源"});
+  await file(worker,"read","candidate.md");
+  assert.equal((await flow(worker,"preflight")).ok,true);
+  assert.equal((await flow(worker,"submit",{quality})).phase,"final-review-ready");
+}));
+
 test("actual submit handler blocks unchanged and incorrect candidates before final review", async () => fixture(async (root, write) => {
   const { flow, file, assess, interrupt, notifications, ledger, user } = host(root);
   user("root", 1, "后续补充更多采样，但先把当前任务完成。");

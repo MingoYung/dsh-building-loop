@@ -158,13 +158,15 @@ export function includes(paths, name) {
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
   if (!bytes) throw new Error("需要项目维护者配置 " + AUTHORITY);
-  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument"]);
+  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument", "requiredLinesGoal"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
   const coordinator = grants(source.coordinator, "总控");
   const ledgerContext = pathList(source.ledgerContext);
   if (ledgerContext.length > 3 || ledgerContext.some(file => !includes(coordinator.read, file))) throw new Error("账本现状依据须在总控读授权内，最多三份");
   const goalContext = pathList(source.goalContext ?? source.ledgerContext);
   if (goalContext.length > 3 || goalContext.some(file => !includes(coordinator.read, file))) throw new Error("项目目标须为总控可读的中央文件，最多三份");
+  const requiredLinesGoal=source.requiredLinesGoal===undefined?undefined:relativeName(source.requiredLinesGoal);
+  if(requiredLinesGoal&&!includes(goalContext,requiredLinesGoal))throw new Error("requiredLinesGoal 须指向 goalContext 中的目标文件");
   const instructions = pathList(source.instructions);
   if (instructions.length > 3 || instructions.some(file => !includes(coordinator.read, file) || includes(coordinator.write, file))) {
     throw new Error("注入的项目规则须在总控只读授权中，最多三份");
@@ -274,6 +276,7 @@ export function authority(root) {
     ...unit.phases["first-review"].evidence, ...unit.phases["final-review"].evidence,
   ])];
   if (mutable.some(file => includes(protectedFiles, file))) throw new Error("指令、原始证据和核验回执不能授予模型写权");
+  if(requiredLinesGoal&&includes(mutable,requiredLinesGoal))throw new Error("requiredLinesGoal 须对总控和执行、核验角色只读");
   if (Object.values(units).some(unit => includes(goalContext, unit.candidate)
     || Object.values(unit.phases).some(phase => phase.write.some(file => includes(goalContext,file))
       || phase.receipt && includes(goalContext,phase.receipt) || phase.evidence?.some(file => includes(goalContext,file))))) {
@@ -292,41 +295,40 @@ export function authority(root) {
     const grant = unit.phases[prefix + "-review"];
     unit.phases[prefix + "-audit"] = { ...grant, write: [], read: grant.read.filter(file => !receiptsSeen.has(keyOf(file))) };
   }
-  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument };
+  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal };
 }
 
-/** 受控写入事务维护正文、单份改前备份和逐文件更新记录。 */
-export function replaceWithHistory(root, file, content, note, tag, markers, rollback) {
+/** Return only the managed history paths derived from an exact project file. */
+export function historyPaths(file) {
+  const log = MANAGED + "/changes/" + file + ".md";
+  return { log, backup: MANAGED + "/latest_backup/" + file, logBackup: MANAGED + "/latest_backup/" + log };
+}
+
+/** Plan or publish the same bounded document, rolling backup and history bytes. */
+export function replaceWithHistory(root, file, content, note, tag, markers, stage) {
   const before = readBytes(root, file);
   const after = Buffer.from(content, "utf8");
   if (equal(before, after)) return { path: file, changed: false, sha256: digest(after) };
-  const log = MANAGED + "/changes/" + file + ".md";
-  const backup = MANAGED + "/latest_backup/" + file;
+  const { log, backup, logBackup } = historyPaths(file);
   const oldLog = readBytes(root, log);
   const summary = note.trim().replace(/\s+/g, " ").slice(0, 500);
   const record = "- " + new Date().toISOString() + " " + tag + " " + summary + " SHA-256 " + digest(after) + "\n";
   const history = Buffer.from(record + (oldLog ? text(oldLog) : ""), "utf8");
   if (history.length > LIMIT || after.length > LIMIT) throw new Error("内容或更新日志超过受控工具的大小上限");
-  // Optional compensation joins a generated projection to its surrounding host
-  // state transaction. Each undo requires our exact written bytes, so a concurrent
-  // external edit is reported rather than silently overwritten during recovery.
-  const write=(name,value,previous)=>{
-    replaceBytes(root,name,value,previous);
-    rollback?.push(()=>replaceBytes(root,name,previous,value));
-  };
+  // Generated ledger exports register all byte pairs before any of these
+  // targets are changed. Ordinary controlled file writes keep their own path.
+  const writes = [];
   const marker = keyOf(file);
   if (markers[marker] !== tag) {
-    if (before) write(backup,before,readBytes(root,backup));
-    if (oldLog) {
-      const logBackup = MANAGED + "/latest_backup/" + log;
-      write(logBackup,oldLog,readBytes(root,logBackup));
-    }
+    if (before) writes.push({ file: backup, before: readBytes(root, backup), after: before });
+    if (oldLog) writes.push({ file: logBackup, before: readBytes(root, logBackup), after: oldLog });
   }
-  write(log,history,oldLog);
-  try { write(file,after,before); }
-  catch (error) {
-    if(!rollback)replaceBytes(root,log,oldLog,history);
-    throw error;
+  if (stage) stage([...writes, { file: log, before: oldLog, after: history }, { file, before, after }]);
+  else {
+    for (const write of writes) replaceBytes(root, write.file, write.after, write.before);
+    replaceBytes(root, log, history, oldLog);
+    try { replaceBytes(root, file, after, before); }
+    catch (error) { replaceBytes(root, log, oldLog, history); throw error; }
   }
   markers[marker] = tag;
   return { path: file, changed: true, sha256: digest(after), log, ...(before ? { backup } : {}) };

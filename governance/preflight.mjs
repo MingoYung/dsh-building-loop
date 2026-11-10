@@ -10,7 +10,7 @@ export const QUALITY = {
 };
 
 export const lineList = bytes => text(bytes).split(/\r\n|\n|\r/);
-const escape = value => value.replace(/[|\\{}()[\]^$+*?.-]/g, "\\$&");
+const escape = value => value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
 
 /** 以唯一编号定位事实行，重复编号交回修改。 */
 export function claimRow(lines, id) {
@@ -42,6 +42,192 @@ export function citation(body, file) {
     return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start ? { start, end } : null;
   }
   return mentioned ? { start: null, end: null } : null;
+}
+
+const exactLineRange = "(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)";
+
+/** Parse a single locator with no surrounding prose or second source. Unknown
+ * paths return only diagnostics and are never opened by this parser. */
+export function exactCitationLocator(value, files) {
+  let body=value.trim().replace(/^(?:出处|来源|证据|source|evidence)\s*[:：]\s*/iu, "").replaceAll("\\", "/");
+  if (/^`[^`]+`$/u.test(body)) body=body.slice(1,-1);
+  for (const file of files) {
+    const name=escape(file);
+    if (!new RegExp("^(?:`"+name+"`|"+name+")\\s*"+exactLineRange+"$",process.platform==="win32"?"iu":"u").test(body)) continue;
+    const cited=citation(body,file);
+    return cited?.start ? {locators:[{file,...cited}],excludedLocators:[]}
+      : {locators:[],excludedLocators:[{file,locator:body,reason:"invalid-range"}]};
+  }
+  const unknown=/^(?:`([^`\r\n]+)`|([^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+))\s*(?:#L\d+(?:-L?\d+)?|[:：]\d+(?:[-–—]\d+)?|第\s*\d+(?:\s*[-–—、至到]\s*\d+)?\s*行)$/iu.exec(body);
+  const file=unknown?.[1]??unknown?.[2];
+  return file&&/^[^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+\.[A-Za-z0-9_-]+$/u.test(file)
+    ? {locators:[],excludedLocators:[{file,locator:body,reason:"unapproved-source"}]} : null;
+}
+
+/** Bind the literal adjacent annotation and its physical end to this quote.
+ * Later locators can belong to different assertions on the same line. */
+export function adjacentCitationLocator(line, quoteEnd, files) {
+  const annotation=/^\s*(?:（([^（）\r\n]*)）|\(([^()\r\n]*)\)|\[([^\[\]\r\n]*)\]|【([^【】\r\n]*)】)/u.exec(line.slice(quoteEnd));
+  if(!annotation)return null;
+  const bound=exactCitationLocator(annotation.slice(1).find(value=>value!==undefined),files);
+  return bound?{...bound,end:quoteEnd+annotation[0].length}:null;
+}
+
+/** Escape parity matters only outside a literal code span. */
+function escapedMarkdown(text, index) {
+  let slashes=0;
+  while(index>0&&text[--index]==="\\")slashes++;
+  return slashes%2===1;
+}
+
+const footnoteId="[A-Za-z0-9][A-Za-z0-9_.-]{0,63}";
+const footnoteDefinition=new RegExp("^ {0,3}\\[\\^("+footnoteId+")\\]:","u");
+const touchingFootnote=new RegExp("^\\[\\^("+footnoteId+")\\]","u");
+const footnoteMarkers=new RegExp("\\[\\^("+footnoteId+")\\]","gu");
+const finalFootnoteMarker=new RegExp("\\[\\^("+footnoteId+")\\]$","u");
+
+/** Quotes explicitly presented as original words are the only automatic targets. */
+export function verbatimQuotes(line) {
+  return line.matchAll(/(?:原文|原句|逐字引文)\s*(?:为|是|写道|[:：])?\s*[“"]([^”"\n]{1,2000})[”"]/gu);
+}
+
+/** Hide literal spans while preserving original offsets. A code span may cross
+ * a soft line break, but cannot claim an owner or definition. */
+function footnoteProse(lines) {
+  let fence=null,hidden=null,paragraph=[];
+  const rows=lines.map(line=>{
+    const marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+    if(fence){if(marker&&marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;return "";}
+    if(!hidden&&marker){fence=marker[1];return "";}
+    if(!hidden&&/^(?: {4}|\t)/u.test(line))return "";
+    let at=0,result="";
+    while(at<line.length){
+      if(hidden){
+        const close=hidden.exec(line.slice(at)),end=close?at+close.index+close[0].length:line.length;
+        result+=" ".repeat(end-at);at=end;if(close)hidden=null;
+      }else{
+        const open=/<!--|<(pre|code)\b[^>]*>/iu.exec(line.slice(at));
+        if(!open){result+=line.slice(at);break;}
+        const start=at+open.index;
+        result+=line.slice(at,start)+" ".repeat(open[0].length);at=start+open[0].length;
+        hidden=open[1]?new RegExp("</"+open[1]+"\\s*>","iu"):/-->/u;
+      }
+    }
+    return result;
+  });
+  const flush=()=>{
+    if(!paragraph.length)return;
+    const text=paragraph.map(index=>rows[index]).join("\n"),runs=[...text.matchAll(/`+/gu)];
+    const next=[],last=new Map();
+    for(let i=runs.length-1;i>=0;i--){next[i]=last.get(runs[i][0].length);last.set(runs[i][0].length,i);}
+    let masked="",at=0;
+    for(let i=0;i<runs.length;i++){
+      if(next[i]===undefined||escapedMarkdown(text,runs[i].index))continue;
+      const start=runs[i].index,close=runs[next[i]],end=close.index+close[0].length;
+      masked+=text.slice(at,start)+text.slice(start,end).replace(/[^\n]/gu,character=>" ".repeat(character.length));
+      at=end;i=next[i];
+    }
+    masked+=text.slice(at);
+    masked.split("\n").forEach((line,i)=>{rows[paragraph[i]]=line;});
+    paragraph=[];
+  };
+  for(const [index,row] of rows.entries()){
+    if(!row.trim()){flush();continue;}
+    if(footnoteDefinition.test(row)||/^ {0,3}(?:#{1,6}\s|[-+*]\s|\d+[.)]\s|>)/u.test(row))flush();
+    paragraph.push(index);
+    if(footnoteDefinition.test(row))flush();
+  }
+  flush();
+  return rows;
+}
+
+/** Bound required literals and authority fences to unambiguous live rows.
+ * Preserve physical offsets, including wholly hidden rows for duplicate tests.
+ * This conservatively excludes HTML, quotations and indented code rather
+ * than treating arbitrary rendered markup as a literal preservation proof.
+ */
+export function requiredLineMarkdown(lines) {
+  let fence=null,comment=false,quoted=false;
+  const tags=[],fences=[];
+  const prose=lines.map((line,index)=>{
+    const marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
+    if(fence){
+      if(marker&&marker[1][0]===fence.marker[0]&&marker[1].length>=fence.marker.length&&!marker[2].trim()){
+        if(fence.contract){fence.contract.end=index;fence.contract.canonical&&=/^```[ \t]*$/u.test(line);}
+        fence=null;
+      }
+      return "";
+    }
+    if(!line.trim())quoted=false;
+    if(!comment&&!tags.length&&/^ {0,3}>/u.test(line))quoted=true;
+    if(quoted)return "";
+    if(!comment&&!tags.length&&marker){
+      fence={marker:marker[1]};
+      if(!line.startsWith(" ")&&/^building-loop-required-lines\b/u.test(marker[2].trim())){
+        fence.contract={start:index,end:null,canonical:/^```building-loop-required-lines[ \t]*$/u.test(line)};
+        fences.push(fence.contract);
+      }
+      return "";
+    }
+    if(!comment&&!tags.length&&/^(?: {4}| {0,3}\t)/u.test(line))return "";
+    let hidden=comment||tags.length>0;
+    for(const match of line.matchAll(/<!--|-->|<\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>])(?:[^>"']|"[^"]*"|'[^']*')*>/gu)){
+      const [token,name]=match,tag=name?.toLowerCase(),top=tags.at(-1);
+      hidden=true;
+      if(comment){if(token==="-->")comment=false;continue;}
+      if(["pre","code","script","style","textarea"].includes(top)){
+        if(token.startsWith("</")&&tag===top)tags.pop();
+        continue;
+      }
+      if(token==="<!--"){comment=true;continue;}
+      if(!tag)continue;
+      if(token.startsWith("</")){if(tag===top)tags.pop();}
+      else if(!/\/>$/u.test(token)&&!/^(?:br|hr|img|input|meta|link|wbr|source|area|base|col|embed|param|track)$/u.test(tag))tags.push(tag);
+    }
+    return hidden?"":line;
+  });
+  const visible=footnoteProse(prose);
+  return {fences,live:visible.map(line=>!!line.trim()),visible};
+}
+
+/** Resolve only one quote-owned Markdown marker and one single-line definition.
+ * Return an explicit unresolved binding when the apparent owner has no unique
+ * location, so the caller cannot borrow a different source from its prose. */
+export function footnoteQuoteIndex(lines, files) {
+  const visible=footnoteProse(lines),definitions=new Map(),owners=new Map();
+  for(const [index,row] of visible.entries()){
+    const definition=footnoteDefinition.exec(row);
+    if(definition){
+      const id=definition[1].toLowerCase(),entries=definitions.get(id)??[];
+      entries.push({line:index+1,text:lines[index].slice(definition[0].length)});definitions.set(id,entries);
+    }
+    for(const marker of row.matchAll(footnoteMarkers)){
+      if(marker.index<(definition?.[0].length??0)||escapedMarkdown(row,marker.index))continue;
+      const id=marker[1].toLowerCase();owners.set(id,(owners.get(id)??0)+1);
+    }
+  }
+  return (line,quoteStart,quoteEnd)=>{
+    const row=lines[line-1],tail=row.slice(quoteEnd),space=/^\s*/u.exec(tail)[0].length,start=quoteEnd+space;
+    // Literal marker demonstrations never gain authority or use a nearby
+    // fallback citation. Full coverage still checks the prose independently.
+    if(/^\s*(?:\\+|`+)\[\^/u.test(tail))return {ignored:true};
+    if(!tail.slice(space).startsWith("[^"))return null;
+    if(!visible[line-1]?.[quoteStart]?.trim()||!visible[line-1]?.slice(start).startsWith("[^"))return {ignored:true};
+    const marker=touchingFootnote.exec(row.slice(start));
+    const end=marker?start+marker[0].length:start+2;
+    const id=marker?.[1]?.toLowerCase(),entries=definitions.get(id)??[];
+    const footnote={id:id??null,...(entries.length===1?{definitionLine:entries[0].line}:{})};
+    const rejected=reason=>({end,footnote,locators:[],excludedLocators:[{reason,footnoteId:id??null}]});
+    if(!marker)return rejected("malformed-footnote");
+    if(/^\s*(?:\[\^|\()/u.test(row.slice(end))||owners.get(id)!==1||entries.length>1)return rejected("ambiguous-footnote");
+    if(!entries.length)return rejected("unresolved-footnote");
+    const entry=entries[0];
+    let next=entry.line;
+    while(next<lines.length&&!lines[next].trim())next++;
+    if(/^(?: {4}|\t)/u.test(lines[next]??""))return rejected("ambiguous-footnote");
+    const exact=exactCitationLocator(entry.text.trim().replace(/[。.]$/u,""),files);
+    return exact?{...exact,end,footnote}:rejected("unresolved-footnote");
+  };
 }
 
 /** Remove only recognized locators. Facts after a citation remain in the comparison. */
@@ -123,7 +309,9 @@ export function repairBaseline(root,spec,lines,finding,readable,seen,extra=[]) {
   if(contextStart<0||context.indexOf(quote,context.indexOf(quote)+1)!==-1)throw new Error("退回 finding.quote 在本段必须唯一定位，请缩小或补足实际错误片段；不要把正确前缀列入退回");
   if(line.slice(contextStart,contextStart+context.length)!==context)throw new Error("退回片段位置与当前正文不一致");
   return {version:1,quote,line:finding.line,start,end:start+quote.length,candidateSha256:digest(readBytes(root,spec.candidate)),
-    kind:finding.finding?.kind,scopeMarkers:scopeMarkers(context),refs:repairReferences(root,spec,line,readable,seen,extra)};
+    kind:finding.finding?.kind,scopeMarkers:scopeMarkers(context),...(finding.footnote?{footnote:finding.footnote}:{}),
+    ...(finding.inlineQuote?{inlineQuote:true}:{}),
+    refs:repairReferences(root,spec,finding.footnote||finding.inlineQuote?"":line,readable,seen,extra)};
 }
 
 /** Group only Markdown paragraph continuations, keeping physical source rows.
@@ -156,7 +344,7 @@ function repairParagraphs(lines) {
  * Offsets refer to NFKC text only for contextual stance checks; saved baselines
  * retain the exact original quotation and UTF-16 source offsets separately.
  */
-function repairOccurrences(lines,quote) {
+function repairOccurrences(lines,quote,footnote) {
   const target=normalized(quote),result=[];if(!target)return result;
   for(const rows of repairParagraphs(lines)){
     const lineAt=[],parts=rows.map(row=>{
@@ -168,13 +356,20 @@ function repairOccurrences(lines,quote) {
     for(let cursor=0;;){
       const at=searchable.indexOf(target,cursor);if(at<0)break;
       const start=positions[at],end=positions[at+target.length-1]+1;
+      cursor=at+target.length;
+      if(footnote?.id){
+        // Presentation normalization may remove an underscore from the quote,
+        // but it cannot merge two different literal footnote identifiers.
+        const close=display.indexOf("]",end);
+        const identifier=close>=end&&close-end<=64?finalFootnoteMarker.exec(display.slice(start,close+1))?.[1]:null;
+        if(identifier?.toLowerCase()!==footnote.id)continue;
+      }
       const before=display.slice(0,start),after=display.slice(end);
       const sentenceStart=Math.max(...[...before.matchAll(/[。；;!?！？]/gu)].map(match=>match.index+1),0);
       const tail=after.search(/[。；;!?！？]/u),sentenceEnd=tail<0?display.length:end+tail+1;
       result.push({line:lineAt[start],endLine:lineAt[end-1],text:display,
         sentence:display.slice(sentenceStart,sentenceEnd).replaceAll("\n"," "),
         before:display.slice(sentenceStart,start).replaceAll("\n"," "),after:display.slice(end,sentenceEnd).replaceAll("\n"," ")});
-      cursor=at+target.length;
     }
   }
   return result;
@@ -193,19 +388,45 @@ function withdrawnOccurrence(item) {
   return denial.test(prefix)||retracted.test(suffix);
 }
 
+/** The retained quote and its touching marker must still own a unique source.
+ * No separately cited same-line source can count as a repaired footnote. */
+function repairedFootnoteLocators(lines,item,baseline,footnotes) {
+  if(item.line!==item.endLine)return [];
+  const row=lines[item.line-1],target=normalized(baseline.quote);
+  return [...verbatimQuotes(row)].flatMap(match=>{
+    const bound=footnotes(item.line,match.index,match.index+match[0].length);
+    return bound?.footnote&&bound.footnote.id===baseline.footnote.id&&normalized(row.slice(match.index,bound.end))===target ? bound.locators : [];
+  });
+}
+
+/** Recheck only the retained inline attribution. A later matching citation on
+ * its line is separate evidence and cannot satisfy this specific repair. */
+function repairedInlineLocators(lines,item,baseline,files) {
+  if(item.line!==item.endLine)return [];
+  const row=lines[item.line-1],target=normalized(baseline.quote);
+  return [...verbatimQuotes(row)].flatMap(match=>{
+    const bound=adjacentCitationLocator(row,match.index+match[0].length,files);
+    return bound&&normalized(row.slice(match.index,bound.end))===target ? bound.locators : [];
+  });
+}
+
 /** Evaluate one returned span. Source changes qualify only for re-review and only
  * when they are cited at the retained assertion and read in this supplement.
  */
-function checkRepairSpan(root,spec,lines,readable,active,finding) {
-  const baseline=finding.repairBaseline;
+function checkRepairSpan(root,spec,lines,readable,active,finding,footnotes) {
+  const baseline=finding.repairBaseline?.attribution??finding.repairBaseline;
   const quote=baseline?.version===1?baseline.quote:finding.finding?.quote??finding.quote;
   if(typeof quote!=="string"||!quote.trim())return null; // Explicit legacy full-line fallback below.
-  const occurrences=repairOccurrences(lines,quote);
+  const occurrences=repairOccurrences(lines,quote,baseline?.footnote);
   const unresolved=[],evidence=[];let withdrawn=0,limited=0;
   for(const item of occurrences){
     if(withdrawnOccurrence(item)){withdrawn++;continue;}
     if(baseline?.kind==="scope"&&scopeMarkers(item.sentence).some(marker=>!baseline.scopeMarkers?.includes(marker))){limited++;continue;}
-    const refs=baseline?.version===1?repairReferences(root,spec,item.sentence,readable,active.seen):[];
+    const refs=baseline?.version!==1?[]:baseline.footnote
+      ? repairReferences(root,spec,"",readable,active.seen,repairedFootnoteLocators(lines,item,baseline,footnotes))
+      : baseline.inlineQuote
+      ? repairReferences(root,spec,"",readable,active.seen,repairedInlineLocators(lines,item,baseline,spec.phases["final-review"].evidence))
+      : repairReferences(root,spec,item.sentence,readable,active.seen);
     const fresh=refs.filter(ref=>{
       const old=(baseline?.refs??[]).filter(value=>keyOf(value.file)===keyOf(ref.file));
       return ref.lineHashes.length>0&&ref.lineHashes.some(hash=>!old.some(value=>value.lineHashes?.includes(hash)));
@@ -449,10 +670,12 @@ export function plainLastIssues(spec, lines) {
 export function supplementChecks(root, spec, lines, readable, active) {
   const issues = plainLastIssues(spec, lines);
   const repairs=[],legacy=[];
+  const footnotes=active.coverageRejections?.some(finding=>finding.repairBaseline?.footnote||finding.repairBaseline?.attribution?.footnote)
+    ? footnoteQuoteIndex(lines,spec.phases["final-review"].evidence) : null;
   // New receipts bind the actual rejected substring, not surrounding correct
   // prose. Every retained assertion needs real revision or newly read evidence.
   for (const finding of active.coverageRejections ?? []) {
-    const repair=checkRepairSpan(root,spec,lines,readable,active,finding);
+    const repair=checkRepairSpan(root,spec,lines,readable,active,finding,footnotes);
     if(repair){repairs.push({...repair,channel:"coverage",block:finding.block});
       if(repair.unresolved.length)issues.push("全文退回 "+finding.block+" 的实际片段仍未修订或补入已读新证据，当前第 "+repair.unresolved.join("、")+" 行："+repair.quote
         +"。修改正确前缀或文件其他行不算落实；可删除/实质修订、在该句明确否定或标为错例，或同行引用本轮已读的新证据后重核。"+(repair.baseline.startsWith("legacy")?"旧回执无证据快照，不能据文件变化宣称补证成功。":""));

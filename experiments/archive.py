@@ -146,7 +146,7 @@ def collect(run, clean):
                 hashes = recorded
             # A manifest must opt in to these additional files so existing
             # public experiment bundles remain byte-for-byte reproducible.
-            for name in ("skills/dispatch-protocol/SKILL.md", "turn-resume/index.mjs"):
+            for name in ("skills/dispatch-protocol/SKILL.md", "turn-resume/index.mjs", "governance/transactions.mjs"):
                 if name in hashes and (runtime / name).is_file():
                     files.append(runtime / name)
         except (ValueError, AttributeError):
