@@ -1,6 +1,6 @@
 {
   "name": "dsh-building-loop",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "description": "面向长任务的 DSH 工作模式。用三级文件和原始证据保持项目方向，以总控和子会话分工降低上下文污染，按阶段约束权限、复用会话、复算数字，并在每轮验收后强制复盘计划、临时需求和搁置任务。",
   "type": "module",
   "exports": {
@@ -8,12 +8,15 @@
     "./governance": "./governance/index.mjs",
     "./turn-resume": "./turn-resume/index.mjs"
   },
-  "dependencies": {
+  "scripts": {
+    "build:markdown": "node scripts/build-markdown-parser.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
     "mdast-util-from-markdown": "2.0.3",
     "mdast-util-gfm-footnote": "2.0.0",
     "micromark-extension-gfm-footnote": "2.1.0"
   },
-  "bundleDependencies": true,
   "files": [
     "cordis.patch.yml",
     "INDEX.json",
@@ -21,6 +24,7 @@
     "experiments/",
     "changes/",
     "governance/",
+    "scripts/",
     "test/",
     "skills/",
     "skills-disabled/",

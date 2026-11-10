@@ -1,7 +1,6 @@
-import { fromMarkdown } from "mdast-util-from-markdown";
-import { gfmFootnoteFromMarkdown } from "mdast-util-gfm-footnote";
-import { gfmFootnote } from "micromark-extension-gfm-footnote";
+import parser from "./vendor/markdown-parser.cjs";
 
+const { fromMarkdown, gfmFootnoteFromMarkdown, gfmFootnote } = parser;
 const parserOptions = { extensions: [gfmFootnote()], mdastExtensions: [gfmFootnoteFromMarkdown()] };
 const fenceMarker = /^ {0,3}(`{3,}|~{3,})(.*)$/u;
 const tags = /<!--[\s\S]*?(?:-->|$)|<\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>])(?:[^>"']|"[^"]*"|'[^']*')*>/gu;

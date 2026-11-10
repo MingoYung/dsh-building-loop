@@ -27,6 +27,8 @@ DeepSeek Harness 的长任务 Agent 预设，适用于项目建设、深度研�
 
 0.7.9 增加 Windows 并发和自动记账恢复、完整单位核验、共用 Markdown 结构、明确出处绑定和按当前材料收敛复核。Windows 原生宿主的新装、激活、升级和回退，以及最终 DeepSeek 复用和新开对照均有验收记录。[四项放行与真实对照](experiments/results-0.7.9.md)
 
+0.7.10 将同一套 Markdown 解析器随仓库源码和安装包一并交付，解决 GitHub 源码安装后缺少解析依赖的问题。维护时用 `npm ci` 和 `npm run build:markdown` 生成解析器及第三方许可清单，用 `npm run build:markdown -- --check` 核对生成物。
+
 ## 分块入口
 
 | 分块 | 进入条件 | 索引 |

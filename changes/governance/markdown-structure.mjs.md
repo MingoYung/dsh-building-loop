@@ -1,3 +1,5 @@
 # governance/markdown-structure.mjs 更新日志
 
 - 2026-11-10 · 0.7.9：从 CommonMark 结构映射正文、引用、脚注、代码和围栏到原始位置。
+
+- 2026-11-11 · 0.7.10：从包内生成物加载同一套 Markdown 解析器。
