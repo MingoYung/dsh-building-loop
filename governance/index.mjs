@@ -23,6 +23,7 @@ const ASSESS = "building_loop_quality";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
 const STATE_LIMIT = 8 * 1024 * 1024;
+const SEARCH_OBSERVATION_LIMIT = 16;
 const EMPTY = { read: [], write: [] };
 
 const BEGIN = {
@@ -46,7 +47,7 @@ const RULES = {
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
 const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选中实际存在的原句片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后 review 逐条 checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
-const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。";
+const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
 const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据；候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
 // Semantic alignment is an explicit review duty, not a host claim that quote
 // hashes or two model approvals establish entailment in arbitrary prose.
@@ -300,6 +301,44 @@ export function apply(ctx, config = {}) {
     noteContextRead(frame,file,hash,start,end);
   }
 
+  /** Persist bounded successful searches, never a model's account of its actions.
+   * Search snippets do not earn full-line reading stamps. Each file records the
+   * exact version and scanned range, so a limit or a missing file cannot be sold
+   * as a complete absence check. Failed/unauthorized calls never reach this path.
+   */
+  function rememberSearch(frame, observation) {
+    const {query,...metadata}=observation;
+    const observed={...metadata,querySha256:digest(Buffer.from(query,"utf8"))};
+    if (!frame.assignment) return {...observed,query};
+    const [id,active]=frame.assignment;
+    const previous=active.searchActivity?.actor===frame.agent.id&&active.searchActivity.phase===active.phase
+      ? active.searchActivity : {actor:frame.agent.id,phase:active.phase,entries:[],omitted:0};
+    // Receipts are visible to the coordinator: neither a protected query literal
+    // nor matching source text may cross that boundary through this side channel.
+    const entry={...observed,materialSha256:digest(buffer(checkpointBinding(frame,unitOf(frame,id))))};
+    const entries=[...previous.entries,entry];
+    active.searchActivity={...previous,entries:entries.slice(-SEARCH_OBSERVATION_LIMIT),
+      omitted:previous.omitted+Math.max(0,entries.length-SEARCH_OBSERVATION_LIMIT)};
+    frame.changed=true;
+    return {...entry,query};
+  }
+
+  /** Export only this role's actual activity; currentMaterial is a version check,
+   * not a claim that the query or returned snippets prove the model's conclusion.
+   */
+  function searchObservations(frame,active,spec) {
+    const stored=active.searchActivity?.actor===frame.agent.id&&active.searchActivity.phase===active.phase
+      ? active.searchActivity : {entries:[],omitted:0};
+    const binding=digest(buffer(checkpointBinding(frame,spec)));
+    return {spec:"building-loop-search-observations/1",provenance:"host-observed-tool-execution",
+      actor:frame.agent.id,phase:active.phase,limit:SEARCH_OBSERVATION_LIMIT,omitted:stored.omitted,
+      entries:stored.entries.map(entry=>({...entry,currentMaterial:entry.materialSha256===binding&&entry.files.every(file=>{
+        const bytes=readBytes(frame.root,file.path);
+        return file.exists ? !!bytes&&digest(bytes)===file.sha256 : bytes===null;
+      })})),
+      boundary:"Only successful searches retained in this role's current checkpoint; omitted entries are counted. Search results are not read stamps or semantic verification, and an empty list is not proof that no earlier search occurred."};
+  }
+
   /** Keep at most one current-version checkpoint for each independent role. */
   function refreshCheckpoints(frame,active,spec) {
     const binding=checkpointBinding(frame,spec),same=value=>JSON.stringify(value)===JSON.stringify(binding);
@@ -322,6 +361,7 @@ export function apply(ctx, config = {}) {
   function ownCheckpoint(frame,active,spec) {
     return {actor:active.actor,phase:active.phase,binding:checkpointBinding(frame,spec),
       seen:structuredClone(active.seen??{}),coverage:structuredClone(active.coverage),
+      ...(active.searchActivity?{searchActivity:structuredClone(active.searchActivity)}:{}),
       ...(frame.role==="reviewer"&&active.assessment?{assessment:structuredClone(active.assessment)}:{})};
   }
 
@@ -407,18 +447,26 @@ export function apply(ctx, config = {}) {
       if (args.action === "search") {
         const query = requireText(args.query, "搜索字面量", 120);
         const paths = args.path === undefined ? frame.reads : [relativeName(args.path)];
-        const matches = [];
+        for(const file of paths)if(!includes(frame.reads,file))throw new Error("该文件不在当前读白名单");
+        const matches = [],files=[];
         for (const file of paths) {
-          if (!includes(frame.reads, file)) throw new Error("该文件不在当前读白名单");
           const bytes = readBytes(frame.root, file);
-          if (!bytes) continue;
+          if (!bytes) {files.push({path:file,exists:false,sha256:null,totalLines:null,scannedThrough:0});continue;}
           const lines = lineList(bytes);
+          let scannedThrough=0;
           for (let i = 0; i < lines.length && matches.length < 40; i++) {
+            scannedThrough=i+1;
             if (lines[i].includes(query)) matches.push({ path: file, line: i + 1, text: lines[i].slice(0, 800) });
           }
+          files.push({path:file,exists:true,sha256:digest(bytes),totalLines:lines.length,scannedThrough});
           if (matches.length >= 40) break;
         }
-        return { matches };
+        const searchObservation=rememberSearch(frame,{id:randomUUID(),tool:FILE,action:"search",actor:frame.agent.id,
+          phase:frame.assignment?.[1].phase??"coordinator",at:new Date().toISOString(),query,requestedPaths:paths,files,
+          unsearchedPaths:paths.slice(files.length),returnedMatches:matches.length,resultLimit:40,textLimit:800,
+          limitReached:matches.length===40,complete:files.length===paths.length&&files.every(file=>file.exists&&file.scannedThrough===file.totalLines),
+          matchLocations:matches.map(({path,line})=>({path,line}))});
+        return { matches, searchObservation };
       }
       const file = relativeName(args.path);
       if (args.action === "write") {
@@ -516,6 +564,7 @@ export function apply(ctx, config = {}) {
       // Only the exact same actor, phase and material binding may retain active
       // proof; checking merely "blocked" would transfer one role's proof to another.
       if (!resumeSame) delete record.coverage;
+      if (!resumeSame) delete record.searchActivity;
       if (!resumeSame) delete record.interruptions;
       if (!resumeSame) delete record.restoredCheckpointBinding;
       const saved=record[plan.role+"Checkpoint"];
@@ -525,6 +574,7 @@ export function apply(ctx, config = {}) {
         // source/hash validation. Never copy the other reviewer's proof or reads.
         record.seen=structuredClone(saved.seen);
         record.coverage=structuredClone(saved.coverage);
+        if(saved.searchActivity)record.searchActivity=structuredClone(saved.searchActivity);
         record.restoredCheckpointBinding=structuredClone(saved.binding);
         for(const dispute of record.reconciliation) {
           const entry=record.coverage.records[dispute.block];
@@ -660,6 +710,7 @@ export function apply(ctx, config = {}) {
         goalFit, revisions, suggestions: (args.suggestions ?? []).map(item => requireText(item,"可选建议")) };
       frame.changed = true;
       return { unit: id, assessed: true, observedSources: refs, actualReads: readInventory(frame, active),
+        searchObservations:searchObservations(frame,active,spec),assessmentProvenance:"model-assessment; prose is not verified tool-execution evidence",
         revise: Object.keys(checks).filter(field => !checks[field].pass), next: "review" };
     });
   }
@@ -715,7 +766,8 @@ export function apply(ctx, config = {}) {
       ...(active.reconciliationRound?{classificationReview:{targetedRounds:active.reconciliationRound,remainingDisputes:conflicts.length}}:{}),
       qualityRejected: layout.length ? [...new Set([...(pending.qualityRejected??[]),"plain"])] : pending.qualityRejected,
       formatIssues: layout,
-      independentAudit: { auditor: frame.agent.id, method: "counterexample-and-concept-mapping", coverage: coverageReceipt(coverage), actualReads: readInventory(frame, active) } };
+       independentAudit: { auditor: frame.agent.id, method: "counterexample-and-concept-mapping", coverage: coverageReceipt(coverage), actualReads: readInventory(frame, active),
+         searchObservations:searchObservations(frame,active,spec) } };
     const receiptBytes = buffer(receipt);
     replaceWithHistory(frame.root, active.receipt, text(receiptBytes), "独立反证 " + decision, tag(frame), frame.state.markers);
     active.unsupported = unsupported;
@@ -843,7 +895,10 @@ export function apply(ctx, config = {}) {
           unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage), formatIssues: layout,
           ...(active.quality ? { quality: active.quality } : {}),
           ...(qualityChecks ? { qualityChecks } : {}),
+          assessmentProvenance:{quality:"executor-model-assessment",qualityChecks:"reviewer-model-assessment",goalFit:"reviewer-model-assessment",
+            proseVerifiedAsToolExecution:false,toolExecutionSources:["actualReads","searchObservations"]},
           observedSources, actualReads: readInventory(frame, active),
+          searchObservations:searchObservations(frame,active,spec),
           ...(qualityChecks ? { unlisted: active.assessment.unlisted, unverifiedSources: active.assessment.unverifiedSources,
             revisions: active.assessment.revisions, suggestions: active.assessment.suggestions } : {}),
         };

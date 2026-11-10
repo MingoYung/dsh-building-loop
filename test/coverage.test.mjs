@@ -655,7 +655,7 @@ test("object parameter errors show valid kind-specific templates and never use t
     {kind:"candidate",check:"citation-count",source:"candidate.md",expected:2},
   ])assert.throws(()=>e.put(bad),error=>{
     const diagnostic=objectDiagnostic(error);assert.equal(diagnostic.category,"parameter");
-    assert.deepEqual(diagnostic.templates.map(row=>row.check),["citation-count","citations-marked"]);
+    assert.deepEqual(diagnostic.templates.map(row=>row.check),["citation-count","citations-marked","citations-leading-marked"]);
     assert.deepEqual(diagnostic.templates[0],{kind:"candidate",check:"citation-count",source:"functional.csv",expected:2});
     assert.ok(diagnostic.parameterRules.some(rule=>rule.includes("不能填候选文件")));assert.match(diagnostic.next,/删除其他模板的字段/);return true;
   });
@@ -801,6 +801,20 @@ test("marking requires an explicit positive universal action and cannot certify 
   }
   const e=objectEnvironment(root,write,"[稿件自述] 本稿所有 functional.csv 引用行都含functional.csv标记。\nfunctional.csv 第2行。\n");
   assert.throws(()=>e.put({...check,marker:"functional.csv"}),/路径及其片段不能充当 marker/);
+}));
+
+test("a marker elsewhere in a citation line cannot support an explicit line-start assertion",async()=>fixture(async(root,write)=>{
+  const claim="本稿所有 functional.csv 引用行都在行首标了[模拟]。", check={kind:"candidate",check:"citations-leading-marked",source:"functional.csv",marker:"[模拟]"};
+  const body=tail=>"[稿件自述] "+claim+"\n- [模拟] functional.csv 第2行。\n"+tail+"\n";
+  let e=objectEnvironment(root,write,body("functional.csv 第2行，注中出现[模拟]。"));
+  assert.throws(()=>e.put({...check,check:"citations-marked"}),/明确标记位置/);
+  assert.throws(()=>e.put(check),error=>{
+    const diagnostic=objectDiagnostic(error);assert.equal(diagnostic.matches,false);assert.deepEqual(diagnostic.missingLines,[3]);return true;
+  });
+  e.put(check,{status:"unsupported",sourceRelation:"contradicts",finding:objectFinding("都在行首标了[模拟]")});
+  assert.equal(e.invoke("status").rejected.length,1);
+  e=objectEnvironment(root,write,body("[模拟] functional.csv 第2行。"));
+  e.put(check);assert.equal(e.invoke("status",{block:e.blocks[0].id}).record.parts[0].objectCheck.result.matches,true);
 }));
 
 test("a fully bound true candidate predicate cannot itself create unsupported author debt",async()=>fixture(async(root,write)=>{
@@ -974,6 +988,29 @@ test("simulation scope is bound to the same authorized source and does not promo
   assert.equal(e.finish().rejected.length,0);
   e=scopeEnvironment(root,write,text,{pinned:false});assert.throws(()=>e.put([e.direct]),/明确合成声明/);
   e.put([{...e.direct,quote:"[模拟] ",evidence:[{file:"functional.csv",start:1,end:1,quote:"# 模拟数据"}]},{...e.direct,quote:e.block.text.slice(5)}]);
+  assert.equal(e.finish().rejected.length,0);
+}));
+
+test("032313Z object annotation is neutral, while the full citation-count assertion remains mandatory",async()=>fixture(async(root,write)=>{
+  const label="- [稿件自述]", claim=" 本稿有 2 行带 functional.csv 的行号定位。";
+  const e=objectEnvironment(root,write,label+claim+"\nfunctional.csv 第2行。\nfunctional.csv 第2行。\n");
+  const block=e.blocks[0],check={kind:"candidate",check:"citation-count",source:"functional.csv",expected:2};
+  const marked={kind:"direct",status:"supported",sourceRelation:"supports",basis:"以实际稿件的授权来源行数做对象复核。",objectCheck:check};
+  e.invoke("record",{entries:[{block:block.id,parts:[marked]}]});
+  const full=e.invoke("status",{block:block.id}).record;
+  e.invoke("record",{entries:[{block:block.id,parts:[{...nonfact,quote:label},{...marked,quote:claim}]}]});
+  const split=e.invoke("status",{block:block.id}).record;
+  assert.deepEqual(classificationDisagreements({records:[full]},{records:[split]}),[]);
+  assert.equal(recordMeetsDispute(split,{text:block.text,requiredSpans:[[3,block.text.length]]}),true);
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[nonfact]}]}),/不能全部 nonfactual/);
+}));
+
+test("a following coverage block's source cannot change the simulation marker's source",async()=>fixture(async(root,write)=>{
+  const body="[模拟] 本例结论为 failure（出处：functional.csv 第2行；timing.csv 第2行）。\n";
+  const e=scopeEnvironment(root,write,body),[simulation,locator]=e.invoke("inventory").blocks;
+  assert.match(simulation.text,/functional.csv/);assert.match(locator.text,/timing.csv/);
+  e.put([e.direct]);
+  e.invoke("record",{entries:[{block:locator.id,parts:[nonfact]}]});
   assert.equal(e.finish().rejected.length,0);
 }));
 

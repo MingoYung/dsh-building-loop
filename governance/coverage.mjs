@@ -5,7 +5,7 @@ import { evidenceReference, registeredObservation, UnobservedExcerptError } from
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 3;
+export const CLASSIFICATION_VERSION = 4;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -34,6 +34,10 @@ export function neutralTextSpans(text) {
   if(typeof text!=="string"||!text.trim())return [];
   const ranges=[],decoration=/^\s*(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)?/u.exec(text)[0].length;
   const remaining=text.slice(decoration);
+  // These two tags select a proof contract. Only the tag is structural;
+  // the assertion that follows still has to use the selected evidence object.
+  const objectLabel=/^\[(?:稿件自述|摘录范围)\]\s*/u.exec(remaining);
+  if(objectLabel)return [{start:0,end:decoration+objectLabel[0].length,kind:"structural-label",rule:"explicit-object-label-v1"}];
   const label=new RegExp("^(?:(?:"+neutralLabels+")\\s*[:：]|\\*\\*(?:"+neutralLabels+")\\s*[:：]\\*\\*|\\*\\*(?:"+neutralLabels+")\\*\\*\\s*[:：])\\s*","u").exec(remaining);
   let bodyStart=decoration;
   if(label){bodyStart=decoration+label[0].length;ranges.push({start:0,end:bodyStart,kind:"structural-label",rule:"explicit-label-v1"});}
@@ -68,10 +72,17 @@ function validateSimulationScope(frame,active,spec,block,parts) {
   const marker=simulationMarker(block?.text??"");if(!marker)return;
   const covering=parts.filter(part=>part.start<marker.end-1&&part.end>marker.start+1);
   if(!covering.length||covering.some(part=>!["direct","inference"].includes(part.kind)))throw scopeFailure("[模拟] 是有事实含义的来源范围标记，须用 direct/inference 覆盖",block,marker);
-  const files=spec.phases[active.phase].evidence.filter(file=>{
-    const located=citation(block.lineText??block.text,file),bytes=readBytes(frame.root,file);
-    return located?.start&&bytes&&includes(spec.phases[active.phase].read,file)&&located.end<=lineList(bytes).length;
+  const grant=spec.phases[active.phase];
+  const locatedFiles=value=>grant.evidence.filter(file=>{
+    const range=citation(value,file);
+    if(!range?.start||!includes(grant.read,file))return false;
+    const bytes=readBytes(frame.root,file);
+    return bytes&&range.end<=lineList(bytes).length;
   });
+  // A later coverage block can cite a general rule on the same physical line.
+  // Keep the simulation assertion attached to the sources of its own block.
+  const inBlock=locatedFiles(block.text);
+  const files=inBlock.length?inBlock:locatedFiles(block.lineText??block.text);
   for(const part of covering) {
     if(part.status!=="supported")continue; // The existing finding gate owns real rejection.
     if(files.length!==1)throw scopeFailure("范围归属须有唯一、有效且授权的同行引用来源，不能猜多个来源的标签归属",block,marker);
@@ -175,7 +186,8 @@ function objectGuide(input,spec,assertion,phase) {
   const target=targets.length===1?targets[0]:"原句引用的授权来源.md";
   const expected=Number.isSafeInteger(input?.expected)&&input.expected>=0?input.expected:0;
   const examples={
-    candidate:[{kind:"candidate",check:"citation-count",source:target,expected},{kind:"candidate",check:"citations-marked",source:target,marker:"原句声明的确切标记"}],
+    candidate:[{kind:"candidate",check:"citation-count",source:target,expected},{kind:"candidate",check:"citations-marked",source:target,marker:"原句声明的确切标记"},
+      {kind:"candidate",check:"citations-leading-marked",source:target,marker:"原句声明的确切行首标记"}],
     "registered-excerpts":[{kind:"registered-excerpts",check:"count",file:target,expected},{kind:"registered-excerpts",check:"contains",file:target,quote:"原句中要核对的单行原文"},
       {kind:"registered-excerpts",check:"excludes",file:target,quote:"原句中明确说未见的单行文本"},{kind:"registered-excerpts",check:"line-status",file:target,line:1,expected:"registered"}],
   };
@@ -183,7 +195,7 @@ function objectGuide(input,spec,assertion,phase) {
     parameterRules:["candidate 不支持 count：用 citation-count；source 是本句引用目标，不能填候选文件 "+spec.candidate+"，也没有 sources 数组字段。",
       "expected 必须是原句明确声称的数量；示例0不是实测值。registered-excerpts/count 统计已登记摘录条目，结论类别或举例数量不能当摘录总数。",
       "file 与 source 按模板二选一；contains/excludes 用 quote，line-status 用 line/expected，citations-marked 用 marker，不混字段。",
-      "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 仅核明确正向全称标记句，如‘本稿所有 来源.md 引用行都含[模拟]标记’，不能替数量、未全标或完全没标作证。"]};
+      "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 核明确的全称含标记；原句限定行首则用 citations-leading-marked，两者都不能替数量、未全标或完全没标作证。"]};
 }
 function objectMismatchNext(value) {
   if(value.kind==="candidate")return value.check==="citation-count"
@@ -233,13 +245,13 @@ function candidateCountClaim(quote,source,guide) {
  * extra assertion cannot borrow the accidental presence of a marker as proof.
  * Not-all and none are distinct predicates and are deliberately unsupported.
  */
-function candidateMarkClaim(quote,source,marker,guide) {
+function candidateMarkClaim(quote,source,marker,leading,guide) {
   if(typeof marker!=="string"||!marker.trim()||marker.length>80||/[\r\n]/u.test(marker)||!quote.includes(marker))throw objectFailure("parameter","marker 须是本句声明的明确单行标记，最长80字符",guide);
   if(source.normalize("NFKC").includes(marker.normalize("NFKC")))throw objectFailure("parameter","引用来源路径及其片段不能充当 marker；文件名的出现不证明已标记",guide);
   const subject="(?:本稿|本文|本节|稿件|候选稿?|当前文档)(?:中)?",target=quotedLiteral(source),label=quotedLiteral(marker);
-  const action="(?:含有?|带有|标有|标注(?:为|了)?|标记(?:为|了)?|标了)\\s*"+label+"(?:\\s*标记)?";
+  const action=(leading?"(?:在)?行首\\s*(?:含有?|带有|标有|标注(?:为|了)?|标记(?:为|了)?|标了|标)":"(?:含有?|带有|标有|标注(?:为|了)?|标记(?:为|了)?|标了)")+"\\s*"+label+"(?:\\s*标记)?";
   const contract=new RegExp("^"+subject+"\\s*(?:(?:所有|全部)\\s*"+target+"\\s*(?:的)?引用行(?:都|均)\\s*"+action+"|引用\\s*"+target+"\\s*的每(?:一)?行(?:都|均)\\s*"+action+"|(?:带|有)\\s*"+target+"\\s*(?:的)?行号定位的每(?:一)?行(?:都|均)\\s*"+action+")$","u");
-  if(!contract.test(candidateClause(quote)))throw objectFailure("parameter","citations-marked 须绑定完整正向全称标记句、同一来源和明确标记动作；数量/行号表请用 citation-count，‘未全标’与‘完全没标’均不能用此谓词代证",{...guide,claimForm:"本稿所有 "+source+" 引用行都含"+marker+"标记。",next:"只修核验参数；若同句另有数量、否定或独立后半句，请按实际原文拆分核验，不要求作者改写正确句子。"});
+  if(!contract.test(candidateClause(quote)))throw objectFailure("parameter",(leading?"citations-leading-marked":"citations-marked")+" 须绑定完整正向全称标记句、同一来源和明确标记位置；数量/行号表请用 citation-count，‘未全标’与‘完全没标’均不能用此谓词代证",{...guide,claimForm:"本稿所有 "+source+" 引用行都"+(leading?"在行首标了":"含")+marker+"标记。",next:"只修核验参数；若同句另有数量、否定或独立后半句，请按实际原文拆分核验，不要求作者改写正确句子。"});
 }
 
 /** Bind a count parameter to the same visible quantity, not a C-number or locator. */
@@ -277,7 +289,7 @@ function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
   if(!input||typeof input!=="object"||Array.isArray(input))throw objectFailure("parameter","objectCheck 需要对象参数",guide);
   const allowed={"registered-excerpts":{
     count:["file","expected"],contains:["file","quote"],excludes:["file","quote"],"line-status":["file","line","expected"]},
-    candidate:{"citation-count":["source","expected"],"citations-marked":["source","marker"]}};
+    candidate:{"citation-count":["source","expected"],"citations-marked":["source","marker"],"citations-leading-marked":["source","marker"]}};
   const fields=allowed[input.kind]?.[input.check];
   if(!fields||fields.some(key=>input[key]===undefined)||Object.keys(input).some(key=>!["kind","check",...fields].includes(key)))throw objectFailure("parameter","objectCheck 的 kind/check 或字段不匹配",{...guide,receivedKind:input.kind??null,receivedCheck:input.check??null,allowedFields:fields?["kind","check",...fields]:[],receivedFields:Object.keys(input)});
   const candidateSha256=digest(bytes),lines=lineList(bytes);
@@ -332,9 +344,14 @@ function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
       }
     }
     else {
-      candidateMarkClaim(assertion.quote,source,input.marker,guide);
+      const leading=input.check==="citations-leading-marked";
+      candidateMarkClaim(assertion.quote,source,input.marker,leading,guide);
       if(!cited.length)throw objectFailure("unverifiable","当前稿无该来源的可识别同行定位，不能用空集合证明逐处已标记");
-      const missing=cited.filter(row=>!row.text.includes(input.marker));
+      // Markdown list and heading markers are presentation. Quoted or inline
+      // occurrences in the rest of the physical line do not prove a leading tag.
+      const missing=cited.filter(({text})=>leading
+        ? !text.trimStart().replace(/^(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)/u,"").startsWith(input.marker)
+        : !text.includes(input.marker));
       result.result={matches:missing.length===0,actual:cited.length,unit:"candidate-citation-lines",lines:cited.slice(0,24).map(row=>row.line),missingLines:missing.slice(0,24).map(row=>row.line),missingCount:missing.length};
     }
   }
@@ -555,7 +572,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
       // Only these fully bound candidate clauses have a mechanically determined
       // truth value. A real independent suffix must be split and proved itself.
       if(part.status==="unsupported"&&result.objectCheck.result.matches&&result.objectCheck.kind==="candidate"
-        &&(result.objectCheck.check==="citations-marked"||candidateCountClaim(quote,result.objectCheck.source,{}).fullyBound)) {
+        &&(["citations-marked","citations-leading-marked"].includes(result.objectCheck.check)||candidateCountClaim(quote,result.objectCheck.source,{}).fullyBound)) {
         throw objectFailure("parameter","完整绑定的稿件对象谓词已实测成立，不能将同一事实填 unsupported 制造作者债；独立后半句请按原文拆分并另给真实 finding",{...result.objectCheck.result,next:"保留正确正文，只修核验状态/分段；不能用已证真对象代替另一断言的反证。"});
       }
     } else if (part.status === "supported") {
@@ -790,14 +807,50 @@ export function coverageSummary(frame, active, spec, complete = true) {
       return {...finding,repairBaseline:repairBaseline(frame.root,spec,lines,{...finding,contextStart},frame.reads,active.seen,refs)};
     }));
   const quotations = complete ? quotationChecks(frame, active, spec, manifest) : [];
-  for (const quote of quotations.filter(row => !row.matches)) rejected.push({ block: quote.block, line: quote.line,
-    text: quote.text, lineText: quote.lineText, status: "unsupported", sourceRelation: "contradicts",
-    basis: "声明为逐字原文的引句与同行所引原文范围不一致，不能用意思相近替代逐字引用。",
-    repair: "换成原文中实际存在的逐字引句，或明确改称转述，不冒充原话。",
-    finding: { kind: "verbatim-quote", quote: quote.text, fix: "恢复逐字引句或改称转述。" },
-    repairBaseline:repairBaseline(frame.root,spec,lines,{line:quote.line,text:quote.text,quote:quote.text,contextStart:quote.contextStart},frame.reads,active.seen,quote.refs) });
+  for (const quote of quotations.filter(row => !row.matches)) {
+    const unavailable = quote.excludedLocators?.some(ref => ["unapproved-source", "invalid-range"].includes(ref.reason));
+    const fix = unavailable ? "提供已授权的有效原文定位，或撤回当前逐字引用声称。" : "恢复逐字引句或改称转述。";
+    rejected.push({ block: quote.block, line: quote.line,
+      text: quote.text, lineText: quote.lineText, status: "unsupported", sourceRelation: unavailable ? "insufficient" : "contradicts",
+      basis: unavailable ? "逐字引句明确相邻的来源未授权或行范围无效，不能用同行另一来源代替核验。此处是缺证，不声称已证明原话为假。"
+        : "声明为逐字原文的引句与同行所引原文范围不一致，不能用意思相近替代逐字引用。",
+      repair: fix, finding: { kind: unavailable ? "missing-evidence" : "verbatim-quote", quote: quote.text, fix },
+      repairBaseline:repairBaseline(frame.root,spec,lines,{line:quote.line,text:quote.text,quote:quote.text,contextStart:quote.contextStart},frame.reads,active.seen,quote.refs) });
+  }
   return { version: COVERAGE_VERSION, candidateSha256: manifest.candidateSha256, total: manifest.blocks.length,
     pending, rejected, records, quotations, receiptSha256: digest(JSON.stringify({ records, quotations })) };
+}
+
+/** Bind only an exact single-source annotation immediately after this quote.
+ * A locator elsewhere on the line may describe a different assertion; it must
+ * not rescue a quotation whose own explicit locator points to different words.
+ * Multi-source notes, footnotes and prose links retain the legacy review scope:
+ * this bounded parser does not invent an association from their nearby text. */
+function adjacentQuoteLocator(line, match, files) {
+  const tail = line.slice(match.index + match[0].length);
+  const annotation = /^\s*(?:（([^（）\r\n]*)）|\(([^()\r\n]*)\)|\[([^\[\]\r\n]*)\]|【([^【】\r\n]*)】)/u.exec(tail);
+  if (!annotation) return null;
+  let body = annotation.slice(1).find(value => value !== undefined).trim()
+    .replace(/^(?:出处|来源|证据|source|evidence)\s*[:：]\s*/iu, "").replaceAll("\\", "/");
+  // Backticks may wrap the whole locator or just its exact filename.
+  if (/^`[^`]+`$/u.test(body)) body = body.slice(1, -1);
+  for (const file of files) {
+    const name = regexLiteral(file), range = "(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)";
+    const exact = new RegExp("^(?:`" + name + "`|" + name + ")\\s*" + range + "$", process.platform === "win32" ? "iu" : "u");
+    if (!exact.test(body)) continue;
+    const cited = citation(body, file);
+    if (!cited?.start) return { locators: [], excludedLocators: [{ file, locator: body, reason: "invalid-range" }] };
+    return { locators: [{ file, start: cited.start, end: cited.end }], excludedLocators: [] };
+  }
+  // A strict file-like relative path plus one locator is explicit even when the
+  // path is not authorized. Record that deficiency without accessing the path;
+  // otherwise an unrelated allowed citation could silently replace its source.
+  const unknown = /^(?:`([^`\r\n]+)`|([^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+))\s*(?:#L\d+(?:-L?\d+)?|[:：]\d+(?:[-–—]\d+)?|第\s*\d+(?:\s*[-–—、至到]\s*\d+)?\s*行)$/iu.exec(body);
+  const file = unknown?.[1] ?? unknown?.[2];
+  if (file && /^[^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+\.[A-Za-z0-9_-]+$/u.test(file)) {
+    return { locators: [], excludedLocators: [{ file, locator: body, reason: "unapproved-source" }] };
+  }
+  return null;
 }
 
 /** Deterministic validation of explicitly verbatim, inline-located quotations.
@@ -810,13 +863,14 @@ function quotationChecks(frame, active, spec, manifest) {
   const lines = lineList(readBytes(frame.root,spec.candidate));
   for (const [index,line] of lines.entries()) {
     for (const match of line.matchAll(/(?:原文|原句|逐字引文)\s*(?:为|是|写道|[:：])?\s*[“"]([^”"\n]{1,2000})[”"]/gu)) {
-      const locators = spec.phases[active.phase].evidence.flatMap(file => {
+      const bound = adjacentQuoteLocator(line, match, spec.phases[active.phase].evidence);
+      const locators = bound ? bound.locators : spec.phases[active.phase].evidence.flatMap(file => {
         const cited = citation(line,file);
         return cited?.start ? [{file,start:cited.start,end:cited.end}] : [];
       });
-      if (!locators.length) continue; // No invented cross-reference; the reviewer must resolve it.
+      if (!locators.length && !bound?.excludedLocators.length) continue; // No invented footnote association.
       const refs = [];
-      const excludedLocators = [];
+      const excludedLocators = [...(bound?.excludedLocators ?? [])];
       for (const locator of locators) {
         try { refs.push(evidenceReference(frame, active, spec, locator)); }
         catch (error) {
@@ -835,6 +889,7 @@ function quotationChecks(frame, active, spec, manifest) {
       });
       results.push({block:manifest.blocks.find(b=>b.line===index+1&&b.start<=match.index&&b.end>match.index)?.id ?? "Q"+(index+1),
         line:index+1,text:match[0],lineText:line,contextStart:match.index,refs,matches,
+        ...(bound ? { binding: "adjacent-single-source" } : {}),
         ...(excludedLocators.length ? { excludedLocators } : {}) });
     }
   }
@@ -932,9 +987,9 @@ export function coverageSchema() {
     counterexample: { type: "object", properties: { possible: { type: "boolean" }, reason: string }, required: ["possible", "reason"], additionalProperties: false },
     formal: { type: "object", description: "modus-ponens 的两项依次为 implies(P,Q)、asserts(P)，结论 asserts(Q)；equality-transitive 为 equals(A,B)、equals(B,C)，结论 equals(A,C)。premises 与原文前提顺序一致。", properties: { premises: { type: "array", minItems: 2, maxItems: 2, items: proposition }, conclusion: proposition }, required: ["premises", "conclusion"], additionalProperties: false }, calculation: string,
   }, required: ["rule", "premises", "scope", "assumptions", "counterexample"], additionalProperties: false };
-  const objectCheck={type:"object",properties:{kind:{type:"string",enum:["registered-excerpts","candidate"]},check:{type:"string",enum:["count","contains","excludes","line-status","citation-count","citations-marked"]},
+  const objectCheck={type:"object",properties:{kind:{type:"string",enum:["registered-excerpts","candidate"]},check:{type:"string",enum:["count","contains","excludes","line-status","citation-count","citations-marked","citations-leading-marked"]},
     file:string,source:string,line:integer,expected:{anyOf:[integer,{type:"string",enum:["registered","unregistered"]}]},quote:string,marker:string},required:["kind","check"],additionalProperties:false,
-    description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)，只核登记摘录/快照成员关系，不证明网页全文。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding，不自动改判作者。"};
+    description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)，只核登记摘录/快照成员关系，不证明网页全文。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding，不自动改判作者。"};
   return { offset: integer, count: integer, block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: 12,
     description: "每次提交1至12块，按 inventory 分页分批提交；不能把全文超过12块塞进一次调用。", items: { type: "object", properties: {
     block: string, parts: { type: "array", items: { type: "object", properties: {

@@ -25,7 +25,7 @@ export function claimRow(lines, id) {
 
 /** 识别准确路径及原文行范围，排除同名前缀和备份别名。 */
 export function citation(body, file) {
-  const pattern = new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、])" + escape(file)
+  const pattern = new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、；;])" + escape(file)
     + "(?=$|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "gi" : "g");
   const row = body.replaceAll("\\", "/");
   let mentioned = false;

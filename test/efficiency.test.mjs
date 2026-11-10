@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {fixture,host,policy} from "./helpers.mjs";
-import {authority} from "../governance/policy.mjs";
+import {authority,digest} from "../governance/policy.mjs";
 import {QUALITY,plainLastIssues} from "../governance/preflight.mjs";
 
 const source={file:"functional.csv",start:2,end:2,quote:"19,20"};
@@ -25,6 +25,79 @@ async function reviewStage(h) {
   const reviewer=(await h.flow("root","advance")).childId;
   return {executor,reviewer};
 }
+
+test("receipts separate actual search paths from model prose without leaking query or matching text",async()=>fixture(async(root,write)=>{
+  single(write);const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
+  const packet=await h.flow(reviewer,"prepare");
+  await h.coverage(reviewer,"record",{entries:packet.coverage.blocks.map((b,i)=>({block:b.id,parts:[i?fact:nonfact]}))});
+  const query="functional.csv 第",result=await h.file(reviewer,"search","candidate.md",{query});
+  assert.equal(result.matches.length,1);assert.equal(result.searchObservation.query,query);
+  assert.equal(result.searchObservation.files[0].sha256,digest(fs.readFileSync(path.join(root,"candidate.md"))));
+  const assessed=await h.assess(reviewer,{...quality(),method:"模型误述：在 made-up.md 中执行过搜索。"});
+  assert.match(assessed.assessmentProvenance,/model-assessment/);
+  await h.flow(reviewer,"review",{checks});
+  let receipt=JSON.parse(fs.readFileSync(path.join(root,"first.json"),"utf8"));
+  const [observed]=receipt.searchObservations.entries;
+  assert.equal(observed.querySha256,digest(Buffer.from(query,"utf8")));assert.equal(observed.query,undefined);
+  assert.deepEqual(observed.requestedPaths,["candidate.md"]);assert.equal(observed.currentMaterial,true);
+  assert.equal(observed.complete,true);assert.equal(observed.returnedMatches,1);
+  assert.deepEqual(observed.matchLocations,[{path:"candidate.md",line:2}]);
+  assert.doesNotMatch(JSON.stringify(receipt),/functional\.csv 第/);
+  assert.equal(receipt.assessmentProvenance.proseVerifiedAsToolExecution,false);
+  assert.match(receipt.qualityChecks.method.basis,/made-up\.md/,
+    "The host labels model prose; this test must not pretend arbitrary prose was semantically verified.");
+  const auditor=(await h.flow("root","advance")).childId,other=await h.flow(auditor,"prepare");
+  await h.coverage(auditor,"record",{entries:other.coverage.blocks.map((b,i)=>({block:b.id,parts:[i?fact:nonfact]}))});
+  await h.flow(auditor,"audit");receipt=JSON.parse(fs.readFileSync(path.join(root,"first.json"),"utf8"));
+  assert.equal(receipt.searchObservations.actor,reviewer);assert.equal(receipt.searchObservations.entries.length,1);
+  assert.equal(receipt.independentAudit.searchObservations.actor,auditor);
+  assert.deepEqual(receipt.independentAudit.searchObservations.entries,[],"An auditor cannot inherit the reviewer's actual actions.");
+}));
+
+test("search observations survive same-role interruption but flag changed material",async()=>fixture(async(root,write)=>{
+  single(write);const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
+  await h.flow(reviewer,"prepare");const first=await h.file(reviewer,"search","functional.csv",{query:"19,20"});
+  h.interrupt(reviewer);assert.equal((await h.flow("root","advance")).childId,reviewer);
+  let observed=(await h.assess(reviewer,quality())).searchObservations;
+  assert.equal(observed.entries[0].id,first.searchObservation.id);assert.equal(observed.entries[0].currentMaterial,true);
+  write("functional.csv","passed,total\n19,20\nchanged source version\n");await h.flow(reviewer,"prepare");
+  observed=(await h.assess(reviewer,quality())).searchObservations;
+  assert.equal(observed.entries[0].currentMaterial,false,"Old execution is historical, not current evidence after material changes.");
+  const next=await h.file(reviewer,"search","functional.csv",{query:"19,20"});
+  observed=(await h.assess(reviewer,quality())).searchObservations;
+  assert.equal(observed.entries[1].id,next.searchObservation.id);assert.equal(observed.entries[1].currentMaterial,true);
+}));
+
+test("bounded searches expose scan limits and missing files without granting source-read stamps",async()=>fixture(async(root,write)=>{
+  single(write,{body:Array.from({length:45},(_,i)=>"hit "+(i+1)).join("\n")});
+  const p=JSON.parse(fs.readFileSync(path.join(root,"BUILDING-LOOP.json"),"utf8"));
+  p.units.K01.phases["first-review"].read.push("absent.md");write("BUILDING-LOOP.json",JSON.stringify(p));
+  const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
+  const partial=await h.file(reviewer,"search",undefined,{query:"hit"});
+  assert.equal(partial.matches.length,40);assert.equal(partial.searchObservation.limitReached,true);
+  assert.equal(partial.searchObservation.complete,false);assert.equal(partial.searchObservation.files[0].scannedThrough,40);
+  assert.ok(partial.searchObservation.unsearchedPaths.includes("functional.csv"));
+  const absent=await h.file(reviewer,"search","absent.md",{query:"hit"});
+  assert.equal(absent.searchObservation.complete,false);assert.equal(absent.searchObservation.files[0].exists,false);
+  await assert.rejects(h.file(reviewer,"search","timing.csv",{query:"before"}),/白名单/);
+  await assert.rejects(h.file(reviewer,"search","candidate.md",{query:" "}),/搜索字面量/);
+  const directory=path.join(process.env.DSH_HOME,"building-loop-state");
+  const saved=JSON.parse(fs.readFileSync(path.join(directory,fs.readdirSync(directory).find(name=>name.endsWith(".json"))),"utf8")).units.K01;
+  assert.deepEqual(saved.seen,{},"Search output, particularly truncated snippets, is never a full-read stamp.");
+  assert.equal(saved.searchActivity.entries.length,2,"Failed/unauthorized calls cannot become recorded successes.");
+  assert.ok(saved.searchActivity.entries.every(row=>!Object.hasOwn(row,"query")));
+}));
+
+test("search retention is bounded and reports omitted successful observations",async()=>fixture(async(root,write)=>{
+  single(write);const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
+  await h.flow(reviewer,"prepare");
+  for(let i=0;i<18;i++)await h.file(reviewer,"search","candidate.md",{query:"not-present-"+i});
+  const observed=(await h.assess(reviewer,quality())).searchObservations;
+  assert.equal(observed.entries.length,16);assert.equal(observed.omitted,2);
+  assert.equal(observed.entries[0].querySha256,digest(Buffer.from("not-present-2","utf8")));
+  assert.ok(observed.entries.every(row=>row.complete&&row.returnedMatches===0));
+  assert.match(observed.boundary,/not.*semantic verification/);
+}));
 
 test("role-visible tools shrink while runtime guards and successful turn conclusion remain",async()=>fixture(async(root,write)=>{
   single(write);const h=host(root,{automaticCoverage:false});

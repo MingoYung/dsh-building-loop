@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {fixture,host,policy} from "./helpers.mjs";
-import {authority,readBytes} from "../governance/policy.mjs";
+import {authority,digest,readBytes} from "../governance/policy.mjs";
 import {QUALITY,supplementChecks} from "../governance/preflight.mjs";
 
 const ref={file:"functional.csv",start:2,end:2,quote:"19,20"};
@@ -163,6 +163,52 @@ test("canonical ledger exports every current item including a late request and b
   await assert.rejects(h.file("root","write","ledger.md",{content:"只列六项",note:"改写"}),/宿主生成/);
   assert.ok(!(await h.file("root","list")).write.includes("ledger.md"));
   const replay=await h.ledger("root","export");assert.equal(replay.changed,false);assert.equal(replay.itemCount,7);
+}));
+
+test("optional evidence for keep resume and defer is validated and retained rather than silently discarded",async()=>fixture(async(root,write)=>{
+  configure(write,{ledger:true});const h=host(root);
+  for(const id of ["keep","resume","defer","legacy"])await h.ledger("root","record",{id,kind:"planned",title:"计划 "+id,note:"按当前项目范围复盘后决定何时执行。"});
+  const {decisions}=await closeReady(h);
+  for(const outcome of ["keep","resume","defer"])Object.assign(decisions.find(row=>row.id===outcome),{
+    outcome,basis:"当前目标下的总控判断，定位证据不等于这段判断已经机器证真。",evidence:{file:"overview.md",start:2,end:2}});
+  const before=await h.ledger("root","read");
+  for(const evidence of [null,{file:"functional.csv",start:2,end:2},{file:"overview.md",start:99,end:99},{file:"overview.md",start:2,end:"2"}]) {
+    const bad=structuredClone(decisions);bad.find(row=>row.id==="keep").evidence=evidence;
+    await assert.rejects(h.ledger("root","review",{decisions:bad}),/处置依据|实际读取/);
+    const current=await h.ledger("root","read");assert.equal(current.revision,before.revision);assert.equal(current.current.phase,"ledger-review");
+  }
+  const result=await h.ledger("root","review",{decisions});assert.equal(result.phase,"closed");
+  const items=(await h.ledger("root","read",{includeClosed:true})).items;
+  for(const id of ["keep","resume","defer"])assert.deepEqual(items.find(row=>row.id===id).disposition.evidence,
+    {file:"overview.md",start:2,end:2,sha256:digest(readBytes(root,"overview.md"))});
+  assert.equal(items.find(row=>row.id==="legacy").disposition.evidence,null);
+  const text=fs.readFileSync(path.join(root,"ledger.md"),"utf8");
+  assert.match(text,/总控处置理由（模型判断）：当前目标下的总控判断/);
+  assert.match(text,/已核定位证据：overview\.md 第 2–2 行；SHA-256 /);
+  assert.doesNotMatch(text,/^依据：/m);assert.equal(result.document.format,"building-loop-ledger/2");
+}));
+
+test("optional disposition evidence must refer to actual read lines and the current version",async()=>fixture(async(root,write)=>{
+  const p=configure(write);p.goalContext=["overview.md"];p.ledgerContext=["overview.md","plan-context.md"];
+  p.coordinator.read.push("plan-context.md");write("BUILDING-LOOP.json",JSON.stringify(p));write("plan-context.md","# 计划\n当前事项仍需复盘。\n");
+  const h=host(root);await h.ledger("root","record",{id:"later",kind:"planned",title:"后续工作",note:"需要依据最新现状决定。"});
+  const {reviewer}=await reachReviewer(h);await h.assess(reviewer,quality());assert.equal((await h.flow(reviewer,"review",{checks})).phase,"ledger-review");
+  await h.file("root","read","overview.md");await h.file("root","read","first.json");await h.file("root","read","plan-context.md",{start:1,count:1});
+  const book=await h.ledger("root","read"),decisions=book.items.map(item=>item.id==="later"
+    ?{id:item.id,outcome:"defer",basis:"等待本项现状核定后安排。",evidence:{file:"plan-context.md",start:2,end:2}}
+    :{id:item.id,outcome:"completed",basis:"本单元已通过独立验收。",evidence:{file:"first.json",start:1,end:5}});
+  await assert.rejects(h.ledger("root","review",{decisions}),/实际读取处置依据的当前原文行/);
+  await h.file("root","read","plan-context.md",{start:2,count:1});write("plan-context.md","# 计划\n现状已经改变，须重新读取。\n");
+  await assert.rejects(h.ledger("root","review",{decisions}),/读取最新项目现状/);
+  await h.file("root","read","plan-context.md");assert.equal((await h.ledger("root","review",{decisions})).phase,"closed");
+}));
+
+test("host ledger labels registration text separately before any model disposition exists",async()=>fixture(async(root,write)=>{
+  configure(write,{ledger:true});const h=host(root);
+  await h.ledger("root","record",{id:"later",kind:"planned",title:"后续计划",note:"尚待确认的登记说明。"});
+  const result=await h.ledger("root","export"),text=fs.readFileSync(path.join(root,"ledger.md"),"utf8");
+  assert.equal(result.format,"building-loop-ledger/2");assert.match(text,/账项说明（登记内容）：尚待确认的登记说明。/);
+  assert.match(text,/当前状态：pending/);assert.doesNotMatch(text,/总控处置理由（模型判断）：/);
 }));
 
 test("configured ledger export failure keeps the workflow open and leaves dispositions unapplied",async()=>fixture(async(root,write)=>{

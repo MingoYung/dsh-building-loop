@@ -275,6 +275,15 @@ test("a bare first source mention cannot hide its later actual locator",()=>{
   assert.equal(citation("sources/example.md.bak 第2行；other/sources/example.md 第2行。","sources/example.md"),null);
 });
 
+test("same-line locators after either semicolon are recognized without accepting nested paths",()=>{
+  for(const separator of ["；",";"]) {
+    const line=`出处：sources/synthetic.md 第3行${separator}sources/nist-scatter.md 第6行。`;
+    assert.deepEqual(citation(line,"sources/nist-scatter.md"),{start:6,end:6});
+    assert.deepEqual(citationLineCounts(Buffer.from(line),["sources/nist-scatter.md"]),[{source:"sources/nist-scatter.md",count:1,lines:[1]}]);
+    assert.equal(citation(`${separator}old/sources/nist-scatter.md 第6行。`,"sources/nist-scatter.md"),null);
+  }
+});
+
 test("the actual L23 is counted once after its leading bare mention and total cited lines become seven",()=>{
   const frozen=Array.from({length:23},()=>"");for(const [line,text] of repeatedMentionRows)frozen[line-1]=text;
   assert.deepEqual(citation(frozen[22],"sources/synthetic.md"),{start:1,end:1});

@@ -195,6 +195,59 @@ test("an unrelated acceptance cannot mark a cancelled standalone plan completed"
   assert.equal((await h.ledger("root","read",{includeClosed:true})).items.find(item=>item.id==="cancelled-quiz").status,"obsolete");
 }));
 
+/** Keep a real second unit blocked while the first completes normal production
+ * review/audit. This tests unit identity, not model interpretation of a plan. */
+async function blockedOtherUnitFixture(run) {
+  await fixture(async(root,write)=>{
+    const p=structuredClone(policy);p.units.K01.claims=["C1"];p.units.K01.calculations={};
+    p.units.K02=JSON.parse(JSON.stringify(p.units.K01).replaceAll("candidate.md","candidate2.md").replaceAll("first.json","first2.json").replaceAll("final.json","final2.json"));
+    p.coordinator.read.push("first2.json","final2.json");
+    write("BUILDING-LOOP.json",JSON.stringify(p));
+    write("candidate.md","- C1：通过 19/20（出处：functional.csv 第2行）。\n");
+    write("candidate2.md","尚未执行的独立工作。\n");
+    write("overview.md","# 当前项目\nK02 工作尚未执行；若 K01 交付确实覆盖所需功能，可登记覆盖关系，不代表 K02 自身已完成。\n");
+    const h=host(root),other=(await h.flow("root","advance",{unit:"K02"})).childId;
+    await h.interrupt(other);
+    const worker=(await h.flow("root","advance")).childId;
+    await h.file(worker,"read","candidate.md");await h.flow(worker,"submit");
+    const reviewer=(await h.flow("root","advance")).childId;
+    for(const file of ["candidate.md","functional.csv","overview.md"])await h.file(reviewer,"read",file);
+    await h.assess(reviewer,{...Object.fromEntries(Object.keys(QUALITY).map(k=>[k,"本轮仅验收K01的原始样例与其适用范围。"])),
+      goalFit:{pass:true,basis:"K01当前范围内的样例已按原始行核对。"},sourceRefs:[{file:"functional.csv",start:2,end:2}],unverifiedSources:[],unlisted:[],revise:[]});
+    const result=await h.flow(reviewer,"review",{checks:[{id:"C1",status:"supported",file:"functional.csv",start:2,end:2,basis:"原始行记载通过19，总数20。"}]});
+    assert.equal(result.phase,"ledger-review");
+    for(const file of ["overview.md","first.json"])await h.file("root","read",file);
+    const book=await h.ledger("root","read");
+    const decisions=book.items.map(item=>({id:item.id,outcome:"completed",basis:"测试跨单元误借本轮验收，不应当让尚未执行的K02完成。",evidence:{file:"first.json",start:1,end:5}}));
+    await run({root,h,book,decisions,other});
+  });
+}
+
+test("another blocked unit cannot borrow the current acceptance as completed and rejection preserves its state",async()=>blockedOtherUnitFixture(async({h,book,decisions})=>{
+  const before=(await h.flow("root","status")).units.find(unit=>unit.unit==="K02");assert.equal(before.phase,"blocked");
+  await assert.rejects(h.ledger("root","review",{decisions}),/K02.*(?:自身|本单元).*验收/);
+  const after=(await h.flow("root","status")).units.find(unit=>unit.unit==="K02");assert.deepEqual(after,before);
+  const unchanged=await h.ledger("root","read");assert.equal(unchanged.revision,book.revision);
+  assert.equal(unchanged.items.find(item=>item.id==="unit-K02").status,"deferred");
+  assert.equal(unchanged.constraints.find(row=>row.id==="unit-K02").outcomes.includes("completed"),false);
+  assert.deepEqual(unchanged.constraints.find(row=>row.id==="unit-K01").outcomes,["completed"]);
+  const preserved=decisions.map(row=>row.id==="unit-K02"?{id:row.id,outcome:"keep",basis:"该工作仍被阻塞，尚无自身验收，保留后续处理。"}:row);
+  assert.equal((await h.ledger("root","review",{decisions:preserved})).phase,"closed");
+  assert.equal((await h.flow("root","status")).units.find(unit=>unit.unit==="K02").phase,"blocked");
+  const history=(await h.ledger("root","read",{includeClosed:true})).items.find(item=>item.id==="unit-K01");assert.equal(history.status,"completed");
+  assert.equal((await h.ledger("root","review",{decisions:preserved})).replayed,true);
+  assert.deepEqual((await h.ledger("root","read",{includeClosed:true})).items.find(item=>item.id==="unit-K01"),history);
+}));
+
+test("a blocked unit can still be retired as covered by an actually accepted owned unit",async()=>blockedOtherUnitFixture(async({h,decisions})=>{
+  const covered=decisions.map(row=>row.id==="unit-K02"?{id:row.id,outcome:"covered",coveredBy:"K01",basis:"K01当前交付覆盖该需求，记录替代关系而不声称K02执行完成。",evidence:{file:"overview.md",start:2,end:2}}:row);
+  await assert.rejects(h.ledger("root","review",{decisions:covered.map(row=>row.id==="unit-K02"?{...row,coveredBy:"K02"}:row)}),/coveredBy.*已验收/);
+  assert.equal((await h.ledger("root","review",{decisions:covered})).phase,"closed");
+  assert.equal((await h.flow("root","status")).units.find(unit=>unit.unit==="K02").phase,"retired");
+  const item=(await h.ledger("root","read",{includeClosed:true})).items.find(row=>row.id==="unit-K02");
+  assert.equal(item.status,"covered");assert.equal(item.disposition.coverage.unit,"K01");assert.equal(item.disposition.coverage.receipt,"first.json");
+}));
+
 test("misplaced contradiction evidence gets a precise parameter error without a new stage",async()=>acceptedFixture(async({h,reviewer,readReview,check})=>{
   await readReview();
   await assert.rejects(h.flow(reviewer,"review",{checks:[{...check,status:"unsupported",file:undefined,start:undefined,end:undefined,

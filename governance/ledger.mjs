@@ -4,6 +4,9 @@ import { acceptedVersion } from "./goals.mjs";
 
 export const TERMINAL = new Set(["closed", "retired"]);
 const FINISHED = new Set(["completed", "covered", "obsolete"]);
+// The projection version distinguishes explicit model-reason labels from the
+// historical generic "依据" format without rewriting stored dispositions.
+const EXPORT_FORMAT="building-loop-ledger/2";
 
 /** Keep the book in the same locked, atomic state file as workflow transitions. */
 function book(frame) {
@@ -98,9 +101,9 @@ export function exportLedger(frame) {
   for(const item of items) {
     const disposition=item.disposition,evidence=disposition?.evidence,coverage=disposition?.coverage;
     lines.push("","### "+literal(item.id),"", "名称："+literal(item.title),
-      "当前状态："+literal(item.status),"依据："+literal(disposition?.basis??item.note));
+      "当前状态："+literal(item.status),(disposition?"总控处置理由（模型判断）：":"账项说明（登记内容）：")+literal(disposition?.basis??item.note));
     if(disposition)lines.push("已登记处置："+literal(disposition.outcome)+"；核对单元："+literal(disposition.checkpoint));
-    if(evidence)lines.push("处置证据："+literal(evidence.file)+" 第 "+evidence.start+"–"+evidence.end+" 行；SHA-256 "+literal(evidence.sha256));
+    if(evidence)lines.push("已核定位证据："+literal(evidence.file)+" 第 "+evidence.start+"–"+evidence.end+" 行；SHA-256 "+literal(evidence.sha256));
     if(coverage)lines.push("覆盖关系："+literal(coverage.unit)+"；验收回执 "+literal(coverage.receipt)+"；回执 SHA-256 "+literal(coverage.receiptHash)
       +"；候选 SHA-256 "+literal(coverage.candidateSha256)+"；目标 SHA-256 "+literal(coverage.goal?.sha256));
     if(item.origin)lines.push("原始请求："+literal(item.origin.session)+"；事件 "+item.origin.event+"；SHA-256 "+literal(item.origin.sha256));
@@ -110,7 +113,7 @@ export function exportLedger(frame) {
   const content=lines.join("\n")+"\n";
   const result=replaceWithHistory(frame.root,file,content,"宿主导出当前账本 revision "+view.revision,
     frame.agent.id+"/ledger/"+view.revision,frame.state.markers,frame.rollback??=[]);
-  const projection={path:file,revision:view.revision,owner:frame.agent.id,sha256:digest(content),itemIds:items.map(item=>item.id)};
+  const projection={format:EXPORT_FORMAT,path:file,revision:view.revision,owner:frame.agent.id,sha256:digest(content),itemIds:items.map(item=>item.id)};
   frame.state.ledgerProjection=projection;frame.changed=true;
   return {configured:true,exported:true,...projection,itemCount:items.length,changed:result.changed};
 }
@@ -217,7 +220,7 @@ export function ledgerAction(frame, args) {
       constraints: view.items.map(item=>({id:item.id,
         outcomes:item.id==="unit-"+unitId?["completed"]
           : active&&frame.policy.units[unitId].covers.includes(item.id)?["covered","obsolete"]
-          : item.unit||item.origin?["keep","resume","defer","completed","covered","obsolete"]
+          : item.origin&&!item.unit?["keep","resume","defer","completed","covered","obsolete"]
           : ["keep","resume","defer","covered","obsolete"],
         ...(item.id==="unit-"+unitId?{requiredEvidenceFile:active.receipt}:{}),
         evidenceRequiredFor:["completed","covered","obsolete"],coveredByRequiredFor:"covered"})) };
@@ -242,7 +245,18 @@ export function ledgerAction(frame, args) {
     const decision = args.decisions.find(row => row.id === item.id);
     if (!decision || !["keep", "resume", "defer", "completed", "covered", "obsolete"].includes(decision.outcome)) throw new Error("账本处置项缺失或状态无效 " + item.id);
     const basis = reason(decision.basis);
-    const evidence = FINISHED.has(decision.outcome) ? contextReference(frame, active, decision.evidence) : null;
+    // Completion belongs to this unit's own independently accepted checkpoint.
+    // A blocked sibling may be retained, cancelled, or replaced by an accepted
+    // delivery; another unit's receipt must never claim it actually completed.
+    // Finished historical items are absent from this open-item plan and unchanged.
+    if(decision.outcome==="completed"&&item.unit&&item.unit!==unitId) {
+      throw new Error(item.id+" 须由本单元自身验收后登记 completed，不能借 "+unitId+" 的验收完成其他阻塞工作；保留/续做用 keep、resume 或 defer，确被已验收成果替代用 covered 并提供 coveredBy，取消用 obsolete");
+    }
+    // Continuing work may cite its current context too. Omission stays legacy-
+    // compatible, but an explicitly supplied locator is never silently dropped:
+    // it must pass the same authority, exact read range and current-version gate.
+    const evidence = FINISHED.has(decision.outcome)||decision.evidence!==undefined
+      ? contextReference(frame, active, decision.evidence) : null;
     if (frame.policy.units[unitId].covers.includes(item.id) && !["covered","obsolete"].includes(decision.outcome)) {
       throw new Error(item.id + " 已声明由本轮当前目标下的验收产物替代，请 covered 并填 coveredBy；关系确已失效时引用当前目标标 obsolete");
     }
