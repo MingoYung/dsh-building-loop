@@ -8,6 +8,8 @@ const tags = /<!--[\s\S]*?(?:-->|$)|<\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>])(?:[^>"
 const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 const literalTags = new Set(["pre", "code", "script", "style", "textarea"]);
 const hiddenBlocks = new Set(["blockquote", "code", "footnoteDefinition", "definition"]);
+export const footnoteId = "[A-Za-z0-9][A-Za-z0-9_.-]{0,63}";
+export const footnoteDefinition = new RegExp("^ {0,3}\\[\\^(" + footnoteId + ")\\]:", "u");
 
 /** Classify Markdown from one syntax tree and retain physical line positions.
  * The project consumes original text and can impose stricter requirements
@@ -19,6 +21,8 @@ export function markdownStructure(lines) {
   const htmlHidden = new Int32Array(lines.length + 1);
   const visible = [...lines];
   const closingRows = new Uint8Array(lines.length);
+  const standaloneFootnotes = new Uint8Array(lines.length);
+  const continuedFootnotes = new Uint8Array(lines.length);
   const fences = [];
   const htmlScopes = new Map();
   const pending = [{ node: root, parent: null, item: null, list: null }];
@@ -68,6 +72,15 @@ export function markdownStructure(lines) {
     const last = end.line - 1;
     if (hiddenBlocks.has(node.type)) {
       hide(first, last);
+      if (node.type === "footnoteDefinition" && parent === root) {
+        const marker = footnoteDefinition.exec(lines[first]);
+        if (marker && lines[first].slice(marker[0].length).trim()) {
+          // A goal can preserve this exact source locator without treating
+          // its contents as prose or letting a lazy continuation count.
+          if (first === last) standaloneFootnotes[first] = 1;
+          else continuedFootnotes.fill(1, first, last + 1);
+        }
+      }
       if (node.type === "code" && parent === root && start.column === 1) {
         const opener = fenceMarker.exec(lines[first]);
         if (opener && /^building-loop-required-lines\b/u.test(opener[2].trim())) {
@@ -118,6 +131,7 @@ export function markdownStructure(lines) {
     htmlDepth += htmlHidden[line];
     htmlHidden[line] = htmlDepth;
     if (depth || htmlDepth) visible[line] = "";
+    if (htmlDepth) standaloneFootnotes[line] = 0;
   }
-  return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, closingRows };
+  return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, closingRows, standaloneFootnotes, continuedFootnotes };
 }

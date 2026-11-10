@@ -1,5 +1,5 @@
 import { digest, includes, keyOf, readBytes, text } from "./policy.mjs";
-import { markdownStructure } from "./markdown-structure.mjs";
+import { footnoteDefinition, footnoteId, markdownStructure } from "./markdown-structure.mjs";
 
 export const QUALITY = {
   sources: "资料的原始出处、核实办法和仍待证的部分",
@@ -81,8 +81,6 @@ function escapedMarkdown(text, index) {
   return slashes%2===1;
 }
 
-const footnoteId="[A-Za-z0-9][A-Za-z0-9_.-]{0,63}";
-const footnoteDefinition=new RegExp("^ {0,3}\\[\\^("+footnoteId+")\\]:","u");
 const touchingFootnote=new RegExp("^\\[\\^("+footnoteId+")\\]","u");
 const footnoteMarkers=new RegExp("\\[\\^("+footnoteId+")\\]","gu");
 const finalFootnoteMarker=new RegExp("\\[\\^("+footnoteId+")\\]$","u");
@@ -148,8 +146,8 @@ function footnoteProse(lines) {
  * than treating arbitrary rendered markup as a literal preservation proof.
  */
 export function requiredLineMarkdown(lines) {
-  const { fences, visible } = markdownStructure(lines);
-  return {fences,live:visible.map(line=>!!line.trim()),visible};
+  const { fences, visible, standaloneFootnotes, continuedFootnotes } = markdownStructure(lines);
+  return { fences, live: visible.map(line => !!line.trim()), visible, standaloneFootnotes, continuedFootnotes };
 }
 
 /** Resolve only one quote-owned Markdown marker and one single-line definition.
@@ -655,8 +653,11 @@ export function plainLastIssues(spec, lines) {
   const newLabel = /^\s*(?:\[|【)?(?:错例|误读|错误示例|错误推理|附录)(?:\s*(?:第)?(?:\d+|[零〇一二两三四五六七八九十百千]+))?(?:\]|】|\s*[:：])/u;
   const appended = body.some(line => blockBoundary.test(line) || newLabel.test(visible(line)) || errorExample(line));
   const explanationVisible = !section || structure.visible.slice(last + 1).some(line => line.trim());
-  return last >= 0 && paragraphs.length === 1 && explanationVisible && !appended ? []
-    : ["正文末尾须有代码/HTML/引用块之外的独立行‘大白话：…’或‘直白说明：…’，可直接接在列表后；其解释之后不能再放错例、附录或其他段落。"];
+  if (last >= 0 && paragraphs.length === 1 && explanationVisible && !appended) return [];
+  const footnoteClosing = lines.findIndex((line, index) => structure.continuedFootnotes[index]
+    && !/^(?: {4}| *\t)/u.test(line) && (labelled.test(visible(line)) || heading.test(visible(line))));
+  return ["正文末尾须有代码/HTML/引用块之外的独立行‘大白话：…’或‘直白说明：…’，可直接接在列表后；其解释之后不能再放错例、附录或其他段落。",
+    ...(footnoteClosing < 0 ? [] : ["第 " + (footnoteClosing + 1) + " 行仍属于上一脚注定义。请在脚注定义之后插入空行，让末尾说明成为独立正文。"])];
 }
 
 /** 补查提交前逐项检查退回、遗漏事实及可复算数字。 */

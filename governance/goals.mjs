@@ -126,13 +126,19 @@ export function requiredLineCheck(frame,id,candidate,pinned,observer) {
   const {lines:required=[],markers,profileSource}=requiredLines(frame,contractBytes).get(id)??{};
   const issues=[];
   if(required.length){
-    const rows=lineList(candidate),{live,visible}=requiredLineMarkdown(rows);
+    const rows = lineList(candidate);
+    const { live, visible, standaloneFootnotes, continuedFootnotes } = requiredLineMarkdown(rows);
     for(const [index,literal] of required.entries()){
-      let count=0,visible=false;
-      for(const [line,row] of rows.entries())if(row===literal){count++;visible||=live[line];}
-      if(count!==1||!visible){
+      let count = 0, allowed = false, continuedFootnote = false;
+      for (const [line, row] of rows.entries()) if (row === literal) {
+        count++;
+        allowed ||= live[line] || !!standaloneFootnotes[line];
+        continuedFootnote ||= !!continuedFootnotes[line];
+      }
+      if(count!==1||!allowed){
         const detail=count===0?"缺失":count>1?"重复（含隐藏位置）":"只出现在非正文区域";
-        issues.push("当前目标原句第 "+(index+1)+" 项"+detail+"，须按 "+file+" 的本单元约束逐字保留一次");
+        const hint = count === 1 && continuedFootnote ? "。当前这行被纳入多行脚注定义，请在脚注定义之后插入空行，并保持脚注定义和正文各自独立。" : "";
+        issues.push("当前目标原句第 "+(index+1)+" 项"+detail+"，须按 "+file+" 的本单元约束逐字保留一次"+hint);
       }
     }
     if(markers?.length){
