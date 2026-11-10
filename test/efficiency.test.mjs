@@ -273,6 +273,32 @@ test("a new classification mismatch after the targeted pass blocks without reusi
   assert.equal(changed.reconciliation,undefined);assert.equal(changed.coverage.pendingCount,changed.coverage.total);
 }));
 
+test("an exhausted reconciliation persisted before the classification upgrade can be reviewed again",async()=>fixture(async(root,write)=>{
+  const {h,reviewer,auditor,disputed}=await classificationLoop(root,write,{partialAudit:true});
+  await h.flow("root","advance");await h.flow(reviewer,"prepare");
+  await h.coverage(reviewer,"record",{entries:[{block:disputed.id,parts:[fact]}]});
+  await h.flow(reviewer,"review",{checks});
+  await h.flow("root","advance");await h.flow(auditor,"prepare");
+  assert.equal((await h.flow(auditor,"audit")).phase,"blocked");
+  await assert.rejects(h.flow("root","advance"),/定向重核已结束/);
+
+  // Simulate 0.7.2 persisted state without changing any project input.
+  const directory=path.join(process.env.DSH_HOME,"building-loop-state");
+  const file=path.join(directory,fs.readdirSync(directory).find(name=>name.endsWith(".json")));
+  const state=JSON.parse(fs.readFileSync(file,"utf8")),unit=state.units.K01;
+  for(const binding of [unit.reconciliationBinding,unit.restoredCheckpointBinding,
+    unit.reviewerCheckpoint?.binding,unit.auditorCheckpoint?.binding]) {
+    if(binding)delete binding.classificationVersion;
+  }
+  fs.writeFileSync(file,JSON.stringify(state));
+  const status=(await h.flow("root","status")).units[0];
+  assert.equal(status.next,"final-review");assert.equal(status.reason,undefined);
+  assert.equal((await h.flow("root","advance")).childId,reviewer);
+  const packet=await h.flow(reviewer,"prepare");
+  assert.equal(packet.reconciliation,undefined);assert.equal(packet.coverage.pendingCount,packet.coverage.total);
+  assert.ok(packet.files.some(file=>file.path==="candidate.md"));
+}));
+
 test("changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse",async()=>{
   for(const change of ["candidate","goal","source","instructions"])await fixture(async(root,write)=>{
     const {h,reviewer}=await classificationLoop(root,write,{instructions:true});

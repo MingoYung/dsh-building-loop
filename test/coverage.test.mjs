@@ -6,7 +6,7 @@ import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { acceptedVersion, goalSnapshot, needsRevalidation } from "../governance/goals.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
-import { coverageAction, coverageSummary, documentCoverage, citationLineCounts, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks } from "../governance/coverage.mjs";
+import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks } from "../governance/coverage.mjs";
 
 /** Raw helpers test the mandatory production gate without auto-generated reviews. */
 function environment(root) {
@@ -341,8 +341,9 @@ test("presentation advice cannot enter factual repair debt without an actual fac
   write("candidate.md","大白话：把状态和结果分开看。\n");
   const e=environment(root),block=e.invoke("inventory").blocks[0].id;
   const rejected={kind:"direct",status:"uncertain",sourceRelation:"insufficient",basis:"方向正确，但结尾没有重复所有正文要点，属于写法。",repair:"再补一句解释。"};
-  assert.throws(()=>e.invoke("record",{entries:[{block,parts:[rejected]}]}),/事实退回须/);
-  assert.throws(()=>e.invoke("record",{entries:[{block,parts:[{...rejected,finding:{kind:"presentation",quote:"分开看",fix:"加长收尾"}}]}]}),/事实退回须/);
+  assert.throws(()=>e.invoke("record",{entries:[{block,parts:[rejected]}]}),/中性.*nonfactual/);
+  assert.throws(()=>e.invoke("record",{entries:[{block,parts:[{...rejected,finding:{kind:"presentation",quote:"分开看",fix:"加长收尾"}}]}]}),/中性.*nonfactual/);
+  assert.equal(e.invoke("status").rejected.length,0);
   e.invoke("record",{entries:[{block,parts:[nonfact]}]});assert.equal(e.finish().rejected.length,0);
 }));
 
@@ -855,3 +856,142 @@ test("old correctly bound positive candidate proofs remain readable while the hi
       result:{matches:true,actual:2,unit:"candidate-citation-lines",lines:[2,3],missingLines:[],missingCount:0}}};
   assert.throws(()=>requireStoredObjectChecks(e.frame,e.spec,[{records:[{block:block.id,parts:[legacy]}]}],Buffer.from(body)),/须重新核验/);
 }));
+
+// The final B16 from 023249Z was correct author text. A previous role's direct
+// label forced the later reviewer to prove even the structural label as fact.
+const advice023249Z="大白话：把完成状态、实际结果和证据能说明的范围分开看。";
+test("023249Z B16 neutral advice cannot manufacture a factual union or require author rewriting",()=>{
+  const full={block:"B16-34fd46e9",line:14,text:advice023249Z,parts:[{...fact,quote:advice023249Z,start:0,end:advice023249Z.length}]};
+  const neutral={...full,parts:[{...nonfact,quote:advice023249Z,start:0,end:advice023249Z.length}]};
+  assert.deepEqual(classificationDisagreements({records:[full]},{records:[neutral]}),[]);
+  const oldDispute={block:full.block,line:14,text:advice023249Z,factualSpans:[[0,4],[4,10],[10,27]],requiredSpans:[[0,4],[4,10],[10,27]]};
+  assert.equal(recordMeetsDispute(neutral,oldDispute),true);
+  assert.equal(recordMeetsDispute({...neutral,parts:[]},oldDispute),false);
+});
+
+test("023249Z B16 accepts a bounded classification correction and rejects new direct author debt",async()=>fixture(async(root,write)=>{
+  write("candidate.md",advice023249Z+"\n");const e=environment(root),block=e.invoke("inventory").blocks[0];
+  e.active.reconciliation=[{block:block.id,text:block.text,requiredSpans:[[0,block.text.length]]}];
+  e.invoke("record",{entries:[{block:block.id,parts:[nonfact]}]});
+  assert.equal(e.finish().rejected.length,0);
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[fact]}]}),/中性.*nonfactual/);
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),advice023249Z+"\n");
+}));
+
+test("neutral recognition is limited to explicit structural labels and complete bare-concept directives",()=>{
+  for(const text of ["大白话：","**直白说明：**","# 摘要","## **建议**",
+    "- 直白说明：把事实与推测分开看。","请区分条件和结论。","建议把定义、对象及单位分开说明。",
+    "把状态和结果区分清楚。","分清相关关系与因果关系。",advice023249Z]) {
+    const ranges=neutralTextSpans(text);
+    for(let i=0;i<text.length;i++)if(/[\p{L}\p{N}]/u.test(text[i]))assert.ok(ranges.some(row=>row.start<=i&&i<row.end),text+":"+i);
+    const direct={block:"B1",text,parts:[{...fact,start:0,end:text.length}]},neutral={...direct,parts:[{...nonfact,start:0,end:text.length}]};
+    assert.deepEqual(classificationDisagreements({records:[direct]},{records:[neutral]}),[]);
+  }
+  for(const text of ["# 当前项目已经完成","# 所有结论已证实","当前结果：","“大白话：把事实与推测分开看。”","> 大白话：全部完成。"])
+    assert.deepEqual(neutralTextSpans(text),[],text);
+});
+
+test("unknown modifiers, source-dependent advice, numeric assertions and appended tails never become host neutral",async()=>fixture(async(root,write)=>{
+  const cases=[
+    "请把已经证明有效的方法和无效方法分开看。",
+    "把完成状态、实际结果和成功率100%的结论分开看。",
+    "大白话：把状态和结果分开看，但是24ms就是24%。",
+    "大白话：完成状态不保证成功。",
+    "建议把状态和结果分开看，因为结果全部成功。",
+    "只有把事实和推测分开看才能保证成功。",
+    "把研究A和研究B分开看。",
+    "把状态和结果分开看，适用于所有研究。",
+    "建议：所有项目均已完成。",
+  ];
+  for(const text of cases) {
+    assert.equal(neutralTextSpans(text).some(row=>row.kind==="directive"),false,text);
+    const direct={block:"B1",text,parts:[{...fact,start:0,end:text.length}]},neutral={...direct,parts:[{...nonfact,start:0,end:text.length}]};
+    const disputes=classificationDisagreements({records:[direct]},{records:[neutral]});assert.equal(disputes.length,1,text);
+    assert.equal(recordMeetsDispute(neutral,disputes[0]),false,text);
+    write("candidate.md",text+"\n");const e=environment(root),block=e.invoke("inventory").blocks[0];
+    e.active.reconciliation=[{...disputes[0],block:block.id}];
+    assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[nonfact]}]}),/事实分类争议尚未逐项落实/);
+  }
+  assert.deepEqual(neutralTextSpans(cases[2]).map(({start,end,kind})=>({start,end,kind})),[{start:0,end:4,kind:"structural-label"}]);
+  // Sentence splitting never extends a safe prefix over another actual block.
+  const blocks=documentCoverage(Buffer.from("大白话：把状态和结果分开看；所有20项均通过。\n")).blocks;
+  assert.equal(blocks.length,2);assert.equal(blocks[1].text,"所有20项均通过。");assert.equal(blocks[1].neutralSpans,undefined);
+}));
+
+test("a structural label is neutral while its factual explanation still needs actual proof",async()=>fixture(async(root,write)=>{
+  const label="大白话：",tail="本样例通过19/20。",text=label+tail;
+  write("candidate.md",text+"\n");const e=environment(root),block=e.invoke("inventory").blocks[0];
+  assert.deepEqual(block.neutralSpans.map(({start,end,kind})=>({start,end,kind})),[{start:0,end:label.length,kind:"structural-label"}]);
+  e.invoke("record",{entries:[{block:block.id,parts:[fact]}]});const whole=e.finish();
+  e.invoke("record",{entries:[{block:block.id,parts:[{...nonfact,quote:label},{...fact,quote:tail}]}]});
+  assert.deepEqual(classificationDisagreements(whole,e.finish()),[]);
+  assert.throws(()=>e.invoke("record",{entries:[{block:block.id,parts:[{...fact,quote:label},{...fact,quote:tail}]}]}),/中性.*nonfactual/);
+  const neutral={block:block.id,text,neutralSpans:[{start:0,end:text.length,kind:"directive"}],parts:[{...nonfact,start:0,end:text.length}]};
+  // A model/old receipt cannot make the factual tail neutral by supplying ranges.
+  const disputed=classificationDisagreements(whole,{records:[neutral]})[0];
+  assert.ok(disputed.requiredSpans.every(([start])=>start>=label.length));assert.equal(recordMeetsDispute(neutral,disputed),false);
+}));
+
+test("inventory exposes bounded host ranges without automatically completing neutral blocks",async()=>fixture(async(root,write)=>{
+  write("candidate.md",advice023249Z+"\n");const e=environment(root),inventory=e.invoke("inventory"),block=inventory.blocks[0];
+  assert.equal(inventory.classificationVersion,CLASSIFICATION_VERSION);
+  assert.deepEqual(block.neutralSpans.map(row=>row.kind),["structural-label","directive"]);
+  assert.throws(e.finish,/未核块/);assert.equal(inventory.pendingCount,1);
+  e.invoke("record",{entries:[{block:block.id,parts:[nonfact]}]});assert.equal(e.finish().rejected.length,0);
+}));
+
+function scopeEnvironment(root,write,body,{pinned=true,kind="synthetic",source="# 模拟数据\nstatus=completed，conclusion=failure。\n"}={}) {
+  const p=structuredClone(policy);p.units.K01.claims=[];p.units.K01.calculations={};
+  if(pinned)p.sourcePins={"functional.csv":{kind,locator:kind==="synthetic"?"synthetic:scope-test":"https://example.test/real",sha256:digest(source)}};
+  write("functional.csv",source);write("candidate.md",body);write("BUILDING-LOOP.json",JSON.stringify(p));
+  const e=environment(root),block=e.invoke("inventory").blocks[0];
+  const scopeRef={file:"functional.csv",start:2,end:2,quote:"status=completed，conclusion=failure。"};
+  const direct={...fact,evidence:[scopeRef]};
+  const put=(parts)=>e.invoke("record",{entries:[{block:block.id,parts}]});
+  return {...e,block,direct,put};
+}
+
+test("030757Z leading simulation scope cannot be nonfactual and the body keeps its independent proof",async()=>fixture(async(root,write)=>{
+  const text="[模拟] 完成状态与实际结论是两个字段（出处：functional.csv 第2行）。\n";
+  const e=scopeEnvironment(root,write,text),marker="[模拟] ",tail=e.block.text.slice(marker.length);
+  assert.deepEqual(e.block.scopeMarkers,[{start:0,end:4,kind:"synthetic",label:"[模拟]"}]);assert.equal(e.block.neutralSpans,undefined);
+  assert.throws(()=>e.put([{...nonfact,quote:marker},{...e.direct,quote:tail}]),error=>{
+    assert.match(error.message,/scope-marker/);assert.match(error.message,/"kind":"direct"/);assert.match(error.message,/不能.*nonfactual/);return true;
+  });
+  e.put([{...e.direct,quote:marker},{...e.direct,quote:tail}]);assert.equal(e.finish().rejected.length,0);
+  assert.throws(()=>e.put([{...e.direct,quote:marker},{...e.direct,quote:tail,evidence:[]}]),/直接事实须给 evidence/);
+  assert.equal(fs.readFileSync(path.join(root,"candidate.md"),"utf8"),text);
+}));
+
+test("simulation scope is bound to the same authorized source and does not promote real or unknown material",async()=>fixture(async(root,write)=>{
+  const text="[模拟] 完成状态与实际结论是两个字段（出处：functional.csv 第2行）。\n";
+  let e=scopeEnvironment(root,write,text);assert.throws(()=>e.put([{...e.direct,evidence:[{file:"timing.csv",start:2,end:2,quote:"before,120"}]}]),/同源.*合成范围证明/);
+  e=scopeEnvironment(root,write,text,{kind:"primary"});assert.throws(()=>e.put([e.direct]),/未知范围不能自动算模拟/);
+  e.put([{kind:"direct",status:"unsupported",sourceRelation:"insufficient",basis:"当前资料尚无足够依据支持其模拟范围声明。",finding:{kind:"missing-evidence",quote:"[模拟]",fix:"核实这份实际来源的范围属性，不能凭标签假设其为模拟数据。"}}]);
+  assert.equal(e.finish().rejected.length,1);
+  // Primary is provenance, not a claim that every dataset is a real observation.
+  e.put([{...e.direct,quote:"[模拟] ",evidence:[{file:"functional.csv",start:1,end:1,quote:"# 模拟数据"}]},{...e.direct,quote:e.block.text.slice(5)}]);
+  assert.equal(e.finish().rejected.length,0);
+  e=scopeEnvironment(root,write,text,{pinned:false});assert.throws(()=>e.put([e.direct]),/明确合成声明/);
+  e.put([{...e.direct,quote:"[模拟] ",evidence:[{file:"functional.csv",start:1,end:1,quote:"# 模拟数据"}]},{...e.direct,quote:e.block.text.slice(5)}]);
+  assert.equal(e.finish().rejected.length,0);
+}));
+
+test("scope provenance changes and old nonfactual receipts invalidate through the shared source and closure gates",async()=>fixture(async(root,write)=>{
+  const body="[模拟] 完成状态与实际结论是两个字段（出处：functional.csv 第2行）。\n",e=scopeEnvironment(root,write,body);
+  e.put([e.direct]);const coverage=e.finish();
+  assert.doesNotThrow(()=>requireStoredObjectChecks(e.frame,e.spec,[coverage],Buffer.from(body)));
+  const old=structuredClone(coverage);old.records[0].parts=[{...nonfact,quote:e.block.text,start:0,end:e.block.text.length}];
+  assert.throws(()=>requireStoredObjectChecks(e.frame,e.spec,[old],Buffer.from(body)),/须重新核验/);
+  e.active.coverage.records[e.block.id]=old.records[0];assert.equal(e.invoke("inventory").invalidatedCount,1);
+  e.put([e.direct]);e.frame.policy.sourcePins[keyOf("functional.csv")].kind="primary";
+  assert.throws(()=>requireStoredObjectChecks(e.frame,e.spec,[coverage],Buffer.from(body)),/须重新核验/);
+  assert.equal(e.invoke("inventory").invalidatedCount,1);
+}));
+
+test("only a true leading simulation marker is handled; other tags and example or numbered internals stay unchanged",()=>{
+  for(const text of ["[模拟] 正文。","- [模拟] 正文。","## [模拟] 正文。","1. [模拟] 正文。"])
+    assert.equal(documentCoverage(Buffer.from(text)).blocks[0].scopeMarkers?.[0]?.label,"[模拟]",text);
+  for(const text of ["[实测] 正文。","[稿件自述] 本稿标记为[模拟]。","C3：[模拟] 正文。","错例：[模拟] 正文。","[错例] [模拟] 正文。","不是[模拟]。"])
+    assert.equal(documentCoverage(Buffer.from(text)).blocks[0].scopeMarkers,undefined,text);
+});

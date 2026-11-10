@@ -3,6 +3,9 @@ import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseli
 import { evidenceReference, registeredObservation, UnobservedExcerptError } from "./evidence.mjs";
 
 export const COVERAGE_VERSION = 1;
+// Checkpoint bindings include this separate classification contract revision;
+// source/proof storage stays compatible while obsolete classification loops reset.
+export const CLASSIFICATION_VERSION = 3;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -11,6 +14,84 @@ const STATUSES = ["supported", "unsupported", "uncertain"];
 // These unambiguous surface connectives are a conservative minimum, not a
 // universal parser. Untagged/implicit deductions remain the reviewers' duty.
 const explicitInference = text => /(?:因此|所以|由此(?:可见|可得|推出)?|据此(?:可知|推出)?|therefore|\bhence\b|\bthus\b)/i.test(text);
+
+// These are presentation labels and bare concepts, never a general heading or
+// imperative classifier. The finite lexicon deliberately excludes predicates,
+// quantities, modifiers such as "已证实", and arbitrary quoted propositions.
+const NEUTRAL_LABELS=["大白话","直白说明","摘要","结论","建议","方法","依据","注意事项"];
+const ADVICE_CONCEPTS=["状态","完成状态","执行状态","任务状态","结果","实际结果","执行结果","结论","证据","证据范围","证据能说明的范围",
+  "适用范围","条件","前提","假设","事实","推测","建议","相关","因果","相关关系","因果关系","定义","概念","对象","数量","单位","来源"];
+const neutralLabels=NEUTRAL_LABELS.join("|"),neutralConcepts="(?:"+[...ADVICE_CONCEPTS].sort((a,b)=>b.length-a.length).join("|")+")";
+const conceptList=neutralConcepts+"(?:\\s*(?:、|和|与|及)\\s*"+neutralConcepts+"){1,7}";
+const neutralDirective=new RegExp("^(?:(?:请|建议)\\s*)?(?:把\\s*"+conceptList+"\\s*(?:分开看|分开说明|区分清楚)|(?:区分|分清)\\s*"+conceptList+")[。.!！]?\\s*$","u");
+
+/** Host-only neutral ranges come from actual block bytes, never a model's part
+ * boundaries. Labels neutralize only themselves. An advice body must match the
+ * entire bounded directive; unknown qualifications/reasons/tails stay factual
+ * candidates and cannot borrow the safe prefix. Every block still needs review.
+ */
+export function neutralTextSpans(text) {
+  if(typeof text!=="string"||!text.trim())return [];
+  const ranges=[],decoration=/^\s*(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)?/u.exec(text)[0].length;
+  const remaining=text.slice(decoration);
+  const label=new RegExp("^(?:(?:"+neutralLabels+")\\s*[:：]|\\*\\*(?:"+neutralLabels+")\\s*[:：]\\*\\*|\\*\\*(?:"+neutralLabels+")\\*\\*\\s*[:：])\\s*","u").exec(remaining);
+  let bodyStart=decoration;
+  if(label){bodyStart=decoration+label[0].length;ranges.push({start:0,end:bodyStart,kind:"structural-label",rule:"explicit-label-v1"});}
+  else if(new RegExp("^\\s*#{1,6}\\s+(?:(?:"+neutralLabels+")|\\*\\*(?:"+neutralLabels+")\\*\\*)\\s*(?:#+\\s*)?$","u").test(text)) {
+    return [{start:0,end:text.length,kind:"structural-label",rule:"explicit-label-v1"}];
+  }
+  if(neutralDirective.test(text.slice(bodyStart)))ranges.push({start:bodyStart,end:text.length,kind:"directive",rule:"bare-concept-separation-v1"});
+  return ranges;
+}
+
+function neutralMask(text) {
+  const mask=new Uint8Array(text.length);
+  for(const {start,end} of neutralTextSpans(text))mask.fill(1,start,end);
+  return mask;
+}
+
+/** A leading simulation marker asserts source scope; it is never neutral syntax.
+ * C-number/error-example internals and other bracket tags keep their own rules. */
+function simulationMarker(text) {
+  const match=/^\s*(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)?\[模拟\]/u.exec(text);
+  return match?{start:match[0].lastIndexOf("[模拟]"),end:match[0].length,kind:"synthetic",label:"[模拟]"}:null;
+}
+function scopeFailure(message,block,marker) {
+  const example={quote:block.text.slice(0,marker.end),kind:"direct",status:"supported",sourceRelation:"supports",basis:"说明该行实际来源的合成范围",evidence:[{file:"该行实际引用来源",start:1,end:1,quote:"替换为已读行逐字原文"}]};
+  return new Error("[building-loop/scope-marker] "+message+"。这是核验参数/范围证明问题，不要求改作者正文。将标记单列 "+JSON.stringify(example)+"；示例行号1须替换为实际已读范围。后续正文另按 direct/inference 核验。没有依据可用 unsupported/uncertain 与真实 finding，不能把标记降为 nonfactual。");
+}
+
+/** Reuse ordinary verified refs; a document pin can prove its scope even when
+ * the citation points to a substantive row. Other pin kinds (or no pin) need a
+ * conservative explicit same-source declaration, not filename/label guessing. */
+function validateSimulationScope(frame,active,spec,block,parts) {
+  const marker=simulationMarker(block?.text??"");if(!marker)return;
+  const covering=parts.filter(part=>part.start<marker.end-1&&part.end>marker.start+1);
+  if(!covering.length||covering.some(part=>!["direct","inference"].includes(part.kind)))throw scopeFailure("[模拟] 是有事实含义的来源范围标记，须用 direct/inference 覆盖",block,marker);
+  const files=spec.phases[active.phase].evidence.filter(file=>{
+    const located=citation(block.lineText??block.text,file),bytes=readBytes(frame.root,file);
+    return located?.start&&bytes&&includes(spec.phases[active.phase].read,file)&&located.end<=lineList(bytes).length;
+  });
+  for(const part of covering) {
+    if(part.status!=="supported")continue; // The existing finding gate owns real rejection.
+    if(files.length!==1)throw scopeFailure("范围归属须有唯一、有效且授权的同行引用来源，不能猜多个来源的标签归属",block,marker);
+    const refs=[...(part.evidence??[]),...(part.inference?.premises??[]),...(part.inference?.warrant??[])];
+    const supported=refs.some(ref=>{
+      if(keyOf(ref.file)!==keyOf(files[0]))return false;
+      const bytes=readBytes(frame.root,ref.file),pin=frame.policy.sourcePins[keyOf(ref.file)];
+      if(!bytes||digest(bytes)!==ref.sha256)return false;
+      const quote=typeof ref.quote==="string"?ref.quote:"",original=lineList(bytes).slice(ref.start-1,ref.end).join("\n");
+      if(!quote.trim()||!original.includes(quote))return false;
+      if(pin&&(pin.sha256!==ref.sha256||ref.origin?.kind!==pin.kind||ref.origin.integrity!=="matches-pin"))return false;
+      if(pin?.kind==="synthetic")return true;
+      // Primary/secondary describes provenance, not whether the reported data
+      // is simulated. An explicit declaration can prove that narrower scope;
+      // merely mentioning 模拟 (possibly negated) cannot.
+      return /^(?:#{1,6}\s*)?(?:本(?:文件|材料|数据|例)(?:为|是))?(?:合成(?:逻辑样例|数据)|模拟(?:样例|数据))(?:[。.]|[；;]\s*不是外部研究、生产日志或真实效果数据[。.]?)?$/u.test(quote.trim());
+    });
+    if(!supported)throw scopeFailure("尚无该行同源的当前合成范围证明：需已核 synthetic 来源凭据，或同源的明确合成声明引句；未知范围不能自动算模拟",block,marker);
+  }
+}
 
 /** Build the mandatory inventory from actual bytes, not a model-selected fact list.
  * Every nonblank character belongs to one block. Sentence punctuation splits long
@@ -24,14 +105,18 @@ export function documentCoverage(bytes) {
       const content = match[0].trim();
       if (!content) continue;
       const start = match.index + match[0].indexOf(content);
+      const neutralSpans=neutralTextSpans(content);
+      const scopeMarker=simulationMarker(content);
       blocks.push({ id: "B" + (blocks.length + 1) + "-" + digest(content).slice(0, 8),
         line: row + 1, start, end: start + content.length, text: content, lineText: line,
+        ...(neutralSpans.length?{neutralSpans}:{}),
+        ...(scopeMarker?{scopeMarkers:[scopeMarker]}:{}),
         requiresInference: explicitInference(content) && !errorExample(content), stance: errorExample(content) ? "error-example"
           : /^\s*(?:[-*#>]\s*)?\[(?:推测|假设|未证实|Hypothesis|Unverified)\]/i.test(content) ? "hypothesis" : "asserted-unless-nonfactual" });
     }
   }
   if (!blocks.length) throw new Error("候选为空，不能用空覆盖清单验收");
-  return { version: COVERAGE_VERSION, candidateSha256: digest(bytes), blocks };
+  return { version: COVERAGE_VERSION, classificationVersion:CLASSIFICATION_VERSION, candidateSha256: digest(bytes), blocks };
 }
 
 /** Demand a concrete explanation while keeping small reviews compact. */
@@ -273,9 +358,12 @@ export function requireStoredObjectChecks(frame,spec,coverages,bytes,phase="fina
   const lines=lineList(bytes),blocks=new Map(documentCoverage(bytes).blocks.map(block=>[block.id,block]));
   try {
     if(!["first-review","final-review"].includes(phase))throw new Error("invalid review authority");
-    for(const coverage of coverages)for(const record of coverage.records)for(const part of record.parts) {
+    for(const coverage of coverages)for(const record of coverage.records) {
+      validateSimulationScope(frame,{phase},spec,blocks.get(record.block),record.parts);
+      for(const part of record.parts) {
       validateObjectPart(frame,{phase},spec,part,lines,blocks.get(record.block),bytes,{host:true});
       if(part.objectCheck&&(!part.objectCheck.result.matches||part.status!=="supported"))throw new Error("object not accepted");
+      }
     }
   }catch{throw new Error("已验收的证据对象或解释证明失效，须重新核验");}
 }
@@ -414,7 +502,7 @@ function spanError(block, part, cursor, quote, reason) {
 /** Bind every part to a real, nonoverlapping span; leaving even a suffix unassigned fails. */
 function reviewBlock(frame, active, spec, block, parts, lines) {
   if (!Array.isArray(parts) || !parts.length || parts.length > 20) throw new Error(block.id + " 需 parts，复合句请拆出各独立判断");
-  let cursor = 0;
+  let cursor = 0;const neutral=neutralMask(block.text);
   const reviewed = parts.map((part, index) => {
     const quote = part.quote ?? (parts.length === 1 ? block.text : undefined);
     if (typeof quote !== "string" || !quote.trim()) throw spanError(block,index+1,cursor,quote,"missing-quote");
@@ -426,6 +514,12 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
     if (!KINDS.includes(part.kind) || !STATUSES.includes(part.status)) throw new Error("每段须声明 kind 与 supported/unsupported/uncertain");
     const basis = explanation(part.basis, "该段的判断依据");
     const result = { quote, start, end: cursor, kind: part.kind, status: part.status, basis };
+    const scope=simulationMarker(block.text);
+    if(scope&&start<scope.end-1&&cursor>scope.start+1&&!["direct","inference"].includes(part.kind))throw scopeFailure("[模拟] 是来源范围断言，不能作为无事实标签",block,scope);
+    if(["direct","inference"].includes(part.kind)&&[...quote].some(char=>/[\p{L}\p{N}]/u.test(char))
+      &&Array.from({length:cursor-start},(_,i)=>start+i).every(i=>neutral[i]||/[\s\p{P}]/u.test(block.text[i]))) {
+      throw new Error("[building-loop/classification] 该片段只有宿主识别的中性标签或有界非断言建议，请改核验参数为 kind=nonfactual、status=supported，并说明其结构/建议作用；保留作者原文，不能为此补来源或制造作者退回。neutralSpans="+JSON.stringify(neutralTextSpans(block.text)));
+    }
     if(part.objectCheck&&(part.kind!=="direct"||part.evidence!==undefined||part.inference!==undefined))throw objectFailure("parameter","objectCheck 仅用于 direct，且不能与外部 evidence/inference 混用");
     if (errorExample(quote) && part.kind !== "error-example") throw new Error("正文已明确标为误读/错例，请用 error-example 核验它的反证，不要把展示错误误当成作者认可该结论。这是核验分类修正，不是正文返工。");
     if (part.kind === "direct" && explicitInference(quote)) throw new Error("该段含明确推导连接词，不能用 direct 跳过推导。改用 inference；这只是核验分类修正，不要求作者改正文。若来源本身已写明关系，可用 source-warrant。不要把未明确标注的错误断言解释成教学反例。");
@@ -497,6 +591,7 @@ function reviewBlock(frame, active, spec, block, parts, lines) {
     return result;
   });
   if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
+  validateSimulationScope(frame,active,spec,block,reviewed);
   const marker=objectMarker(block.text),expected=marker==="摘录范围"?"registered-excerpts":marker==="稿件自述"?"candidate":null;
   if(expected) {
     const facts=reviewed.filter(part=>["direct","inference"].includes(part.kind));
@@ -528,7 +623,7 @@ export function coverageAction(frame, active, spec, args, options = {}) {
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(count) || count < 1 || count > 24) throw new Error("覆盖分页 offset/count 无效，每页最多 24 块");
     const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest);
     const pending = manifest.blocks.filter(b => !Object.hasOwn(active.coverage.records, b.id)).map(b => b.id);
-    const result = { candidateSha256: manifest.candidateSha256, total: manifest.blocks.length,
+    const result = { candidateSha256: manifest.candidateSha256, classificationVersion:CLASSIFICATION_VERSION,total: manifest.blocks.length,
       pending: options.maxBytes ? pending.slice(0,24) : pending, pendingCount: pending.length,
       invalidated:options.maxBytes?invalidated.slice(0,8).map(row=>({...row,reason:row.reason.slice(0,240),
         ...(row.reason.length>240?{reasonTruncated:true}:{})})):invalidated,
@@ -648,6 +743,7 @@ function validateRecordSources(frame, active, spec, record, lines, block, bytes)
     validateCalculationPart(frame, spec, part, lines, block);
     validateObjectPart(frame, active, spec, part, lines, block, bytes);
   }
+  validateSimulationScope(frame,active,spec,block,record.parts);
 }
 
 /** Keep independent unaffected blocks; explicitly expose every invalidation. */
@@ -776,6 +872,9 @@ function factualMask(record) {
   }
   const files=record.parts.flatMap(part=>[...(part.evidence??[]),...(part.inference?.premises??[])].map(ref=>ref.file));
   for(const [start,end] of record.syntaxSpans??syntaxSpans(record.text,files))mask.fill(0,start,end);
+  // Always recompute host neutrality, including for old receipts. Neither a
+  // prior overbroad direct label nor a supplied neutralSpans field is authority.
+  for(const {start,end} of neutralTextSpans(record.text))mask.fill(0,start,end);
   for(let i=0;i<mask.length;i++)if(/[\s\p{P}]/u.test(record.text[i]))mask[i]=0;
   return mask;
 }
@@ -798,16 +897,16 @@ export function classificationDisagreements(first,second) {
     const factualSpans=maskSpans(different,record.text),requiredSpans=maskSpans(required,record.text);
     return factualSpans.length?[{block:record.block,line:record.line,text:record.text,factualSpans,requiredSpans,
       ...(objects.some(Boolean)?{objectSpans:maskSpans(objects,record.text)}:{}),
-      basis:"核验对事实范围或证据对象存在分歧。requiredSpans 是双方事实并集；按真实对象补证，保留正确正文。纯编号/合法定位可等价，解释与大白话中的事实不能跳过；仍无依据时 block 请求裁定。"}]:[];
+      basis:"核验对事实范围或证据对象存在分歧。requiredSpans 是扣除宿主有界中性语法后的双方事实并集；按真实对象补证，保留正确正文。纯编号/合法定位及 neutralSpans 可等价，未知修饰、解释与大白话中的事实不能跳过；仍无依据时 block 请求裁定。"}]:[];
   });
 }
 
 /** Used by checkpoint restoration and submission; never borrows the other role's proof. */
 export function recordMeetsDispute(record,dispute) {
-  if(!record||record.text!==dispute.text)return false;
-  const mask=factualMask(record),spans=dispute.requiredSpans?.length?dispute.requiredSpans:dispute.factualSpans?.length?dispute.factualSpans:[[0,dispute.text.length]];
+  if(!record||record.text!==dispute.text||!Array.isArray(record.parts)||!record.parts.length)return false;
+  const mask=factualMask(record),neutral=neutralMask(record.text),spans=dispute.requiredSpans?.length?dispute.requiredSpans:dispute.factualSpans?.length?dispute.factualSpans:[[0,dispute.text.length]];
   return spans.every(([a,b])=>{
-    for(let i=a;i<b;i++)if(dispute.text[i]?.trim()&&!/[\s\p{P}]/u.test(dispute.text[i])&&!mask[i])return false;
+    for(let i=a;i<b;i++)if(dispute.text[i]?.trim()&&!/[\s\p{P}]/u.test(dispute.text[i])&&!neutral[i]&&!mask[i])return false;
     return true;
   });
 }
