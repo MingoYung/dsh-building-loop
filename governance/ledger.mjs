@@ -33,22 +33,30 @@ function put(frame, id, value) {
   return ledger.items[id];
 }
 
-/** Capture direct human messages so a mid-task request remains discoverable. */
-export function captureRequest(frame, event) {
+/** Reduce a direct human event to the data needed for a durable ledger intent. */
+export function requestIntent(session, event) {
   const message = event.data;
-  if (frame.role !== "coordinator" || message?.source?.kind !== "user") return;
+  if (session.header.parentSession !== undefined || session.header.origin === "subagent" || message?.source?.kind !== "user" ||
+      !Number.isSafeInteger(event.seq) || event.seq < 0) return;
   const text = (message.content ?? []).filter(part => part.type === "text").map(part => part.text).join("\n").trim();
   if (!text) return;
-  const id = "request-" + digest(frame.agent.id + "/" + event.seq).slice(0, 20);
+  return { kind: "request", session: session.id, seq: event.seq, time: event.time ?? 0,
+    title: text.replace(/\s+/g, " ").slice(0, 120), sha256: digest(text) };
+}
+
+/** Replay under the workspace lock with the original owner and event identity. */
+export function captureRequest(frame, event) {
+  const owner = event.session;
+  const id = "request-" + digest(owner + "/" + event.seq).slice(0, 20);
   if (book(frame).items[id]) return;
   const running = Object.values(frame.state.units).some(unit => !TERMINAL.has(unit.phase));
   put(frame, id, { kind: running ? "temporary" : "planned", status: "pending",
-    title: text.replace(/\s+/g, " ").slice(0, 120), note: "用户消息待结合项目现状判定，原文见会话事件。",
-    origin: { session: frame.agent.id, event: event.seq, sha256: digest(text) }, owner: frame.agent.id });
+    title: event.title, note: "用户消息待结合项目现状判定，原文见会话事件。",
+    origin: { session: owner, event: event.seq, sha256: event.sha256 }, owner });
   // A notice consumed after closure must still receive a ledger checkpoint.
   // This reopens administration only; a changed goal still forces independent review.
   if (!running) {
-    const recent = Object.entries(frame.state.units).filter(([,unit]) => unit.owner === frame.agent.id && unit.phase === "closed")
+    const recent = Object.entries(frame.state.units).filter(([,unit]) => unit.owner === owner && unit.phase === "closed")
       .sort((a,b) => (b[1].closedAt ?? "").localeCompare(a[1].closedAt ?? ""))[0];
     if (recent) {
       const [unitId, active] = recent;

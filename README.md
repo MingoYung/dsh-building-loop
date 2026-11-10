@@ -39,12 +39,21 @@ DeepSeek Harness 的长任务 Agent 预设，适用于项目建设、深度研�
 
 ## 安装
 
-兼容基线为 DeepSeek Harness `0.2.2-rc.1`，对应 DSH NEXT `2.0.22-next`。在 DSH 终端安装。
+兼容基线为 DeepSeek Harness `0.2.2-rc.1`，对应 DSH NEXT `2.0.22-next`。Desktop 和 Web 的插件安装入口各自管理对应的 Profile。
+
+- Windows Desktop 可从侧栏「插件」打开「添加插件」，选择该版本的发行包或仓库来源。
+- 命令行管理 Desktop 时，先启动应用初始化目标 Profile，再使用 DSH NEXT 打开的内置终端和它自带的 `dsh`。安装后重新打开应用并核对模式。Windows 系统终端里的 npm 版 `dsh` 只用于它自己管理的 Profile。
 
 ```powershell
 dsh plugin --profile desktop add github:MingoYung/dsh-building-loop
 ```
 
-安装 `dsh-building-loop` 后，在新会话的模式列表中选 **building-loop**。本地开发可将安装地址换成本仓库路径。从旧包 `building-loop` 迁移时，先从同一 Profile 移除旧包，再安装新包。两者使用同一个预设 ID。
+Web 用户在 Web 使用的终端安装。
+
+```powershell
+dsh plugin --profile web add github:MingoYung/dsh-building-loop
+```
+
+安装 `dsh-building-loop` 后，在新会话的模式列表中选 **building-loop**。验证指定版本时可用实际 `.tgz` 路径替代仓库地址。从旧包 `building-loop` 迁移时，先从同一 Profile 移除旧包，再安装新包。两者使用同一个预设 ID。
 
 项目维护者先从[派单分块索引](docs/work-delivery.md)查看授权示例，在工作区根创建 `BUILDING-LOOP.json`，再开会话。清单缺失时受控文件工具会拒绝访问。

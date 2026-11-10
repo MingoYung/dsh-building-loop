@@ -58,10 +58,39 @@ function observedExcerpt(root, file, bytes, pin, start, end) {
 export function sourceVersionCurrent(root, ref) {
   const bytes = readBytes(root, ref.file);
   if (!bytes || digest(bytes) !== ref.sha256) return false;
+  if (ref.evidenceSpan && evidenceSpan(bytes,ref) !== ref.evidenceSpan) return false;
   const observation = ref.origin?.observation;
   if (!observation) return true;
   const receipt = readBytes(root, observation.file);
   return !!receipt && digest(receipt) === observation.sha256;
+}
+
+/** Bind an exact quote to the original bytes and line range. Two quotes on the
+ * same page remain distinct pieces of evidence under one source identity. */
+export function evidenceSpan(bytes, ref) {
+  const lines=lineList(bytes);
+  if (!Number.isSafeInteger(ref.start)||!Number.isSafeInteger(ref.end)||ref.start<1||ref.end<ref.start||ref.end>lines.length
+    ||typeof ref.quote!=="string"||!ref.quote.trim()) return null;
+  const excerpt=lines.slice(ref.start-1,ref.end).join("\n");
+  if(!excerpt.includes(ref.quote))return null;
+  return digest(JSON.stringify([ref.sha256,ref.start,ref.end,ref.quote]));
+}
+
+/** Fragments locate material within a page without creating another source. */
+export function webSourceLocator(value) {
+  if(!/^https?:\/\/[^\s<>]+$/iu.test(value??""))return null;
+  try {
+    const url=new URL(value);
+    if(url.username||url.password)return null;
+    url.hash="";
+    return url.href;
+  } catch { return null; }
+}
+
+function sourceIdentity(file, pin) {
+  const url=pin?.kind!=="synthetic"&&webSourceLocator(pin?.locator);
+  if(url)return digest(url);
+  return digest(JSON.stringify([keyOf(file),pin?.locator??null]));
 }
 
 /** The shared source gate always checks authority and pins. Only the private
@@ -85,7 +114,8 @@ function checkedSource(frame,active,spec,input,{whole=false,host=false}={}) {
 export function evidenceReference(frame, active, spec, input) {
   const {file,bytes,start,end,sha256,pin}=checkedSource(frame,active,spec,input);
   const observation=pin?.observation&&observedExcerpt(frame.root,file,bytes,pin,start,end);
-  return {file,start,end,sha256,origin:pin
+  return {file,start,end,sha256,sourceIdentity:sourceIdentity(file,pin),
+    provenance:observation?"maintainer-pinned-acquisition-receipt":pin?"maintainer-pinned-local-material":"observed-local-bytes",origin:pin
     ?{kind:pin.kind,locator:pin.locator,integrity:"matches-pin",...(observation?{observation}:{})}
     :{kind:"unregistered",integrity:"observed-local-bytes"}};
 }
@@ -97,16 +127,20 @@ export function registeredObservation(frame,active,spec,file,{host=false}={}) {
   const {bytes,lines,sha256,pin}=checked;
   if(!pin?.observation)throw new Error("该来源没有登记摘录获取回执，不能证明摘录集合的范围");
   const result=observationRegistry(frame.root,checked.file,bytes,pin);
-  return {source:{file:checked.file,sha256,origin:{kind:pin.kind,locator:pin.locator,integrity:"matches-pin",observation:result.observation}},
+  return {source:{file:checked.file,sha256,sourceIdentity:sourceIdentity(checked.file,pin),provenance:"maintainer-pinned-acquisition-receipt",
+    origin:{kind:pin.kind,locator:pin.locator,integrity:"matches-pin",observation:result.observation}},
     lines,registered:result.registered};
 }
 
 /** Build the read inventory from the host's coverage records, never model prose. */
 export function readInventory(frame, active) {
+  const carried=new Set(Object.values(active.coverage?.records??{}).filter(record=>record.reusedProof)
+    .flatMap(record=>[...record.parts.flatMap(part=>part.evidence??[]),...(record.syntaxSources??[])].map(ref=>keyOf(ref.file))));
   return frame.reads.flatMap(file => {
     const observed = active.seen[keyOf(file)];
     const bytes = observed && readBytes(frame.root, file);
-    return observed ? [{ file, sha256: observed.hash, ranges: observed.ranges, current: !!bytes && digest(bytes) === observed.hash }] : [];
+    return observed ? [{ file, sha256: observed.hash, ranges: observed.ranges, current: !!bytes && digest(bytes) === observed.hash,
+      ...(carried.has(keyOf(file))?{includesSameRolePriorReads:true}:{}) }] : [];
   });
 }
 

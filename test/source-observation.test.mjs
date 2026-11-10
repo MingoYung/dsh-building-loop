@@ -53,6 +53,9 @@ test("actual excerpt evidence passes, copied metadata and changed acquisition re
   await record(reviewer, [source, { ...source, start: 4, end: 4, quote: secondExcerpt }]);
   const item = (await h.coverage(reviewer, "status", { block: packet.coverage.blocks[0].id })).record.parts[0];
   assert.equal(item.evidence[0].origin.observation.sha256, digest(receipt));
+  assert.equal(item.evidence[0].provenance,"maintainer-pinned-acquisition-receipt");
+  assert.equal(item.evidence[0].sourceIdentity,item.evidence[1].sourceIdentity);
+  assert.notEqual(item.evidence[0].evidenceSpan,item.evidence[1].evidenceSpan);
   await h.assess(reviewer, { ...Object.fromEntries(Object.keys(QUALITY).map(key => [key, "核准明确范围、实际来源和读者可理解的表述。"])),
     goalFit: { pass: true, basis: "正文保留授权材料的相关性边界。" },
     sourceRefs: [{ file: source.file, start: 3, end: 3 }], unverifiedSources: [], unlisted: [], revise: [] });

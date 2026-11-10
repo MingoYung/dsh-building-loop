@@ -67,6 +67,7 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
   const listeners = new Map();
   const notifications = [];
   const activations = [];
+  const warnings = [];
   function agent(id, parentSession) {
     live.set(id, { id, session: { header: { cwd: root, parentSession } },
       whenIdle: async () => {}, model: { current: () => null }, ctx: {tools:{
@@ -86,7 +87,7 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     },
     tools: { register: (tool,options) => {tools.set(tool.name, tool);admissions.set(tool.name,options?.when);}, guard: handler => {guard=handler;} },
     systemPrompt: { context: value => {prompt=value;} }, on: (name, listener) => listeners.set(name, listener),
-    logger:{warn:()=>{}},
+    logger:{warn:message=>warnings.push(message)},
   });
   const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(3000),
     concludeTurn:()=>concluded.push(id) });
@@ -142,8 +143,8 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     user: (id, seq, content) => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
       type: "user/message", seq, data: { source: { kind: "user" }, content: [{ type: "text", text: content }] },
     }),
-    interrupt: id => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
-      type: "turn/end", data: { reason: { kind: "error" } },
+    interrupt: (id, seq, kind = "error") => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
+      type: "turn/end", seq, data: { reason: { kind } },
     }),
     finish: id => listeners.get("session/event")(Object.assign(live.get(id).session, { id }), {
       type: "turn/end", data: { reason: { kind: "completed" } },
@@ -153,7 +154,10 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     }),
     notifications,
     activations,
+    warnings,
     coordinator: id => agent(id),
+    restoreChild: (id, parent) => agent(id, parent),
+    detachChild: id => live.delete(id),
     concluded,
     invoke,
     prompt:id=>prompt.text({agent:live.get(id)}),

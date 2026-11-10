@@ -4,29 +4,75 @@ import { randomUUID } from "node:crypto";
 import { AUTHORITY, digest, historyPaths, keyOf, readBytes, replaceBytes, text } from "./policy.mjs";
 
 export const STATE_LIMIT = 8 * 1024 * 1024;
+export const LEDGER_TURN_ENDS = Object.freeze(["error", "max-tokens", "blocked", "completed", "aborted", "interrupted"]);
 const JOURNAL_LIMIT = 2 * STATE_LIMIT;
 const FILE_LIMIT = 256 * 1024;
 const JOURNAL_SPEC = "building-loop-ledger-transaction/1";
+const EVENT_SPEC = "building-loop-ledger-event/1";
+const EVENT_LIMIT = 4096;
+const EVENT_NAME = /^[a-f0-9]{64}\.[a-f0-9-]{36}\.json$/u;
 const OWNER = /^owner-([1-9]\d{0,9})-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 const WINDOWS_CLAIM_DELAYS = [10, 25, 50, 100];
 const CLAIM_WAIT = new Int32Array(new SharedArrayBuffer(4));
-const busy = () => new Error("工作台账正在更新，请按当前台账重试");
+const WINDOWS_LOCK_ERRORS = new Set(["EPERM", "EBUSY", "EACCES", "EBADF"]);
 const unknownLock = () => new Error("工作台账锁来源未知，需维护者确认旧进程已退出后核对宿主状态");
 const stateDigest = bytes => bytes === null ? null : digest(bytes);
 const journalName = file => file + ".ledger-txn";
 const recordBytes = value => value === null ? null : value.toString("base64");
 
+/** Only an unacquired lock may be retried as ordinary contention. */
+export class WorkspaceLockBusy extends Error {
+  constructor() {
+    super("工作台账正在更新，请按当前台账重试");
+    this.code = "BUILDING_LOOP_LOCK_BUSY";
+  }
+}
+
+class LockPathObservation extends Error {}
+
+/** Windows can expose a delete-pending directory between lstat, realpath,
+ * readdir and rmdir. Re-read the name without following a link. A stable
+ * noncanonical path or persistent permission failure still fails closed.
+ */
+function observeLock(lock, operation) {
+  for (let attempt = 0; ; attempt++) {
+    try { return operation(); }
+    catch (error) {
+      if (error.code === "ENOENT") return;
+      const delay = WINDOWS_CLAIM_DELAYS[attempt];
+      if (process.platform !== "win32" || delay === undefined ||
+          !(error instanceof LockPathObservation || WINDOWS_LOCK_ERRORS.has(error.code))) {
+        throw error instanceof LockPathObservation ? unknownLock() : error;
+      }
+      try { if (!fs.lstatSync(lock, { throwIfNoEntry: false })) return; }
+      catch (probe) {
+        if (probe.code === "ENOENT") return;
+        if (!WINDOWS_LOCK_ERRORS.has(probe.code)) throw probe;
+      }
+      Atomics.wait(CLAIM_WAIT, 0, 0, delay);
+    }
+  }
+}
+
 /** Remove the empty directory only. A new owner always publishes it nonempty. */
 function removeEmptyLock(lock) {
   try { fs.rmdirSync(lock); }
-  catch (error) { if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code)) throw error; }
+  catch (error) {
+    if (["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error.code)) return;
+    if (process.platform === "win32" && WINDOWS_LOCK_ERRORS.has(error.code)) {
+      const entry = fs.lstatSync(lock, { throwIfNoEntry: false });
+      // A replacement owner may have published between the empty read and
+      // rmdir. Preserve it and let the next claim observe the new owner.
+      if (!entry || entry.isDirectory() && !entry.isSymbolicLink() && fs.readdirSync(lock).length) return;
+    }
+    throw error;
+  }
 }
 
 /** Owner names are unique, so concurrent recovery cannot unlink a fresh claim. */
 function dropOwner(lock, owner) {
-  try { fs.unlinkSync(path.join(lock, owner)); }
-  catch (error) { if (error.code === "ENOENT") return; throw error; }
-  removeEmptyLock(lock);
+  observeLock(lock, () => fs.unlinkSync(path.join(lock, owner)));
+  observeLock(lock, () => removeEmptyLock(lock));
 }
 
 /** Retire only a verifiably dead PID. Alive, reused, inaccessible and legacy
@@ -36,39 +82,37 @@ function retireLock(lock) {
   const entry = fs.lstatSync(lock, { throwIfNoEntry: false });
   if (!entry) return;
   if (!entry.isDirectory() || entry.isSymbolicLink()) throw unknownLock();
-  let owners;
-  try {
-    if (keyOf(fs.realpathSync.native(lock)) !== keyOf(lock)) throw unknownLock();
-    owners = fs.readdirSync(lock, { withFileTypes: true });
-  } catch (error) { if (error.code === "ENOENT") return; throw error; }
+  if (keyOf(fs.realpathSync.native(lock)) !== keyOf(lock)) throw new LockPathObservation();
+  const owners = fs.readdirSync(lock, { withFileTypes: true });
   if (!owners.length) { removeEmptyLock(lock); return; }
   const match = owners.length === 1 && owners[0].isFile() && OWNER.exec(owners[0].name);
   if (!match || Number(match[1]) > 0x7fffffff) throw unknownLock();
   try { process.kill(Number(match[1]), 0); }
   catch (error) {
-    if (error.code !== "ESRCH") throw busy();
+    if (error.code !== "ESRCH") throw new WorkspaceLockBusy();
     dropOwner(lock, owners[0].name);
     return;
   }
-  throw busy();
+  throw new WorkspaceLockBusy();
 }
 
 /** Claim the lock with a complete same-volume owner directory. This avoids
  * an interruption between claiming an empty file and writing its owner PID.
  */
-export function withWorkspaceLock(home, file, operation) {
+export function withWorkspaceLock(home, file, operation, warnCleanup) {
   const lock = path.join(home, file + ".lock");
-  retireLock(lock);
+  observeLock(lock, () => retireLock(lock));
+  const occupied = () => observeLock(lock, () => fs.lstatSync(lock, { throwIfNoEntry: false }));
   const staged = fs.mkdtempSync(path.join(home, file + ".claim-"));
   const owner = "owner-" + process.pid + "-" + randomUUID();
   let acquired = false;
   try {
     fs.closeSync(fs.openSync(path.join(staged, owner), "wx", 0o600));
     for (let attempt = 0; ; attempt++) {
-      if (fs.lstatSync(lock, { throwIfNoEntry: false })) throw busy();
+      if (occupied()) throw new WorkspaceLockBusy();
       try { fs.renameSync(staged, lock); break; }
       catch (error) {
-        if (fs.lstatSync(lock, { throwIfNoEntry: false })) throw busy();
+        if (occupied()) throw new WorkspaceLockBusy();
         // Windows can briefly refuse the same-volume directory rename while
         // no owner has won. Retry the staged claim only, before any writes.
         const delay = WINDOWS_CLAIM_DELAYS[attempt];
@@ -79,13 +123,70 @@ export function withWorkspaceLock(home, file, operation) {
     acquired = true;
     return operation();
   } finally {
-    if (acquired) dropOwner(lock, owner);
-    else { dropOwner(staged, owner); removeEmptyLock(staged); }
+    // Cleanup is separate from the operation result. In particular, a failed
+    // rmdir after commit must not cause the host to replay the mutation.
+    try { dropOwner(acquired ? lock : staged, owner); }
+    catch (error) { warnCleanup?.(error); }
   }
 }
 
 export function hasLedgerJournal(home, file) {
   return !!fs.lstatSync(path.join(home, journalName(file)), { throwIfNoEntry: false });
+}
+
+const eventDirectory = file => "automatic/" + file;
+const eventIdentity = event => digest(event.session + "/" + event.seq);
+const sessionId = value => typeof value === "string" && !!value && value.length <= 200 && !/[\x00-\x1f]/u.test(value);
+
+/** Publish an immutable intent before attempting the contended workspace lock.
+ * Distinct delivery filenames avoid replacing another process's open file.
+ * Replays still share one logical ID. The full user message stays in DSH.
+ */
+export function persistLedgerEvent(home, file, event) {
+  const name = eventDirectory(file) + "/" + eventIdentity(event) + "." + randomUUID() + ".json";
+  const raw = Buffer.from(JSON.stringify({ spec: EVENT_SPEC, ...event }));
+  replaceBytes(home, name, raw, null, EVENT_LIMIT);
+}
+
+/** Temporary staging files never count as complete events. */
+function pendingEventNames(home, file) {
+  const directory = path.join(home, eventDirectory(file));
+  const entry = fs.lstatSync(directory, { throwIfNoEntry: false });
+  if (!entry) return [];
+  if (!entry.isDirectory() || entry.isSymbolicLink() || keyOf(fs.realpathSync.native(directory)) !== keyOf(directory)) {
+    throw new Error("自动账本事件目录不是普通宿主目录");
+  }
+  return fs.readdirSync(directory).filter(leaf => EVENT_NAME.test(leaf));
+}
+
+export const hasPendingLedgerEvents = (home, file) => pendingEventNames(home, file).length > 0;
+
+/** Validate protected host intents before applying them inside the workspace transaction. */
+export function pendingLedgerEvents(home, file) {
+  const entries = [];
+  for (const leaf of pendingEventNames(home, file)) {
+    const name = eventDirectory(file) + "/" + leaf;
+    const raw = readBytes(home, name, EVENT_LIMIT);
+    if (!raw) continue;
+    const event = JSON.parse(text(raw));
+    const request = event?.kind === "request" && typeof event.title === "string" && !!event.title &&
+      event.title.length <= 120 && /^[a-f0-9]{64}$/u.test(event.sha256);
+    const end = event?.kind === "turn-end" && sessionId(event.parent) && LEDGER_TURN_ENDS.includes(event.reason);
+    if (event?.spec !== EVENT_SPEC || !sessionId(event.session) || !Number.isSafeInteger(event.seq) || event.seq < 0 ||
+        !Number.isSafeInteger(event.time) || event.time < 0 || !(request || end) || !leaf.startsWith(eventIdentity(event) + ".")) {
+      throw new Error("自动账本事件记录损坏，需维护者核对");
+    }
+    entries.push({ name, raw, event });
+  }
+  return entries.sort((a, b) => a.event.time - b.event.time || a.event.session.localeCompare(b.event.session) || a.event.seq - b.event.seq);
+}
+
+/** Repeated application after a crash is harmless; remove only after commit. */
+export function clearLedgerEvents(home, pending, warnCleanup) {
+  for (const { name, raw } of pending) {
+    try { replaceBytes(home, name, null, raw, EVENT_LIMIT); }
+    catch (error) { warnCleanup(error); }
+  }
 }
 
 /** Refuse noncanonical stored bytes or oversized before images before writes. */
@@ -159,7 +260,7 @@ export function recoverLedgerJournal(home, file, root, policy) {
 /** Persist generated ledger files before the authoritative state, with one
  * recoverable journal. Ordinary state-only transactions retain their path.
  */
-export function commitWorkspaceState(home, frame, next) {
+export function commitWorkspaceState(home, frame, next, warnCleanup) {
   if (next.length > STATE_LIMIT) throw new Error("内容超过受控工具的大小上限");
   const { file, root, policy, old, ledgerWrites } = frame;
   // Idempotent retry must not replace the one rolling pre-commit backup.
@@ -190,5 +291,8 @@ export function commitWorkspaceState(home, frame, next) {
     catch (failure) { throw new AggregateError([error, failure], "宿主提交失败，未完成账本事务仍待核对", { cause: error }); }
     throw error;
   }
-  replaceBytes(home, name, null, raw, JOURNAL_LIMIT);
+  try { replaceBytes(home, name, null, raw, JOURNAL_LIMIT); }
+  // The state rename above already committed this receipt. If unlink fails,
+  // leave the journal for normal committed recovery and report cleanup alone.
+  catch (error) { warnCleanup?.(error); }
 }

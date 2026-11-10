@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -323,4 +324,226 @@ test("Windows lock publication stops for a live or unknown competitor before a s
   finally { Atomics.wait = wait; }
   assert.equal(fs.readFileSync(lock, "utf8"), "unrecognized");
   assertUnchanged(root, f);
+}));
+
+test("Windows lock observation recovers a vanished directory without clearing an unknown lock", windowsOnly, async () => fixture(async (root, write) => {
+  const f = await scenario(root, write);
+  const lock = f.statePath + ".lock";
+  const native = fs.realpathSync.native;
+  for (const failure of ["redirected", "EBADF"]) {
+    fs.mkdirSync(lock);
+    let observed = false;
+    fs.realpathSync.native = (name, ...args) => {
+      if (name !== lock || observed) return native(name, ...args);
+      observed = true;
+      fs.rmdirSync(lock);
+      if (failure === "EBADF") throw claimError(failure);
+      return lock + ".delete-pending";
+    };
+    try {
+      assert.equal((await f.h.ledger("root", "read")).current.phase, "ledger-review");
+      assert.equal(observed, true);
+    } finally { fs.realpathSync.native = native; }
+  }
+
+  fs.mkdirSync(lock);
+  fs.realpathSync.native = (name, ...args) => name === lock ? lock + ".stable-redirect" : native(name, ...args);
+  try { await assert.rejects(f.h.ledger("root", "read"), /锁来源未知/); }
+  finally { fs.realpathSync.native = native; }
+  assert.ok(fs.statSync(lock).isDirectory());
+}));
+
+test("Windows empty-lock cleanup preserves a new owner and distinguishes persistent denial", windowsOnly, async () => fixture(async (root, write) => {
+  const f = await scenario(root, write);
+  const lock = f.statePath + ".lock";
+  const owner = path.join(lock, "owner-" + process.pid + "-11111111-1111-1111-1111-111111111111");
+  const rmdir = fs.rmdirSync;
+  const failure = claimError("EPERM");
+  fs.mkdirSync(lock);
+  fs.rmdirSync = (name, ...args) => {
+    if (name !== lock) return rmdir(name, ...args);
+    rmdir(lock);
+    fs.mkdirSync(lock);
+    fs.writeFileSync(owner, "other process");
+    throw failure;
+  };
+  try { await assert.rejects(f.h.ledger("root", "read"), { code: "BUILDING_LOOP_LOCK_BUSY" }); }
+  finally { fs.rmdirSync = rmdir; }
+  assert.equal(fs.readFileSync(owner, "utf8"), "other process");
+
+  fs.unlinkSync(owner);
+  fs.rmdirSync = (name, ...args) => {
+    if (name === lock) throw failure;
+    return rmdir(name, ...args);
+  };
+  try { await assert.rejects(f.h.ledger("root", "read"), actual => actual === failure); }
+  finally { fs.rmdirSync = rmdir; }
+  assertUnchanged(root, f);
+}));
+
+test("post-commit journal cleanup failure reports a committed receipt and recovers without a second commit", async () => fixture(async (root, write) => {
+  const f = await scenario(root, write);
+  const journal = f.statePath + ".ledger-txn";
+  const unlink = fs.unlinkSync;
+  fs.unlinkSync = (file, ...args) => {
+    if (file === journal) throw claimError("EPERM");
+    return unlink(file, ...args);
+  };
+  try {
+    const receipt = await f.h.ledger("root", "review", { decisions: f.decisions });
+    assert.equal(receipt.phase, "closed");
+    assert.equal(fs.existsSync(journal), true);
+    assert.match(f.h.warnings[0], /账本清理未完成.*EPERM/u);
+  } finally { fs.unlinkSync = unlink; }
+  const state = fs.readFileSync(f.statePath);
+  assert.equal((await f.h.ledger("root", "review", { decisions: f.decisions })).replayed, true);
+  assert.deepEqual(fs.readFileSync(f.statePath), state);
+  assert.equal(fs.existsSync(journal), false);
+}));
+
+async function withCompetingLock(root, write, home, file, operation) {
+  const release = path.join(root, "release-competitor");
+  const script = `import fs from "node:fs";
+import { withWorkspaceLock } from ${JSON.stringify(new URL("../governance/transactions.mjs", import.meta.url).href)};
+const [home,file,release] = process.argv.slice(1);
+withWorkspaceLock(home,file,()=>{
+  fs.writeSync(1,"locked\\n");
+  const wait = new Int32Array(new SharedArrayBuffer(4)), deadline = Date.now()+6000;
+  while(!fs.existsSync(release)) {
+    if(Date.now()>deadline) throw new Error("release barrier timed out");
+    Atomics.wait(wait,0,0,10);
+  }
+});`;
+  const child = spawn(process.execPath, ["--input-type=module", "--eval", script, home, file, release], { windowsHide: true });
+  const exited = once(child, "exit");
+  let stderr = "";
+  child.stderr.setEncoding("utf8").on("data", value => { stderr += value; });
+  try {
+    const ready = await Promise.race([once(child.stdout, "data"), exited]);
+    assert.equal(String(ready[0]).trim(), "locked", stderr);
+    await operation(() => write("release-competitor", "release"), exited);
+  } finally {
+    if (!fs.existsSync(release)) write("release-competitor", "release");
+    const [code] = await exited;
+    assert.equal(code, 0, stderr);
+  }
+}
+
+test("real cross-process lock contention defers both automatic events and does not replay a completed event", async () => fixture(async (root, write) => {
+  const h = host(root);
+  const executor = (await h.flow("root", "advance")).childId;
+  const home = path.join(process.env.DSH_HOME, "building-loop-state");
+  const file = fs.readdirSync(home).find(name => /^[a-f0-9]{64}\.json$/u.test(name));
+  const statePath = path.join(home, file);
+  await withCompetingLock(root,write,home,file,async release=>{
+    const before = fs.readFileSync(statePath);
+    const pending = [h.user("root", 32, "保留跨进程争用时到达的真实用户消息。"), h.interrupt(executor, 45)];
+    assert.ok(pending.every(item => item instanceof Promise));
+    const reading = h.ledger("root", "read");
+    assert.deepEqual(fs.readFileSync(statePath), before);
+    release();
+    await Promise.all(pending);
+    const book = await reading;
+    assert.equal(book.items.filter(item => item.origin?.event === 32).length, 1);
+    assert.equal(book.items.find(item => item.id === "unit-K01").status, "deferred");
+    assert.equal((await h.flow("root", "status")).units[0].interruptions, 1);
+    assert.equal((await h.flow("root", "advance")).childId, executor);
+
+    await h.user("root", 32, "保留跨进程争用时到达的真实用户消息。");
+    await h.interrupt(executor, 45);
+    assert.equal((await h.flow("root", "status")).units[0].phase, "intake");
+    assert.equal((await h.ledger("root", "read")).items.filter(item => item.origin?.event === 32).length, 1);
+    assert.deepEqual(h.warnings, []);
+  });
+}));
+
+test("hard exit under contention preserves automatic intents for a new host without the source child", async () => fixture(async (root, write) => {
+  const h = host(root);
+  const executor = (await h.flow("root", "advance")).childId;
+  const home = path.join(process.env.DSH_HOME, "building-loop-state");
+  const file = fs.readdirSync(home).find(name => /^[a-f0-9]{64}\.json$/u.test(name));
+  const statePath = path.join(home, file);
+  const intentHome = path.join(home, "automatic", file);
+  await withCompetingLock(root,write,home,file,async (release,exited)=>{
+    const before = fs.readFileSync(statePath);
+    const script = `import assert from "node:assert/strict"; import fs from "node:fs";
+import { host } from ${JSON.stringify(new URL("./helpers.mjs", import.meta.url).href)};
+const [root,executor] = process.argv.slice(1);
+const h=host(root);h.restoreChild(executor,"root");
+assert.ok(h.user("root",32,"重启前保留用户请求。") instanceof Promise);
+assert.ok(h.interrupt(executor,45) instanceof Promise);
+fs.writeSync(1,"both intents were staged before commit\\n");
+process.kill(process.pid,"SIGKILL");`;
+    const crashed = spawnSync(process.execPath, ["--input-type=module", "--eval", script, root, executor],
+      { env: process.env, windowsHide: true, timeout: 4500, encoding: "utf8" });
+    assert.ifError(crashed.error);
+    assert.notEqual(crashed.status, 0);
+    assert.match(crashed.stdout,/both intents were staged before commit/u,crashed.stderr);
+    assert.equal(fs.readdirSync(intentHome).filter(name=>name.endsWith(".json")).length,2);
+    assert.deepEqual(fs.readFileSync(statePath), before);
+
+    release();
+    await exited;
+    const commitThenCrash = `import fs from "node:fs"; import path from "node:path";
+import { host } from ${JSON.stringify(new URL("./helpers.mjs", import.meta.url).href)};
+const [root,intentHome] = process.argv.slice(1);
+const unlink=fs.unlinkSync;
+fs.unlinkSync=(name,...args)=>{
+  if (path.dirname(name)!==intentHome) return unlink(name,...args);
+  fs.writeSync(1,"state was committed before intent acknowledgement\\n");
+  process.kill(process.pid,"SIGKILL");
+};
+await host(root).ledger("root","read");
+throw new Error("intent acknowledgement not reached");`;
+    const committed = spawnSync(process.execPath,["--input-type=module","--eval",commitThenCrash,root,intentHome],
+      { env: process.env, windowsHide: true, timeout: 4500, encoding: "utf8" });
+    assert.ifError(committed.error);
+    assert.notEqual(committed.status,0);
+    assert.match(committed.stdout,/state was committed before intent acknowledgement/u,committed.stderr);
+    const onceCommitted = fs.readFileSync(statePath);
+    assert.notDeepEqual(onceCommitted,before);
+    assert.equal(fs.readdirSync(intentHome).filter(name=>name.endsWith(".json")).length,2);
+    const restarted = host(root);
+    const book = await restarted.ledger("root", "read");
+    assert.equal(book.items.filter(item => item.origin?.event === 32).length, 1);
+    assert.equal(book.items.find(item => item.id === "unit-K01").status, "deferred");
+    assert.equal((await restarted.flow("root", "status")).units[0].interruptions, 1);
+    assert.deepEqual(fs.readdirSync(intentHome),[]);
+    await restarted.user("root",32,"重启前保留用户请求。");
+    assert.deepEqual(fs.readFileSync(statePath),onceCommitted);
+    assert.deepEqual(restarted.warnings,[]);
+  });
+}));
+
+test("native live cancellation and crash recovery closers both record interruptions", async () => fixture(async root => {
+  const h = host(root);
+  const executor = (await h.flow("root", "advance")).childId;
+  for (const [seq, kind] of [[30,"aborted"],[60,"interrupted"]]) {
+    await h.interrupt(executor,seq,kind);
+    const current = (await h.flow("root","status")).units[0];
+    assert.equal(current.phase,"blocked");
+    assert.match(current.blocked,new RegExp(kind,"u"));
+    assert.equal((await h.flow("root","advance")).childId,executor);
+  }
+  assert.deepEqual(h.warnings,[]);
+}));
+
+test("an orphaned usage event cannot block a durable request in the same contended queue", async () => fixture(async (root, write) => {
+  const h = host(root);
+  const executor = (await h.flow("root", "advance")).childId;
+  const home = path.join(process.env.DSH_HOME, "building-loop-state");
+  const file = fs.readdirSync(home).find(name => /^[a-f0-9]{64}\.json$/u.test(name));
+  await withCompetingLock(root,write,home,file,async release=>{
+    const usage = h.usage(executor,1,1,77);
+    assert.ok(usage instanceof Promise);
+    h.detachChild(executor);
+    const request = h.user("root",32,"子会话离开后仍保留争用期间的新请求。");
+    assert.ok(request instanceof Promise);
+    const reading = h.ledger("root","read");
+    release();
+    await Promise.all([usage,request]);
+    assert.equal((await reading).items.filter(item=>item.origin?.event===32).length,1);
+    assert.equal(h.warnings.length,1);
+    assert.match(h.warnings[0],/未能补记内存事件/u);
+  });
 }));

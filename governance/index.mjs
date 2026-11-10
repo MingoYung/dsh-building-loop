@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   AUTHORITY, MANAGED, PHASES, authority, digest, includes, keyOf, readBytes, relativeName,
   replaceWithHistory, text, workspaceRoot,
@@ -11,10 +12,11 @@ import {
   rejectedClaims, reviewedQuality, supplementChecks, repairBaseline,
 } from "./preflight.mjs";
 import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory } from "./evidence.mjs";
-import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, trackUnit } from "./ledger.mjs";
+import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
-import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues } from "./coverage.mjs";
-import { STATE_LIMIT, commitWorkspaceState, hasLedgerJournal, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
+import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage } from "./coverage.mjs";
+import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
+  pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools"];
@@ -26,6 +28,8 @@ const COVERAGE = "building_loop_coverage";
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
+const AUTO_BOOK_RETRY_MS = 3000;
+const settleOnly = () => undefined;
 const EMPTY = { read: [], write: [] };
 
 const BEGIN = {
@@ -139,6 +143,13 @@ function findingBinding(frame,active,material) {
   return digest(buffer({actor:frame.agent.id,phase:active.phase,material}));
 }
 
+/** Candidate edits are the only material change that can permit a selective
+ * carry. A changed source, acquisition receipt, rule, goal or context clears it. */
+function proofMaterials(binding) {
+  const {candidateSha256,...materials}=binding;
+  return digest(buffer(materials));
+}
+
 /** Report an actual reconciliation transition without exposing either proof.
  * The notice is derived from current disputes, so successful resolution or a
  * version invalidation cannot leave behind a misleading historical fault label.
@@ -184,6 +195,8 @@ export function apply(ctx, config = {}) {
   const stateHome = path.join(hostHome, "building-loop-state");
   fs.mkdirSync(stateHome, { recursive: true });
   const restrictedAgents = new WeakSet();
+  const automaticWrites = new Map();
+  const warnCleanup = error => ctx.logger.warn("building-loop 宿主账本清理未完成 " + error.message);
 
   /** Hide inherited native tools inside this agent's own scope. Runtime guards
    * remain authoritative, including calls made without the advertised schema.
@@ -222,10 +235,11 @@ export function apply(ctx, config = {}) {
   function scope(agent,{lockedFile,inspection=false}={}) {
     const {root,file}=coordinates(agent);
     if (lockedFile && lockedFile !== file) throw new Error("工作区在动作前发生变化");
+    if (!inspection && !lockedFile && hasPendingLedgerEvents(stateHome,file)) return change(agent, frame => frame);
     if (!inspection && hasLedgerJournal(stateHome,file)) {
       const settle=()=>recoverLedgerJournal(stateHome,file,root,authority(root));
       if (lockedFile) settle();
-      else withWorkspaceLock(stateHome,file,settle);
+      else withWorkspaceLock(stateHome,file,settle,warnCleanup);
     }
     const policy = authority(root);
     const old = readBytes(stateHome, file, STATE_LIMIT);
@@ -258,7 +272,21 @@ export function apply(ctx, config = {}) {
   function change(agent, operation) {
     const {file}=coordinates(agent);
     return withWorkspaceLock(stateHome,file,()=>{
-      const frame = scope(agent,{lockedFile:file});
+      let frame = scope(agent,{lockedFile:file});
+      const pending = pendingLedgerEvents(stateHome,file);
+      if (pending.length) {
+        for (const { event } of pending) {
+          if (event.kind === "request") captureRequest(frame, event);
+          else captureInterruption(frame, event);
+        }
+        // Commit independently of the tool action. An invalid tool argument
+        // cannot roll back an observed user request or interruption.
+        if (frame.changed) {
+          commitWorkspaceState(stateHome,frame,buffer(frame.state),warnCleanup);
+          frame = scope(agent,{lockedFile:file});
+        }
+        clearLedgerEvents(stateHome,pending,warnCleanup);
+      }
       let result, invalidation;
       try { result = operation(frame); }
       catch(error) {
@@ -271,11 +299,95 @@ export function apply(ctx, config = {}) {
         // A projection can be regenerated without changing any ledger item.
         // Give each actual publication a distinct authoritative commit point.
         if (frame.ledgerWrites?.length) frame.state.ledgerCommit = randomUUID();
-        commitWorkspaceState(stateHome,frame,buffer(frame.state));
+        commitWorkspaceState(stateHome,frame,buffer(frame.state),warnCleanup);
       }
       if (invalidation) throw invalidation;
       return result;
+    },warnCleanup);
+  }
+
+  /** Keep native events in observation order. A typed busy result precedes
+   * every mutation, so only that result is retried. Retain a pending event
+   * after the wait budget, and drain it before the next tool reads the ledger.
+   */
+  function drainAutomatic(file, queue) {
+    if (queue.draining) return queue.draining;
+    queue.draining = Promise.resolve().then(async () => {
+      try {
+        const deadline = performance.now() + AUTO_BOOK_RETRY_MS;
+        while (queue.writes.length) {
+          const { agentId, operation } = queue.writes[0];
+          const agent = ctx.agents.get(agentId);
+          let currentFile;
+          try { if (agent) currentFile = coordinates(agent).file; }
+          catch { /* This delivery no longer resolves to its original workspace. */ }
+          if (currentFile !== file) {
+            // Durable intents replay on the next workspace access. An
+            // in-memory usage event cannot outlive its source agent or block
+            // the remaining durable ledger work when that agent is gone.
+            if (operation !== settleOnly) ctx.logger.warn("building-loop 会话已离开原工作区，未能补记内存事件 " + agentId);
+            queue.writes.shift();
+            continue;
+          }
+          try { change(agent, operation); }
+          catch (error) {
+            if (!(error instanceof WorkspaceLockBusy) || performance.now() >= deadline) throw error;
+            await delay(25 + Math.floor(Math.random() * 25));
+            continue;
+          }
+          queue.writes.shift();
+        }
+      } finally {
+        queue.draining = undefined;
+        if (!queue.writes.length) automaticWrites.delete(file);
+      }
     });
+    return queue.draining;
+  }
+
+  /** Uncontended hooks remain synchronous so the same-turn tool sees the event. */
+  function recordAutomatic(agent, operation, label) {
+    try {
+      const {file} = coordinates(agent);
+      let queue = automaticWrites.get(file);
+      if (!queue) {
+        try { return change(agent, operation); }
+        catch (error) { if (!(error instanceof WorkspaceLockBusy)) throw error; }
+        queue = { writes: [] };
+        automaticWrites.set(file, queue);
+      }
+      queue.writes.push({agentId:agent.id, operation});
+      return drainAutomatic(file, queue).catch(error => {
+        ctx.logger.warn("building-loop 自动账本待补记 " + label + " " + error.message);
+      });
+    } catch (error) { ctx.logger.warn("building-loop 无法记录 " + label + " " + error.message); }
+  }
+
+  function recordLedgerEvent(agent, intent, label) {
+    try {
+      const {file} = coordinates(agent);
+      persistLedgerEvent(stateHome,file,intent);
+    } catch (error) {
+      ctx.logger.warn("building-loop 无法暂存自动账本事件 " + label + " " + error.message);
+      return;
+    }
+    return recordAutomatic(agent,settleOnly,label);
+  }
+
+  function register(toolDefinition, options) {
+    const execute = toolDefinition.execute;
+    toolDefinition.execute = async (args, exec) => {
+      if (automaticWrites.size) {
+        const {file} = coordinates(exec.agent);
+        const queue = automaticWrites.get(file);
+        if (queue) {
+          await drainAutomatic(file, queue);
+          exec.signal?.throwIfAborted();
+        }
+      }
+      return execute(args, exec);
+    };
+    ctx.tools.register(toolDefinition, options);
   }
 
   /** 同阶段重试沿用改前备份，跨阶段建立新的改前边界。 */
@@ -344,6 +456,11 @@ export function apply(ctx, config = {}) {
   /** Keep at most one current-version checkpoint for each independent role. */
   function refreshCheckpoints(frame,active,spec) {
     const binding=checkpointBinding(frame,spec),same=value=>JSON.stringify(value)===JSON.stringify(binding);
+    if(active.reusedProofMaterials&&active.reusedProofMaterials!==proofMaterials(binding)) {
+      for(const [id,record] of Object.entries(active.coverage?.records??{}))if(record.reusedProof)delete active.coverage.records[id];
+      delete active.reusedProofMaterials;
+      frame.changed=true;
+    }
     if(active.restoredCheckpointBinding&&!same(active.restoredCheckpointBinding)) {
       // A restored memo has already become the active proof/read state. Retire
       // that copy as well, including nonfactual blocks with no source references.
@@ -351,6 +468,9 @@ export function apply(ctx, config = {}) {
       active.seen={};frame.changed=true;
     }
     for(const key of ["reviewerCheckpoint","auditorCheckpoint"])if(active[key]&&!same(active[key].binding)) {
+      delete active[key];frame.changed=true;
+    }
+    for(const key of ["reviewerProofMemo","auditorProofMemo"])if(active[key]&&proofMaterials(active[key].binding)!==proofMaterials(binding)) {
       delete active[key];frame.changed=true;
     }
     if(active.reconciliationBinding&&!same(active.reconciliationBinding)) {
@@ -365,6 +485,12 @@ export function apply(ctx, config = {}) {
       seen:structuredClone(active.seen??{}),coverage:structuredClone(active.coverage),
       ...(active.searchActivity?{searchActivity:structuredClone(active.searchActivity)}:{}),
       ...(frame.role==="reviewer"&&active.assessment?{assessment:structuredClone(active.assessment)}:{})};
+  }
+
+  function rememberDirectCoverage(frame,active,spec,summary) {
+    const key=frame.role+"ProofMemo",memo=directCoverageMemo(frame,active,spec,summary);
+    if(memo.items.length)active[key]={...memo,actor:active.actor,phase:active.phase,binding:checkpointBinding(frame,spec)};
+    else delete active[key];
   }
 
   /** Deliver a bounded, visible reading packet and phase contract in one call.
@@ -556,6 +682,10 @@ export function apply(ctx, config = {}) {
         // Current hashes are rechecked by every evidence/goal/candidate consumer.
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
       };
+      // A new activation cannot consume an earlier turn/end from the same
+      // native session, even if that event is delivered again after the resume.
+      if (Number.isSafeInteger(resident?.session.seq)) record.activationStartSeq = resident.session.seq;
+      else delete record.activationStartSeq;
       delete record.blocked;
       delete record.resumePhase;
       delete record.assessment;
@@ -572,6 +702,7 @@ export function apply(ctx, config = {}) {
       if (!resumeSame) delete record.searchActivity;
       if (!resumeSame) delete record.interruptions;
       if (!resumeSame) delete record.restoredCheckpointBinding;
+      if (!resumeSame) delete record.reusedProofMaterials;
       const saved=record[plan.role+"Checkpoint"];
       if(record.reconciliation?.length&&saved?.actor===childId&&saved.phase===plan.phase&&plan.prior?.phase!=="blocked") {
         // Restore only this role's own observed lines and proofs. The disputed
@@ -588,6 +719,12 @@ export function apply(ctx, config = {}) {
           if(!entry||dispute.objectSpans?.length||!recordMeetsDispute(entry,dispute))delete record.coverage.records[dispute.block];
         }
         if(saved.assessment)record.assessment=structuredClone(saved.assessment);
+      } else if(!resumeSame) {
+        const memo=record[plan.role+"ProofMemo"];
+        if(memo?.actor===childId&&memo.binding.candidateSha256!==binding.candidateSha256) {
+          restoreDirectCoverage(frame,record,spec,memo);
+          if(record.coverage)record.reusedProofMaterials=proofMaterials(binding);
+        }
       }
       if (plan.phase === "supplement" && record.unsupported?.length && !record.rejected) {
         const candidate = readBytes(frame.root, spec.candidate);
@@ -644,6 +781,26 @@ export function apply(ctx, config = {}) {
     active.blocked = reason;
     active.resumePhase = active.phase;
     active.phase = "blocked";
+  }
+
+  /** Bind native interruption replay to its original owner and event range. */
+  function captureInterruption(frame, event) {
+    const assignment = Object.entries(frame.state.units).find(([, unit]) =>
+      unit.owner === event.parent && unit.actor === event.session && PHASES.includes(unit.phase));
+    if (!assignment) return;
+    const [id, active] = assignment;
+    if (Number.isSafeInteger(event.seq) && event.seq >= 0) {
+      const previous = Object.hasOwn(active.interruptionEvents ?? {}, event.session) ? active.interruptionEvents[event.session] : -1;
+      if (event.seq < (active.activationStartSeq ?? 0) || event.seq <= previous) return;
+      active.interruptionEvents = { ...active.interruptionEvents, [event.session]: event.seq };
+    }
+    // A conversational end without a workflow receipt is not a delivery.
+    pause(active, event.reason === "completed"
+      ? "子会话已结束但本阶段未提交宿主回执。总控可从原阶段续派到同一会话。"
+      : "子会话中断 " + event.reason + "，本阶段未交付。总控可续派到原会话。");
+    trackUnit(frame, id, active, true);
+    active.interruptions = (active.interruptions ?? 0) + 1;
+    frame.changed = true;
   }
 
   /** Cross-check review metadata against concrete rejected factual spans.
@@ -752,6 +909,7 @@ export function apply(ctx, config = {}) {
     if(needsRevalidation(frame,id,active))throw new Error("待复核的来源或获取回执版本已经变化，请总控重新推进核验");
     const coverage = coverageSummary(frame, active, spec);
     requireDisputedProof(active,coverage.records,true);
+    rememberDirectCoverage(frame,active,spec,coverage);
     const layout = plainLastIssues(spec,lineList(bytes));
     const preservation=requiredLineCheck(frame,id,bytes,goal);
     const formatIssues=[...layout,...preservation.issues];
@@ -944,6 +1102,7 @@ export function apply(ctx, config = {}) {
         let checked = reviewChecks(frame, active, spec, grant, args.checks??previous, lines, binding, fullCoverage);
         coverage=fullCoverage();
         requireDisputedProof(active,coverage.records,true);
+        rememberDirectCoverage(frame,active,spec,coverage);
         if(active.assessment?.hash===hash)consistentUnlisted(frame,active,spec,bytes,active.assessment.unlisted,coverage);
         // Evaluate each configured number even when another claim has already failed.
         const calculations = numericChecks(frame.root, spec, lines, frame.reads);
@@ -1072,7 +1231,7 @@ export function apply(ctx, config = {}) {
       // cumulative traffic is not confused with a context-window measurement.
       if(agent?.session!==session||!Number.isSafeInteger(turn)||!Number.isSafeInteger(step)
         ||turn<1||step<1||!Number.isSafeInteger(usage?.cacheReadTokens)||usage.cacheReadTokens<0)return;
-      try { change(agent,frame=>{
+      return recordAutomatic(agent,frame=>{
         const active=Object.values(frame.state.units).find(row=>row.owner===session.header.parentSession
           && (row.executor===session.id||Object.hasOwn(row.executorUsage??{},session.id)));
         if(!active)return;
@@ -1084,44 +1243,34 @@ export function apply(ctx, config = {}) {
         if(!Number.isSafeInteger(total))throw new Error("执行会话累计用量超过安全整数范围");
         active.executorUsage[session.id]={cacheReadTokens:total,turnSteps:{...previous.turnSteps,[turn]:mergeRanges([...ranges,[step,step]])}};
         frame.changed=true;
-      }); } catch(error) {ctx.logger.warn("building-loop 无法记录执行会话用量 "+error.message);}
-      return;
+      },"执行会话用量");
     }
     if (event.type === "user/message") {
       if (event.data?.source?.kind !== "user") return;
       const agent = ctx.agents.get(session.id);
-      try { if (agent?.session === session) change(agent, frame => captureRequest(frame, event)); }
-      catch (error) { ctx.logger.warn("building-loop 无法登记用户消息 " + error.message); }
+      if (agent?.session !== session) return;
+      const intent = requestIntent(session,event);
+      if (intent) return recordLedgerEvent(agent,intent,"用户消息");
       return;
     }
-    if (event.type !== "turn/end" || !["error", "max-tokens", "blocked", "completed"].includes(event.data?.reason?.kind)) return;
+    if (event.type !== "turn/end" || !LEDGER_TURN_ENDS.includes(event.data?.reason?.kind)) return;
     const agent = ctx.agents.get(session.id);
     if (agent?.session !== session || session.header.parentSession === undefined) return;
-    try {
-      change(agent, frame => {
-        if (!frame.assignment) return;
-        const [id, active] = frame.assignment;
-        // A conversational end without a workflow receipt is not a delivery.
-        // Preserve a resumable checkpoint instead of leaving an idle actor in an active phase.
-        pause(active, event.data.reason.kind === "completed"
-          ? "子会话已结束但本阶段未提交宿主回执。总控可从原阶段续派到同一会话。"
-          : "子会话中断 " + event.data.reason.kind + "，本阶段未交付。总控可续派到原会话。");
-        trackUnit(frame, id, active, true);
-        active.interruptions = (active.interruptions ?? 0) + 1;
-        frame.changed = true;
-      });
-    } catch (error) { ctx.logger.warn("building-loop 无法记录子会话中断 " + error.message); }
+    const intent = { kind:"turn-end", session:session.id, parent:session.header.parentSession,
+      seq:event.seq, time:event.time ?? 0, reason:event.data.reason.kind };
+    if (Number.isSafeInteger(event.seq) && event.seq >= 0) return recordLedgerEvent(agent,intent,"子会话中断");
+    return recordAutomatic(agent,frame=>captureInterruption(frame,intent),"子会话中断");
   });
 
-  ctx.tools.register(tool(FILE, "按当前角色的准确路径白名单列出、读取、字面搜索或原子写入 UTF-8 文件。写入自动维护一份改前备份和逐文件日志。history 取授权文件的最近更新。", ["list", "read", "search", "write", "history"], {
+  register(tool(FILE, "按当前角色的准确路径白名单列出、读取、字面搜索或原子写入 UTF-8 文件。写入自动维护一份改前备份和逐文件日志。history 取授权文件的最近更新。", ["list", "read", "search", "write", "history"], {
     path: string, query: string, content: string, note: string, start: number, count: number,
   }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor"])});
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
-  ctx.tools.register(tool(COVERAGE, "按宿主全文清单逐块核验。inventory分页取全文；record每次1–12块，部分错误只重交invalid块；status默认只给进度，可用block取单块证明。", ["inventory", "record", "status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"])});
+  register(tool(COVERAGE, "按宿主全文清单逐块核验。inventory分页取全文；record每次1–12块，部分错误只重交invalid块；status默认只给进度，可用block取单块证明。", ["inventory", "record", "status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"])});
   const qualityNames = Object.keys(QUALITY);
   const referenceSchema = { type: "object", properties: { file: string, start: number, end: number }, required: ["file", "start", "end"], additionalProperties: false };
-  ctx.tools.register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
+  register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
     unit: { ...string, description: "可省略，宿主沿用当前子会话唯一已授权单元；显式编号须与授权一致。" }, ...qualityFields,
     goalFit: { type: "object", properties: { pass: { type: "boolean" }, basis: string }, required: ["pass","basis"], additionalProperties: false },
     revisions: { type: "array", items: { type: "object", properties: {
@@ -1133,7 +1282,7 @@ export function apply(ctx, config = {}) {
     unverifiedSources: { type: "array", items: string },
     unlisted: { type: "array", description: "仅当前coverage中仍被拒绝且有finding的未编号事实，不能填已核标题/假设/错例/支持项。混合行须用quote限定真实缺口；无遗漏填[]。", items: { type: "object", properties: { line: number, quote: string, basis: string }, required: ["line", "basis"], additionalProperties: false } },
   }, assess, [...qualityNames, "revise", "sourceRefs", "unverifiedSources", "unlisted", "goalFit"]), {when:visible(["reviewer"])});
-  ctx.tools.register(tool(LEDGER, "总控登记后续计划、临时需求和搁置事项。每轮事实验收后read最新账本和项目现状，再逐项review。配置ledgerDocument时，review成功会由宿主生成完整当前账本；export也可生成阻塞时的当前快照，不改变验收状态。不要手写该文件。"+LEDGER_BASIS_RULE, ["read", "record", "review", "export"], {
+  register(tool(LEDGER, "总控登记后续计划、临时需求和搁置事项。每轮事实验收后read最新账本和项目现状，再逐项review。配置ledgerDocument时，review成功会由宿主生成完整当前账本；export也可生成阻塞时的当前快照，不改变验收状态。不要手写该文件。"+LEDGER_BASIS_RULE, ["read", "record", "review", "export"], {
     unit: { ...string, description: "复盘时指定单元；record(kind=interrupted) 指明已有宿主中断的单元时，返回原 unit-账项，勿重复登记。独立搁置任务可省略。" }, id: string, kind: { type: "string", enum: ["planned", "temporary", "interrupted"] },
     title: string, note: string, originId: string, includeClosed: { type: "boolean" },
     expectedItemSha256: { ...string, description: "显式修改已有独立账项时必填；取最近 ledger read 对应项目的 itemSha256。新增项目和原请求归类不填。" },
@@ -1142,7 +1291,7 @@ export function apply(ctx, config = {}) {
       basis: {...string,description:LEDGER_BASIS_RULE}, evidence: referenceSchema, coveredBy: string,
     }, required: ["id", "outcome", "basis"], additionalProperties: false } },
   }, (args, exec) => change(exec.agent, frame => ledgerAction(frame, args))), {when:visible(["coordinator"])});
-  ctx.tools.register(tool(WORKFLOW, "每阶段先prepare获取授权读包、版本、待读页和契约；重复prepare只给未读或变化内容。advance仅总控，preflight/submit仅执行，review仅核验，audit仅独立反证；交付后自动结束本轮。", ["prepare", "status", "advance", "preflight", "submit", "review", "audit", "block"], {
+  register(tool(WORKFLOW, "每阶段先prepare获取授权读包、版本、待读页和契约；重复prepare只给未读或变化内容。advance仅总控，preflight/submit仅执行，review仅核验，audit仅独立反证；交付后自动结束本轮。", ["prepare", "status", "advance", "preflight", "submit", "review", "audit", "block"], {
     unit: { ...string, description: "总控 advance 必填；子会话动作省略时沿用宿主唯一授权单元。" }, note: string,
     checks: { type: "array", description: "这里只提交 claims/正文 C数字 的事实编号（如 C1/C2/C3）；B开头的全文块只在 building_loop_coverage record 提交，不放这里。", items: {
       type: "object", properties: {

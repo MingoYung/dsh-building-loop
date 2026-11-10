@@ -1,4 +1,5 @@
 import { digest, includes, keyOf, readBytes, text } from "./policy.mjs";
+import { markdownStructure } from "./markdown-structure.mjs";
 
 export const QUALITY = {
   sources: "资料的原始出处、核实办法和仍待证的部分",
@@ -141,60 +142,13 @@ function footnoteProse(lines) {
   return rows;
 }
 
-/** A lazy blockquote can continue a paragraph, but not a new heading or fence. */
-function interruptsLazyBlockquote(line, marker) {
-  return /^ {0,3}#{1,6}(?:[ \t]|$)/u.test(line)
-    || Boolean(marker && (marker[1][0] === "~" || !marker[2].includes("`")));
-}
-
 /** Bound required literals and authority fences to unambiguous live rows.
  * Preserve physical offsets, including wholly hidden rows for duplicate tests.
  * This conservatively excludes HTML, quotations and indented code rather
  * than treating arbitrary rendered markup as a literal preservation proof.
  */
 export function requiredLineMarkdown(lines) {
-  let fence=null,comment=false,quoted=false;
-  const tags=[],fences=[];
-  const prose=lines.map((line,index)=>{
-    const marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
-    if(fence){
-      if(marker&&marker[1][0]===fence.marker[0]&&marker[1].length>=fence.marker.length&&!marker[2].trim()){
-        if(fence.contract){fence.contract.end=index;fence.contract.canonical&&=/^```[ \t]*$/u.test(line);}
-        fence=null;
-      }
-      return "";
-    }
-    if(!line.trim()||quoted&&!comment&&!tags.length&&interruptsLazyBlockquote(line,marker))quoted=false;
-    if(!comment&&!tags.length&&/^ {0,3}>/u.test(line))quoted=true;
-    // Keep tracking a bare HTML opener even while suppressing a possible lazy
-    // quote. A later heading or fence inside it cannot become visible prose.
-    if(quoted&&!comment&&!tags.length&&!/^ {0,3}<(?:!--|[A-Za-z][A-Za-z0-9-]*(?=[\s/>]))/u.test(line))return "";
-    if(!comment&&!tags.length&&marker){
-      fence={marker:marker[1]};
-      if(!line.startsWith(" ")&&/^building-loop-required-lines\b/u.test(marker[2].trim())){
-        fence.contract={start:index,end:null,canonical:/^```building-loop-required-lines[ \t]*$/u.test(line)};
-        fences.push(fence.contract);
-      }
-      return "";
-    }
-    if(!comment&&!tags.length&&/^(?: {4}| {0,3}\t)/u.test(line))return "";
-    let hidden=comment||tags.length>0;
-    for(const match of line.matchAll(/<!--|-->|<\/?([A-Za-z][A-Za-z0-9-]*)(?=[\s/>])(?:[^>"']|"[^"]*"|'[^']*')*>/gu)){
-      const [token,name]=match,tag=name?.toLowerCase(),top=tags.at(-1);
-      hidden=true;
-      if(comment){if(token==="-->")comment=false;continue;}
-      if(["pre","code","script","style","textarea"].includes(top)){
-        if(token.startsWith("</")&&tag===top)tags.pop();
-        continue;
-      }
-      if(token==="<!--"){comment=true;continue;}
-      if(!tag)continue;
-      if(token.startsWith("</")){if(tag===top)tags.pop();}
-      else if(!/\/>$/u.test(token)&&!/^(?:br|hr|img|input|meta|link|wbr|source|area|base|col|embed|param|track)$/u.test(tag))tags.push(tag);
-    }
-    return hidden||quoted?"":line;
-  });
-  const visible=footnoteProse(prose);
+  const { fences, visible } = markdownStructure(lines);
   return {fences,live:visible.map(line=>!!line.trim()),visible};
 }
 
@@ -239,10 +193,10 @@ export function footnoteQuoteIndex(lines, files) {
 }
 
 /** Remove only recognized locators. Facts after a citation remain in the comparison. */
-function conclusion(body, files = []) {
-  let result = body.normalize("NFKC").replaceAll("−", "-").replaceAll("\\", "/");
+function conclusion(body, files = [], normalize = value => value.normalize("NFKC")) {
+  let result = normalize(body).replaceAll("−", "-").replaceAll("\\", "/");
   for (const file of files) {
-    const locator = new RegExp(escape(file.normalize("NFKC"))
+    const locator = new RegExp(escape(normalize(file))
       + "\\s*(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)", "gi");
     result = result.replace(locator, "");
   }
@@ -543,38 +497,82 @@ export function numericChecks(root, spec, lines, readable) {
       const { expected, before, after } = calculate(bytes, rule);
       const row = claimRow(lines, id);
       const cites = row && citation(row.body, rule.source);
-      const body = row ? conclusion(row.body, [rule.source]) : "";
+      const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
       // A literal ×100% is a formula multiplier, while 24% in a claim is a result.
-      const percentages = [...body.matchAll(/(?<![\dA-Za-z.,+\-])([+-]?\d+(?:\.\d+)?)\s*%/g)]
-        .filter(match => !(match[1] === "100" && /[×*]\s*$/.test(body.slice(0, match.index))))
-        .map(match => match[1]);
-      const correct = percentages.length > 0 && percentages.every(value => equalNumber(value, expected));
+      const percentages = quantityScanner(["%"])(body).filter(quantity => quantity.unit)
+        .filter(quantity => !(quantity.complete && quantity.value === "100" && /[×*]\s*$/u.test(body.slice(0, quantity.start))));
+      const correct = percentages.length > 0 && percentages.every(quantity => quantity.complete && equalNumber(quantity.value, expected));
       const coversRows = cites?.start && cites.start <= Math.min(before.line, after.line)
         && cites.end >= Math.max(before.line, after.line) && cites.end <= lineList(bytes).length;
       const issue = !correct ? "结论中的降幅应为 " + expected + "%"
         : !coversRows ? "出处须引用 " + rule.source + " 中两条原始数据行" : null;
       return {
-        id, ok: issue === null, issue, expected: expected + "%", reported: percentages.map(value => value + "%"),
+        id, ok: issue === null, issue, expected: expected + "%", reported: percentages.map(quantity => quantity.value + "%"),
         source: rule.source, sourceHash: digest(bytes), before, after, formula: "(基准-对照)/基准×100",
       };
     } catch (error) { return { id, ok: false, source: rule.source, issue: error.message }; }
   });
 }
 
+/** Normalize presentation width without flattening a unit exponent into a digit. */
+function quantityText(value) {
+  return value.replace(/[^\u00b2\u00b3\u00b9\u2070-\u209f]+/gu, span => span.normalize("NFKC"));
+}
+
+const quantityNumber = /(?<![\d\p{Script=Latin}\p{Script=Greek}.])([+-]?\d+(?:\.\d+)?)/gu;
+// A glued symbol or an operator with an operand extends the unit. Plain
+// punctuation and adjacent prose (for example “24 毫秒后”) remain boundaries.
+const gluedUnitSuffix = /^(?:[\p{Script=Latin}\p{Script=Greek}\p{N}\u2070-\u209f%‰°′″]|[+−-]\d)/u;
+const compoundUnitSuffix = /^\s*(?:[\/⁄∕^·⋅*×÷]\s*[\p{L}\p{N}°%‰(+−-]|\.(?=[\p{Script=Latin}\p{Script=Greek}]|\d)|每[\p{L}]|平方|立方)/u;
+const spacedUnitFactor = /^\s+(?:s|ms|μs|ns|min|h|m|cm|mm|km|g|kg|K|Hz|N|Pa|W|V|A)(?=$|[\s\p{P}\p{S}])/u;
+
+function unitSpelling(value) {
+  // SI symbols stay exact (ms and mS differ). English descriptive phrases
+  // retain the earlier case-insensitive source match.
+  const descriptive = /^[A-Za-z]+(?:\s+[A-Za-z]+)+$/u.test(value);
+  return value.split(/\s+/u).map(word => descriptive
+    ? word.replace(/[A-Za-z]/g, letter => `[${letter.toLowerCase()}${letter.toUpperCase()}]`)
+    : escape(word)).join("\\s+");
+}
+
+function completeUnit(body, start, end) {
+  let suffix = body.slice(end);
+  // A presentation wrapper can close at the unit boundary. Any operator or
+  // glued suffix after the closing marker still belongs to the quantity.
+  const wrapper = /(?<![*_`])(\*{1,3}|_{1,3}|`{1,3})$/u.exec(body.slice(Math.max(0, start - 4), start));
+  if (wrapper && suffix.startsWith(wrapper[1])) suffix = suffix.slice(wrapper[1].length);
+  return !gluedUnitSuffix.test(suffix) && !compoundUnitSuffix.test(suffix) && !spacedUnitFactor.test(suffix);
+}
+
+/** Use the configured aliases to locate a quantity, then check its whole unit
+ * boundary. Sharing this scanner prevents source, claim, and document scope
+ * from accepting different prefixes. Unit symbols preserve their case. */
+function quantityScanner(aliases) {
+  const spellings = [...new Set(aliases.map(unit => quantityText(unit.trim())))]
+    .sort((left, right) => right.length - left.length);
+  const unitPattern = new RegExp("^\\s*(?:个\\s*)?(" + spellings.map(unitSpelling).join("|") + ")", "u");
+  return body => [...body.matchAll(quantityNumber)].map(match => {
+    const after = match.index + match[0].length;
+    const unit = unitPattern.exec(body.slice(after));
+    const end = after + (unit?.[0].length ?? 0);
+    return { value: match[1], start: match.index, end, unit: unit?.[1], complete: !!unit && completeUnit(body, match.index, end) };
+  });
+}
+
 /** Check direct numerical restatements; conversions require a different declared formula. */
 function sourceNumber(bytes, rule, lines, id, evidence) {
-  const source = lineList(bytes)[rule.line-1] ?? "";
-  const pattern = new RegExp("([+-]?\\d+(?:\\.\\d+)?)\\s*" + escape(rule.sourceUnit),"gi");
-  const matches = [...source.matchAll(pattern)];
-  if (matches.length !== 1) throw new Error("原文指定行须含唯一的数值与单位");
-  const expected = matches[0][1];
+  const sourceLines = lineList(bytes);
+  const source = quantityText(sourceLines[rule.line - 1] ?? "").replaceAll("−", "-");
+  const matches = quantityScanner([rule.sourceUnit])(source).filter(quantity => quantity.unit);
+  if (matches.length !== 1 || !matches[0].complete) throw new Error("原文指定行须含唯一的数值与完整单位");
+  const expected = matches[0].value;
   const row = claimRow(lines,id);
-  const body = row ? conclusion(row.body,[rule.source]) : "";
-  const values = [...body.matchAll(/(?<![\dA-Za-z.])([+-]?\d+(?:\.\d+)?)/g)].map(m=>m[1]);
-  const unitPattern = new RegExp("[+-]?\\d+(?:\\.\\d+)?\\s*(?:个\\s*)?(?:"+rule.units.map(escape).join("|")+")");
+  const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
+  const quantities = quantityScanner(rule.units)(body);
+  const values = quantities.map(quantity => quantity.value);
   const cited = row && citation(row.body,rule.source);
-  const rowOk = values.length > 0 && values.every(value=>equalNumber(value,expected)) && unitPattern.test(body)
-    && cited?.start <= rule.line && cited?.end >= rule.line;
+  const rowOk = quantities.length > 0 && quantities.every(quantity => quantity.complete && equalNumber(quantity.value, expected))
+    && cited?.start <= rule.line && cited?.end >= rule.line && cited.end <= sourceLines.length;
   // This opt-in contract is for one scalar per declared unit across the document.
   // It deliberately does not infer quantities or support arbitrary conversions.
   const documentIssues = rule.scope === "document" ? directQuantityIssues(lines, rule, expected, evidence) : [];
@@ -591,25 +589,24 @@ function sourceNumber(bytes, rule, lines, id, evidence) {
  * require independent full-document review, not a regex claim of general truth.
  */
 function directQuantityIssues(lines, rule, expected, evidence) {
-  const units = [...new Set([...rule.units,rule.sourceUnit])].sort((a,b)=>b.length-a.length).map(escape).join("|");
-  const quantity = new RegExp("(?<![\\dA-Za-z.])([+-]?\\d+(?:\\.\\d+)?)\\s*(?:个\\s*)?(?:"+units+")(?![A-Za-z])","gi");
+  const scan = quantityScanner([...rule.units, rule.sourceUnit]);
   const beforeBound = /(?:[<>≤≥]=?|超过|不足|至少|至多|大于|小于|多于|少于|高于|低于|不满|不超过|不低于|more\s+than|less\s+than|longer\s+than|shorter\s+than|at\s+least|at\s+most|over|under)\s*(?:约|大约)?\s*$/i;
   const afterBound = /^\s*(?:以上|以下|以外|以内|左右以外|或更多|或更少|[<>≤≥]=?)/;
   const compareAfter = /^\s*(?:略|稍|更|还|要|偏|稍微|略微)*\s*(?:长|短|多|少|大|小|高|低)/;
   const issues = [];
   for (const [index,line] of lines.entries()) {
-    const body = conclusion(line,evidence);
-    const quantities = [...body.matchAll(quantity)];
+    const body = conclusion(line, evidence, quantityText);
+    const quantities = scan(body).filter(quantity => quantity.unit);
     // A direct restatement does not authorize extra operands or derived values in
     // the same line. Locators and URLs are metadata, not arithmetic operands.
     const statement = body.replace(/https?:\/\/[^\s）)\]】>"'“”]+/gi, "");
-    const additionalNumbers = quantities.length ? [...statement.matchAll(/(?<![\dA-Za-z.])([+-]?\d+(?:\.\d+)?)/g)]
-      .map(match=>match[1]).filter(value=>!equalNumber(value,expected)) : [];
+    const additionalNumbers = quantities.length ? scan(statement)
+      .map(quantity => quantity.value).filter(value => !equalNumber(value, expected)) : [];
     if (additionalNumbers.length) issues.push({line:index+1,text:line,reported:additionalNumbers,
       issue:"直接转述同一行包含其他操作数或结果；换算须另行登记原始量、单位与复算规则，不能混入本条直接转述"});
     for (const match of quantities) {
-      const before = body.slice(0,match.index).split(/[，,。；;!?！？\n]/).at(-1);
-      const after = body.slice(match.index+match[0].length).split(/[，,。；;!?！？\n]/)[0];
+      const before = body.slice(0, match.start).split(/[，,。；;!?！？\n]/).at(-1);
+      const after = body.slice(match.end).split(/[，,。；;!?！？\n]/)[0];
       const comparison = beforeBound.test(before) || afterBound.test(after)
         || /比\s*$/.test(before) && compareAfter.test(after);
       // A bare source numeral provides no warrant for an "exact" value. Only
@@ -617,8 +614,10 @@ function directQuantityIssues(lines, rule, expected, evidence) {
       // "the excerpt provides no finer value" has no such quantity-label pair.
       const exactness = /(?:精确值|精确数值|准确值|确切值|exact(?:ly)?|precisely)[^。；;，,!?！？]{0,24}$/i.test(before)
         || /^\s*(?:就是|即为|是|为|为其)\s*(?:精确值|精确数值|准确值|确切值)/.test(after);
-      if (!equalNumber(match[1],expected) || comparison || exactness) {
-        issues.push({line:index+1,text:line,reported:match[1],issue:exactness
+      if (!match.complete || !equalNumber(match.value, expected) || comparison || exactness) {
+        issues.push({line:index+1,text:line,reported:match.value,issue:!match.complete
+          ? "全文直接转述的完整单位须与已登记单位一致，不能将乘除、指数或后缀留在单位之外"
+          : exactness
           ? "原文给出数字不等于证明精确值；直接转述不得自行升级精度，改为说明原文给出的数值与未知边界"
           :comparison
           ? "直接转述契约没有授权给原文数值添加上下界或长短比较；删去无据推断，或先登记支持该关系的证据与核验规则"
@@ -637,31 +636,15 @@ export function plainLastIssues(spec, lines) {
   const visible=value=>value.replace(/[*_~]/gu,"").trim();
   const labelled=/^(?:#{1,6}\s*)?(?:大白话|直白说明)\s*[:：]\s*\S/u;
   const heading=/^(?:#{1,6}\s+)?(?:大白话|直白说明)\s*[:：]?\s*$/u;
-  let fence=null,html=0,comment=false,quoted=false,last=-1,section=false;
-  for(const [index,line] of lines.entries()){
-    const marker=/^ {0,3}(`{3,}|~{3,})(.*)$/u.exec(line);
-    if(!fence&&!html&&!comment&&quoted&&interruptsLazyBlockquote(line,marker))quoted=false;
-    if(marker){
-      if(!fence)fence=marker[1];
-      else if(marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;
-      continue;
-    }
-    if(fence)continue;
-    if(!line.trim())quoted=false;
-    if(/^ {0,3}>/u.test(line))quoted=true;
-    const outside=!html&&!comment&&!quoted&&!/^(?: {4}|\t)/u.test(line);
-    if(outside&&(labelled.test(visible(line))||heading.test(visible(line)))){
-      last=index;section=heading.test(visible(line));
-    }
-    // Ignore markers inside HTML or comments. This small containment check is
-    // deliberately conservative; it is not a general Markdown/HTML renderer.
-    for(const token of line.matchAll(/<!--[\s\S]*?-->|<!--|-->|<\/?[A-Za-z][^>]*>/gu)){
-      const value=token[0];
-      if(value.startsWith("<!--")){if(!value.endsWith("-->"))comment=true;continue;}
-      if(value==="-->"){comment=false;continue;}if(comment)continue;
-      if(/^<\//u.test(value))html=Math.max(0,html-1);
-      else if(!/\/>$/u.test(value)&&!/^<(?:br|hr|img|input|meta|link|wbr|source|area|base|col|embed|param|track)(?:\s|>)/iu.test(value))html++;
-    }
+  const structure = markdownStructure(lines);
+  let last = -1;
+  let section = false;
+  for (let index = 0; index < lines.length; index++) {
+    if (!structure.closingRows[index] || /^(?: {4}|\t)/u.test(lines[index])) continue;
+    const line = visible(structure.visible[index]);
+    if (!labelled.test(line) && !heading.test(line)) continue;
+    last = index;
+    section = heading.test(line);
   }
   // An explicit standalone line can follow a list without a blank separator.
   // Its own trailing explanation must still be the final substantive paragraph.
@@ -671,7 +654,8 @@ export function plainLastIssues(spec, lines) {
   const blockBoundary = /^\s*(?:#{1,6}\s|```|~~~|\||[-*+]\s|\d+[.)]\s|>|\[\^[^\]]+\]:|<(?:!--|\/?[A-Za-z][^>]*>)|(?:---+|___+|\*\*\*+)\s*$)/u;
   const newLabel = /^\s*(?:\[|【)?(?:错例|误读|错误示例|错误推理|附录)(?:\s*(?:第)?(?:\d+|[零〇一二两三四五六七八九十百千]+))?(?:\]|】|\s*[:：])/u;
   const appended = body.some(line => blockBoundary.test(line) || newLabel.test(visible(line)) || errorExample(line));
-  return last>=0&&paragraphs.length===1&&!appended?[]
+  const explanationVisible = !section || structure.visible.slice(last + 1).some(line => line.trim());
+  return last >= 0 && paragraphs.length === 1 && explanationVisible && !appended ? []
     : ["正文末尾须有代码/HTML/引用块之外的独立行‘大白话：…’或‘直白说明：…’，可直接接在列表后；其解释之后不能再放错例、附录或其他段落。"];
 }
 

@@ -39,6 +39,7 @@ def sanitizer(root):
             value = value.replace(secret, "[REDACTED_CREDENTIAL]")
         value = re.sub(r"\bsk-[A-Za-z0-9_-]{16,}\b", "[REDACTED_CREDENTIAL]", value)
         value = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9_.-]{20,}", r"\1[REDACTED_CREDENTIAL]", value)
+        value = re.sub(r"(?i)([?&](?:token|access_token|api_key)=)[A-Za-z0-9_.%-]{16,}", r"\1[REDACTED_CREDENTIAL]", value)
         for source, label in replacements:
             value = value.replace(source, label)
         return value
@@ -141,7 +142,8 @@ def collect(run, clean):
     manifest_file = run / "run.json"
     if manifest_file.is_file():
         try:
-            recorded = json.loads(manifest_file.read_text(encoding="utf-8")).get("runtimeHashes", {})
+            metadata = json.loads(manifest_file.read_text(encoding="utf-8"))
+            recorded = metadata.get("runtimeHashes", {})
             if isinstance(recorded, dict):
                 hashes = recorded
             # A manifest must opt in to these additional files so existing
@@ -149,6 +151,10 @@ def collect(run, clean):
             for name in ("skills/dispatch-protocol/SKILL.md", "turn-resume/index.mjs", "governance/transactions.mjs"):
                 if name in hashes and (runtime / name).is_file():
                     files.append(runtime / name)
+            if metadata.get("qualifiedPackageArchiveSha256"):
+                # New manifests include every first-party governance module in the installed package.
+                files.extend(p for p in (runtime / "governance").glob("*.mjs")
+                             if p.relative_to(runtime).as_posix() in hashes)
         except (ValueError, AttributeError):
             pass  # Preserve malformed historical manifests through artifact().
     for name in ("cordis.patch.yml", "witness.mjs"):
@@ -170,6 +176,26 @@ def collect(run, clean):
     return result
 
 
+def run_bundle(run, clean):
+    artifacts = collect(run, clean)
+    if not artifacts:
+        return None
+    ending = next((a["data"] for a in artifacts if a["path"] == "finished.json"), None)
+    bundle = {"spec": "building-loop-experiment/1", "family": run.parent.name, "run": run.name,
+              "completion": ending, "recordedUsage": usage(artifacts), "artifacts": artifacts}
+    name = run.parent.name + "/" + run.name + ".json"
+    data = serialize(bundle)
+    metadata = next((a["data"] for a in artifacts if a["path"] == "run.json" and isinstance(a["data"], dict)), {})
+    encoding = {}
+    if metadata.get("reconciliationControls"):
+        # Preserve the complete canonical bundle without crossing Git's blob limit.
+        name += ".gz"
+        encoding = {"encoding": "gzip", "contentSha256": sha256(data).hexdigest(), "contentBytes": len(data)}
+        data = gzip.compress(data, compresslevel=6, mtime=0)
+    return data, {"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), **encoding,
+                  "completion": ending, "recordedUsage": bundle["recordedUsage"]}
+
+
 def export(root, destination):
     """Export every available run and standalone smoke artifact in this workspace."""
     clean = sanitizer(root)
@@ -179,28 +205,14 @@ def export(root, destination):
                              "full-page external source downloads"], "runs": []}
     for family in sorted((root / "outputs").glob("building-loop-*audit")):
         for run in sorted(p for p in family.iterdir() if p.is_dir()):
-            artifacts = collect(run, clean)
-            if not artifacts:
+            exported = run_bundle(run, clean)
+            if not exported:
                 continue
-            ending = next((a["data"] for a in artifacts if a["path"] == "finished.json"), None)
-            bundle = {"spec": "building-loop-experiment/1", "family": family.name, "run": run.name,
-                      "completion": ending, "recordedUsage": usage(artifacts), "artifacts": artifacts}
-            name = family.name + "/" + run.name + ".json"
-            data = serialize(bundle)
-            metadata = next((a["data"] for a in artifacts if a["path"] == "run.json" and isinstance(a["data"], dict)), {})
-            encoding = {}
-            if metadata.get("reconciliationControls"):
-                # Preserve the complete canonical bundle without crossing Git's
-                # blob limit as repeated real request bodies grow. Old runs keep
-                # their original paths, encoding and SHA values.
-                name += ".gz"
-                encoding = {"encoding": "gzip", "contentSha256": sha256(data).hexdigest(), "contentBytes": len(data)}
-                data = gzip.compress(data, compresslevel=6, mtime=0)
-            target = destination / name
+            data, entry = exported
+            target = destination / entry["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-            manifest["runs"].append({"path": name, "sha256": sha256(data).hexdigest(), "bytes": len(data), **encoding,
-                                     "completion": ending, "recordedUsage": bundle["recordedUsage"]})
+            manifest["runs"].append(entry)
     smoke = []
     for directory in sorted((root / "work").glob("building-loop-*")):
         if not directory.is_dir() or not any(k in directory.name for k in ("smoke-", "scope-check-", "index-")):
@@ -243,9 +255,50 @@ def export(root, destination):
     print("Exported", len(manifest["runs"]), "runs and", len(smoke), "standalone artifacts; recorded total tokens", total)
 
 
+def append_runs(root, destination, runs):
+    """Publish selected runs without rewriting an earlier archived result."""
+    index = destination / "index.json"
+    manifest = json.loads(index.read_bytes())
+    existing = {entry["path"]: entry for entry in manifest["runs"]}
+    clean = sanitizer(root)
+    for requested in runs:
+        run = requested.resolve(strict=True)
+        if run.parent.parent != root / "outputs" or not run.parent.name.startswith("building-loop-"):
+            raise ValueError(f"Expected an isolated building-loop run: {run}")
+        exported = run_bundle(run, clean)
+        if not exported:
+            raise ValueError(f"Run has no archived artifacts: {run}")
+        data, entry = exported
+        target = destination / entry["path"]
+        if entry["path"] in existing:
+            if existing[entry["path"]] != entry or sha256(target.read_bytes()).hexdigest() != entry["sha256"]:
+                raise ValueError(f"Refusing to replace an existing run: {entry['path']}")
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            with target.open("xb") as handle:
+                handle.write(data)
+        if sha256(target.read_bytes()).hexdigest() != entry["sha256"]:
+            raise ValueError(f"Unexpected archive already exists: {entry['path']}")
+        existing[entry["path"]] = entry
+        manifest["runs"].append(entry)
+    payload = serialize(manifest)
+    if payload != index.read_bytes():
+        staging = index.with_suffix(".json.pending")
+        with staging.open("xb") as handle:
+            handle.write(payload)
+        staging.replace(index)
+    print("Archived index contains", len(manifest["runs"]), "runs")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("workspace", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument("--append", type=Path, nargs="+", metavar="RUN")
     args = parser.parse_args()
-    export(args.workspace.resolve(strict=True), args.destination.resolve())
+    root, destination = args.workspace.resolve(strict=True), args.destination.resolve()
+    if args.append:
+        append_runs(root, destination, args.append)
+    else:
+        export(root, destination)
