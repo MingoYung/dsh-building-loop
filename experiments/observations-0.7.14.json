@@ -1,0 +1,881 @@
+{
+  "schema": "building-loop-resume-observations/1",
+  "date": "2026-11-11",
+  "scope": [
+    "Native Windows continuation, interrupted reviewer recovery, and procedural acceptance without source material.",
+    "The 0.7.13 tail and 0.7.14 no-source fixtures reached closure. The 0.7.14 complex cold fixture verifies same-reviewer continuation up to first audit and leaves closure unverified.",
+    "The legacy-preset and cold baseline loopback runs exercise native DSH wiring with scripted model responses.",
+    "The managed-install runs verify the bundled native local-archive route and frozen offline dependency refresh. Online market installation and general model/cache guarantees are outside these observations."
+  ],
+  "usagePolicy": "Provider-reported native assistant-message records with input usage. Prompt tokens sum uncached input, cache reads, and cache writes. Cache read percentage divides cache reads by prompt tokens. Synthetic transport counters describe the fixture only.",
+  "privacyPolicy": "Public fields retain aggregate usage, tool names and actions, state checkpoints, validation categories, and evidence digests. Raw prompts, user and machine paths, native session identifiers, and credentials were omitted.",
+  "runs": [
+    {
+      "run": "deepseek-tail-6LBYng",
+      "version": "0.7.13",
+      "archiveSha256": "4843e1c0c67b9f58e1b46027d7e3b3823d00298c247fd2dc9ed5b8860a13d6fc",
+      "sourceReportSha256": "33bc9c8a3b956f41caea10535a81d7d42d7f6a498fde92d61dfc72036effe593",
+      "sourceNativeUsageSha256": "85bfdda4a2b828967c5fb1a04e5dfc0b9244b805e42ef594e68bf8e0cfafb402",
+      "host": "Windows DSH NEXT",
+      "transport": "official-deepseek-api",
+      "harnessOutcome": "passed",
+      "observedOutcome": "Preexisting candidate passed independent audit and ledger closure.",
+      "usage": {
+        "responses": 14,
+        "inputTokens": 19967,
+        "cacheReadTokens": 242304,
+        "cacheWriteTokens": 0,
+        "outputTokens": 3918,
+        "totalTokens": 266189,
+        "promptTokens": 262271,
+        "cacheReadPercent": 92.39,
+        "providerModel": [
+          {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash"
+          }
+        ]
+      },
+      "nativeTurnErrors": 0,
+      "nativeToolErrors": 1,
+      "initialPhase": "first-audit-ready",
+      "phaseTimeline": [
+        {
+          "event": "restored-native-session",
+          "phase": "first-audit-ready"
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-audit-ready"
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-audit"
+        },
+        {
+          "event": "durable-phase",
+          "phase": "ledger-review"
+        },
+        {
+          "event": "durable-phase",
+          "phase": "closed"
+        }
+      ],
+      "hostOutcome": {
+        "status": "closed",
+        "phase": "closed",
+        "stateChanges": 4,
+        "steps": 14,
+        "nudges": 0
+      },
+      "proof": {
+        "phase": "closed",
+        "candidateSha256": "6b8427405708b8fb641309a7afdd15a63733e52ec921446f8b0f8bbc47846581",
+        "unchangedCandidate": true,
+        "decision": "accept",
+        "receiptSha256": "7c222e169bcafb53595db0b566b29aaf9ab67bf7b10c7bda8fa81102585477a5",
+        "stateReceiptSha256": "7c222e169bcafb53595db0b566b29aaf9ab67bf7b10c7bda8fa81102585477a5",
+        "closedLedgerTool": true,
+        "ledgerDispositionCounts": {
+          "completed": 2,
+          "covered": 1
+        },
+        "threeDistinctAcceptanceActors": true,
+        "receiptMatchesState": true
+      },
+      "isolation": {
+        "originalEvidenceStable": true,
+        "formalFingerprintsStable": true
+      },
+      "restoredNativeSessions": 3,
+      "toolErrors": [
+        {
+          "action": "read",
+          "tool": "building_loop_file",
+          "seq": 133
+        }
+      ]
+    },
+    {
+      "run": "baseline-cold-review-NO0jNy",
+      "version": "0.7.13",
+      "archiveSha256": "4843e1c0c67b9f58e1b46027d7e3b3823d00298c247fd2dc9ed5b8860a13d6fc",
+      "sourceReportSha256": "839dd5c60e1fd566785dc4522a5fb8277b8f562ec8cea25f63f09941af2ce1e5",
+      "sourceNativeUsageSha256": "cdb18d1d05c54804586623c4d3203c428be63152bf767735a9bbfe833a2a6437",
+      "host": "Windows DSH NEXT",
+      "transport": "loopback-fixture-through-native-dsh-model-adapter",
+      "harnessOutcome": "reproduced",
+      "observedOutcome": "Reproduced the cold first-review stall. Native advance was rejected and the original reviewer did not continue.",
+      "usage": {
+        "responses": 3,
+        "inputTokens": 51,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "outputTokens": 15,
+        "totalTokens": 66,
+        "promptTokens": 51,
+        "cacheReadPercent": 0.0,
+        "providerModel": [
+          {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash"
+          }
+        ]
+      },
+      "nativeTurnErrors": 0,
+      "nativeToolErrors": 1,
+      "initialPhase": "first-review",
+      "phaseTimeline": [
+        {
+          "event": "restored-native-session",
+          "phase": "first-review"
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-review"
+        }
+      ],
+      "hostOutcome": {
+        "status": "baseline-stale",
+        "phase": "first-review",
+        "stateChanges": 1,
+        "steps": 3,
+        "nudges": 0
+      },
+      "proof": {
+        "phase": "first-review",
+        "candidateSha256": "a463674f8f60f58207fe8b1a1525da3b2781c93f864f3175e75ae3dc426fcc9e",
+        "unchangedCandidate": true,
+        "closedLedgerTool": false,
+        "ledgerDispositionCounts": {
+          "pending": 2,
+          "running": 1
+        },
+        "threeDistinctAcceptanceActors": false,
+        "interruptedNativeTurn": {
+          "openTurn": 1,
+          "openSeq": 7,
+          "lastDurableSeq": 62
+        },
+        "sameReviewerContinued": false
+      },
+      "isolation": {
+        "originalEvidenceStable": true,
+        "formalFingerprintsStable": true
+      },
+      "restoredNativeSessions": 3,
+      "toolErrors": [
+        {
+          "action": "advance",
+          "tool": "building_loop",
+          "seq": 132,
+          "classification": "active phase has not handed in work or is already closed"
+        }
+      ],
+      "syntheticModelRequests": 3
+    },
+    {
+      "run": "deepseek-cold-review-N0OXoT",
+      "version": "0.7.14",
+      "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+      "sourceReportSha256": "ef5b386f10820088b389e2a4c8b01dc6cf9b208c389917de698b350970c668cf",
+      "sourceNativeUsageSha256": "d37c782954d8fb4e2d330f4f2e9f04726843a672e5d24d3ba9b733473c62269e",
+      "host": "Windows DSH NEXT",
+      "transport": "official-deepseek-api",
+      "harnessOutcome": "failed",
+      "observedOutcome": "The original reviewer resumed at the preserved checkpoint and submitted first review. First audit started but this run did not reach closure.",
+      "usage": {
+        "responses": 40,
+        "inputTokens": 50276,
+        "cacheReadTokens": 1476608,
+        "cacheWriteTokens": 0,
+        "outputTokens": 24059,
+        "totalTokens": 1550943,
+        "promptTokens": 1526884,
+        "cacheReadPercent": 96.71,
+        "providerModel": [
+          {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash"
+          }
+        ]
+      },
+      "nativeTurnErrors": 0,
+      "nativeToolErrors": 6,
+      "initialPhase": "first-review",
+      "phaseTimeline": [
+        {
+          "event": "restored-native-session",
+          "phase": "first-review"
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-review",
+          "serial": 2,
+          "checkpointBlocks": 7
+        },
+        {
+          "event": "durable-phase",
+          "phase": "blocked",
+          "serial": 2,
+          "checkpointBlocks": 7
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-review",
+          "serial": 3,
+          "checkpointBlocks": 7
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-audit-ready",
+          "serial": 3,
+          "checkpointBlocks": 80
+        },
+        {
+          "event": "durable-phase",
+          "phase": "first-audit",
+          "serial": 4,
+          "checkpointBlocks": 0
+        }
+      ],
+      "hostOutcome": {
+        "status": "observation-ended",
+        "phase": "first-audit",
+        "stateChanges": 5,
+        "steps": 40,
+        "nudges": 0
+      },
+      "proof": {
+        "phase": "first-audit",
+        "candidateSha256": "a463674f8f60f58207fe8b1a1525da3b2781c93f864f3175e75ae3dc426fcc9e",
+        "unchangedCandidate": true,
+        "decision": "pending-audit",
+        "receiptSha256": "5a62bec3bee0d9112ca7613b82f246563cfca467e0d90e49c377452dfd115075",
+        "closedLedgerTool": false,
+        "ledgerDispositionCounts": {
+          "pending": 2,
+          "running": 1
+        },
+        "threeDistinctAcceptanceActors": false,
+        "interruptedNativeTurn": {
+          "openTurn": 1,
+          "openSeq": 7,
+          "lastDurableSeq": 62
+        },
+        "sameReviewerContinued": true,
+        "recoveredSameReviewerCheckpoint": true,
+        "initialSerial": 2,
+        "initialCoverageBlocks": 7,
+        "firstReviewCoverage": {
+          "retainedBlocksOnResume": 7,
+          "submittedBlocks": 80,
+          "unresolvedBlocks": 0,
+          "returnedBlocks": 0
+        },
+        "independentAuditProgress": {
+          "distinctAuditorFromReviewer": true,
+          "dispatchSerial": 4,
+          "persistedCoverageBlocksAtStop": 5,
+          "observationWindowSeconds": 180,
+          "finalAuditReceiptObserved": false,
+          "ledgerClosureObserved": false
+        }
+      },
+      "isolation": {
+        "originalEvidenceStable": true,
+        "formalFingerprintsStable": false,
+        "formalProfileChangeContext": "The separately authorized managed deployment changed protected production bytes while the isolated fixture was running. The original fixture evidence stayed byte-identical."
+      },
+      "restoredNativeSessions": 3,
+      "toolErrors": [
+        {
+          "action": "record",
+          "tool": "building_loop_coverage",
+          "seq": 76,
+          "classification": "quote mismatch against original block"
+        },
+        {
+          "action": "record",
+          "tool": "building_loop_coverage",
+          "seq": 100,
+          "classification": "required source-relation field absent"
+        },
+        {
+          "action": "record",
+          "tool": "building_loop_coverage",
+          "seq": 106,
+          "classification": "gap before submitted span"
+        },
+        {
+          "action": "record",
+          "tool": "building_loop_coverage",
+          "seq": 124,
+          "classification": "invalid reasoning classification"
+        },
+        {
+          "action": "record",
+          "tool": "building_loop_coverage",
+          "seq": 178,
+          "classification": "insufficient evidence classified as support"
+        },
+        {
+          "action": "record",
+          "tool": "building_loop_coverage",
+          "seq": 196,
+          "classification": "batch outside 1–12 entries"
+        }
+      ],
+      "harnessFailureCauses": [
+        "bounded observation ended before final acceptance and ledger closure",
+        "formal-profile fingerprint change triggered the isolation assertion"
+      ],
+      "sourceAssessmentSha256": "e2fd0c4a5d419e804837f35346790a5f08a95b29b3853a7993a037290afae137"
+    },
+    {
+      "run": "deepseek-no-source-lRZYVs",
+      "version": "0.7.14",
+      "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+      "sourceReportSha256": "8cd48e8e664d33ba2d2679b7ee4d3cc9b40888186ebd298b81519a44586729b5",
+      "sourceNativeUsageSha256": "d6f23df8b6c7d17deafc85202f340723155e7f4849b8261b0c0520abbe15ee73",
+      "host": "Windows DSH NEXT",
+      "transport": "official-deepseek-api",
+      "harnessOutcome": "passed",
+      "observedOutcome": "A procedural checklist with no granted evidence and no synthetic source file reached first review, independent audit, and ledger closure.",
+      "usage": {
+        "responses": 32,
+        "inputTokens": 36103,
+        "cacheReadTokens": 317184,
+        "cacheWriteTokens": 0,
+        "outputTokens": 9740,
+        "totalTokens": 363027,
+        "promptTokens": 353287,
+        "cacheReadPercent": 89.78,
+        "providerModel": [
+          {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash"
+          }
+        ]
+      },
+      "nativeTurnErrors": 0,
+      "nativeToolErrors": 6,
+      "checks": [
+        {
+          "name": "installed Building-loop archive into fresh profile",
+          "outcome": "passed",
+          "detail": {
+            "version": "0.7.14"
+          }
+        },
+        {
+          "name": "real DSH dark palette active",
+          "outcome": "passed"
+        },
+        {
+          "name": "registered an isolated synthetic workspace through the actual DSH host",
+          "outcome": "passed"
+        },
+        {
+          "name": "actual DeepSeek started one procedural checklist with no granted evidence and no synthetic source file",
+          "outcome": "passed"
+        },
+        {
+          "name": "actual source-free quality assessment, first review, independent counterexample review and ledger closed",
+          "outcome": "passed",
+          "detail": {
+            "artifactBytes": 441,
+            "candidateSha256": "39b17795f4000ff8b80ab3bf5496a8c58bc1a319492c3d140acfd2b2d3c42571",
+            "observedPhases": [
+              "intake",
+              "review-ready",
+              "first-review",
+              "first-audit-ready",
+              "first-audit",
+              "ledger-review",
+              "closed"
+            ]
+          }
+        }
+      ],
+      "isolation": {
+        "productionFingerprintsStable": true
+      },
+      "nativeToolSeriesResets": 5,
+      "nativeToolStages": [
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 1,
+          "step": 2,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 1,
+          "step": 3,
+          "name": "building_loop",
+          "action": "advance",
+          "unit": "K01"
+        },
+        {
+          "turn": 1,
+          "step": 4,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare",
+          "unit": "K01"
+        },
+        {
+          "turn": 1,
+          "step": 2,
+          "name": "building_loop_file",
+          "action": "write"
+        },
+        {
+          "turn": 1,
+          "step": 3,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 4,
+          "name": "building_loop",
+          "action": "submit",
+          "unit": "K01"
+        },
+        {
+          "turn": 2,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 2,
+          "step": 2,
+          "name": "building_loop",
+          "action": "advance",
+          "unit": "K01"
+        },
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 1,
+          "step": 2,
+          "name": "building_loop_file",
+          "action": "list"
+        },
+        {
+          "turn": 1,
+          "step": 2,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 3,
+          "name": "building_loop_coverage",
+          "action": "record"
+        },
+        {
+          "turn": 1,
+          "step": 4,
+          "name": "building_loop_quality",
+          "action": "assess"
+        },
+        {
+          "turn": 1,
+          "step": 5,
+          "name": "building_loop",
+          "action": "review"
+        },
+        {
+          "turn": 3,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 3,
+          "step": 2,
+          "name": "building_loop",
+          "action": "advance",
+          "unit": "K01"
+        },
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 1,
+          "step": 2,
+          "name": "building_loop_coverage",
+          "action": "record"
+        },
+        {
+          "turn": 1,
+          "step": 3,
+          "name": "building_loop_coverage",
+          "action": "record"
+        },
+        {
+          "turn": 1,
+          "step": 4,
+          "name": "building_loop_coverage",
+          "action": "record"
+        },
+        {
+          "turn": 1,
+          "step": 5,
+          "name": "building_loop_coverage",
+          "action": "status"
+        },
+        {
+          "turn": 1,
+          "step": 5,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 6,
+          "name": "building_loop_coverage",
+          "action": "record"
+        },
+        {
+          "turn": 1,
+          "step": 7,
+          "name": "building_loop_coverage",
+          "action": "record"
+        },
+        {
+          "turn": 1,
+          "step": 8,
+          "name": "building_loop",
+          "action": "audit"
+        },
+        {
+          "turn": 4,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 4,
+          "step": 2,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 4,
+          "step": 2,
+          "name": "building_loop_ledger",
+          "action": "read"
+        },
+        {
+          "turn": 4,
+          "step": 3,
+          "name": "building_loop_ledger",
+          "action": "review",
+          "unit": "K01"
+        },
+        {
+          "turn": 4,
+          "step": 4,
+          "name": "building_loop_ledger",
+          "action": "review",
+          "unit": "K01"
+        }
+      ],
+      "requestCounts": {
+        "observed": 32,
+        "modelRequestsWithToolSchema": 0,
+        "modelRequestsWithAllToolsDeferred": 0
+      },
+      "workflow": {
+        "phase": "closed",
+        "independentReviewClosed": true,
+        "finalBytes": 441,
+        "observedPhases": [
+          "intake",
+          "review-ready",
+          "first-review",
+          "first-audit-ready",
+          "first-audit",
+          "ledger-review",
+          "closed"
+        ]
+      }
+    },
+    {
+      "run": "candidate-6V05wQ",
+      "version": "0.7.14",
+      "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+      "sourceReportSha256": "917e601154a267033ed20ecb4e2da76a206c718e3c486d8ea751209d824216f1",
+      "sourceNativeUsageSha256": "9df07ab2d468f7beb72f611023df9023a0fb58640d5fa2ffc4256a0b6c41c25e",
+      "host": "Windows DSH NEXT",
+      "transport": "loopback-fixture-through-native-dsh-model-adapter",
+      "harnessOutcome": "passed",
+      "observedOutcome": "Strict native GUI and host regression passed with the historic paidan preset alias.",
+      "usage": {
+        "responses": 35,
+        "inputTokens": 805,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "outputTokens": 245,
+        "totalTokens": 1050,
+        "promptTokens": 805,
+        "cacheReadPercent": 0.0,
+        "providerModel": [
+          {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash"
+          }
+        ]
+      },
+      "nativeTurnErrors": 0,
+      "nativeToolErrors": 4,
+      "checks": [
+        {
+          "name": "installed Building-loop archive into fresh profile",
+          "outcome": "passed",
+          "detail": {
+            "version": "0.7.14"
+          }
+        },
+        {
+          "name": "real DSH dark palette active",
+          "outcome": "passed"
+        },
+        {
+          "name": "Building-loop can still chat in the default DSH workspace without establishing filesystem scope",
+          "outcome": "passed"
+        },
+        {
+          "name": "registered an isolated synthetic workspace through the actual DSH host",
+          "outcome": "passed"
+        },
+        {
+          "name": "ordinary Building-loop chat has no settings card, no project tools and creates no project files",
+          "outcome": "passed"
+        },
+        {
+          "name": "the native model saw both human turns and an approval-only card displayed the pending task in wide and narrow DSH",
+          "outcome": "passed"
+        },
+        {
+          "name": "the native discuss decision leaves files untouched and a replayed start cannot revive the declined proposal",
+          "outcome": "passed"
+        },
+        {
+          "name": "the real proposal tool rejected material text not present in this human conversation",
+          "outcome": "passed"
+        },
+        {
+          "name": "newer scope supersedes stale proposal; confirmation awakens the same session, stores exact readonly user material, and is idempotent",
+          "outcome": "passed"
+        },
+        {
+          "name": "active coordinator has its own project tools while the actual boundary rejects an out-of-project file read",
+          "outcome": "passed"
+        },
+        {
+          "name": "a model-suggested start plus a user quoting a start command remains a proposal, without filesystem authorization",
+          "outcome": "passed"
+        },
+        {
+          "name": "explicit human launch builds a separate project in the same physical workspace and takes no second confirmation",
+          "outcome": "passed"
+        },
+        {
+          "name": "actual child dispatch excludes inherited parent workspace rules, rejects a blank draft, writes and reads back a new artifact, and submits it to first review",
+          "outcome": "passed",
+          "detail": {
+            "unit": "K01",
+            "phase": "review-ready",
+            "bytes": 162
+          }
+        },
+        {
+          "name": "continuation after UI reload retains the native session ID and reuses the existing private project",
+          "outcome": "passed"
+        },
+        {
+          "name": "a preconfigured real workspace retains its original authority bytes and does not create a shadow project",
+          "outcome": "passed"
+        }
+      ],
+      "isolation": {
+        "productionFingerprintsStable": true
+      },
+      "nativeToolSeriesResets": 8,
+      "nativeToolStages": [
+        {
+          "turn": 3,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 4,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 5,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 6,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 8,
+          "step": 1,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 9,
+          "step": 1,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 2,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        },
+        {
+          "turn": 2,
+          "step": 2,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 2,
+          "step": 3,
+          "name": "building_loop",
+          "action": "advance",
+          "unit": "K01"
+        },
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare"
+        },
+        {
+          "turn": 1,
+          "step": 2,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 3,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 4,
+          "name": "building_loop",
+          "action": "submit"
+        },
+        {
+          "turn": 1,
+          "step": 5,
+          "name": "building_loop_file",
+          "action": "write"
+        },
+        {
+          "turn": 1,
+          "step": 6,
+          "name": "building_loop_file",
+          "action": "read"
+        },
+        {
+          "turn": 1,
+          "step": 7,
+          "name": "building_loop",
+          "action": "submit"
+        },
+        {
+          "turn": 1,
+          "step": 1,
+          "name": "building_loop_propose",
+          "action": "propose"
+        }
+      ],
+      "requestCounts": {
+        "observed": 134,
+        "modelRequestsWithToolSchema": 35,
+        "modelRequestsWithAllToolsDeferred": 0
+      },
+      "presetAlias": "paidan"
+    }
+  ],
+  "managedInstallation": [
+    {
+      "run": "managed-rehearsal-aiGLBU",
+      "profile": "isolated-desktop-rehearsal",
+      "outcome": "passed",
+      "installer": "bundled DSH desktop CLI, native plugin add offline, pnpm 11.28.5",
+      "refresh": "pnpm 11.25.0 install offline with frozen lockfile and lifecycle scripts disabled",
+      "nativeInstallLogSha256": "ce27a0f922a7d5f0ba2b532707fd890092f297e2032815cd3d0c32fd58e4c7a1",
+      "frozenRefreshLogSha256": "b2032b58f7d25479ff8eb129165e8d49023c787858d65d704e2ab19b40f2fbe8",
+      "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+      "installedVersion": "0.7.14",
+      "directDependencyRecorded": true,
+      "bundleEnabled": true,
+      "lockfileEntryPresentAfterRefresh": true
+    },
+    {
+      "run": "managed-formal-rnITdM",
+      "profile": "formal-desktop",
+      "outcome": "passed",
+      "installer": "bundled DSH desktop CLI, native plugin add offline, pnpm 11.28.5",
+      "refresh": "pnpm 11.25.0 install offline with frozen lockfile and lifecycle scripts disabled",
+      "nativeInstallLogSha256": "1975b9594d63a1df8bed47ed9e603ed986b193b44bf5557f52975afa3772acee",
+      "frozenRefreshLogSha256": "07ca8a997de99707b0970ab917b64ce70c59bd3611162d3d60ace5640134662a",
+      "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+      "installedVersion": "0.7.14",
+      "directDependencyRecorded": true,
+      "bundleEnabled": true,
+      "lockfileEntryPresentAfterRefresh": true,
+      "persistentLocalArchiveVerified": true,
+      "verifiedRuntimeFilesAfterRefreshAndRestart": 20,
+      "unchangedPreexistingDirectDependencySpecs": 17,
+      "retainedPresetAlias": "paidan"
+    }
+  ]
+}
