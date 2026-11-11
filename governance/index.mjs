@@ -4,7 +4,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
-  AUTHORITY, MANAGED, PHASES, authority, digest, includes, keyOf, readBytes, relativeName,
+  AUTHORITY, MANAGED, PHASES, MissingProjectAuthority, authority, digest, includes, keyOf, readBytes, relativeName,
   replaceWithHistory, text, workspaceRoot,
 } from "./policy.mjs";
 import {
@@ -25,6 +25,7 @@ const FILE = "building_loop_file";
 const ASSESS = "building_loop_quality";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
+const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, LEDGER, COVERAGE];
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
@@ -203,10 +204,19 @@ export function apply(ctx, config = {}) {
    */
   function restrictVisible(agent) {
     if (!agent?.ctx?.tools || restrictedAgents.has(agent)) return;
-    scope(agent,{inspection:true}); // Establish identity without making tool advertisement a write.
+    if (ctx.agents.get(agent.id) !== agent) throw new Error("只接受当前 DSH 会话的调用");
     const names = agent.ctx.tools.view(agent).restrictableNames;
-    agent.ctx.tools.restrict({ allow: [...names].filter(name => [WORKFLOW,FILE,ASSESS,LEDGER,COVERAGE].includes(name)) });
+    agent.ctx.tools.restrict({ allow: [...names].filter(name => PROJECT_TOOLS.includes(name)) });
     restrictedAgents.add(agent);
+  }
+
+  function isChild(agent) {
+    const header = agent.session.header;
+    return header.parentSession !== undefined || header.origin === "subagent";
+  }
+
+  function mayChat(agent, error) {
+    return error instanceof MissingProjectAuthority && !isChild(agent);
   }
 
   /** Registration admission is recalculated each step; it never grants file rights. */
@@ -252,7 +262,7 @@ export function apply(ctx, config = {}) {
     state.units = Object.assign(Object.create(null), state.units);
     state.markers = Object.assign(Object.create(null), state.markers);
     const parent = agent.session.header.parentSession;
-    const child = parent !== undefined || agent.session.header.origin === "subagent";
+    const child = isChild(agent);
     let assignment;
     if (child) {
       assignment = Object.entries(state.units).find(([, unit]) =>
@@ -365,7 +375,9 @@ export function apply(ctx, config = {}) {
 
   function recordLedgerEvent(agent, intent, label) {
     try {
-      const {file} = coordinates(agent);
+      const {root,file} = coordinates(agent);
+      // A conversation outside a configured project has no project ledger.
+      if (intent.kind === "request" && !isChild(agent) && readBytes(root, AUTHORITY) === null) return;
       persistLedgerEvent(stateHome,file,intent);
     } catch (error) {
       ctx.logger.warn("building-loop 无法暂存自动账本事件 " + label + " " + error.message);
@@ -1210,7 +1222,7 @@ export function apply(ctx, config = {}) {
   }
 
   const deny = exec => {
-    if ([WORKFLOW, FILE, ASSESS, LEDGER, COVERAGE].includes(exec.name)) return undefined;
+    if (PROJECT_TOOLS.includes(exec.name)) return undefined;
     return "[building-loop/denied] 原生工具 " + exec.name + " 禁止直接调用。使用受控文件或派单入口";
   };
   ctx.tools.guard(deny);
@@ -1220,6 +1232,14 @@ export function apply(ctx, config = {}) {
   });
   ctx.on("agent/pre-step", async (request, next) => {
     restrictVisible(request.agent);
+    try { scope(request.agent, { inspection: true }); }
+    catch (error) {
+      const tools = request.agent.ctx?.tools;
+      if (!mayChat(request.agent, error) || !tools) throw error;
+      // DSH's inherited-tool restriction does not cover agent-local registrations.
+      const visible = tools.view(request.agent).visible;
+      if ([...visible.keys()].some(name => !PROJECT_TOOLS.includes(name))) throw error;
+    }
     const decision = await next();
     if (decision.kind !== "enter") return decision;
     return { ...decision, messages: decision.messages.filter(message => message.source?.kind !== "agent-instructions") };
@@ -1356,6 +1376,11 @@ export function apply(ctx, config = {}) {
             JSON.stringify({ ledger: ledgerSummary(frame).items.map(({ id, kind, title, status }) => ({ id, kind, title, status })) })] : []),
           JSON.stringify({ read: frame.reads, write: frame.writes, detail }), ...shared, ...goals].join("\n");
       } catch (error) {
+        if (mayChat(agent ?? owner, error)) {
+          return "building-loop role=chat phase=unconfigured\n" +
+            "当前会话可以直接进行普通对话。这里尚无项目授权。涉及读取、修改或搜索项目文件、派单、验收或记录项目账本时，请说明当前缺少 BUILDING-LOOP.json，" +
+            "由项目维护者在所选工作区配置后才能执行。可以继续讨论问题或提供示例。只报告实际发生的操作。";
+        }
         return "building-loop role=blocked phase=authority\n" + error.message + "。请项目维护者核对 " + AUTHORITY + "。";
       }
     },

@@ -8,6 +8,14 @@ const BASE_PHASES = ["intake", "first-review", "supplement", "final-review"];
 export const PHASES = [...BASE_PHASES, "first-audit", "final-audit"];
 const LIMIT = 256 * 1024;
 
+/** The workspace has no authority to grant any Building-loop project access. */
+export class MissingProjectAuthority extends Error {
+  constructor(root) {
+    super(`当前工作区缺少 ${path.join(root, AUTHORITY)}。请切换到已配置的项目，或由维护者创建授权清单后重试。`);
+    this.name = "MissingProjectAuthority";
+  }
+}
+
 export const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 export const keyOf = value => process.platform === "win32" ? value.toLowerCase() : value;
 
@@ -157,7 +165,7 @@ export function includes(paths, name) {
 /** 解析项目权威清单，核角色隔离、证据只读和来源凭据。 */
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
-  if (!bytes) throw new Error("需要项目维护者配置 " + AUTHORITY);
+  if (!bytes) throw new MissingProjectAuthority(root);
   const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument", "requiredLinesGoal"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
   const coordinator = grants(source.coordinator, "总控");

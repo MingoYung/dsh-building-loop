@@ -60,4 +60,4 @@ dsh plugin --profile web add github:MingoYung/dsh-building-loop
 
 安装 `dsh-building-loop` 后，在新会话的模式列表中选 **building-loop**。验证指定版本时可用实际 `.tgz` 路径替代仓库地址。从旧包 `building-loop` 迁移时，先从同一 Profile 移除旧包，再安装新包。两者使用同一个预设 ID。
 
-项目维护者先从[派单分块索引](docs/work-delivery.md)查看授权示例，在工作区根创建 `BUILDING-LOOP.json`，再开会话。清单缺失时受控文件工具会拒绝访问。
+在未配置的工作区，可以用 Building-loop 普通聊天。要读取项目文件或派单，请让项目维护者在当前工作区根创建 `BUILDING-LOOP.json`，再在同一会话继续。 [授权示例](docs/work-delivery.md)

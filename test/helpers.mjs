@@ -71,7 +71,11 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
   function agent(id, parentSession) {
     live.set(id, { id, session: { header: { cwd: root, parentSession } },
       whenIdle: async () => {}, model: { current: () => null }, ctx: {tools:{
-        view:()=>({restrictableNames:new Set(["read","pwsh",...tools.keys()])}),
+        view:()=>{
+          const names = ["read", "pwsh", ...tools.keys()];
+          const allowed = restrictions.get(id)?.allow ?? names;
+          return { restrictableNames: new Set(names), visible: new Map(allowed.map(name => [name, tools.get(name)])) };
+        },
         restrict:value=>{ restrictions.set(id,value);return ()=>restrictions.delete(id); },
       }} });
   }
@@ -161,6 +165,7 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     concluded,
     invoke,
     prompt:id=>prompt.text({agent:live.get(id)}),
+    preStep:(id,messages=[])=>listeners.get("agent/pre-step")({agent:live.get(id)},async()=>({kind:"enter",messages})),
     visible:id=>[...tools.keys()].filter(name=>!admissions.get(name)||admissions.get(name)({agent:live.get(id)})),
     restriction:id=>restrictions.get(id),
     guard:(id,name)=>guard({agent:live.get(id),name}),
