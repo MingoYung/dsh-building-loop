@@ -8,6 +8,7 @@
 | 重算公开数据、检查摘要与缺失记录 | [只读核对脚本](verify.py) |
 | 了解导出范围、路径处理和用量统计 | [导出脚本](archive.py) |
 | 查各版本原始运行器、事件记录器和统计脚本 | [运行脚本快照](data/harnesses.json) |
+| 标准模式与 Building-loop 0.7.14 | [资料核对、工程规划与失败记录的真实配对](results-standard-comparison.md) |
 | 0.7.7 核验缺字段、明确脚注和账本中断恢复 | [原始重放、故障注入与配对实测](results-0.7.7.md) |
 | 0.7.8 冻结前宿主热修 | [同版本账本强退及 Markdown 块边界回归](results-0.7.8.md) |
 | 0.7.9 Windows 放行和 DeepSeek 实测 | [账本并发、复算、正文与来源核验](results-0.7.9.md) |

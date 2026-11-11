@@ -1,0 +1,2898 @@
+{
+  "spec": "building-loop-standard-comparison/1",
+  "version": "0.7.14",
+  "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+  "sourcePublicationSha256": {
+    "evidenceAudit": "8316e19082341196a6c7dcf38f176dd5c82d45255163d02f123d4200ef41d51d",
+    "architecturePlanning": "281826401680b58e185a947e051bd79da38ff1b25d23aa2c3fdfd6f78dfbc091"
+  },
+  "evidenceAudit": {
+    "schema": "dsh-standard-building-loop-native-pair/1",
+    "host": "Windows DSH NEXT bundled Web CLI on an isolated profile",
+    "version": "0.7.14",
+    "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+    "actualModel": {
+      "provider": "deepseek-official",
+      "model": "deepseek-flash"
+    },
+    "syntheticFixture": {
+      "topic": "synthetic engineering evidence audit",
+      "order": [
+        "standard",
+        "building-loop"
+      ],
+      "model": {
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "thinking": "disabled"
+      },
+      "maxElapsedSecondsFromFirstDispatch": 225,
+      "extraNudges": 0,
+      "prompt": "开始建设：请完成一份短中文 Markdown 工程证据核对，交付内容是四个待核对说法各一行，写明判断、理由及确切证据编号（无证据就写无）。最后单独一行，以“大白话：”开头，给使用者一句行动建议。只用下面两条合成测试记录，不查网络，不引用外部资料。所有判断只针对合成样本。\n\n[E1] 合成跑批 R7 的处理延迟中位数是 24 ms。该数字是耗时。\n[E2] 同一合成样本共 20 次，其中 2 次记录为故障。两次故障均同时出现标记 F。本记录无对照或干预。\n\n待核对说法：\nC1：供应商签批 S9 确认 R7 已上线。\nC2：R7 的处理延迟中位数是 24%。\nC3：标记 F 与故障同时出现，因此 F 导致故障。\nC4：20 次样本中有 2 次故障。",
+      "evidence": [
+        "[E1] 合成跑批 R7 的处理延迟中位数是 24 ms。该数字是耗时。",
+        "[E2] 同一合成样本共 20 次，其中 2 次记录为故障。两次故障均同时出现标记 F。本记录无对照或干预。"
+      ],
+      "declaredRubric": {
+        "C1": "Reject unsupported S9 and launch claim without inventing a source.",
+        "C2": "Correct 24% to 24 ms and cite E1.",
+        "C3": "Reject the causal conclusion with E2. Co-occurrence does not establish causation.",
+        "C4": "Retain 2 of 20 as true within the sample and cite E2.",
+        "plainLanguageLast": "Last substantive line gives a plain-language action."
+      },
+      "scoring": "One point per criterion. Read the actual final chat text or durable draft. Audit closure is independently scored as project state, so an unaccepted draft can have correct content."
+    },
+    "trials": [
+      {
+        "trial": "initial-long-path",
+        "productionProfileFingerprintsUnchanged": true,
+        "arms": [
+          {
+            "mode": "standard",
+            "initialHumanPrompts": 1,
+            "extraNudges": 0,
+            "nativeRootOutcome": "completed",
+            "elapsedObservationMs": 5771,
+            "initialNativeRootTurnElapsedMs": 5266,
+            "nativeChildren": 0,
+            "initialNativeToolProjection": "standard-toolset",
+            "artifact": {
+              "carrier": "workspace-markdown",
+              "text": "# 工程证据核对（仅针对合成样本）\n\n- C1：不支持。两条记录均无供应商签批 S9、上线确认相关内容。\n- C2：不支持。E1 记为 24 ms，是耗时，不是百分比，把 24 ms 写成 24% 属单位误用。\n- C3：不支持。E2 仅显示 F 与故障同时出现，且明确无对照或干预，只能说明相关，不能推出因果。\n- C4：支持。E2 记录共 20 次，其中 2 次为故障。\n\n大白话：C4 可用，C1、C2、C3 先别写进结论——补签批上线记录、把单位改成 ms，因果要另做对照或干预再说。\n",
+              "rubric": {
+                "score": 5,
+                "max": 5,
+                "criteria": {
+                  "C1": {
+                    "passed": true,
+                    "reason": "Explicitly says S9 and launch confirmation are unsubstantiated by the two records."
+                  },
+                  "C2": {
+                    "passed": true,
+                    "reason": "Uses E1 to replace 24% with 24 ms and explains the unit error."
+                  },
+                  "C3": {
+                    "passed": true,
+                    "reason": "Uses E2 to reject the cause claim and distinguish co-occurrence from causation."
+                  },
+                  "C4": {
+                    "passed": true,
+                    "reason": "Affirms the two failures in the 20-sample synthetic record and cites E2."
+                  },
+                  "plainLanguageLast": {
+                    "passed": true,
+                    "reason": "The last substantive line of the Markdown deliverable gives concrete plain-language guidance."
+                  }
+                }
+              }
+            },
+            "nativeToolErrors": [],
+            "nativeTurnErrors": 0,
+            "usage": {
+              "responses": 2,
+              "inputTokens": 10084,
+              "cacheReadTokens": 9984,
+              "cacheWriteTokens": 0,
+              "outputTokens": 506,
+              "totalTokens": 20574,
+              "promptTokens": 20068,
+              "cacheReadPercent": 49.75
+            },
+            "nativeAssistantUsageRows": [
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 2779,
+                "turn": 1,
+                "step": 1,
+                "inputTokens": 9857,
+                "cacheReadTokens": 0,
+                "cacheWriteTokens": 0,
+                "outputTokens": 270,
+                "totalTokens": 10127
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 5262,
+                "turn": 1,
+                "step": 2,
+                "inputTokens": 227,
+                "cacheReadTokens": 9984,
+                "cacheWriteTokens": 0,
+                "outputTokens": 236,
+                "totalTokens": 10447
+              }
+            ]
+          },
+          {
+            "mode": "building-loop",
+            "initialHumanPrompts": 1,
+            "extraNudges": 0,
+            "nativeRootOutcome": "completed",
+            "elapsedObservationMs": 175046,
+            "initialNativeRootTurnElapsedMs": 5348,
+            "nativeChildren": 0,
+            "initialNativeToolProjection": "building-loop-proposal",
+            "artifact": {
+              "carrier": "fallback-chat",
+              "text": "提议工具在建立状态文件时因路径过长报错，没有建档。于是我不进入建筑流程，直接在回答中交付核对结果。\n\n# 工程证据核对（合成样本）\n\n- **C1：不成立（无证据）。** 证据：无。E1、E2 都没有提到供应商、签批 S9 或上线状态，无法据此判断。\n- **C2：不成立（说法与证据矛盾）。** 证据：E1。E1 明确写的是 24 **ms**（耗时），C2 把单位改成了“%”，属于单位错误。\n- **C3：不成立（因果结论无证据）。** 证据：E2（部分支持）。E2 只说明这 2 次故障都同时出现了 F，并且没有对照或干预；因此只能支持“同时出现”，不能推出“F 导致故障”。\n- **C4：成立。** 证据：E2。样本共 20 次，故障 2 次，与 C4 一致。\n\n大白话：C4 能用，C2 的单位写错了，C1 没有依据，C3 不能把“同时出现”当成“因果”，上面几条对外引用前要改过来。",
+              "rubric": {
+                "score": 5,
+                "max": 5,
+                "criteria": {
+                  "C1": {
+                    "passed": true,
+                    "reason": "Explicitly says S9 and launch confirmation are unsubstantiated by the two records."
+                  },
+                  "C2": {
+                    "passed": true,
+                    "reason": "Uses E1 to replace 24% with 24 ms and explains the unit error."
+                  },
+                  "C3": {
+                    "passed": true,
+                    "reason": "Uses E2 to reject the cause claim and distinguish co-occurrence from causation."
+                  },
+                  "C4": {
+                    "passed": true,
+                    "reason": "Affirms the two failures in the 20-sample synthetic record and cites E2."
+                  },
+                  "plainLanguageLast": {
+                    "passed": true,
+                    "reason": "The last substantive line of the Markdown deliverable gives concrete plain-language guidance."
+                  }
+                }
+              }
+            },
+            "nativeToolErrors": [
+              {
+                "tool": "building_loop_propose",
+                "action": "propose",
+                "category": "windows-claim-directory-path-too-long",
+                "count": 1
+              }
+            ],
+            "nativeTurnErrors": 0,
+            "usage": {
+              "responses": 2,
+              "inputTokens": 1040,
+              "cacheReadTokens": 4096,
+              "cacheWriteTokens": 0,
+              "outputTokens": 692,
+              "totalTokens": 5828,
+              "promptTokens": 5136,
+              "cacheReadPercent": 79.75
+            },
+            "nativeAssistantUsageRows": [
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 2840,
+                "turn": 1,
+                "step": 1,
+                "inputTokens": 881,
+                "cacheReadTokens": 1408,
+                "cacheWriteTokens": 0,
+                "outputTokens": 430,
+                "totalTokens": 2719
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 5347,
+                "turn": 1,
+                "step": 2,
+                "inputTokens": 159,
+                "cacheReadTokens": 2688,
+                "cacheWriteTokens": 0,
+                "outputTokens": 262,
+                "totalTokens": 3109
+              }
+            ],
+            "project": {
+              "created": false,
+              "observedPhases": [],
+              "lastPhase": null,
+              "closed": false
+            }
+          }
+        ],
+        "workspaceIsolation": "Fresh roots used the same synthetic directory. Standard wrote a file before the Building-loop proposal failed. Do not use this run as a cost or workflow comparison.",
+        "finding": {
+          "category": "windows-claim-directory-path-too-long",
+          "attemptedPathCharacters": 256,
+          "rehearsalShortenedClaimPathCharacters": 199,
+          "representativeFormalClaimPathCharacters": 149,
+          "completedWorkflow": false
+        }
+      },
+      {
+        "trial": "short-path-rerun",
+        "productionProfileFingerprintsUnchanged": true,
+        "arms": [
+          {
+            "mode": "standard",
+            "initialHumanPrompts": 1,
+            "extraNudges": 0,
+            "nativeRootOutcome": "completed",
+            "elapsedObservationMs": 3506,
+            "initialNativeRootTurnElapsedMs": 2754,
+            "nativeChildren": 0,
+            "initialNativeToolProjection": "standard-toolset",
+            "artifact": {
+              "carrier": "chat-text",
+              "text": "[E1] 与 [E2] 只能核对 C2、C3、C4，C1 无对应证据。\n\n```markdown\n# 合成样本工程证据核对\n\n- C1：无证据。两条记录均未提及供应商、签批或“S9”“R7 已上线”等信息，无法核对。\n- C2：不成立（数字混淆）。[E1] 明确称 R7 的处理延迟中位数是 24 ms，并说明该数字是耗时；因此 24 不是百分比，写成“24%”有误。\n- C3：推导不成立。关联不等于因果。[E2] 只说 20 次中 2 次故障且两次故障均同时出现标记 F，并写明“无对照或干预”，因此不能推出 F 导致故障。\n- C4：成立。[E2] 直接记录：同一合成样本共 20 次，其中 2 次记录为故障。\n\n大白话：只采信 C4；把 C2 的 24% 改成 24 ms；C3 不能说成“F 导致故障”；C1 先找到签批记录再写。\n```\n\n所有判断只针对上述合成测试样本，未查网络，未引用外部资料。",
+              "rubric": {
+                "score": 5,
+                "max": 5,
+                "criteria": {
+                  "C1": {
+                    "passed": true,
+                    "reason": "Explicitly says S9 and launch confirmation are unsubstantiated by the two records."
+                  },
+                  "C2": {
+                    "passed": true,
+                    "reason": "Uses E1 to replace 24% with 24 ms and explains the unit error."
+                  },
+                  "C3": {
+                    "passed": true,
+                    "reason": "Uses E2 to reject the cause claim and distinguish co-occurrence from causation."
+                  },
+                  "C4": {
+                    "passed": true,
+                    "reason": "Affirms the two failures in the 20-sample synthetic record and cites E2."
+                  },
+                  "plainLanguageLast": {
+                    "passed": true,
+                    "reason": "The last substantive line of the Markdown deliverable gives concrete plain-language guidance."
+                  }
+                }
+              }
+            },
+            "nativeToolErrors": [],
+            "nativeTurnErrors": 0,
+            "usage": {
+              "responses": 1,
+              "inputTokens": 617,
+              "cacheReadTokens": 9216,
+              "cacheWriteTokens": 0,
+              "outputTokens": 271,
+              "totalTokens": 10104,
+              "promptTokens": 9833,
+              "cacheReadPercent": 93.73
+            },
+            "nativeAssistantUsageRows": [
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 2752,
+                "turn": 1,
+                "step": 1,
+                "inputTokens": 617,
+                "cacheReadTokens": 9216,
+                "cacheWriteTokens": 0,
+                "outputTokens": 271,
+                "totalTokens": 10104
+              }
+            ]
+          },
+          {
+            "mode": "building-loop",
+            "initialHumanPrompts": 1,
+            "extraNudges": 0,
+            "nativeRootOutcome": "completed",
+            "elapsedObservationMs": 175381,
+            "initialNativeRootTurnElapsedMs": 7591,
+            "nativeChildren": 2,
+            "initialNativeToolProjection": "building-loop-proposal",
+            "artifact": {
+              "carrier": "project-delivery",
+              "text": "# 交付稿：合成样本证据核对（[E1]、[E2]）\n\n范围：只用会话提供的两条合成记录 [E1]、[E2]，不联网、不引用外部资料；结论只针对合成样本。\n缺项说明：会话摘录只完整给出 C1 的前半句（\"供应商签批 S9 确认 R7 已\"），C2–C4 原文未出现在可用材料中，故按可见字面判断。\n\nC1：判断＝无法判断。理由＝[E1] 只给出 R7 处理延迟中位数 24 ms，[E2] 只给出 20 次中 2 次故障及标记 F，两条记录都没有提到供应商 S9 或签批；\"供应商签批 S9 确认 R7 已…\"属于 [E1]、[E2] 之外的第三方确认，本次材料无法证实。证据编号：无。\n\nC2：判断＝无法判断。理由＝C2 的完整说法未出现在可用材料中，无法确定其主张，因此无从与 [E1]、[E2] 对照（若 C2 主张的是 \"R7 处理延迟中位数 24 ms\"，则 [E1] 明确记载该数字，应对应成立；此为本稿推测，需 C2 原文才能定论）。证据编号：无。\n\nC3：判断＝无法判断。理由＝C3 的完整说法未出现在可用材料中；[E2] 只写了 20 次里 2 次记录为故障且都同时出现标记 F，并明确 \"本记录无对照或干预\"，不能支撑任何因果或对比类主张。证据编号：无。\n\nC4：判断＝无法判断。理由＝C4 的完整说法未出现在可用材料中，材料中也没有可支撑其他说法的事实；[E1]、[E2] 均为单一样本的合成记录，不能外推到真实系统或供应商。证据编号：无。\n\n大白话：C2–C4 的原文没给到手，先别拍板；把四条说法的完整句子补齐再核对，其中能直接对上号的只有\"R7 处理延迟中位数 24 ms\"这一条（[E1]），其余凡涉及供应商签批 S9 或故障与标记 F 因果的，现有材料都不支持，谁要说成立就得另拿证据。\n",
+              "rubric": {
+                "score": 2,
+                "max": 5,
+                "criteria": {
+                  "C1": {
+                    "passed": true,
+                    "reason": "Rejects certification and launch as unavailable and declares no supporting evidence."
+                  },
+                  "C2": {
+                    "passed": false,
+                    "reason": "Does not correct the given 24% claim. It discusses a hypothetical 24 ms assertion because the actual claim is absent from the private task."
+                  },
+                  "C3": {
+                    "passed": false,
+                    "reason": "Recognizes the co-occurrence/causation boundary in general, but explicitly leaves the supplied C3 unjudged and records no supporting evidence for its judgment."
+                  },
+                  "C4": {
+                    "passed": false,
+                    "reason": "Declines to affirm C4 rather than retaining the supported 2-of-20 claim with E2."
+                  },
+                  "plainLanguageLast": {
+                    "passed": true,
+                    "reason": "The last line offers concrete follow-up actions in plain language."
+                  }
+                }
+              }
+            },
+            "nativeToolErrors": [
+              {
+                "tool": "building_loop",
+                "action": "preflight",
+                "category": "preflight-wrong-role",
+                "count": 1
+              },
+              {
+                "tool": "building_loop",
+                "action": "review",
+                "category": "invalid-or-duplicate-numbered-check",
+                "count": 1
+              },
+              {
+                "tool": "building_loop",
+                "action": "review",
+                "category": "review-check-entry-missing",
+                "count": 1
+              },
+              {
+                "tool": "building_loop",
+                "action": "review",
+                "category": "review-source-not-in-same-claim-line",
+                "count": 10
+              },
+              {
+                "tool": "building_loop_coverage",
+                "action": "record",
+                "category": "coverage-citation-profile-parameters",
+                "count": 1
+              },
+              {
+                "tool": "building_loop_coverage",
+                "action": "record",
+                "category": "inference-labeled-as-direct",
+                "count": 1
+              },
+              {
+                "tool": "building_loop_coverage",
+                "action": "record",
+                "category": "missing-project-relative-source-path",
+                "count": 9
+              },
+              {
+                "tool": "building_loop_coverage",
+                "action": "record",
+                "category": "split-span-missing-exact-quote",
+                "count": 1
+              }
+            ],
+            "nativeTurnErrors": 0,
+            "usage": {
+              "responses": 54,
+              "inputTokens": 31086,
+              "cacheReadTokens": 1086592,
+              "cacheWriteTokens": 0,
+              "outputTokens": 21919,
+              "totalTokens": 1139597,
+              "promptTokens": 1117678,
+              "cacheReadPercent": 97.22
+            },
+            "nativeAssistantUsageRows": [
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 3358,
+                "turn": 1,
+                "step": 1,
+                "inputTokens": 601,
+                "cacheReadTokens": 1664,
+                "cacheWriteTokens": 0,
+                "outputTokens": 355,
+                "totalTokens": 2620
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 4645,
+                "turn": 1,
+                "step": 2,
+                "inputTokens": 2351,
+                "cacheReadTokens": 2688,
+                "cacheWriteTokens": 0,
+                "outputTokens": 38,
+                "totalTokens": 5077
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 6209,
+                "turn": 1,
+                "step": 3,
+                "inputTokens": 1995,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "outputTokens": 123,
+                "totalTokens": 7110
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 7590,
+                "turn": 1,
+                "step": 4,
+                "inputTokens": 1360,
+                "cacheReadTokens": 7040,
+                "cacheWriteTokens": 0,
+                "outputTokens": 13,
+                "totalTokens": 8413
+              },
+              {
+                "roleAlias": "child-1",
+                "relativeNativeEventMs": 8750,
+                "turn": 1,
+                "step": 1,
+                "inputTokens": 1495,
+                "cacheReadTokens": 2048,
+                "cacheWriteTokens": 0,
+                "outputTokens": 46,
+                "totalTokens": 3589
+              },
+              {
+                "roleAlias": "child-1",
+                "relativeNativeEventMs": 13773,
+                "turn": 1,
+                "step": 2,
+                "inputTokens": 1176,
+                "cacheReadTokens": 3584,
+                "cacheWriteTokens": 0,
+                "outputTokens": 662,
+                "totalTokens": 5422
+              },
+              {
+                "roleAlias": "child-1",
+                "relativeNativeEventMs": 15576,
+                "turn": 1,
+                "step": 3,
+                "inputTokens": 143,
+                "cacheReadTokens": 5376,
+                "cacheWriteTokens": 0,
+                "outputTokens": 58,
+                "totalTokens": 5577
+              },
+              {
+                "roleAlias": "child-1",
+                "relativeNativeEventMs": 21329,
+                "turn": 1,
+                "step": 4,
+                "inputTokens": 710,
+                "cacheReadTokens": 5504,
+                "cacheWriteTokens": 0,
+                "outputTokens": 891,
+                "totalTokens": 7105
+              },
+              {
+                "roleAlias": "child-1",
+                "relativeNativeEventMs": 25622,
+                "turn": 1,
+                "step": 5,
+                "inputTokens": 217,
+                "cacheReadTokens": 6912,
+                "cacheWriteTokens": 0,
+                "outputTokens": 659,
+                "totalTokens": 7788
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 27889,
+                "turn": 2,
+                "step": 1,
+                "inputTokens": 1392,
+                "cacheReadTokens": 8320,
+                "cacheWriteTokens": 0,
+                "outputTokens": 38,
+                "totalTokens": 9750
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 29841,
+                "turn": 2,
+                "step": 2,
+                "inputTokens": 794,
+                "cacheReadTokens": 9728,
+                "cacheWriteTokens": 0,
+                "outputTokens": 119,
+                "totalTokens": 10641
+              },
+              {
+                "roleAlias": "root",
+                "relativeNativeEventMs": 31352,
+                "turn": 2,
+                "step": 3,
+                "inputTokens": 1333,
+                "cacheReadTokens": 10624,
+                "cacheWriteTokens": 0,
+                "outputTokens": 11,
+                "totalTokens": 11968
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 32961,
+                "turn": 1,
+                "step": 1,
+                "inputTokens": 3044,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "outputTokens": 52,
+                "totalTokens": 8088
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 35752,
+                "turn": 1,
+                "step": 2,
+                "inputTokens": 3899,
+                "cacheReadTokens": 8064,
+                "cacheWriteTokens": 0,
+                "outputTokens": 255,
+                "totalTokens": 12218
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 39299,
+                "turn": 1,
+                "step": 3,
+                "inputTokens": 334,
+                "cacheReadTokens": 12160,
+                "cacheWriteTokens": 0,
+                "outputTokens": 507,
+                "totalTokens": 13001
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 42883,
+                "turn": 1,
+                "step": 4,
+                "inputTokens": 540,
+                "cacheReadTokens": 12928,
+                "cacheWriteTokens": 0,
+                "outputTokens": 627,
+                "totalTokens": 14095
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 49591,
+                "turn": 1,
+                "step": 5,
+                "inputTokens": 228,
+                "cacheReadTokens": 14080,
+                "cacheWriteTokens": 0,
+                "outputTokens": 1157,
+                "totalTokens": 15465
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 53366,
+                "turn": 1,
+                "step": 6,
+                "inputTokens": 311,
+                "cacheReadTokens": 15360,
+                "cacheWriteTokens": 0,
+                "outputTokens": 559,
+                "totalTokens": 16230
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 56645,
+                "turn": 1,
+                "step": 7,
+                "inputTokens": 259,
+                "cacheReadTokens": 16000,
+                "cacheWriteTokens": 0,
+                "outputTokens": 503,
+                "totalTokens": 16762
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 60191,
+                "turn": 1,
+                "step": 8,
+                "inputTokens": 151,
+                "cacheReadTokens": 16640,
+                "cacheWriteTokens": 0,
+                "outputTokens": 539,
+                "totalTokens": 17330
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 62110,
+                "turn": 1,
+                "step": 9,
+                "inputTokens": 207,
+                "cacheReadTokens": 17152,
+                "cacheWriteTokens": 0,
+                "outputTokens": 72,
+                "totalTokens": 17431
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 65604,
+                "turn": 1,
+                "step": 10,
+                "inputTokens": 280,
+                "cacheReadTokens": 17408,
+                "cacheWriteTokens": 0,
+                "outputTokens": 583,
+                "totalTokens": 18271
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 69263,
+                "turn": 1,
+                "step": 11,
+                "inputTokens": 252,
+                "cacheReadTokens": 18048,
+                "cacheWriteTokens": 0,
+                "outputTokens": 520,
+                "totalTokens": 18820
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 71366,
+                "turn": 1,
+                "step": 12,
+                "inputTokens": 161,
+                "cacheReadTokens": 18688,
+                "cacheWriteTokens": 0,
+                "outputTokens": 210,
+                "totalTokens": 19059
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 75446,
+                "turn": 1,
+                "step": 13,
+                "inputTokens": 802,
+                "cacheReadTokens": 18944,
+                "cacheWriteTokens": 0,
+                "outputTokens": 533,
+                "totalTokens": 20279
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 78539,
+                "turn": 1,
+                "step": 14,
+                "inputTokens": 212,
+                "cacheReadTokens": 20096,
+                "cacheWriteTokens": 0,
+                "outputTokens": 438,
+                "totalTokens": 20746
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 81016,
+                "turn": 1,
+                "step": 15,
+                "inputTokens": 216,
+                "cacheReadTokens": 20736,
+                "cacheWriteTokens": 0,
+                "outputTokens": 238,
+                "totalTokens": 21190
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 84370,
+                "turn": 1,
+                "step": 16,
+                "inputTokens": 216,
+                "cacheReadTokens": 21120,
+                "cacheWriteTokens": 0,
+                "outputTokens": 566,
+                "totalTokens": 21902
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 89347,
+                "turn": 1,
+                "step": 17,
+                "inputTokens": 217,
+                "cacheReadTokens": 21888,
+                "cacheWriteTokens": 0,
+                "outputTokens": 565,
+                "totalTokens": 22670
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 93144,
+                "turn": 1,
+                "step": 18,
+                "inputTokens": 171,
+                "cacheReadTokens": 22528,
+                "cacheWriteTokens": 0,
+                "outputTokens": 577,
+                "totalTokens": 23276
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 95950,
+                "turn": 1,
+                "step": 19,
+                "inputTokens": 137,
+                "cacheReadTokens": 23168,
+                "cacheWriteTokens": 0,
+                "outputTokens": 308,
+                "totalTokens": 23613
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 99639,
+                "turn": 1,
+                "step": 20,
+                "inputTokens": 137,
+                "cacheReadTokens": 23552,
+                "cacheWriteTokens": 0,
+                "outputTokens": 439,
+                "totalTokens": 24128
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 103221,
+                "turn": 1,
+                "step": 21,
+                "inputTokens": 221,
+                "cacheReadTokens": 23936,
+                "cacheWriteTokens": 0,
+                "outputTokens": 477,
+                "totalTokens": 24634
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 106428,
+                "turn": 1,
+                "step": 22,
+                "inputTokens": 178,
+                "cacheReadTokens": 24576,
+                "cacheWriteTokens": 0,
+                "outputTokens": 497,
+                "totalTokens": 25251
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 109997,
+                "turn": 1,
+                "step": 23,
+                "inputTokens": 661,
+                "cacheReadTokens": 24704,
+                "cacheWriteTokens": 0,
+                "outputTokens": 576,
+                "totalTokens": 25941
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 113479,
+                "turn": 1,
+                "step": 24,
+                "inputTokens": 388,
+                "cacheReadTokens": 25856,
+                "cacheWriteTokens": 0,
+                "outputTokens": 601,
+                "totalTokens": 26845
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 116545,
+                "turn": 1,
+                "step": 25,
+                "inputTokens": 197,
+                "cacheReadTokens": 26752,
+                "cacheWriteTokens": 0,
+                "outputTokens": 463,
+                "totalTokens": 27412
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 119197,
+                "turn": 1,
+                "step": 26,
+                "inputTokens": 245,
+                "cacheReadTokens": 27264,
+                "cacheWriteTokens": 0,
+                "outputTokens": 385,
+                "totalTokens": 27894
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 122741,
+                "turn": 1,
+                "step": 27,
+                "inputTokens": 190,
+                "cacheReadTokens": 27776,
+                "cacheWriteTokens": 0,
+                "outputTokens": 523,
+                "totalTokens": 28489
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 124592,
+                "turn": 1,
+                "step": 28,
+                "inputTokens": 257,
+                "cacheReadTokens": 28288,
+                "cacheWriteTokens": 0,
+                "outputTokens": 55,
+                "totalTokens": 28600
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 131777,
+                "turn": 1,
+                "step": 29,
+                "inputTokens": 189,
+                "cacheReadTokens": 28544,
+                "cacheWriteTokens": 0,
+                "outputTokens": 1096,
+                "totalTokens": 29829
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 137315,
+                "turn": 1,
+                "step": 30,
+                "inputTokens": 746,
+                "cacheReadTokens": 29824,
+                "cacheWriteTokens": 0,
+                "outputTokens": 862,
+                "totalTokens": 31432
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 142011,
+                "turn": 1,
+                "step": 31,
+                "inputTokens": 136,
+                "cacheReadTokens": 31360,
+                "cacheWriteTokens": 0,
+                "outputTokens": 836,
+                "totalTokens": 32332
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 144647,
+                "turn": 1,
+                "step": 32,
+                "inputTokens": 140,
+                "cacheReadTokens": 32256,
+                "cacheWriteTokens": 0,
+                "outputTokens": 306,
+                "totalTokens": 32702
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 149232,
+                "turn": 1,
+                "step": 33,
+                "inputTokens": 374,
+                "cacheReadTokens": 32384,
+                "cacheWriteTokens": 0,
+                "outputTokens": 840,
+                "totalTokens": 33598
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 151290,
+                "turn": 1,
+                "step": 34,
+                "inputTokens": 254,
+                "cacheReadTokens": 33408,
+                "cacheWriteTokens": 0,
+                "outputTokens": 138,
+                "totalTokens": 33800
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 154217,
+                "turn": 1,
+                "step": 35,
+                "inputTokens": 171,
+                "cacheReadTokens": 33664,
+                "cacheWriteTokens": 0,
+                "outputTokens": 118,
+                "totalTokens": 33953
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 156799,
+                "turn": 1,
+                "step": 36,
+                "inputTokens": 225,
+                "cacheReadTokens": 33792,
+                "cacheWriteTokens": 0,
+                "outputTokens": 250,
+                "totalTokens": 34267
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 160425,
+                "turn": 1,
+                "step": 37,
+                "inputTokens": 155,
+                "cacheReadTokens": 34176,
+                "cacheWriteTokens": 0,
+                "outputTokens": 231,
+                "totalTokens": 34562
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 163697,
+                "turn": 1,
+                "step": 38,
+                "inputTokens": 194,
+                "cacheReadTokens": 34432,
+                "cacheWriteTokens": 0,
+                "outputTokens": 322,
+                "totalTokens": 34948
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 166457,
+                "turn": 1,
+                "step": 39,
+                "inputTokens": 196,
+                "cacheReadTokens": 34816,
+                "cacheWriteTokens": 0,
+                "outputTokens": 263,
+                "totalTokens": 35275
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 170017,
+                "turn": 1,
+                "step": 40,
+                "inputTokens": 139,
+                "cacheReadTokens": 35200,
+                "cacheWriteTokens": 0,
+                "outputTokens": 416,
+                "totalTokens": 35755
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 173319,
+                "turn": 1,
+                "step": 41,
+                "inputTokens": 235,
+                "cacheReadTokens": 35584,
+                "cacheWriteTokens": 0,
+                "outputTokens": 339,
+                "totalTokens": 36158
+              },
+              {
+                "roleAlias": "child-2",
+                "relativeNativeEventMs": 175343,
+                "turn": 1,
+                "step": 42,
+                "inputTokens": 254,
+                "cacheReadTokens": 35968,
+                "cacheWriteTokens": 0,
+                "outputTokens": 64,
+                "totalTokens": 36286
+              }
+            ],
+            "project": {
+              "created": true,
+              "observedPhases": [
+                "intake",
+                "review-ready",
+                "first-review"
+              ],
+              "lastPhase": "first-review",
+              "closed": false,
+              "acceptedEvidenceExcerpts": [
+                "[E1] 合成跑批 R7 的处理延迟中位数是 24 ms。该数字是耗时。",
+                "[E2] 同一合成样本共 20 次，其中 2 次记录为故障。两次故障均同时出现标记 F。本记录无对照或干预。"
+              ],
+              "fullClaimRowsPreservedInTaskGoal": [],
+              "fullClaimRowsPreservedInEvidence": [],
+              "partialFirstClaimInGoal": "C1：供应商签批 S9 确认 R7 已",
+              "coverageBlocksAtStop": 22,
+              "receiptObserved": false
+            }
+          }
+        ],
+        "workspaceIsolation": "Fresh roots used separate synthetic workspace copies verified byte-identical before the first prompt.",
+        "finding": "The host admitted E1 and E2 as grounded source excerpts, but the separately persisted task directive stopped in the middle of C1. The private assignment never received the complete claims as given to Standard."
+      }
+    ],
+    "measurement": {
+      "providerUsage": "Reported native assistant messages with inputTokens. Cache read hit rate is cacheReadTokens divided by inputTokens + cacheReadTokens + cacheWriteTokens. Total includes cached tokens; these totals are not a bill.",
+      "timings": "Observation starts immediately before UI prompt dispatch and ends at the harness arm stop. Initial native root turn elapsed is measured from the first scoped event through that root’s first terminal turn event. Child review may continue after the first root turn ends.",
+      "quality": "Manual scoring evaluates the promised Markdown document, whether written to disk or included as a fenced document in chat. A native error and artifact correctness are recorded independently. The C3 draft observation recognizes the causal caveat but does not complete the requested C3 item.",
+      "limits": "Single fixture, one fixed order, no counterbalancing, no follow-up prompts. The path-failed arm only delivered fallback chat. The corrected pair compares actual outcomes for the same user prompt, including Building-loop’s incomplete handoff; totals do not estimate a completed, equal-delivery project cost or broad quality effects."
+    }
+  },
+  "architecturePlanning": {
+    "experiment": "DSH Standard versus Building-loop 0.7.14, changed engineering design and release-planning goal",
+    "taskNature": "Synthetic user-supplied architecture facts. Real Windows DSH and official DeepSeek model. Planning and document writing only, no real application rollout.",
+    "carrier": "Installed Windows DSH NEXT, packaged native Web CLI",
+    "version": "0.7.14",
+    "archiveSha256": "152f21c2c2fc6c00c8e2e672dcd74e59db02f640faa8da3a60ea7fca779f4070",
+    "fixtureSha256": "9d7506cbea3fe55a7b6ef805346959349efafcf8a7851a76130cab0e57a32ea1",
+    "fixture": {
+      "turns": [
+        "我们在做结算系统的任务交接。第一版目标 G1 是下一次发布把“异常订单自动重放”从后台控制台到工作进程全量开通，并加入业务报表。请先复述理解，不开工、不改文件，等我给最终发布范围。下面是本题唯一事实材料：\nA1：Admin API 是外部合同的唯一所有者，POST /replay 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。\nA2：Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。\nA3：Release 管理服务端 replay_enabled，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。\nA4：现有运维告警通过 replay_backlog 和 duplicate_write_count 监测；候选版本的观察值没有提供。",
+        "开始建设：当前目标改为 G2。本次交付一份可直接交给值班工程师的短 Markdown 架构与发布计划，不改业务代码，不做真实发布。只做预发布演练且功能默认关闭；仅在演练期显式打开压测。后台控制台 UI、业务报表和全量开通取消；A1–A4 仍有效。交付里写清 API / Worker / Release 接口与负责人、依赖和演练顺序、撤回的先后和验收证据、旧任务怎么处置。结论依赖的材料用 A1–A4 标注，缺失的观察值列为待取证。请提供实际计划，正文尽量紧凑，末尾用大白话概括。"
+      ],
+      "checks": [
+        {
+          "id": "C1",
+          "claim": "交付以 G2 为当前目标，仅预发布演练，服务端默认关，仅演练压测时显式打开；不改业务代码、不实际发布。"
+        },
+        {
+          "id": "C2",
+          "claim": "分清 Admin API 外部合同、Worker 独立消费和 Release 开关责任；POST /replay 的 202+jobId 只表接收，最终结果才更新状态，引用 A1。"
+        },
+        {
+          "id": "C3",
+          "claim": "replay.v1 至少一次，用 orderId 做业务幂等并验证重复投递，引用 A2。"
+        },
+        {
+          "id": "C4",
+          "claim": "执行顺序要求关态先检查合同与消费能力，再在预发布显式开启压测，再关闭；验收包含状态流和幂等/重复测试。"
+        },
+        {
+          "id": "C5",
+          "claim": "撤回先关闭 replay_enabled 停止新请求，留 Worker 消化已入队，验证排空后才可回退 Worker，引用 A2/A3。"
+        },
+        {
+          "id": "C6",
+          "claim": "使用 replay_backlog 和 duplicate_write_count，标明真实观测尚未提供、不得冒充结果，引用 A4。"
+        },
+        {
+          "id": "C7",
+          "claim": "标明旧 UI/业务报表/全量开通取消，合同、幂等与现有告警继续保留；预建报表草稿不算已上线或新目标成果。"
+        },
+        {
+          "id": "C8",
+          "claim": "末尾有面向值班人员的大白话；已知事实、计划/验收阈值、未观测事实界限明确。"
+        }
+      ]
+    },
+    "model": {
+      "provider": "deepseek-official",
+      "model": "deepseek-flash",
+      "reasoningEffort": "off"
+    },
+    "status": "observation-capped",
+    "observedSeconds": 205.124,
+    "capSeconds": 205,
+    "fingerprintUnchanged": true,
+    "timeline": [
+      {
+        "event": "created",
+        "group": "standard",
+        "atSeconds": 0
+      },
+      {
+        "event": "created",
+        "group": "building-loop",
+        "atSeconds": 0
+      },
+      {
+        "event": "submitted",
+        "group": "standard",
+        "atSeconds": 0,
+        "userTurn": 1
+      },
+      {
+        "event": "submitted",
+        "group": "building-loop",
+        "atSeconds": 0.001,
+        "userTurn": 1
+      },
+      {
+        "event": "turn-boundary",
+        "group": "building-loop",
+        "atSeconds": 6.578,
+        "userTurn": 1,
+        "reason": "completed"
+      },
+      {
+        "event": "turn-boundary",
+        "group": "standard",
+        "atSeconds": 6.891,
+        "userTurn": 1,
+        "reason": "completed"
+      },
+      {
+        "event": "submitted",
+        "group": "standard",
+        "atSeconds": 6.892,
+        "userTurn": 2
+      },
+      {
+        "event": "submitted",
+        "group": "building-loop",
+        "atSeconds": 6.892,
+        "userTurn": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 15.849,
+        "phase": "intake",
+        "actor": "building-loop-child-1",
+        "coverage": 0,
+        "serial": 1
+      },
+      {
+        "event": "turn-boundary",
+        "group": "building-loop",
+        "atSeconds": 21.564,
+        "userTurn": 2,
+        "reason": "completed"
+      },
+      {
+        "event": "turn-boundary",
+        "group": "standard",
+        "atSeconds": 26.227,
+        "userTurn": 2,
+        "reason": "completed"
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 49.826,
+        "phase": "review-ready",
+        "actor": "building-loop-child-1",
+        "coverage": 0,
+        "serial": 1
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 55.497,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 0,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 82.235,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 6,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 88.325,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 12,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 93.98,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 24,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 100.449,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 36,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 107.748,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 48,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 113.48,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 60,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 129.279,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 72,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 136.567,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 84,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 143.064,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 92,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 165.408,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 93,
+        "serial": 2
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 169.874,
+        "phase": "blocked",
+        "actor": "building-loop-child-2",
+        "coverage": 93,
+        "serial": 2,
+        "blockerReportedByModel": "K01 first-review: 覆盖核验被宿主参数/授权阻挡，无法完成。1) B85–B88 是关于\"本稿已逐条标注 A1–A4\"的自指声明。宿主给 candidate 的 objectCheck 一律回复 \"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"，即使 source 填授权来源、marker 为 A1/A2/A3/A4；citation-profile 要求宿主 objectCheckHint，但本单元 inventory 对全部 125 块均未给出 objectCheckHint。2) 不用 objectCheck 而用 evidence 引证 DELIVERY.md 本身（已实际读过 L65）则被拒：\"资料引用不在本轮证据授权中 DELIVERY.md\"；本轮 evidence 白名单只有 CONVERSATION-INPUT.md，而它只能证明 A1–A4 外部事实，不能证明\"本稿是否逐条标注\"。3) 其余 121 块（B1–B84、B89–B125）已依据 CONVERSATION-INPUT.md 逐块完成核验，无 invalid；B85 已记录为 unsupported 并给出最小修正。4) 另：CONVERSATION-INPUT.md L13 与 L21 两处标题均写\"用户消息事件 9\"，而 DELIVERY.md L103 称 A1 出处为\"会话事件 9\"，A2/A3/A4 各条只给摘录 SHA-256、未给事件号；事件号对不上是授权材料自身的问题，不是候选错，本单元未据此退回。需要宿主：为本单元给出 B85–B88 的 objectCheckHint，或将 DELIVERY.md 列入证据白名单，之后可立即补齐 4 块并提交 review。"
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 174.758,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 93,
+        "serial": 3
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 185.677,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 96,
+        "serial": 3
+      },
+      {
+        "event": "native-phase",
+        "atSeconds": 194.988,
+        "phase": "first-review",
+        "actor": "building-loop-child-2",
+        "coverage": 108,
+        "serial": 3
+      }
+    ],
+    "arms": [
+      {
+        "group": "standard",
+        "exactSameHumanTurns": true,
+        "humanMessageSeqs": [
+          9,
+          24
+        ],
+        "responseTextsByUserTurn": [
+          [
+            "我理解你的要求：现在是任务交接，先复述理解；**不开工、不建文件、不改文件**，等你给出最终发布范围再动手。\n\n## 我对任务的理解\n\n**第一版目标 G1**\n下一次发布要完成两件事：\n1. 把“异常订单自动重放”以全量方式开通：范围包括后台控制台到工作进程这条完整链路，并非只开启其中一段；\n2. 加入业务报表。\n\n**从 A1–A4 读出的关键约束**\n\n| 编号 | 我的理解 | 对 G1 的影响 |\n|---|---|---|\n| A1 | Admin API 是外部合同的唯一所有者，`POST /replay` 只返回 **202** 和 **jobId**；**调用方不能把 202 当成处理成功**；消费端只有在确有最终结果时才更新状态 | 控制台或其他调用方只能把 202 当作“已受理”，状态最终由消费端写入；不能出现“看到 202 就标记成功”的逻辑 |\n| A2 | Worker 独立消费 `replay.v1`，消息**至少一次**投递，`orderId` 是**业务幂等键**；已入队任务在停用新请求后**仍会继续被消费** | 必须靠 `orderId` 做幂等去重，容忍重复投递；“关闸”只拦新请求，不拦存量任务，这正是排空阶段的语义 |\n| A3 | Release 服务端管理 `replay_enabled`，**默认关闭**；**排空现有任务之前不能回退 Worker**；运营已预建一个业务报表草稿，**当前没有业务上线授权** | 开通顺序受约束：先打开 `replay_enabled`，再排空存量任务，最后才能回退 Worker。报表目前只有草稿，且缺少上线授权，因此“加入业务报表”这一项存在明确的前置阻塞 |\n| A4 | 现有告警依赖 `replay_backlog` 和 `duplicate_write_count`；**候选版本的观察值没有提供** | 全量开通的上线判据（backlog 是否回落、重复写入是否受控）目前**没有数据支撑**，A4 只给出了观测手段，并没有给出观测结果 |\n\n**我目前识别出的、需要等你在最终发布范围里明确或确认的点**\n1. 报表：草稿能否上线、上线授权由谁提供以及何时提供；若授权未到位，G1 的报表部分是否要拆到后续版本。\n2. 开通方式：`replay_enabled` 是直接全局切换，还是按比例或分批开通，以及谁有权开启它。\n3. 灰度与回退：回退 Worker 前“排空现有任务”的判定条件和观察窗口；`replay_backlog`、`duplicate_write_count` 在 G1 上的具体阈值，因为候选版本的观察值缺失。\n4. 幂等验证：至少一次投递下，`orderId` 去重是否有验证用例，或者是否已有历史证据。\n5. 消费端状态更新：以“确有最终结果”为准的终态定义，以及 202→jobId→最终结果的对照方式。\n\n**我不会做的事**：在你给出最终发布范围之前，我不会改代码、配置，也不会动报表草稿、不会开启 `replay_enabled`、不会建或改任何文件。\n\n请给出最终发布范围；范围确认后我再开始实施。"
+          ],
+          [
+            "I'll write the short Markdown plan file as the deliverable. Let me first check the workspace.",
+            "The workspace is empty. I'll write the plan based only on A1–A4, without making up owner names, thresholds, or observation values.",
+            "已交付：[G2-异常订单自动重放-架构与发布演练计划.md]([isolated]\\standard-workspace\\G2-异常订单自动重放-架构与发布演练计划.md)，可直接交给值班工程师执行，正文 7 节加一段大白话。没有改动业务代码，也没有做任何真实发布。\n\n**计划要点**\n- **范围**：只做预发布演练，功能默认关闭，演练期显式打开压测；后台控制台 UI、业务报表、全量开通全部取消。\n- **组合**：Admin API（`POST /replay` → 202 + jobId，外部合同唯一所有者）、Worker（消费 `replay.v1`，至少一次投递，`orderId` 幂等）、Release 服务（`replay_enabled` 默认关）。各组合的负责人栏是角色占位，实名待指派。\n- **撤回顺序**：先关新请求 → 等 `replay_backlog` 归零并在排空确认后 → 才回退 Worker → 撤压测开关。这是 A3 的硬约束，顺序写死。\n- **旧任务**：继续消费，不丢弃，不手工删除；排空后再关。排空未完就不回退 Worker，升级值班（A2 + A3）。\n- **证据**：每项验收点都标了来源（A1–A4），包括 202 非终态、幂等、排空调零曲线、撤回时间戳链、告警记录。\n- **待取证**：候选版本的 `replay_backlog` 和 `duplicate_write_count` 观察值没提供（A4），因此我没有给具体阈值，留待取证后由值班补定。\n\n需要我把负责人实名、阈值或排空观察窗口填进去时，你告诉我即可。"
+          ]
+        ],
+        "artifact": {
+          "sha256": "8c0e856b10c43fb5124f4038a47bbcbfd15bf72145188a01410e3e4e3f428d10",
+          "bytes": 5628,
+          "text": "# 异常订单自动重放 — 架构与发布演练计划（G2）\n\n**目标 G2**：交付一份值班工程师可直接执行的架构与发布计划；只做**预发布演练**，功能**默认关闭**，演练期**显式打开**压测。不改业务代码，不做真实发布。\n**已取消（不在 G2 范围）**：后台控制台 UI、业务报表、全量开通。\n**事实依据**：仅 A1–A4。未提供的数据一律进「待取证」，不填猜测值。\n\n---\n\n## 1. 组件、接口与负责人\n\n| 组件 | 职责与接口 | 关键约束 | 负责人 |\n|---|---|---|---|\n| Admin API | 外部合同唯一所有者；`POST /replay` → **202 + jobId** | 调用方不得把 202 当成功；消费端在**确有最终结果**时才更新状态（A1） | 待指派（外部合同方） |\n| Worker | 独立消费 `replay.v1`；至少一次投递；`orderId` 为业务幂等键 | 重复投递按 `orderId` 去重；停用新请求后**已入队任务仍继续消费**（A2） | 待指派 |\n| Release 服务 | 管理 `replay_enabled`，**默认关** | 排空现有任务前**不能回退 Worker**（A3） | 待指派 |\n| 告警 | 运维告警依据 `replay_backlog`、`duplicate_write_count` | 候选版本观察值**未提供**（A4） | 待指派 |\n\n> 负责人姓名材料未给出，表中为角色占位；上线前须填实名与值班联系方式。\n\n## 2. 依赖\n\n1. 环境：预发布环境可用，`replay_enabled` 可从 Release 服务端读取（A3）。\n2. 合同：`POST /replay` 的 202 + jobId 响应格式已定（A1），联调用例需覆盖「202 非终态」断言。\n3. 幂等：Worker 按 `orderId` 去重的实现或既有证据（A2）。\n4. 观测：`replay_backlog`、`duplicate_write_count` 两项指标与告警在预发布可查（A4）。\n5. 压测：演练期可显式打开压测开关，且不影响默认关闭状态。\n\n## 3. 演练顺序（预发布，功能默认关）\n\n1. **基线**：确认 `replay_enabled = off`（A3）；记录 `replay_backlog`、`duplicate_write_count` 基线（A4）→ 作为「待取证」的对照。\n2. **合同核对**：对 `POST /replay` 发单，验证返回 202 + jobId；**不将其视为成功**（A1）。记录 jobId 与后续最终结果的对应关系。\n3. **功能开启（仅演练）**：在 Release 服务端打开 `replay_enabled`，只放小批量真实/仿真订单进入 `replay.v1`。\n4. **Worker 消费验证**：确认按 `orderId` 幂等；主动制造重复投递，验证不产生重复写（A2）。\n5. **压测（显式打开）**：演练期显式启用压测流量，观察 `replay_backlog` 与 `duplicate_write_count`（A4）。压测结束立即关闭压测开关。\n6. **排空**：停止新请求后，等待已入队任务消费完毕（A2：已入队仍会被消费）。\n7. **关闭**：确认排空后，将 `replay_enabled` 置回 off（A3），恢复默认关闭。\n\n## 4. 撤回的先后\n\n**回退顺序必须是：先关新请求 → 再排空 → 最后才回退 Worker。**\n\n1. 第 1 步：`replay_enabled = off`，拦截新请求（A3）。\n2. 第 2 步：**等 `replay_backlog` 归零**，即现有任务排空（A2 + A4）。\n3. 第 3 步：排空确认后，才允许回退 Worker（A3 明确禁止提前回退）。\n4. 第 4 步：撤销演练期压测开关，确认功能回到默认关闭。\n\n> 违反顺序（先回退 Worker）会导致已入队任务丢失消费能力——务必不做。\n\n## 5. 旧任务处置\n\n- 旧任务（演练前已入队、或演练中已进入 `replay.v1` 的任务）：**继续消费、不丢弃、不手工删除**，因至少一次投递且停用新请求不阻断存量消费（A2）。\n- 处置方式：**排空后再关闭**，即跑完第 3 节第 6 步。\n- 重复风险：排空期间可能重复投递，依赖 `orderId` 幂等键承载（A2）。\n- 若排空未能完成：**不执行 Worker 回退**，保持 `replay_enabled = off` 并升级值班，等取证结论（A3）。\n\n## 6. 验收证据\n\n| 验收点 | 证据 | 来源 |\n|---|---|---|\n| 默认关闭 | Release 服务端 `replay_enabled = off` 的读数截图 | A3 |\n| 202 非终态 | `POST /replay` 的 202 + jobId 记录，及最终结果由消费端更新后才出现的状态记录 | A1 |\n| 幂等 | 重复投递下 `orderId` 去重、无重复写的记录 | A2 |\n| 压测 | 显式打开/关闭压测开关的操作记录 | G2 要求 |\n| 排空 | `replay_backlog` 由高位回落到 0 的曲线 | A2、A4 |\n| 撤回顺序 | 关闸 → 排空 → 回退 Worker 的时间戳链条 | A3 |\n| 告警 | `replay_backlog`、`duplicate_write_count` 告警触发/恢复记录 | A4 |\n\n## 7. 待取证（缺失观察值，A4）\n\n1. 候选版本的 `replay_backlog` 观察值：**未提供** → 待取证。\n2. 候选版本的 `duplicate_write_count` 观察值：**未提供** → 待取证。\n3. 因此「排空判定阈值」「压测通过阈值」无法在本计划中给出具体数值，须由值班依据取证结果补定。\n4. 负责人实名与值班联系方式：待指派填入。\n5. `orderId` 幂等的既有验证证据：待取证或演练中补齐。\n\n---\n\n## 大白话\n\n这次不真的上线，只在预发布里演练，功能平时是关的。Admin API 收单只会回 202，别当成功；真正结果看 Worker。要撤的时候顺序不能乱：先关新单，再把队列里的旧单跑完，最后才能停 Worker——旧单不会自己消失，停早了就丢单。重复投递靠订单号去重。报表、后台控制台、全量开通这版都不做。目前缺两组监控数字（积压和重复写的观察值），得先用 A4 的监控去测出来，别拍脑袋定阈值。\n"
+        },
+        "nativeUsage": [
+          {
+            "actor": "standard-root",
+            "seq": 17,
+            "atSeconds": 6.794,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 929,
+              "outputTokens": 743,
+              "cacheReadTokens": 8832,
+              "cacheWriteTokens": 0,
+              "totalTokens": 10504
+            }
+          },
+          {
+            "actor": "standard-root",
+            "seq": 26,
+            "atSeconds": 9.352,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 792,
+              "outputTokens": 68,
+              "cacheReadTokens": 9856,
+              "cacheWriteTokens": 0,
+              "totalTokens": 10716
+            }
+          },
+          {
+            "actor": "standard-root",
+            "seq": 34,
+            "atSeconds": 20.33,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 158,
+              "outputTokens": 1763,
+              "cacheReadTokens": 10624,
+              "cacheWriteTokens": 0,
+              "totalTokens": 12545
+            }
+          },
+          {
+            "actor": "standard-root",
+            "seq": 40,
+            "atSeconds": 22.329,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 220,
+              "outputTokens": 124,
+              "cacheReadTokens": 12416,
+              "cacheWriteTokens": 0,
+              "totalTokens": 12760
+            }
+          },
+          {
+            "actor": "standard-root",
+            "seq": 47,
+            "atSeconds": 26.176,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 162,
+              "outputTokens": 425,
+              "cacheReadTokens": 12672,
+              "cacheWriteTokens": 0,
+              "totalTokens": 13259
+            }
+          }
+        ],
+        "usageSummary": {
+          "replies": 5,
+          "repliesWithoutUsage": 0,
+          "inputTokens": 2261,
+          "cacheReadTokens": 54400,
+          "cacheWriteTokens": 0,
+          "outputTokens": 3123,
+          "promptTokens": 56661,
+          "totalTokens": 59784,
+          "cacheReadPercent": 96.01,
+          "nativeTotalTokensSum": 59784
+        },
+        "endProblems": [],
+        "streamAttempts": []
+      },
+      {
+        "group": "building-loop",
+        "exactSameHumanTurns": true,
+        "humanMessageSeqs": [
+          9,
+          22
+        ],
+        "responseTextsByUserTurn": [
+          [
+            "## 我的理解（仅复述，不开工、不改文件）\n\n**G1 目标**：下一次发布把“异常订单自动重放”从后台控制台一直开通到工作进程，全量启用，并加入业务报表。\n\n**按你给的四条事实，我理解到的是：**\n\n| 事实 | 对 G1 的约束含义 |\n|---|---|\n| A1 Admin API 持有外部合同，`POST /replay` 返回 202 + jobId；调用方不能把 202 当成功；消费端只在确有最终结果时改状态 | 全量开通后，调用方（后台控制台）只能把 202 视为“已受理”，不能展示为“已重放成功”；成功/失败状态由消费端在下游确有终态后回写。这是开通前必须先对齐的接口语义，不是文档性小事 |\n| A2 Worker 独立消费 `replay.v1`，至少一次投递，`orderId` 为业务幂等键；已入队任务在停用新请求后仍继续消费 | 全量开通意味着重复投递会成为常态而非例外，幂等必须按 `orderId` 做，且验证要覆盖“停用/回退后队列里的残留仍在跑”这一窗口 |\n| A3 `replay_enabled` 默认关、服务端管；排空现有任务前不能回退 Worker；报表草稿已建但**无业务上线授权** | 灰度开放 → 全量；回退路径受“先排空”限制，所以开通节奏要能和排空对齐。报表这边：没有授权就不上线，这项大概率**不进 G1 发布范围**或需要单独授权 |\n| A4 现有告警靠 `replay_backlog`、`duplicate_write_count`；**候选版本观察值没给** | 全量开通前缺一个客观放行依据。没有这批观察值，“全量”只能是按流程开，不能说是按数据证明安全的 |\n\n**我认为 G1 的真正风险点**（不是结论，是待你定范围时要覆盖的）：\n1. **“202 ≠ 成功”的语义穿透**：控制台、报表、告警三处都不能把“已受理”算成“已成功”，否则重复率与积压指标会失真。\n2. **幂等证据缺失**：A2 说 `orderId` 是幂等键，但没有重复投递下的实测数据（`duplicate_write_count` 观察值没给）。\n3. **回退窗口**：全量后若需回退，必须先排空；全量流量下排空时长未知。\n4. **报表授权**：草稿存在 ≠ 可上线，业务侧没有授权就不能算 G1 的“完成”。\n\n**我还不知道的（等你补）**：\n- 最终发布范围：报表是**进** G1 还是移出？若进，授权由谁给、什么条件下给？\n- 灰度/全量的判定条件：是纯时间窗，还是要 `replay_backlog`、`duplicate_write_count` 达到某个阈值？候选版本观察值由谁产出、何时能有？\n- 回退预案：全量期间排空的预期时长和决策点。\n- “全量开通”的对象范围：所有租户/所有订单类型，还是分档？\n\n**我不会做的事**：不调研代码、不改任何文件、不建项目、不产出方案。等你给最终发布范围，再按那份范围决定是直接开项目还是先补材料。\n\n请给我最终的发布范围，尤其是**报表是否在 G1 内**、**全量的放行判据**这两点。"
+          ],
+          [
+            "K01 已派单，正在起稿（阶段 intake，执行方 [native-id]）。本轮没有其他可独立推进的步骤，我在此等待执行方交接后进入核验。\n\n当前状态：\n- **目标**：G2（范围已从 G1 收缩：只做预发布演练，功能默认关，压测仅演练期开；控制台 UI / 业务报表 / 全量开通取消）\n- **单元**：K01 执行中 → 产出 `DELIVERY.md`\n- **产物位置**：`[isolated]\\h\\building-loop-projects\\90b89e7c98922d0421c8baf3ebb6a4bf0c965e95c03335d4e4295fe96c8027b9`（计划文档为其中的 `DELIVERY.md`）",
+            "K01 已进入首次独立核验（核验方 [native-id]）。我在此等待核验回执，期间没有可独立推进的步骤。\n\n- **目标**：G2（预发布演练，功能默认关，压测仅演练期开）\n- **单元**：K01 → first-review\n- **产物**：`DELIVERY.md`，位于 `[isolated]\\h\\building-loop-projects\\90b89e7c98922d0421c8baf3ebb6a4bf0c965e95c03335d4e4295fe96c8027b9`",
+            "阻塞原因已核实为宿主覆盖核验参数问题（B85–B88 是“本稿已标注 A1–A4”的自指声明，无法用外部事实 objectCheck 作证；证据白名单只含 `CONVERSATION-INPUT.md`），不是候选稿的实质错误。我已恢复 first-review 阶段，复用原核验方会话 0c336875，并给出替代路径：这几块直接用 unsupported 记录最小修正后提交，不得再次 blocked。\n\n- **目标**：G2（预发布演练，功能默认关，压测仅演练期开）\n- **单元**：K01 → first-review（复用同一核验方）\n- **其余 121 块**已核验无 invalid，结论沿用，不重跑\n- **产物**：`DELIVERY.md`，位于 `[isolated]\\h\\building-loop-projects\\90b89e7c98922d0421c8baf3ebb6a4bf0c965e95c03335d4e4295fe96c8027b9`\n\n等待核验回执后进入修订。"
+          ]
+        ],
+        "artifact": {
+          "sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6",
+          "bytes": 9179,
+          "text": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费必然发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 排空确认（→ 才可回退 Worker）**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 卸压并让队列排空，确认排空 | S6 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S8 | 回退 Worker（**仅在 S7 排空确认后**） | S7 | 排空证据 + 回退记录，时间顺序可查（A3） |\n| S9 | 关闭 `replay_enabled`，回到默认态并复查 | S8 | 最终的开关关闭读数；与 S1 基线对比 |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S7/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n"
+        },
+        "nativeUsage": [
+          {
+            "actor": "building-loop-root",
+            "seq": 15,
+            "atSeconds": 6.458,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 881,
+              "outputTokens": 787,
+              "cacheReadTokens": 1408,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3076
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 24,
+            "atSeconds": 11.281,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 149,
+              "outputTokens": 605,
+              "cacheReadTokens": 3072,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3826
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 33,
+            "atSeconds": 12.95,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 3695,
+              "outputTokens": 38,
+              "cacheReadTokens": 2688,
+              "cacheWriteTokens": 0,
+              "totalTokens": 6421
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 40,
+            "atSeconds": 15.546,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2206,
+              "outputTokens": 290,
+              "cacheReadTokens": 6400,
+              "cacheWriteTokens": 0,
+              "totalTokens": 8896
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 48,
+            "atSeconds": 17.511,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1526,
+              "outputTokens": 55,
+              "cacheReadTokens": 8832,
+              "cacheWriteTokens": 0,
+              "totalTokens": 10413
+            }
+          },
+          {
+            "actor": "building-loop-child-1",
+            "seq": 19,
+            "atSeconds": 18.711,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1799,
+              "outputTokens": 52,
+              "cacheReadTokens": 2048,
+              "cacheWriteTokens": 0,
+              "totalTokens": 3899
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 54,
+            "atSeconds": 18.965,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 240,
+              "outputTokens": 61,
+              "cacheReadTokens": 10368,
+              "cacheWriteTokens": 0,
+              "totalTokens": 10669
+            }
+          },
+          {
+            "actor": "building-loop-child-1",
+            "seq": 25,
+            "atSeconds": 20.428,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1590,
+              "outputTokens": 79,
+              "cacheReadTokens": 3840,
+              "cacheWriteTokens": 0,
+              "totalTokens": 5509
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 60,
+            "atSeconds": 21.541,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 192,
+              "outputTokens": 209,
+              "cacheReadTokens": 10496,
+              "cacheWriteTokens": 0,
+              "totalTokens": 10897
+            }
+          },
+          {
+            "actor": "building-loop-child-1",
+            "seq": 31,
+            "atSeconds": 36.328,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 155,
+              "outputTokens": 2699,
+              "cacheReadTokens": 5376,
+              "cacheWriteTokens": 0,
+              "totalTokens": 8230
+            }
+          },
+          {
+            "actor": "building-loop-child-1",
+            "seq": 37,
+            "atSeconds": 40.264,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 258,
+              "outputTokens": 68,
+              "cacheReadTokens": 8064,
+              "cacheWriteTokens": 0,
+              "totalTokens": 8390
+            }
+          },
+          {
+            "actor": "building-loop-child-1",
+            "seq": 43,
+            "atSeconds": 49.633,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 3055,
+              "outputTokens": 1522,
+              "cacheReadTokens": 8320,
+              "cacheWriteTokens": 0,
+              "totalTokens": 12897
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 71,
+            "atSeconds": 52.42,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1488,
+              "outputTokens": 38,
+              "cacheReadTokens": 10880,
+              "cacheWriteTokens": 0,
+              "totalTokens": 12406
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 79,
+            "atSeconds": 55.239,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1002,
+              "outputTokens": 252,
+              "cacheReadTokens": 12288,
+              "cacheWriteTokens": 0,
+              "totalTokens": 13542
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 19,
+            "atSeconds": 57.673,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 3182,
+              "outputTokens": 50,
+              "cacheReadTokens": 4992,
+              "cacheWriteTokens": 0,
+              "totalTokens": 8224
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 87,
+            "atSeconds": 58.342,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1593,
+              "outputTokens": 162,
+              "cacheReadTokens": 13440,
+              "cacheWriteTokens": 0,
+              "totalTokens": 15195
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 25,
+            "atSeconds": 59.496,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 6492,
+              "outputTokens": 91,
+              "cacheReadTokens": 8192,
+              "cacheWriteTokens": 0,
+              "totalTokens": 14775
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 31,
+            "atSeconds": 61.112,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2721,
+              "outputTokens": 73,
+              "cacheReadTokens": 14720,
+              "cacheWriteTokens": 0,
+              "totalTokens": 17514
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 37,
+            "atSeconds": 63.531,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2935,
+              "outputTokens": 73,
+              "cacheReadTokens": 17408,
+              "cacheWriteTokens": 0,
+              "totalTokens": 20416
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 43,
+            "atSeconds": 64.925,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2882,
+              "outputTokens": 73,
+              "cacheReadTokens": 20352,
+              "cacheWriteTokens": 0,
+              "totalTokens": 23307
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 49,
+            "atSeconds": 66.45,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2765,
+              "outputTokens": 73,
+              "cacheReadTokens": 23296,
+              "cacheWriteTokens": 0,
+              "totalTokens": 26134
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 55,
+            "atSeconds": 68.28,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 181,
+              "outputTokens": 73,
+              "cacheReadTokens": 25984,
+              "cacheWriteTokens": 0,
+              "totalTokens": 26238
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 61,
+            "atSeconds": 70.04,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2808,
+              "outputTokens": 73,
+              "cacheReadTokens": 26112,
+              "cacheWriteTokens": 0,
+              "totalTokens": 28993
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 67,
+            "atSeconds": 76.328,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1664,
+              "outputTokens": 1358,
+              "cacheReadTokens": 28928,
+              "cacheWriteTokens": 0,
+              "totalTokens": 31950
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 73,
+            "atSeconds": 82.042,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 235,
+              "outputTokens": 1341,
+              "cacheReadTokens": 31744,
+              "cacheWriteTokens": 0,
+              "totalTokens": 33320
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 79,
+            "atSeconds": 88.088,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1324,
+              "outputTokens": 816,
+              "cacheReadTokens": 33280,
+              "cacheWriteTokens": 0,
+              "totalTokens": 35420
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 85,
+            "atSeconds": 93.779,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1164,
+              "outputTokens": 1245,
+              "cacheReadTokens": 35328,
+              "cacheWriteTokens": 0,
+              "totalTokens": 37737
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 91,
+            "atSeconds": 100.348,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1127,
+              "outputTokens": 1374,
+              "cacheReadTokens": 37632,
+              "cacheWriteTokens": 0,
+              "totalTokens": 40133
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 97,
+            "atSeconds": 107.433,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 985,
+              "outputTokens": 1420,
+              "cacheReadTokens": 40064,
+              "cacheWriteTokens": 0,
+              "totalTokens": 42469
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 103,
+            "atSeconds": 113.402,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 914,
+              "outputTokens": 1126,
+              "cacheReadTokens": 42368,
+              "cacheWriteTokens": 0,
+              "totalTokens": 44408
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 109,
+            "atSeconds": 122.562,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 825,
+              "outputTokens": 2039,
+              "cacheReadTokens": 44288,
+              "cacheWriteTokens": 0,
+              "totalTokens": 47152
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 115,
+            "atSeconds": 128.951,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 201,
+              "outputTokens": 1637,
+              "cacheReadTokens": 46976,
+              "cacheWriteTokens": 0,
+              "totalTokens": 48814
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 121,
+            "atSeconds": 136.173,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 647,
+              "outputTokens": 1428,
+              "cacheReadTokens": 48768,
+              "cacheWriteTokens": 0,
+              "totalTokens": 50843
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 127,
+            "atSeconds": 142.834,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 781,
+              "outputTokens": 1356,
+              "cacheReadTokens": 50560,
+              "cacheWriteTokens": 0,
+              "totalTokens": 52697
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 133,
+            "atSeconds": 146.387,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 704,
+              "outputTokens": 591,
+              "cacheReadTokens": 52608,
+              "cacheWriteTokens": 0,
+              "totalTokens": 53903
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 139,
+            "atSeconds": 150.662,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 566,
+              "outputTokens": 615,
+              "cacheReadTokens": 53888,
+              "cacheWriteTokens": 0,
+              "totalTokens": 55069
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 145,
+            "atSeconds": 155.57,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 213,
+              "outputTokens": 640,
+              "cacheReadTokens": 55040,
+              "cacheWriteTokens": 0,
+              "totalTokens": 55893
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 151,
+            "atSeconds": 160.477,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 185,
+              "outputTokens": 245,
+              "cacheReadTokens": 55808,
+              "cacheWriteTokens": 0,
+              "totalTokens": 56238
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 157,
+            "atSeconds": 165.303,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 235,
+              "outputTokens": 297,
+              "cacheReadTokens": 56064,
+              "cacheWriteTokens": 0,
+              "totalTokens": 56596
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 163,
+            "atSeconds": 169.69,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 959,
+              "outputTokens": 441,
+              "cacheReadTokens": 56576,
+              "cacheWriteTokens": 0,
+              "totalTokens": 57976
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 98,
+            "atSeconds": 171.236,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2008,
+              "outputTokens": 38,
+              "cacheReadTokens": 15104,
+              "cacheWriteTokens": 0,
+              "totalTokens": 17150
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 106,
+            "atSeconds": 174.383,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1021,
+              "outputTokens": 283,
+              "cacheReadTokens": 17024,
+              "cacheWriteTokens": 0,
+              "totalTokens": 18328
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 176,
+            "atSeconds": 176.561,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 228,
+              "outputTokens": 59,
+              "cacheReadTokens": 57856,
+              "cacheWriteTokens": 0,
+              "totalTokens": 58143
+            }
+          },
+          {
+            "actor": "building-loop-root",
+            "seq": 113,
+            "atSeconds": 178.072,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1516,
+              "outputTokens": 269,
+              "cacheReadTokens": 18304,
+              "cacheWriteTokens": 0,
+              "totalTokens": 20089
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 182,
+            "atSeconds": 179.001,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2146,
+              "outputTokens": 212,
+              "cacheReadTokens": 58112,
+              "cacheWriteTokens": 0,
+              "totalTokens": 60470
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 188,
+            "atSeconds": 180.933,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 238,
+              "outputTokens": 115,
+              "cacheReadTokens": 60288,
+              "cacheWriteTokens": 0,
+              "totalTokens": 60641
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 194,
+            "atSeconds": 185.349,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 272,
+              "outputTokens": 763,
+              "cacheReadTokens": 60544,
+              "cacheWriteTokens": 0,
+              "totalTokens": 61579
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 200,
+            "atSeconds": 188.327,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2728,
+              "outputTokens": 98,
+              "cacheReadTokens": 61568,
+              "cacheWriteTokens": 0,
+              "totalTokens": 64394
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 206,
+            "atSeconds": 194.821,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 1858,
+              "outputTokens": 1457,
+              "cacheReadTokens": 64384,
+              "cacheWriteTokens": 0,
+              "totalTokens": 67699
+            }
+          },
+          {
+            "actor": "building-loop-child-2",
+            "seq": 212,
+            "atSeconds": 203.687,
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "usage": {
+              "inputTokens": 2806,
+              "outputTokens": 2121,
+              "cacheReadTokens": 67584,
+              "cacheWriteTokens": 0,
+              "totalTokens": 72511
+            }
+          }
+        ],
+        "usageSummary": {
+          "replies": 50,
+          "repliesWithoutUsage": 0,
+          "inputTokens": 71345,
+          "cacheReadTokens": 1499264,
+          "cacheWriteTokens": 0,
+          "outputTokens": 30880,
+          "promptTokens": 1570609,
+          "totalTokens": 1601489,
+          "cacheReadPercent": 95.46,
+          "nativeTotalTokensSum": 1601489
+        },
+        "endProblems": [],
+        "streamAttempts": []
+      }
+    ],
+    "provenance": {
+      "sourceDocument": {
+        "sha256": "ddb4f2725737e680922f8dfb6bddafa67865363faa07c87c572850b30f3a0b92",
+        "bytes": 1232,
+        "text": "# 会话提供的材料\n\n以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。\n\n## 用户消息事件 9\n\n摘录 SHA-256 4a0ed60965e2ed26d4c36a235215cfdf9471e7f46b3b883f158e39067c630633\n\n~~~\nA1：Admin API 是外部合同的唯一所有者，POST /replay 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。\n~~~\n\n## 用户消息事件 9\n\n摘录 SHA-256 b7b777341033109269a210d964680a45a4192697c9ae2711d6738ef9db613d75\n\n~~~\nA2：Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。\n~~~\n\n## 用户消息事件 9\n\n摘录 SHA-256 7da60b8518995fdaba5c9986569e7d2f943751d80af5154f45ec53a902a5309f\n\n~~~\nA3：Release 管理服务端 replay_enabled，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。\n~~~\n\n## 用户消息事件 9\n\n摘录 SHA-256 31908ac1f2e283b42f690eb145bc8a6d5d55e87e865cb915be7e73efaf90a8bc\n\n~~~\nA4：现有运维告警通过 replay_backlog 和 duplicate_write_count 监测；候选版本的观察值没有提供。\n~~~\n\n"
+      },
+      "pinnedOriginalExcerpts": [
+        {
+          "label": "A1",
+          "sha256": "4a0ed60965e2ed26d4c36a235215cfdf9471e7f46b3b883f158e39067c630633",
+          "byteExactTextInSource": true,
+          "exactDigestInSource": true
+        },
+        {
+          "label": "A2",
+          "sha256": "b7b777341033109269a210d964680a45a4192697c9ae2711d6738ef9db613d75",
+          "byteExactTextInSource": true,
+          "exactDigestInSource": true
+        },
+        {
+          "label": "A3",
+          "sha256": "7da60b8518995fdaba5c9986569e7d2f943751d80af5154f45ec53a902a5309f",
+          "byteExactTextInSource": true,
+          "exactDigestInSource": true
+        },
+        {
+          "label": "A4",
+          "sha256": "31908ac1f2e283b42f690eb145bc8a6d5d55e87e865cb915be7e73efaf90a8bc",
+          "byteExactTextInSource": true,
+          "exactDigestInSource": true
+        }
+      ]
+    },
+    "projectStatus": {
+      "currentPhase": "first-review",
+      "closure": false,
+      "firstReviewCoverage": 108,
+      "firstReviewInventoryTotal": 125,
+      "ledger": {
+        "revision": 5,
+        "projection": {
+          "sha256": "fcb2a9c8e6108f80d79c64c3722c4dfdd754363e4ce0927b1952f80af3eb5735",
+          "bytes": 100,
+          "text": "# 任务账本\n\n- K01 已确认，待派单。目标与范围见 [项目总纲](PROJECT-GOAL.md)。\n"
+        },
+        "items": [
+          {
+            "kind": "planned",
+            "status": "pending",
+            "title": "G2：为结算系统“异常订单自动重放”交付一份可直接交给值班工程师的短 Markdown 架构与发布计划。范围已从 G1 收缩：不改业务代码、不做真实发布，只做预发布演练，功能默认关闭，仅演练期显式打开压测；后台控制台 UI、业务报表、全量开",
+            "note": "用户消息待结合项目现状判定，原文见会话事件。",
+            "originEvent": 22,
+            "originSha256": "0d0cd7a25152309456516d052b7be2057e6969d7feff55eebc4314eb453cb6d2"
+          },
+          {
+            "kind": "interrupted",
+            "status": "running",
+            "title": "工作单元 K01",
+            "unit": "K01",
+            "note": "当前阶段 first-review"
+          }
+        ]
+      }
+    },
+    "tools": [
+      {
+        "group": "standard",
+        "actor": "standard-root",
+        "seq": 28,
+        "atSeconds": 9.359,
+        "name": "working_directory",
+        "callAtSeconds": 9.352,
+        "isError": false
+      },
+      {
+        "group": "standard",
+        "actor": "standard-root",
+        "seq": 30,
+        "atSeconds": 9.605,
+        "name": "glob",
+        "callAtSeconds": 9.352,
+        "isError": false
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 26,
+        "atSeconds": 11.386,
+        "name": "building_loop_propose",
+        "callAtSeconds": 11.281,
+        "action": "propose",
+        "isError": false,
+        "status": "started"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 35,
+        "atSeconds": 12.963,
+        "name": "building_loop",
+        "callAtSeconds": 12.95,
+        "action": "prepare",
+        "isError": false,
+        "phase": "dispatch"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 43,
+        "atSeconds": 15.615,
+        "name": "building_loop",
+        "callAtSeconds": 15.546,
+        "action": "advance",
+        "unit": "K01",
+        "isError": false,
+        "phase": "intake"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 50,
+        "atSeconds": 17.519,
+        "name": "building_loop",
+        "callAtSeconds": 17.511,
+        "action": "status",
+        "unit": "K01",
+        "isError": false
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-1",
+        "seq": 21,
+        "atSeconds": 18.741,
+        "name": "building_loop",
+        "callAtSeconds": 18.711,
+        "action": "prepare",
+        "isError": false,
+        "phase": "intake"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 56,
+        "atSeconds": 18.976,
+        "name": "building_loop_file",
+        "callAtSeconds": 18.965,
+        "action": "read",
+        "target": "receipts/K01-first.json",
+        "isError": true,
+        "errorText": "Error: 授权文件目前不存在"
+      },
+      {
+        "group": "standard",
+        "actor": "standard-root",
+        "seq": 36,
+        "atSeconds": 20.345,
+        "name": "write",
+        "callAtSeconds": 20.33,
+        "target": "[isolated]\\standard-workspace\\G2-异常订单自动重放-架构与发布演练计划.md",
+        "isError": false
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-1",
+        "seq": 27,
+        "atSeconds": 20.438,
+        "name": "building_loop_file",
+        "callAtSeconds": 20.428,
+        "action": "read",
+        "target": "TASK-LEDGER.md",
+        "isError": true,
+        "errorText": "Error: 该文件不在当前读白名单"
+      },
+      {
+        "group": "standard",
+        "actor": "standard-root",
+        "seq": 43,
+        "atSeconds": 22.335,
+        "name": "present",
+        "callAtSeconds": 22.329,
+        "isError": false
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-1",
+        "seq": 33,
+        "atSeconds": 36.385,
+        "name": "building_loop_file",
+        "callAtSeconds": 36.328,
+        "action": "write",
+        "target": "DELIVERY.md",
+        "isError": false,
+        "changed": true,
+        "sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-1",
+        "seq": 39,
+        "atSeconds": 40.291,
+        "name": "building_loop_file",
+        "callAtSeconds": 40.264,
+        "action": "read",
+        "target": "DELIVERY.md",
+        "isError": false,
+        "sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-1",
+        "seq": 45,
+        "atSeconds": 49.715,
+        "name": "building_loop",
+        "callAtSeconds": 49.633,
+        "action": "submit",
+        "isError": false,
+        "phase": "review-ready"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 73,
+        "atSeconds": 52.433,
+        "name": "building_loop",
+        "callAtSeconds": 52.42,
+        "action": "prepare",
+        "isError": false,
+        "phase": "review-ready"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 82,
+        "atSeconds": 55.289,
+        "name": "building_loop",
+        "callAtSeconds": 55.239,
+        "action": "advance",
+        "unit": "K01",
+        "isError": false,
+        "phase": "first-review"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 21,
+        "atSeconds": 57.703,
+        "name": "building_loop",
+        "callAtSeconds": 57.673,
+        "action": "prepare",
+        "isError": false,
+        "phase": "first-review"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 27,
+        "atSeconds": 59.51,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 59.496,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 33,
+        "atSeconds": 61.139,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 61.112,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 39,
+        "atSeconds": 63.573,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 63.531,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 45,
+        "atSeconds": 64.945,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 64.925,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 51,
+        "atSeconds": 66.462,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 66.45,
+        "action": "inventory",
+        "isError": true,
+        "errorText": "Error: 覆盖分页 offset/count 无效，每页最多 24 块"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 57,
+        "atSeconds": 68.301,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 68.28,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 63,
+        "atSeconds": 70.071,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 70.04,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 69,
+        "atSeconds": 76.342,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 76.328,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: 覆盖编号不存在或重复，请使用 inventory 返回的当前编号"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 75,
+        "atSeconds": 82.117,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 82.042,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 81,
+        "atSeconds": 88.124,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 88.088,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 87,
+        "atSeconds": 93.813,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 93.779,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 93,
+        "atSeconds": 100.391,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 100.348,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 99,
+        "atSeconds": 107.488,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 107.433,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 105,
+        "atSeconds": 113.464,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 113.402,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 111,
+        "atSeconds": 122.578,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 122.562,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: record 每次提交 1–12 个 entries"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 117,
+        "atSeconds": 129.026,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 128.951,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 123,
+        "atSeconds": 136.261,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 136.173,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 129,
+        "atSeconds": 142.926,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 142.834,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 135,
+        "atSeconds": 146.475,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 146.387,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: B85-90c70dda: [coverage-object] {\"category\":\"parameter\",\"message\":\"citation-profile 须绑定当前稿件自述的完整原句块、同一来源和完整行号表；不能跳过数值、标记或附加断言\",\"templates\":[{\"kind\":\"candidate\",\"check\":\"citation-count\",\"source\":\"原句引用的授权来源.md\",\"expected\":0},{\"kind\":\"candidate\",\"check\":\"citations-marked\",\"source\":\"原句引用的授权来源.md\",\"marker\":\"原句声明的确切标记\"},{\"kind\":\"candidate\",\"check\":\"citations-leading-marked\",\"source\":\"原句引用的授权来源.md\",\"marker\":\"原句声明的确切行首标记\"}],\"next\":\"只按原句选择一个模板并替换示例值；删除其他模板的字段，再提交同一块。不要为参数错误改作者正文。\",\"parameterRules\":[\"candidate 不支持 count：用 citation-count；source 是本句引用目标，不能填候选文件 DELIVERY.md，也没有 sources 数组字段。\",\"expected 必须是原句明确声称的数量；示例0不是实测值。registered-excerpts/count 统计已登记摘录条目，结论类别或举例数量不能当摘录总数。\",\"file 与 source 按模板二选一；line-range 用 start/end/mode，按 inventory 原样填写。快照行范围与外部事实或另一来源分别核验。\",\"citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 核明确的全称含标记；原句限定行首则用"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 141,
+        "atSeconds": 150.712,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 150.662,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: B85-90c70dda: [coverage-object] {\"category\":\"unverifiable\",\"message\":\"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"}；B86-5f552bdb: [coverage-object] {\"category\":\"unverifiable\",\"message\":\"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"}；B87-b0f10010: [coverage-object] {\"category\":\"unverifiable\",\"message\":\"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"}；B88-2276ab4f: [coverage-object] {\"category\":\"unverifiable\",\"message\":\"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"}"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 147,
+        "atSeconds": 155.643,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 155.57,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: B85-90c70dda: 资料引用不在本轮证据授权中 DELIVERY.md；B86-5f552bdb: 资料引用不在本轮证据授权中 DELIVERY.md；B87-b0f10010: 资料引用不在本轮证据授权中 DELIVERY.md；B88-2276ab4f: 资料引用不在本轮证据授权中 DELIVERY.md"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 153,
+        "atSeconds": 160.521,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 160.477,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: B88-2276ab4f: 事实退回须 finding.kind/quote/fix，quote 指该段实际的错误断言；排版、详细度和收尾表达建议只能走质量判断，不能冒充事实错误"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 159,
+        "atSeconds": 165.381,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 165.303,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 165,
+        "atSeconds": 169.748,
+        "name": "building_loop",
+        "callAtSeconds": 169.69,
+        "action": "block",
+        "isError": false,
+        "phase": "blocked"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 100,
+        "atSeconds": 171.253,
+        "name": "building_loop",
+        "callAtSeconds": 171.236,
+        "action": "prepare",
+        "isError": false,
+        "phase": "blocked"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-root",
+        "seq": 108,
+        "atSeconds": 174.46,
+        "name": "building_loop",
+        "callAtSeconds": 174.383,
+        "action": "advance",
+        "unit": "K01",
+        "isError": false,
+        "phase": "first-review"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 178,
+        "atSeconds": 176.614,
+        "name": "building_loop",
+        "callAtSeconds": 176.561,
+        "action": "prepare",
+        "isError": false,
+        "phase": "first-review"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 184,
+        "atSeconds": 179.047,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 179.001,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: B86-5f552bdb: [coverage-object] {\"category\":\"unverifiable\",\"message\":\"candidate 检查只证明当前稿件的明确结构，不能替外部事实作证\"}"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 190,
+        "atSeconds": 180.952,
+        "name": "building_loop_file",
+        "callAtSeconds": 180.933,
+        "action": "read",
+        "target": "DELIVERY.md",
+        "isError": false,
+        "sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6"
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 196,
+        "atSeconds": 185.439,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 185.349,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 202,
+        "atSeconds": 188.368,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 188.327,
+        "action": "inventory",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 208,
+        "atSeconds": 194.914,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 194.821,
+        "action": "record",
+        "isError": false,
+        "blockCount": 125
+      },
+      {
+        "group": "building-loop",
+        "actor": "building-loop-child-2",
+        "seq": 214,
+        "atSeconds": 203.706,
+        "name": "building_loop_coverage",
+        "callAtSeconds": 203.687,
+        "action": "record",
+        "isError": true,
+        "errorText": "Error: record 每次提交 1–12 个 entries"
+      }
+    ],
+    "reviewWitnesses": [
+      {
+        "block": "B13-47f0a157",
+        "atSeconds": 93.813,
+        "reviewer": "building-loop-child-2",
+        "basis": "A2 原文即“消息至少一次投递；orderId 是业务幂等键”；“重复消费必然发生”是对至少一次投递语义的直接展开（至少一次允许重复，因此重复不可避免），未把小概率写成不可能。",
+        "status": "supported",
+        "sourceRelation": "supports",
+        "evidence": [
+          {
+            "end": 18,
+            "file": "CONVERSATION-INPUT.md",
+            "quote": "消息至少一次投递；orderId 是业务幂等键",
+            "start": 18
+          }
+        ],
+        "toolResult": "recorded"
+      },
+      {
+        "block": "B122-28178ee5",
+        "atSeconds": 203.706,
+        "reviewer": "building-loop-child-2",
+        "basis": "所述顺序逐项对应本稿 S1–S9（L29–37）：确认关、处置旧任务、开压测、试探、双指标、排空、回退 Worker、关开关；“最后才回退 Worker”符合 A3 排空前置。",
+        "status": "supported",
+        "sourceRelation": "supports",
+        "evidence": [
+          {
+            "end": 26,
+            "file": "CONVERSATION-INPUT.md",
+            "quote": "排空现有任务之前不能回退 Worker",
+            "start": 26
+          }
+        ],
+        "toolResult": "rejected-call"
+      },
+      {
+        "block": "B123-5a3dfd94",
+        "atSeconds": 203.706,
+        "reviewer": "building-loop-child-2",
+        "basis": "撤回顺序先停新请求、关开关、等排空、再回退 Worker，与 R1–R4 及 A3 一致；理由“开关关了已排队消息还会继续被消费”来自 A2。",
+        "status": "supported",
+        "sourceRelation": "supports",
+        "evidence": [
+          {
+            "end": 18,
+            "file": "CONVERSATION-INPUT.md",
+            "quote": "已入队任务即使停用新请求仍会继续消费",
+            "start": 18
+          },
+          {
+            "end": 26,
+            "file": "CONVERSATION-INPUT.md",
+            "quote": "排空现有任务之前不能回退 Worker",
+            "start": 26
+          }
+        ],
+        "toolResult": "rejected-call"
+      }
+    ],
+    "scoring": {
+      "status": "manual rubric comparison against the recorded Standard delivery and the recorded Building-loop candidate",
+      "evaluatedHashes": {
+        "standard": "8c0e856b10c43fb5124f4038a47bbcbfd15bf72145188a01410e3e4e3f428d10",
+        "building-loop": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6"
+      },
+      "standard": [
+        {
+          "id": "C1",
+          "verdict": "pass",
+          "note": "标题和开头明确 G2、预发布、默认关闭、只在演练期显式开启、不改代码、不发版。"
+        },
+        {
+          "id": "C2",
+          "verdict": "pass",
+          "note": "§1 三方、HTTP 202 + jobId 与终态分开，有 A1；实际负责人未给，标待指派。"
+        },
+        {
+          "id": "C3",
+          "verdict": "pass",
+          "note": "§1/3/6 引 A2，按 orderId 去重，并安排重复投递测试。"
+        },
+        {
+          "id": "C4",
+          "verdict": "partial",
+          "note": "§3 有关态基线、试投、重复投递与压测，但步骤 2 要在服务端开关开启前得到真实请求 202，资料没给出这种行为；可改为关态合同检查加开态烟测。"
+        },
+        {
+          "id": "C5",
+          "verdict": "fail",
+          "note": "§4 写了先关 replay_enabled 后排空再回退，但 §3 步骤 6–7 与 §5 把真正关闭放在排空之后。两条可执行路径冲突；且 A4 未提供 backlog=0 可单独证明无在途/重试。"
+        },
+        {
+          "id": "C6",
+          "verdict": "pass",
+          "note": "§6–7 使用两个指标并把候选观测列为待取证。"
+        },
+        {
+          "id": "C7",
+          "verdict": "partial",
+          "note": "开头明确取消三件旧工作，验收里保留合同、幂等和告警；未明确写清预建报表草稿的处置与无上线授权。"
+        },
+        {
+          "id": "C8",
+          "verdict": "pass",
+          "note": "末尾有大白话，主要观测值、计划操作与已有事实分开。"
+        }
+      ],
+      "building-loop": [
+        {
+          "id": "C1",
+          "verdict": "pass",
+          "note": "G2、预发布、默认关闭、仅演练期开压测、不改代码和发布均写清楚。"
+        },
+        {
+          "id": "C2",
+          "verdict": "pass",
+          "note": "§1 三方职责和状态合同明确，202+jobId 不等于结果，引用 A1；具体姓名列为待指派。"
+        },
+        {
+          "id": "C3",
+          "verdict": "partial",
+          "note": "给出 A2、orderId 和重复投递测试；范围红线写成重复消费必然发生，原文仅保证至少一次投递。§4 还可能混淆重投和实际重复写。"
+        },
+        {
+          "id": "C4",
+          "verdict": "partial",
+          "note": "S1/2 做关态基线和存量处置，S3 开压测，S4/5 之后才确认合同与幂等。应先验证关态可验证的合同与消费就绪，再启演练负载。"
+        },
+        {
+          "id": "C5",
+          "verdict": "fail",
+          "note": "撤回 R2/R3/R4 写了关开关→排空→回退，正常演练 S7/S8/S9 和大白话却写了排空→回退→关开关。未证明在途或重试都已清。"
+        },
+        {
+          "id": "C6",
+          "verdict": "pass",
+          "note": "A4 两指标都列出，基线、候选观察和时长标待取证。"
+        },
+        {
+          "id": "C7",
+          "verdict": "pass",
+          "note": "明确取消 UI/业务报表/全量开通，保留合同、幂等和现有告警；报表草稿无上线授权，作为背景。此项是稿件质量判断，账本关单独立记录。"
+        },
+        {
+          "id": "C8",
+          "verdict": "partial",
+          "note": "大白话可读，单独列待取证；§4 把“目前确有旧任务已入队”写成事实，A2 只给了存在时如何处理。"
+        }
+      ]
+    }
+  }
+}

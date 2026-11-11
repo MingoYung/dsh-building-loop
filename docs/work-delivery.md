@@ -4,6 +4,7 @@
 
 | 想做什么 | 读哪份正文 |
 |---|---|
+| 一眼看清从对话到关单，以及谁负责哪一步 | [当前流程图](building-loop-flow.md) |
 | 看 DSH 预设、工具和模式约束 | [预设配置](../cordis.patch.yml) |
 | 设置文件授权与阶段 | [项目配置和工具说明](../governance/README.md) · [宿主机制](../governance/index.mjs) · [路径与权限检查](../governance/policy.mjs) |
 | 检查退回项、数字复算和交付质量 | [提交预检](../governance/preflight.mjs) |
