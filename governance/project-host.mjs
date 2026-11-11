@@ -2,19 +2,28 @@ import os from "node:os";
 import path from "node:path";
 import { Remote, RemoteError, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { BUILDING_LOOP_PROJECT_REMOTE } from "./project-remote.cjs";
-import { changeProjectSetting, projectSnapshot, setupProjectSetting } from "./project-settings.mjs";
-import { workspaceRoot } from "./policy.mjs";
+import { conversationStartSnapshot, decideConversationStart, latestConversationUser, startedConversationProject } from "./conversation-start.mjs";
+import { initializeConversationProject } from "./conversation-project.mjs";
 
-export const name = "building-loop-project-settings";
-export const inject = ["agents", "agentPresets", "sessionQuery", "typert"];
+export const name = "building-loop-conversation-start";
+export const inject = ["agents", "agentPresets", "sessionQuery", "sessionController", "typert"];
 const service = "buildingLoopProject";
-const methods = ["get", "set", "setup"];
+const methods = ["proposal", "decide"];
 const initializers = [];
 const presets = new Set(["building-loop", "paidan"]);
 const badRequest = message => new RemoteError("gateway/bad-request", message, {});
+const NOTICE = "building-loop-start";
 
-/** Resolve project scope from the current DSH session. The browser cannot supply a directory or act on a child. */
-class ProjectSettingsService extends TypertRemoteService {
+/** Detect a wake already accepted by the native inbox or log, including after restart. */
+function needsWake(session, started) {
+  if (!started?.wake) return false;
+  const id = started.proposal.id;
+  return !session.wakes.has(id) && !session.agent?.inbox.nextTurn.some(message =>
+    message.source.kind === NOTICE && message.source.proposalId === id);
+}
+
+/** Read the actual DSH conversation and authorize only its owner. */
+class ConversationStartService extends TypertRemoteService {
   constructor(ctx) {
     super(ctx, service);
     for (const initialize of initializers) initialize.call(this);
@@ -23,60 +32,69 @@ class ProjectSettingsService extends TypertRemoteService {
 
   async session(sessionId) {
     if (this.ctx.invocation?.peer?.principal?.kind !== "owner") {
-      throw new RemoteError("gateway/forbidden", "只有 DSH 所有者可管理项目授权", {});
+      throw new RemoteError("gateway/forbidden", "只有 DSH 所有者可处理会话开工提议", {});
     }
-    const live = () => this.ctx.agents.get(sessionId);
-    let agent = live(), header, preset;
-    if (!agent) {
-      let observed;
-      try {
-        observed = await this.ctx.sessionQuery.observeSession(sessionId);
-        header = observed.header;
-        preset = observed.projections?.values?.agentPreset;
-      } catch {
-        throw badRequest("会话尚未就绪，请重新打开设置");
-      } finally { observed?.[Symbol.dispose](); }
-      agent = live();
-    }
-    if (agent) {
-      header = agent.session.header;
-      preset = this.ctx.agentPresets.presetForSession(agent.session);
-    }
-    if (header?.parentSession || !presets.has(typeof preset === "string" ? preset : preset?.id)) {
-      throw badRequest("仅 Building-loop 主会话可设置项目协作");
-    }
-    try { return { root: workspaceRoot(header.cwd, this.hostHome), agent }; }
-    catch { return { root: null, agent }; }
+    let observed;
+    try { observed = await this.ctx.sessionQuery.observeSession(sessionId); }
+    catch { throw badRequest("会话尚未就绪，请重新打开会话"); }
+    try {
+      const agent = this.ctx.agents.get(sessionId);
+      const header = agent?.session.header ?? observed.header;
+      const preset = agent ? this.ctx.agentPresets.presetForSession(agent.session) : observed.projections?.values?.agentPreset;
+      if (header?.parentSession || header?.origin === "subagent" || !presets.has(typeof preset === "string" ? preset : preset?.id)) {
+        throw badRequest("仅 Building-loop 主会话可处理开工提议");
+      }
+      const events = observed.events;
+      const wakes = new Set(events.filter(event => event.type === "user/message" && event.data.source.kind === NOTICE)
+        .map(event => event.data.source.proposalId));
+      return { agent, header, cursor: observed.cursor, current: latestConversationUser(events, observed.inheritedEventCount), wakes };
+    } finally { observed[Symbol.dispose](); }
   }
 
-  async get({ sessionId }) {
-    const { root } = await this.session(sessionId);
-    return root ? projectSnapshot(this.hostHome, root, sessionId) : {
-      enabled: false, workspace: "", status: "unavailable", message: "请先为当前会话选择本地项目目录",
-    };
-  }
-
-  async update(sessionId, operation) {
-    const { root, agent } = await this.session(sessionId);
-    if (!root) throw badRequest("请先为当前会话选择本地项目目录");
-    if (agent && agent.status !== "idle") throw badRequest("请等待当前会话停止运行，再调整项目协作");
-    try { return operation(root); }
+  async proposal({ sessionId }) {
+    const session = await this.session(sessionId);
+    try {
+      const snapshot = conversationStartSnapshot(this.hostHome, sessionId, session.current);
+      if (snapshot.status === "started" && needsWake(session, startedConversationProject(this.hostHome, sessionId))) {
+        return { ...snapshot, status: "proposed", message: "项目已经建档。再次选择开始可继续执行。" };
+      }
+      return snapshot;
+    }
     catch (error) { throw badRequest(error.message); }
   }
 
-  async set({ sessionId, enabled }) {
-    return this.update(sessionId, root => changeProjectSetting(this.hostHome, root, sessionId, enabled));
-  }
-
-  async setup({ sessionId, ...selection }) {
-    return this.update(sessionId, root => setupProjectSetting(this.hostHome, root, sessionId, selection));
+  async decide({ sessionId, proposalId, decision }) {
+    let session = await this.session(sessionId);
+    if (decision === "start" && !session.agent) {
+      const pending = conversationStartSnapshot(this.hostHome, sessionId, session.current);
+      if (pending.proposal?.id === proposalId && (pending.status === "proposed" ||
+        pending.status === "started" && needsWake(session, startedConversationProject(this.hostHome, sessionId)))) {
+        // Let DSH restore the normal preset and native inbox for a closed conversation.
+        const resolved = await this.ctx.sessionController.agents.resolveAgent(sessionId);
+        if (resolved.error) throw badRequest("会话恢复失败，请重新打开后确认");
+        session = await this.session(sessionId);
+      }
+    }
+    try {
+      if (session.agent && session.agent.session.seq !== session.cursor + 1) throw new Error("当前会话已有新消息，请按最新提议确认");
+      const result = decideConversationStart(this.hostHome, sessionId, session.current, proposalId, decision,
+        task => initializeConversationProject(this.hostHome, sessionId, session.header.cwd, task));
+      if (result.status === "started" && needsWake(session, startedConversationProject(this.hostHome, sessionId))) {
+        if (!session.agent) throw new Error("项目已经建档，重新打开会话后可以继续");
+        // A host notice wakes the same session without manufacturing a second user request.
+        session.agent.followup({ id: "building-loop-start-" + proposalId, role: "user", source: {
+          kind: NOTICE, proposalId, form: "notice", summary: "用户已确认开工",
+        }, content: [{ type: "text", text: "Building-loop 宿主确认已建档。按当前已确认的项目总纲和阶段开始执行。" }] });
+      }
+      return result;
+    } catch (error) { throw badRequest(error.message); }
   }
 }
 
-// Bind each endpoint to its requested session and reuse Gateway's native resource and codec checks.
+// These owner operations remain scoped to the exact requested native session.
 for (const method of methods) {
   Remote({ name: method, resources: { session: request => request.sessionId } })(
-    ProjectSettingsService.prototype[method],
+    ConversationStartService.prototype[method],
     { kind: "method", name: method, private: false, static: false, addInitializer: initialize => initializers.push(initialize) },
   );
 }
@@ -87,9 +105,9 @@ export function apply(ctx) {
     face: "host", schemas: [], invocations: BUILDING_LOOP_PROJECT_REMOTE.descriptors,
     model: {
       services: [{ key: service, exportName: "BuildingLoopProjectService", tags: [], types: [],
-        members: methods.map(name => ({ kind: "method", name, signature: `${name}(request: ProjectRequest): Promise<ProjectSnapshot>` })) }],
+        members: methods.map(name => ({ kind: "method", name, signature: `${name}(request: ConversationRequest): Promise<ConversationSnapshot>` })) }],
       events: [], objects: [],
     },
   });
-  new ProjectSettingsService(ctx);
+  new ConversationStartService(ctx);
 }

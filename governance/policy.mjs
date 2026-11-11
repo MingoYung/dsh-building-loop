@@ -113,8 +113,7 @@ export function equal(left, right) {
 }
 
 /** 同卷暂存、刷新、核改前版本后替换，失败清理暂存。 */
-export function replaceBytes(root, name, bytes, before, limit = LIMIT, { createOnly = false } = {}) {
-  if (createOnly && (before !== null || bytes === null)) throw new Error("仅新建操作需要空的改前版本");
+export function replaceBytes(root, name, bytes, before, limit = LIMIT) {
   const { file } = resolveFile(root, name, bytes !== null);
   if (bytes === null) {
     if (!equal(readBytes(root, name, limit), before)) throw new Error("文件在写入前发生变化");
@@ -132,13 +131,8 @@ export function replaceBytes(root, name, bytes, before, limit = LIMIT, { createO
       fs.fsyncSync(fd);
     } finally { fs.closeSync(fd); }
     if (!equal(readBytes(root, name, limit), before)) throw new Error("文件在写入前发生变化");
-    if (createOnly) {
-      // Publish the flushed file atomically without replacing a name claimed by another writer.
-      fs.linkSync(temp, file);
-    } else {
-      fs.renameSync(temp, file);
-      staged = false;
-    }
+    fs.renameSync(temp, file);
+    staged = false;
   } finally { if (staged) fs.unlinkSync(temp); }
 }
 
