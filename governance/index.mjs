@@ -36,6 +36,20 @@ const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
 const AUTO_BOOK_RETRY_MS = 3000;
 const settleOnly = () => undefined;
 const EMPTY = { read: [], write: [] };
+// Keep the identity across loader reloads. A reload in the same process cannot orphan its active dispatches.
+const activationIdentity = Symbol.for("dsh-building-loop.activation-host");
+const activationHost = globalThis[activationIdentity] ??= Object.freeze({ pid: process.pid, instance: randomUUID() });
+
+/** PID reuse outside this process is ambiguous, so only absence or a known recycled self PID proves death. */
+function previousActivationHost(value) {
+  if (value === undefined) return "legacy";
+  if (!Number.isSafeInteger(value?.pid) || value.pid < 1 || value.pid > 0x7fffffff ||
+    typeof value.instance !== "string" || !/^[0-9a-f-]{36}$/u.test(value.instance)) return "unknown";
+  if (value.pid === activationHost.pid) return value.instance === activationHost.instance ? "live" : "dead";
+  try { process.kill(value.pid, 0); }
+  catch (error) { return error.code === "ESRCH" ? "dead" : "unknown"; }
+  return "live";
+}
 
 /** DeepSeek rejects an addition-only catalog when every currently visible tool is deferred. */
 function needsImmediateProjectTools(names, toolHistory) {
@@ -92,7 +106,7 @@ const RULES = {
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
 const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选编号行内实际有问题的逐字正文片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后按 prepare 的实际 claims 提交 review checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
 const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
-const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据；候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
+const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据。没有授权原始资料时填 []，仍须逐块判断，缺源事实应退回。候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
 // Semantic alignment is an explicit review duty, not a host claim that quote
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
@@ -714,6 +728,7 @@ export function apply(ctx, config = {}) {
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
         : phase==="supplement" ? "按退回项修改，读回、preflight、submit"
         : frame.role==="executor"&&phase==="intake" ? (frame.managed ? "按当前目标写出首稿，完整读回后 submit" : "保留原稿 submit")
+        : phase==="blocked" ? "核对阻塞原因；可恢复时用 advance 续派到原子会话"
         : phase==="ledger-review" ? "ledger read 后逐项 ledger review"
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付";
       return {role:frame.role,phase,unit:assignment?.[0],files,pending,complete:pending.length===0,
@@ -831,6 +846,7 @@ export function apply(ctx, config = {}) {
   async function advance(args, exec) {
     const agent = exec.agent;
     const id = args.unit;
+    await recoverOrphanedActivation(scope(agent, { inspection: true }), exec.signal, id);
     const prepared = prepare(scope(agent), id);
     const resident = prepared.reusable && ctx.agents.get(prepared.reusable);
     if (resident) await waitIdle(resident, exec.signal);
@@ -846,7 +862,7 @@ export function apply(ctx, config = {}) {
         &&JSON.stringify(plan.prior.materialBinding)===JSON.stringify(binding);
       const record = {
         ...(plan.prior ?? {}), owner: agent.id, actor: childId, [plan.role]: childId,
-        phase: plan.phase, serial: plan.serial,materialBinding:binding,
+        phase: plan.phase, serial: plan.serial, materialBinding: binding, activationHost,
         // An interrupted same-role checkpoint retains what that same session saw.
         // Current hashes are rechecked by every evidence/goal/candidate consumer.
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
@@ -952,6 +968,49 @@ export function apply(ctx, config = {}) {
     active.phase = "blocked";
   }
 
+  /** Recover an absent child only while holding its native cross-process Session write lease. */
+  async function recoverOrphanedActivation(frame, signal, requestedUnit) {
+    if (frame.role !== "coordinator") return;
+    const persistence = ctx.get?.("sessionPersistence");
+    if (typeof persistence?.open !== "function") return;
+    const { agent } = frame;
+    const eligible = active => active?.owner === agent.id && typeof active.actor === "string" &&
+      PHASES.includes(active.phase) && !ctx.agents.get(active.actor) &&
+      ["dead", "legacy"].includes(previousActivationHost(active.activationHost));
+    const found = Object.entries(frame.state.units).find(([id, active]) =>
+      (requestedUnit === undefined || id === requestedUnit) && eligible(active));
+    if (!found) return;
+    const [id, active] = found;
+    const previousHost = previousActivationHost(active.activationHost);
+    let lease;
+    try {
+      // Another process with the native actor open owns this lease. Do not pause it.
+      lease = await persistence.open(active.actor, "write", { signal });
+      if (lease.access !== "write" || lease.header.id !== active.actor || lease.header.parentSession !== agent.id) return;
+      if (previousHost === "legacy") {
+        // A legacy row has no process marker. Only a persisted own incomplete turn proves work was interrupted.
+        const offset = Math.max(lease.inheritedEventCount ?? 0, active.activationStartSeq ?? 0);
+        const { events } = await lease.read(offset, undefined, { signal });
+        const boundary = events.findLast(event => event.type === "turn/start" || event.type === "turn/end");
+        if (boundary?.type !== "turn/start") return;
+      }
+      signal?.throwIfAborted();
+      change(agent, current => {
+        const row = current.state.units[id];
+        if (current.role !== "coordinator" || !eligible(row) || row.actor !== active.actor ||
+          row.phase !== active.phase || row.serial !== active.serial) return;
+        pause(row, "检测到宿主中断，原子会话已持久保存。可从原阶段续派到同一会话。");
+        row.interruptions = (row.interruptions ?? 0) + 1;
+        trackUnit(current, id, row, true);
+        current.changed = true;
+      });
+    } catch (error) {
+      signal?.throwIfAborted();
+      // Missing or owned native records cannot authorize recovery.
+      if (lease && !(error instanceof WorkspaceLockBusy)) throw error;
+    } finally { await lease?.close(); }
+  }
+
   /** Bind native interruption replay to its original owner and event range. */
   function captureInterruption(frame, event) {
     const assignment = Object.entries(frame.state.units).find(([, unit]) =>
@@ -1030,7 +1089,10 @@ export function apply(ctx, config = {}) {
       const revisions = validateRevisions(frame, active, args.revisions ?? [], args.revise);
       if (!goalFit.pass) checks.conclusion = { pass: false, basis: goalFit.basis };
       const spec = unitOf(frame, id);
-      if (!Array.isArray(args.sourceRefs) || !args.sourceRefs.length || args.sourceRefs.length > 64) throw new Error("请逐份提交实际读取的 sourceRefs");
+      if (!Array.isArray(args.sourceRefs) || args.sourceRefs.length > 64 ||
+        (spec.phases[active.phase].evidence.length > 0 && !args.sourceRefs.length)) {
+        throw new Error("请逐份提交实际读取的 sourceRefs。没有授权原始资料时填 []");
+      }
       const refs = args.sourceRefs.map(ref => evidenceReference(frame, active, spec, ref));
       checkSourceNarrative(frame, active, args.sources);
       if (!Array.isArray(args.unverifiedSources) || args.unverifiedSources.length > 64
@@ -1289,7 +1351,9 @@ export function apply(ctx, config = {}) {
         if (qualityChecks && layout.length) qualityChecks.plain = {pass:false,basis:layout.join("；")};
         if (!unsupported.length && !qualityChecks) throw new Error("请先用 building_loop_quality 提交当前候选的六项独立质量判断，再执行 review");
         const observedSources = qualityChecks ? active.assessment.refs?.map(ref => evidenceReference(frame, active, spec, ref)) : [];
-        if (!unsupported.length && (!observedSources?.length || checked.some(check => !observedSources.some(ref =>
+        // A source-free design can pass independent review. Supported factual
+        // spans and numbered claims still require their own verified evidence.
+        if (!unsupported.length && ((grant.evidence.length > 0 && !observedSources?.length) || checked.some(check => !observedSources.some(ref =>
           keyOf(ref.file) === keyOf(check.file) && ref.sha256 === check.sha256 && ref.start <= check.end && ref.end >= check.start)))) {
           throw new Error("资料核验须覆盖每份支持结论的实际原文，请重新提交 sourceRefs");
         }
@@ -1346,9 +1410,13 @@ export function apply(ctx, config = {}) {
 
   /** 阶段动作统一入口，持久回执成功后再通知父会话。 */
   async function workflow(args, exec) {
-    if (args.action === "prepare") return prepareInputs(args,exec);
+    if (args.action === "prepare") {
+      await recoverOrphanedActivation(scope(exec.agent, { inspection: true }), exec.signal);
+      return prepareInputs(args,exec);
+    }
     if (args.action === "status") {
       try {
+        await recoverOrphanedActivation(scope(exec.agent, { inspection: true }), exec.signal);
         const frame = scope(exec.agent);
         if (frame.role === "coordinator") return { role: frame.role, units: viewUnits(frame), read: frame.reads, write: frame.writes,
           ...(frame.managed ? { projectDirectory: frame.root } : {}) };
@@ -1399,6 +1467,7 @@ export function apply(ctx, config = {}) {
     restrictVisible(agent);
     try {
       const frame = scope(agent, { inspection: true });
+      await recoverOrphanedActivation(frame, request.signal);
       if (frame.role !== "idle") anchor = WORKFLOW;
     }
     catch (error) {
@@ -1736,7 +1805,8 @@ function reviewChecks(frame, active, spec, grant, checks, candidate, material, f
     byId.set(id, check);
   }
   const ids = declared.length ? declared : [...byId.keys()];
-  if (!ids.length) throw new Error("至少需要一项核验结果");
+  // An unnumbered manuscript still goes through mandatory full-text coverage.
+  // The absence of numbered claims is not a reason to invent one for the receipt.
   return ids.map(id => {
     const supplied=byId.get(id);
     const carried=!supplied||supplied.status==="unsupported"&&!Object.hasOwn(supplied,"finding")
