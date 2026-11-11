@@ -17,6 +17,7 @@ import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } f
 import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage } from "./coverage.mjs";
 import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
   pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
+import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools"];
@@ -32,6 +33,23 @@ const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
 const AUTO_BOOK_RETRY_MS = 3000;
 const settleOnly = () => undefined;
 const EMPTY = { read: [], write: [] };
+
+class ProjectModeDisabled extends Error {
+  constructor(message = "本会话的 Building-loop 项目模式已关闭") {
+    super(message);
+  }
+}
+
+class NoProjectWorkspace extends Error {
+  constructor(message = "当前会话未选择本地项目目录") {
+    super(message);
+  }
+}
+
+/** A top-level conversation may keep running when no project access is available. */
+function lacksProjectAccess(error) {
+  return error instanceof ProjectModeDisabled || error instanceof NoProjectWorkspace || error instanceof MissingProjectAuthority;
+}
 
 const BEGIN = {
   dispatch: "intake",
@@ -216,7 +234,7 @@ export function apply(ctx, config = {}) {
   }
 
   function mayChat(agent, error) {
-    return error instanceof MissingProjectAuthority && !isChild(agent);
+    return lacksProjectAccess(error) && !isChild(agent);
   }
 
   /** Registration admission is recalculated each step; it never grants file rights. */
@@ -232,26 +250,45 @@ export function apply(ctx, config = {}) {
     };
   }
 
-  /** Resolve only the real workspace identity before attempting its lock. */
+  /** Resolve the real workspace and consult the root session's operator choice
+   * before reading authority, replaying pending events or attempting its lock.
+   */
   function coordinates(agent) {
     if (!agent || ctx.agents.get(agent.id) !== agent) throw new Error("只接受当前 DSH 会话的调用");
-    const root = workspaceRoot(agent.session.header.cwd, hostHome);
-    return { root, file: digest(keyOf(root)) + ".json" };
+    const { cwd, parentSession } = agent.session.header;
+    if (cwd == null || cwd === "") throw new NoProjectWorkspace();
+    let root;
+    try { root = workspaceRoot(cwd, hostHome); }
+    catch (error) { throw new NoProjectWorkspace(error.message); }
+    const owner = isChild(agent) ? parentSession : agent.id;
+    const mode = sessionProjectMode(hostHome, root, owner);
+    if (mode === false) throw new ProjectModeDisabled();
+    return { root, file: workspaceStateFile(root), mode };
+  }
+
+  /** GUI-created authority applies only to sessions that opt in. Old manifests
+   * keep their established behavior while an explicit off choice still wins.
+   */
+  function allowedAuthority({root, mode}) {
+    const policy = authority(root);
+    if (policy.sessionOptIn && mode !== true) throw new ProjectModeDisabled("本会话尚未启用 Building-loop 项目模式");
+    return policy;
   }
 
   /** Read the durable authority and settle any unfinished ledger export before
    * returning operational state. Tool admission itself only inspects identity.
    */
   function scope(agent,{lockedFile,inspection=false}={}) {
-    const {root,file}=coordinates(agent);
+    const binding = coordinates(agent);
+    const {root,file} = binding;
     if (lockedFile && lockedFile !== file) throw new Error("工作区在动作前发生变化");
+    const policy = allowedAuthority(binding);
     if (!inspection && !lockedFile && hasPendingLedgerEvents(stateHome,file)) return change(agent, frame => frame);
     if (!inspection && hasLedgerJournal(stateHome,file)) {
-      const settle=()=>recoverLedgerJournal(stateHome,file,root,authority(root));
+      const settle=()=>recoverLedgerJournal(stateHome,file,root,lockedFile ? policy : allowedAuthority(coordinates(agent)));
       if (lockedFile) settle();
       else withWorkspaceLock(stateHome,file,settle,warnCleanup);
     }
-    const policy = authority(root);
     const old = readBytes(stateHome, file, STATE_LIMIT);
     let state = old ? JSON.parse(text(old)) : { spec: "building-loop-state/1", policy: policy.hash, units: {}, markers: {} };
     if (state.spec !== "building-loop-state/1") throw new Error("工作台账版本无效");
@@ -330,7 +367,14 @@ export function apply(ctx, config = {}) {
           const agent = ctx.agents.get(agentId);
           let currentFile;
           try { if (agent) currentFile = coordinates(agent).file; }
-          catch { /* This delivery no longer resolves to its original workspace. */ }
+          catch (error) {
+            // A prior workspace's durable intents remain available to an
+            // authorized session; a disabled session must not replay them.
+            if (lacksProjectAccess(error)) {
+              queue.writes.shift();
+              continue;
+            }
+          }
           if (currentFile !== file) {
             // Durable intents replay on the next workspace access. An
             // in-memory usage event cannot outlive its source agent or block
@@ -341,6 +385,10 @@ export function apply(ctx, config = {}) {
           }
           try { change(agent, operation); }
           catch (error) {
+            if (lacksProjectAccess(error)) {
+              queue.writes.shift();
+              continue;
+            }
             if (!(error instanceof WorkspaceLockBusy) || performance.now() >= deadline) throw error;
             await delay(25 + Math.floor(Math.random() * 25));
             continue;
@@ -370,17 +418,24 @@ export function apply(ctx, config = {}) {
       return drainAutomatic(file, queue).catch(error => {
         ctx.logger.warn("building-loop 自动账本待补记 " + label + " " + error.message);
       });
-    } catch (error) { ctx.logger.warn("building-loop 无法记录 " + label + " " + error.message); }
+    } catch (error) {
+      if (!lacksProjectAccess(error)) {
+        ctx.logger.warn("building-loop 无法记录 " + label + " " + error.message);
+      }
+    }
   }
 
   function recordLedgerEvent(agent, intent, label) {
     try {
-      const {root,file} = coordinates(agent);
-      // A conversation outside a configured project has no project ledger.
-      if (intent.kind === "request" && !isChild(agent) && readBytes(root, AUTHORITY) === null) return;
+      const binding = coordinates(agent);
+      // Validate project permission before journaling any conversational content.
+      allowedAuthority(binding);
+      const {file} = binding;
       persistLedgerEvent(stateHome,file,intent);
     } catch (error) {
-      ctx.logger.warn("building-loop 无法暂存自动账本事件 " + label + " " + error.message);
+      if (!lacksProjectAccess(error)) {
+        ctx.logger.warn("building-loop 无法暂存自动账本事件 " + label + " " + error.message);
+      }
       return;
     }
     return recordAutomatic(agent,settleOnly,label);
@@ -390,9 +445,11 @@ export function apply(ctx, config = {}) {
     const execute = toolDefinition.execute;
     toolDefinition.execute = async (args, exec) => {
       if (automaticWrites.size) {
-        const {file} = coordinates(exec.agent);
+        const binding = coordinates(exec.agent);
+        const {file} = binding;
         const queue = automaticWrites.get(file);
         if (queue) {
+          allowedAuthority(binding);
           await drainAutomatic(file, queue);
           exec.signal?.throwIfAborted();
         }
@@ -1249,7 +1306,7 @@ export function apply(ctx, config = {}) {
       const agent=ctx.agents.get(session.id),{turn,step,usage}=event.data??{};
       // Missing usage stays unknown. Only DSH's measured cache-read field counts;
       // cumulative traffic is not confused with a context-window measurement.
-      if(agent?.session!==session||!Number.isSafeInteger(turn)||!Number.isSafeInteger(step)
+      if(agent?.session!==session||!isChild(agent)||!Number.isSafeInteger(turn)||!Number.isSafeInteger(step)
         ||turn<1||step<1||!Number.isSafeInteger(usage?.cacheReadTokens)||usage.cacheReadTokens<0)return;
       return recordAutomatic(agent,frame=>{
         const active=Object.values(frame.state.units).find(row=>row.owner===session.header.parentSession
@@ -1377,10 +1434,16 @@ export function apply(ctx, config = {}) {
           JSON.stringify({ read: frame.reads, write: frame.writes, detail }), ...shared, ...goals].join("\n");
       } catch (error) {
         if (mayChat(agent ?? owner, error)) {
+          if (error instanceof ProjectModeDisabled || error instanceof NoProjectWorkspace) {
+            const state = error instanceof ProjectModeDisabled ? "disabled" : "unconfigured";
+            return "building-loop role=chat phase=" + state + "\n" +
+              error.message + "。当前可以普通对话。需要访问项目文件、派单、验收或记录项目账本时，请用户在输入框的「项目协作」中启用并确认授权。只报告实际发生的操作。";
+          }
           return "building-loop role=chat phase=unconfigured\n" +
-            "当前会话可以直接进行普通对话。这里尚无项目授权。涉及读取、修改或搜索项目文件、派单、验收或记录项目账本时，请说明当前缺少 BUILDING-LOOP.json，" +
-            "由项目维护者在所选工作区配置后才能执行。可以继续讨论问题或提供示例。只报告实际发生的操作。";
+            "当前会话可以普通对话。这里尚无项目授权。需要读取、修改或搜索项目文件、派单、验收或记录项目账本时，" +
+            "请用户在输入框的「项目协作」中确认所选工作区和授权范围。只报告实际发生的操作。";
         }
+        if (error instanceof ProjectModeDisabled) return "building-loop role=blocked phase=project-disabled\n" + error.message + "。";
         return "building-loop role=blocked phase=authority\n" + error.message + "。请项目维护者核对 " + AUTHORITY + "。";
       }
     },

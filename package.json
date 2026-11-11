@@ -1,29 +1,36 @@
 {
   "name": "dsh-building-loop",
-  "version": "0.7.11",
+  "version": "0.7.12",
   "description": "面向长任务的 DSH 工作模式。用三级文件和原始证据保持项目方向，以总控和子会话分工降低上下文污染，按阶段约束权限、复用会话、复算数字，并在每轮验收后强制复盘计划、临时需求和搁置任务。",
   "type": "module",
   "exports": {
+    ".": "./governance/project-host.mjs",
+    "./client": "./lib/client.js",
     "./package.json": "./package.json",
     "./governance": "./governance/index.mjs",
     "./turn-resume": "./turn-resume/index.mjs"
   },
   "scripts": {
+    "build:client": "node scripts/build-client.mjs",
     "build:markdown": "node scripts/build-markdown-parser.mjs"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.1",
     "esbuild": "0.25.12",
     "mdast-util-from-markdown": "2.0.3",
     "mdast-util-gfm-footnote": "2.0.0",
-    "micromark-extension-gfm-footnote": "2.1.0"
+    "micromark-extension-gfm-footnote": "2.1.0",
+    "zod": "4.4.3"
   },
   "files": [
+    "client.jsx",
     "cordis.patch.yml",
     "INDEX.json",
     "docs/",
     "experiments/",
     "changes/",
     "governance/",
+    "lib/",
     "scripts/",
     "test/",
     "skills/",
@@ -36,6 +43,11 @@
     "url": "git+https://github.com/MingoYung/dsh-building-loop.git"
   },
   "dsh": {
+    "manifestVersion": 1,
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-slots", "@deepseek-ai/dsh-client-ui-conversation", "@deepseek-ai/dsh-api-remotes"]
+    },
     "bundle": {
       "patch": "./cordis.patch.yml"
     }

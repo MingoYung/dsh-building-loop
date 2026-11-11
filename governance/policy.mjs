@@ -113,7 +113,8 @@ export function equal(left, right) {
 }
 
 /** 同卷暂存、刷新、核改前版本后替换，失败清理暂存。 */
-export function replaceBytes(root, name, bytes, before, limit = LIMIT) {
+export function replaceBytes(root, name, bytes, before, limit = LIMIT, { createOnly = false } = {}) {
+  if (createOnly && (before !== null || bytes === null)) throw new Error("仅新建操作需要空的改前版本");
   const { file } = resolveFile(root, name, bytes !== null);
   if (bytes === null) {
     if (!equal(readBytes(root, name, limit), before)) throw new Error("文件在写入前发生变化");
@@ -131,8 +132,13 @@ export function replaceBytes(root, name, bytes, before, limit = LIMIT) {
       fs.fsyncSync(fd);
     } finally { fs.closeSync(fd); }
     if (!equal(readBytes(root, name, limit), before)) throw new Error("文件在写入前发生变化");
-    fs.renameSync(temp, file);
-    staged = false;
+    if (createOnly) {
+      // Publish the flushed file atomically without replacing a name claimed by another writer.
+      fs.linkSync(temp, file);
+    } else {
+      fs.renameSync(temp, file);
+      staged = false;
+    }
   } finally { if (staged) fs.unlinkSync(temp); }
 }
 
@@ -166,8 +172,15 @@ export function includes(paths, name) {
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
   if (!bytes) throw new MissingProjectAuthority(root);
-  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument", "requiredLinesGoal"]);
+  return parseAuthority(bytes);
+}
+
+/** 新建授权也通过现有宿主解析器，写入前就检查角色隔离。 */
+export function parseAuthority(bytes) {
+  if (bytes.length > 64 * 1024) throw new Error("授权文件超过大小上限");
+  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "sessionOptIn", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument", "requiredLinesGoal"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
+  if (source.sessionOptIn !== undefined && typeof source.sessionOptIn !== "boolean") throw new Error("sessionOptIn 须为布尔值");
   const coordinator = grants(source.coordinator, "总控");
   const ledgerContext = pathList(source.ledgerContext);
   if (ledgerContext.length > 3 || ledgerContext.some(file => !includes(coordinator.read, file))) throw new Error("账本现状依据须在总控读授权内，最多三份");
@@ -303,7 +316,7 @@ export function authority(root) {
     const grant = unit.phases[prefix + "-review"];
     unit.phases[prefix + "-audit"] = { ...grant, write: [], read: grant.read.filter(file => !receiptsSeen.has(keyOf(file))) };
   }
-  return { hash: digest(bytes), coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal };
+  return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal };
 }
 
 /** Return only the managed history paths derived from an exact project file. */

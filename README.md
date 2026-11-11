@@ -60,4 +60,4 @@ dsh plugin --profile web add github:MingoYung/dsh-building-loop
 
 安装 `dsh-building-loop` 后，在新会话的模式列表中选 **building-loop**。验证指定版本时可用实际 `.tgz` 路径替代仓库地址。从旧包 `building-loop` 迁移时，先从同一 Profile 移除旧包，再安装新包。两者使用同一个预设 ID。
 
-在未配置的工作区，可以用 Building-loop 普通聊天。要读取项目文件或派单，请让项目维护者在当前工作区根创建 `BUILDING-LOOP.json`，再在同一会话继续。 [授权示例](docs/work-delivery.md)
+选中 **building-loop** 后，从输入框底部打开 **项目协作**。在新工作区可浏览并选择项目总纲、待验收稿和可选证据，保存后由 DSH 生成授权清单，并为当前会话开启协作。打开已有项目时，可在同一入口查看授权摘要和开关。关闭后可以直接聊天。 [文件授权与阶段推进](governance/README.md)
