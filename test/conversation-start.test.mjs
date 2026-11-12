@@ -8,6 +8,8 @@ import {
   proposeConversationTask, startedConversationProject,
 } from "../governance/conversation-start.mjs";
 import { digest } from "../governance/policy.mjs";
+import { initializeConversationProject } from "../governance/conversation-project.mjs";
+import { fixture as workspaceFixture, host } from "./helpers.mjs";
 
 const human = (seq, text, kind = "user") => ({ type: "user/message", seq, data: { source: { kind }, content: [{ type: "text", text }] } });
 const pendingTask = { goal: "查清 DSH 更新后预设加载失败", deliverable: "提供可复现步骤、原始日志和根因报告", scope: "本会话内整理已提供的版本和日志" };
@@ -104,9 +106,82 @@ test("a typed start binds the immediately preceding pending proposal or its own 
   const explicit = latestConversationUser([human(3, text)]);
   const direct = proposeConversationTask(home, "direct", explicit, pendingTask).proposal;
   assert.equal(direct.userSeq, explicit.seq);
-  assert.equal(direct.directive, text);
+  assert.equal(direct.instruction, text);
+  assert.equal(direct.directive, undefined);
   assert.equal(decideConversationStart(home, "direct", explicit, direct.id, "start", privateBinding, { typed: true }).status, "started");
 });
+
+test("the previous format's direct proposal can be recovered without changing its ID or bytes", t => {
+  const home = fixture(t), session = "legacy-start";
+  const full = "开始建设：" + "资料🧪".repeat(150);
+  const current = latestConversationUser([human(7, full)]);
+  const directive = Array.from(full).slice(0, 256).join("");
+  const id = digest(JSON.stringify([session, current.seq, current.sha256, pendingTask, [], directive]));
+  const source = { seq: current.seq, sha256: current.sha256 };
+  const proposal = { id, userSeq: current.seq, ...pendingTask, directive };
+  const dir = path.join(home, "building-loop-state");
+  fs.mkdirSync(dir);
+  const file = path.join(dir, "conversation-start-" + digest(session) + ".json");
+  fs.writeFileSync(file, JSON.stringify({ spec: "building-loop-conversation-start/1", phase: "starting", source, proposal,
+    approval: { ...source, method: "owner-message" } }) + "\n");
+
+  assert.equal(conversationStartSnapshot(home, session, current).proposal.id, id);
+  const later = latestConversationUser([human(7, full), human(8, "请恢复上次建档")]);
+  const recovered = decideConversationStart(home, session, later, id, "start", task => {
+    assert.deepEqual(task, proposal);
+    return privateBinding();
+  });
+  assert.equal(recovered.status, "started");
+  const beforeRetry = fs.readFileSync(file);
+  assert.deepEqual(startedConversationProject(home, session).proposal, proposal);
+  assert.equal(decideConversationStart(home, session, later, id, "start", () => assert.fail("must not initialize twice")).changed, false);
+  assert.deepEqual(fs.readFileSync(file), beforeRetry);
+});
+
+test("an over-limit or malformed direct command cannot silently become a summarized proposal", t => {
+  const home = fixture(t);
+  for (const [text, expected] of [["开始建设：" + "字".repeat(8000), /最多 8000/], ["开始建设：检查 \ud800", /无效 Unicode/]]) {
+    const current = latestConversationUser([human(1, text)]);
+    assert.equal(current.authorization.kind, "none");
+    assert.throws(() => proposeConversationTask(home, "chat", current, pendingTask), expected);
+    assert.equal(conversationStartSnapshot(home, "chat", current).status, "idle");
+  }
+  const shared = human(2, "开始建设：" + "共享原文".repeat(125));
+  shared.data.source.principal = { kind: "share", subject: "guest" };
+  const current = latestConversationUser([shared]);
+  const pending = proposeConversationTask(home, "chat", current, pendingTask).proposal;
+  assert.equal(pending.instruction, undefined);
+  assert.throws(() => decideConversationStart(home, "chat", current, pending.id, "start", privateBinding, { typed: true }), /消息已经变化/);
+});
+
+test("the assigned executor gets the complete bounded Unicode command without a workspace grant", () => workspaceFixture(async (root, write) => {
+  const home = process.env.DSH_HOME;
+  const prefix = "开始建设：\n🧪 ", tail = "\n最后核对唯一标识 TAIL";
+  const original = prefix + "验".repeat(8000 - prefix.length - tail.length) + tail;
+  assert.equal(original.length, 8000);
+  assert.ok(Buffer.byteLength(original) > 12 * 1024);
+  const current = latestConversationUser([human(9, original)]);
+  const pending = proposeConversationTask(home, "root", current, pendingTask).proposal;
+  decideConversationStart(home, "root", current, pending.id, "start",
+    task => initializeConversationProject(home, "root", root, task), { typed: true });
+  assert.deepEqual(startedConversationProject(home, "root").binding, { kind: "workspace", root });
+  assert.equal(startedConversationProject(home, "root").proposal.instruction, original);
+
+  write("candidate.md", "交付说明\n".repeat(900));
+  const native = host(root, { automaticCoverage: false });
+  assert.equal((await native.flow("root", "prepare")).instruction, undefined);
+  const { childId } = await native.flow("root", "advance");
+  const grants = await native.file(childId, "list");
+  assert.deepEqual(grants, { read: ["candidate.md", "overview.md"], write: [] });
+  await assert.rejects(native.flow(childId, "submit"), /完整的用户开工指令/);
+  const first = await native.flow(childId, "prepare");
+  assert.deepEqual(first.instruction, { seq: current.seq, sha256: current.sha256, text: original });
+  assert.equal(first.complete, false);
+  assert.equal((await native.flow(childId, "prepare")).instruction, undefined);
+  await native.flow(childId, "block", { note: "暂缓核验，恢复后继续当前单元" });
+  assert.equal((await native.flow("root", "advance")).childId, childId);
+  assert.deepEqual((await native.flow(childId, "prepare")).instruction, first.instruction);
+}));
 
 test("an interrupted initialization retries the same confirmed proposal and becomes active only after success", t => {
   const home = fixture(t), initial = latestConversationUser([human(10, "想要报告")]);

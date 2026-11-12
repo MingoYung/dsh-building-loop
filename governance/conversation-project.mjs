@@ -88,6 +88,8 @@ function createPrivateProject(hostHome, sessionId, proposal) {
     const files = {
       [GOAL]: ["# 项目总纲", "", "## 目标", proposal.goal, "", "## 交付与验收", proposal.deliverable,
         "", "## 已确认范围", proposal.scope, "",
+        ...(proposal.instruction ? ["## 用户直接开工指令",
+          "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 " + proposal.userSeq + "）。", ""] : []),
         ...(proposal.directive ? ["## 用户直接开工指令摘录（会话事件 " + proposal.userSeq + "）",
           ...proposal.directive.split(/\r?\n/u).map(line => "> " + line), ""] : []),
         "## 分块入口", "[项目索引](INDEX.md)", ""].join("\n"),

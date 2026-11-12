@@ -1,0 +1,3806 @@
+{
+  "schema": "dsh-hard-case-comparison/1",
+  "carrier": "Installed Windows DSH NEXT, packaged native Web CLI",
+  "candidateVersion": "0.7.15",
+  "archiveSha256": "e58896553bca6dbd132e7dde35f99bdd2716a7a1262dc48b7db660bb70331ea8",
+  "fixtureSha256": "b149761955e90a7d478947008fcadc52e529ee14d2dc331a39a42d209971bef4",
+  "rubricSha256": "2aa4f738579e81bcb79fa7137bcc0fecdbd120c19b1944031384fae1154653ea",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "off"
+  },
+  "status": "observation-capped",
+  "observedNativeStatus": "observation-capped",
+  "formalProfileFingerprintsUnchanged": true,
+  "observationCapMs": 150000,
+  "method": "Fresh pair per case, one host, same human prompt and official model, concurrent requests with alternated pair submission order, no repeat or recovery prompt. Primary scores Standard artifact at first completed turn vs first durable Building-loop draft. Missing/ambiguous answer rows earn zero. Latest content and host-accepted closed result are recorded separately. Provider cache is measured but not controllable. Accuracy concerns fixed table values; explanations are available for inspection and were not scored. Post-run sensitivity recovers labels only when none of the frozen expected IDs occurs and all six numeric rows appear once in ascending order. It never changes value text or the primary score.",
+  "comparablePairs": 3,
+  "overall": {
+    "standard": {
+      "correct": 13,
+      "maximum": 18,
+      "firstArtifacts": 3,
+      "correctIgnoringPrefix": 13,
+      "standardCompletedTurns": 3,
+      "nativeClosed": null,
+      "primaryTokens": 110713,
+      "observedTokens": 110713
+    },
+    "building-loop": {
+      "correct": 8,
+      "maximum": 18,
+      "firstArtifacts": 3,
+      "correctIgnoringPrefix": 14,
+      "standardCompletedTurns": null,
+      "nativeClosed": 0,
+      "primaryTokens": 327765,
+      "observedTokens": 2084456
+    }
+  },
+  "fixture": [
+    {
+      "id": "signed-scope",
+      "description": "版本、范围与未知证据",
+      "prompt": "开始建设：核对银杉票据项目的操作权限。每题独立，均在 06-01 冻结结束时作决定。值只写 ALLOW（有完整有效授权）、DENY（有效规则明确禁止）或 HOLD（其余，等待取证）。\n\n[A1] 已签且当前生效 G17：范围只含银杉项目华北内网。仅项目所有者可读取原件。恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。华北内网不能导出原件，也不能把原件跨区复制给同项目。\n[A2] 已签且生效的 G17 增补：华北内网可给已登记的同项目分析员读取无原件字段的内部汇总。其余 G17 规则保持。\n[A3] G18 预览稿写有“分析员可读取原件，校验通过后可跨区复制并外发公开标签原件”。它只用于演练，未生效。\n[A4] 解密或哈希成功仅能证明文件可读或完整；公开标签不能证明输出授权。“14 天前”满足 30 天条件。未写明的信息一律未知。\n\nE1：项目所有者在华北读取一份银杉原件。\nE2：把签名、归属均确认且 14 天前生成的银杉快照恢复至华东。\nE3：签名、华北落点、14 天均确认，解密成功但没有银杉项目归属证明，申请恢复。\nE4：把哈希通过且有公开标签的银杉原件从华北导出公网，申请人引用 G18。\nE5：已登记银杉分析员在华北内网读取一份银杉内部汇总，已核实无原件字段。\nE6：签名、银杉归属、华北落点均确认，只记录了上一次访问时间，没有生成时间，申请恢复。\n\n交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 E1、E2、E3、E4、E5、E6，每个编号恰好一行。值一格只写题目要求的值。依据一格写所用材料编号或简短算式。末行可用“大白话：”总结结论。若当前模式有交付文件则写入 DELIVERY.md，否则在回复贴出完整稿。只用本条消息内的合成材料，不查网络，不读其他文件。"
+    },
+    {
+      "id": "paired-metrics",
+      "description": "重复修订、配对数据与门槛",
+      "prompt": "开始建设：核算两个组的处理时延并据此决定是否放行。每个任务 ID 先取最大修订号，然后仅保留该修订不是 withdrawn 且同时有前、后观测的任务。不要回退使用旧修订，不允许用缺失观测补零。\n\n[M1] 格式为 组,任务,修订,前值,后值,状态（单位均 ms）。\nN,A,1,100,86,ok\nN,B,1,90,70,ok\nN,B,2,80,90,ok\nN,C,1,100,90,ok\nN,C,2,100,90,withdrawn\nN,D,1,缺失,30,ok\nN,E,1,120,114,ok\nS,F,1,50,44,ok\nS,G,1,50,41,ok\nS,H,1,100,95,ok\nS,I,1,90,79,ok\nS,I,2,90,缺失,ok\nS,J,1,100,105,ok\n[M2] 改善基点 = 10000 ×（前值合计－后值合计）÷ 前值合计，最后四舍五入为整数。门槛使用舍入前真实值：全体改善至少 400 基点，每组改善至少 350 基点，每组有效任务至少 2 个，并且没有单任务“后值－前值”大于 10 ms。所有门槛都满足才放行。\n\nN1：有效任务 ID 按字母排序，逗号分隔，不带修订号。\nN2：N 组改善基点，只写整数。\nN3：S 组改善基点，只写整数。\nN4：全体改善基点，只写整数。\nN5：所有有效任务的“后值－前值”中位数，只写有符号整数。\nN6：门槛结论，值只写 PASS 或 BLOCK，依据写失败门槛（若有）。\n\n交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 N1、N2、N3、N4、N5、N6，每个编号恰好一行。值一格只写题目要求的值。依据一格写所用材料编号或简短算式。末行可用“大白话：”总结结论。若当前模式有交付文件则写入 DELIVERY.md，否则在回复贴出完整稿。只用本条消息内的合成材料，不查网络，不读其他文件。"
+    },
+    {
+      "id": "change-schedule",
+      "description": "资源互斥、最早排程与反事实",
+      "prompt": "开始建设：给一次合成维护排程找最早结束时间。时刻从 0 开始，时间单位为整数，区间为 [开始,结束)，允许前一任务恰好结束时开始下一任务。任务不可抢占；每个工位每次只能运行一个任务，不同工位可并行；完成所有任务即结束。\n\n[S1] 任务,工位,持续时间,所有先决任务。A 固定在 0 开始。\nA,OPS,2,无\nB,IO,4,A\nC,OPS,3,A\nD,OPS,2,B与C\nE,IO,3,B\nF,OPS,1,D与E与H\nG,IO,2,F\nH,OPS,2,C\n[S2] 首先按所有任务尽早完成优化。若最早结束时间相同，再按 A、B、C、D、E、F、G、H 的顺序，使起始时刻向量按字典序最小。业务截止时刻为 12，恰好在 12 结束算按期。反事实只把任务 E 的耗时从 3 改成 5，其余均不改。\n\nQ1：最优基线中 D 和 H 谁先开始，值只写 D 或 H。\nQ2：基线任务 H 开始时刻，只写整数。\nQ3：基线任务 D 开始时刻，只写整数。\nQ4：基线任务 F 开始时刻，只写整数。\nQ5：基线最早结束时刻，只写整数。\nQ6：反事实最早结束时刻，只写整数。\n\n交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 Q1、Q2、Q3、Q4、Q5、Q6，每个编号恰好一行。值一格只写题目要求的值。依据一格写所用材料编号或简短算式。末行可用“大白话：”总结结论。若当前模式有交付文件则写入 DELIVERY.md，否则在回复贴出完整稿。只用本条消息内的合成材料，不查网络，不读其他文件。"
+    }
+  ],
+  "expected": {
+    "signed-scope": {
+      "E1": "ALLOW",
+      "E2": "DENY",
+      "E3": "HOLD",
+      "E4": "DENY",
+      "E5": "ALLOW",
+      "E6": "HOLD"
+    },
+    "paired-metrics": {
+      "N1": "A,B,E,F,G,H,J",
+      "N2": "333",
+      "N3": "500",
+      "N4": "417",
+      "N5": "-6",
+      "N6": "BLOCK"
+    },
+    "change-schedule": {
+      "Q1": "H",
+      "Q2": "5",
+      "Q3": "7",
+      "Q4": "9",
+      "Q5": "12",
+      "Q6": "14"
+    }
+  },
+  "pairs": [
+    {
+      "id": "signed-scope",
+      "description": "版本、范围与未知证据",
+      "arms": [
+        {
+          "mode": "standard",
+          "preset": "standard",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": false,
+          "instructionPackets": [],
+          "observedMs": 150076,
+          "firstArtifactMs": 8456,
+          "firstArtifact": {
+            "sha256": "02d20685501c752a8cf575133f86a2bb5e324d2bddfa37fd28171d3171092e06",
+            "bytes": 1453,
+            "text": "# 银杉票据项目：操作权限核对（06-01 冻结结束）\n\n适用材料：G17（已签生效，范围仅银杉·华北内网）、G17 增补（已签生效）、G18（演练稿，未生效）、A4（通用判定原则）。G18 不产生任何授权。\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| E1 | ALLOW | G17：项目所有者读原件，范围含华北内网 |\n| E2 | DENY | G17：恢复须四个条件均确认（已确认：归属、华北落点、签名、14天≤30天）；华东不在范围内，属明确超范围，因此禁止 |\n| E3 | HOLD | G17：缺少银杉项目归属证明，四个条件缺一，先挂起；A4：解密成功不能作为归属证明 |\n| E4 | DENY | G17：华北内网不能导出原件，也不能跨区复制给同项目，更不可能外发公网；G18 未生效，其中条款不构成授权；A4：哈希通过和公开标签都不能证明输出授权 |\n| E5 | ALLOW | G17 增补：已登记的同项目分析员可以在华北内网读取无原件字段的内部汇总 |\n| E6 | HOLD | G17：没有生成时间，只有访问时间，30 天条件无法确认，缺一即挂起；A4：未写明的一律视为未知 |\n\n大白话：E1、E5 按生效的 G17 和增补允许；E4 既被 G17 明文禁止，又拿未生效的 G18 当依据，所以禁止；E2 缺少华东落点，属于明确超范围，所以禁止；E3 没有归属证明，E6 没有生成时间，证据不全，先挂起取证。\n",
+            "kind": "standard-file"
+          },
+          "primary": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：项目所有者读原件，范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：恢复须四个条件均确认（已确认：归属、华北落点、签名、14天≤30天）；华东不在范围内，属明确超范围，因此禁止"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：缺少银杉项目归属证明，四个条件缺一，先挂起；A4：解密成功不能作为归属证明"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：华北内网不能导出原件，也不能跨区复制给同项目，更不可能外发公网；G18 未生效，其中条款不构成授权；A4：哈希通过和公开标签都不能证明输出授权"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17 增补：已登记的同项目分析员可以在华北内网读取无原件字段的内部汇总"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：没有生成时间，只有访问时间，30 天条件无法确认，缺一即挂起；A4：未写明的一律视为未知"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：项目所有者读原件，范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：恢复须四个条件均确认（已确认：归属、华北落点、签名、14天≤30天）；华东不在范围内，属明确超范围，因此禁止"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：缺少银杉项目归属证明，四个条件缺一，先挂起；A4：解密成功不能作为归属证明"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：华北内网不能导出原件，也不能跨区复制给同项目，更不可能外发公网；G18 未生效，其中条款不构成授权；A4：哈希通过和公开标签都不能证明输出授权"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17 增补：已登记的同项目分析员可以在华北内网读取无原件字段的内部汇总"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：没有生成时间，只有访问时间，30 天条件无法确认，缺一即挂起；A4：未写明的一律视为未知"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "02d20685501c752a8cf575133f86a2bb5e324d2bddfa37fd28171d3171092e06",
+            "bytes": 1453,
+            "text": "# 银杉票据项目：操作权限核对（06-01 冻结结束）\n\n适用材料：G17（已签生效，范围仅银杉·华北内网）、G17 增补（已签生效）、G18（演练稿，未生效）、A4（通用判定原则）。G18 不产生任何授权。\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| E1 | ALLOW | G17：项目所有者读原件，范围含华北内网 |\n| E2 | DENY | G17：恢复须四个条件均确认（已确认：归属、华北落点、签名、14天≤30天）；华东不在范围内，属明确超范围，因此禁止 |\n| E3 | HOLD | G17：缺少银杉项目归属证明，四个条件缺一，先挂起；A4：解密成功不能作为归属证明 |\n| E4 | DENY | G17：华北内网不能导出原件，也不能跨区复制给同项目，更不可能外发公网；G18 未生效，其中条款不构成授权；A4：哈希通过和公开标签都不能证明输出授权 |\n| E5 | ALLOW | G17 增补：已登记的同项目分析员可以在华北内网读取无原件字段的内部汇总 |\n| E6 | HOLD | G17：没有生成时间，只有访问时间，30 天条件无法确认，缺一即挂起；A4：未写明的一律视为未知 |\n\n大白话：E1、E5 按生效的 G17 和增补允许；E4 既被 G17 明文禁止，又拿未生效的 G18 当依据，所以禁止；E2 缺少华东落点，属于明确超范围，所以禁止；E3 没有归属证明，E6 没有生成时间，证据不全，先挂起取证。\n",
+            "kind": "standard-file"
+          },
+          "latestObserved": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：项目所有者读原件，范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：恢复须四个条件均确认（已确认：归属、华北落点、签名、14天≤30天）；华东不在范围内，属明确超范围，因此禁止"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：缺少银杉项目归属证明，四个条件缺一，先挂起；A4：解密成功不能作为归属证明"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：华北内网不能导出原件，也不能跨区复制给同项目，更不可能外发公网；G18 未生效，其中条款不构成授权；A4：哈希通过和公开标签都不能证明输出授权"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17 增补：已登记的同项目分析员可以在华北内网读取无原件字段的内部汇总"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：没有生成时间，只有访问时间，30 天条件无法确认，缺一即挂起；A4：未写明的一律视为未知"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": null,
+          "coverage": null,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 8456
+            }
+          ],
+          "toolErrors": [],
+          "streamErrors": [],
+          "roleCount": 1,
+          "usageAtPrimary": {
+            "inputTokens": 1468,
+            "cacheReadTokens": 19200,
+            "cacheWriteTokens": 0,
+            "outputTokens": 917,
+            "totalTokens": 21585,
+            "providerMessages": 2,
+            "withUsage": 2,
+            "cacheReadPercent": 92.9
+          },
+          "usageObserved": {
+            "inputTokens": 1468,
+            "cacheReadTokens": 19200,
+            "cacheWriteTokens": 0,
+            "outputTokens": 917,
+            "totalTokens": 21585,
+            "providerMessages": 2,
+            "withUsage": 2,
+            "cacheReadPercent": 92.9
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 17,
+              "ms": 5474,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1217,
+                "outputTokens": 496,
+                "cacheReadTokens": 8832,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10545
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 23,
+              "ms": 8453,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 251,
+                "outputTokens": 421,
+                "cacheReadTokens": 10368,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11040
+              }
+            }
+          ]
+        },
+        {
+          "mode": "building-loop",
+          "preset": "building-loop",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": true,
+          "instructionPackets": [
+            {
+              "actor": "child-1",
+              "seq": 21,
+              "role": "executor",
+              "phase": "intake",
+              "declaredSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualCodePoints": 790,
+              "exactPrompt": true
+            },
+            {
+              "actor": "child-2",
+              "seq": 21,
+              "role": "reviewer",
+              "phase": "first-review",
+              "declaredSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualCodePoints": 790,
+              "exactPrompt": true
+            },
+            {
+              "actor": "child-1",
+              "seq": 59,
+              "role": "executor",
+              "phase": "supplement",
+              "declaredSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualCodePoints": 790,
+              "exactPrompt": true
+            }
+          ],
+          "observedMs": 150076,
+          "firstArtifactMs": 26816,
+          "firstArtifact": {
+            "sha256": "17e3106145a640a38824781155e69b6342df6a0200159c52b46941668cde33b6",
+            "bytes": 2414,
+            "text": "# 银杉票据项目操作权限判定（06-01 冻结结束时）\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| E1 | ALLOW | A1「仅项目所有者可读取原件」+ 范围含华北内网 |\n| E2 | HOLD | A1 四项：归属✓签名✓14天✓，华北落点未写明→缺一 |\n| E3 | HOLD | A1 四项：签名✓华北落点✓14天✓，项目归属缺；解密成功≠归属（A4） |\n| E4 | DENY | A1「不能导出原件」；A3 未生效不授权；哈希/公开标签≠授权（A4） |\n| E5 | ALLOW | A2 增补明许：华北内网 + 已登记同项目分析员 + 无原件字段 |\n| E6 | HOLD | A1 四项：签名✓归属✓华北落点✓，生成时间未知→缺一 |\n\n大白话：E1 所有者读自己项目的原件，明摆着允许；E5 分析员读的是脱敏汇总，增补条款正好给了许可；E4 是把原件往公网送，现有规则明确禁止，未生效的 G18 撑不起这个授权，所以禁止。E2、E3、E6 都是恢复快照，规则要求\"归属、华北落点、签名、30 天内生成\"四项全齐，它们各缺一项（分别缺落点、缺归属、缺生成时间），所以先挂起取证，不是拒绝也不是放行。\n\n## 说明\n\n- 依据中的 A1–A4 是会话材料编号（[A1] G17 生效条、[A2] G17 增补、[A3] G18 预览稿、[A4] 通用约束），与项目 claims 事实编号无关。\n- E1：范围「只含银杉项目华北内网」，请求方是项目所有者、动作是读原件、地点华北，落在 A1 第一条明许之内，无缺项。\n- E2：材料只说签名、归属确认且 14 天前生成（A4 说明 14 天满足 30 天），未写华北落点，按 A4「未写明的信息一律未知」视为未知，不能推定满足，故 HOLD。\n- E3：解密成功只证明可读（A4），不等于项目归属证明；归属缺失，故 HOLD。\n- E4：A1 明确「华北内网不能导出原件」，属有效规则明确禁止→DENY；A3 未生效不产生授权，A4 说明哈希通过和公开标签均不构成输出授权。\n- E5：A2 明许已登记的同项目分析员在华北内网读取无原件字段的内部汇总，条件全部满足，A1 未禁止此类读取，故 ALLOW。\n- E6：只记录上一次访问时间，不是生成时间，30 天条件无法核实，按缺项挂起。\n- 待核事项：E2 的华北落点、E3 的项目归属证明、E6 的快照生成时间均需补充证据后才能改判。\n",
+            "kind": "building-loop-durable",
+            "source": "native-tool-result-review-ready",
+            "observedAt": 1794484113719
+          },
+          "primary": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A1「仅项目所有者可读取原件」+ 范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1 四项：归属✓签名✓14天✓，华北落点未写明→缺一"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1 四项：签名✓华北落点✓14天✓，项目归属缺；解密成功≠归属（A4）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "A1「不能导出原件」；A3 未生效不授权；哈希/公开标签≠授权（A4）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A2 增补明许：华北内网 + 已登记同项目分析员 + 无原件字段"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1 四项：签名✓归属✓华北落点✓，生成时间未知→缺一"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A1「仅项目所有者可读取原件」+ 范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1 四项：归属✓签名✓14天✓，华北落点未写明→缺一"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1 四项：签名✓华北落点✓14天✓，项目归属缺；解密成功≠归属（A4）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "A1「不能导出原件」；A3 未生效不授权；哈希/公开标签≠授权（A4）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A2 增补明许：华北内网 + 已登记同项目分析员 + 无原件字段"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1 四项：签名✓归属✓华北落点✓，生成时间未知→缺一"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "f75d01246c5930790246a44e1402d40dc6dad6b17927ad45560aee56c1857ca2",
+            "bytes": 2501,
+            "text": "# 银杉票据项目操作权限判定（06-01 冻结结束时）\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| E1 | ALLOW | A1：所有者✓ 华北内网✓ 读原件✓ → 命中明许 |\n| E2 | HOLD | A1：归属✓ 华北落点× 签名✓ 30天✓ → 缺一挂起 |\n| E3 | HOLD | A1：归属× 华北落点✓ 签名✓ 30天✓ → 缺一挂起；A4 解密成功只证可读 |\n| E4 | DENY | A1「不能导出原件」；A3 未生效不授权；A4 哈希/公开标签≠授权 |\n| E5 | ALLOW | A2：华北内网✓ 已登记同项目分析员✓ 无原件字段✓ → 命中明许 |\n| E6 | HOLD | A1：归属✓ 华北落点✓ 签名✓ 生成时间× → 缺一挂起 |\n\n## 依据说明\n\n- 依据列中的 A1–A4 是会话材料编号：[A1] 生效 G17、[A2] G17 增补、[A3] G18 预览稿、[A4] 通用约束（解密/哈希、标签、14 天与 30 天、未写明即未知），与项目 claims 事实编号无关。\n- E1：A1 范围「只含银杉项目华北内网」，「仅项目所有者可读取原件」；请求方为项目所有者、地点华北、动作读原件，无缺项。\n- E2：材料只确认签名、归属与「14 天前生成」（A4 说明 14 天满足 30 天），未写华北落点，按 A4「未写明的信息一律未知」不能推定满足。\n- E3：解密成功只证明文件可读（A4），不等同项目归属证明；归属缺失。\n- E4：A1 明确「华北内网不能导出原件」，属有效规则明确禁止→DENY；A3 未生效不产生授权，A4 说明哈希通过和公开标签均不构成输出授权。\n- E5：A2 明许华北内网给已登记的同项目分析员读取无原件字段的内部汇总；E5 分析员读的是无原件字段的内部汇总，增补条款正好给了许可。\n- E6：只记录上一次访问时间，不是生成时间，30 天条件无法核实。\n- 待核事项：E2 的华北落点、E3 的项目归属证明、E6 的快照生成时间，需补证后才能改判。\n\n大白话：E1 项目所有者读自家项目的原件，规则明说可以；E5 分析员读的是没有原件字段的内部汇总，增补条款正好给了许可；E4 是把原件往公网送，现有规则明令禁止，未生效的 G18 撑不起这个授权，所以拦下。E2、E3、E6 都是恢复快照，规则要求\"归属、华北落点、签名、30 天内生成\"四项全齐，它们各差一项（分别差落点、差归属、差生成时间），所以先压着等材料补齐，不是拒绝也不是放行。\n",
+            "kind": "building-loop-durable"
+          },
+          "latestObserved": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A1：所有者✓ 华北内网✓ 读原件✓ → 命中明许"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1：归属✓ 华北落点× 签名✓ 30天✓ → 缺一挂起"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1：归属× 华北落点✓ 签名✓ 30天✓ → 缺一挂起；A4 解密成功只证可读"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "A1「不能导出原件」；A3 未生效不授权；A4 哈希/公开标签≠授权"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A2：华北内网✓ 已登记同项目分析员✓ 无原件字段✓ → 命中明许"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1：归属✓ 华北落点✓ 签名✓ 生成时间× → 缺一挂起"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": "supplement",
+          "coverage": 0,
+          "receipt": {
+            "sha256": "ca5092a8e709f3c04e157ea2dbf003ce526070c8cd76709ae4640c6d23df59a6",
+            "bytes": 12078,
+            "text": "{\n  \"unit\": \"K01\",\n  \"phase\": \"first-review\",\n  \"reviewer\": \"child-2\",\n  \"decision\": \"reject\",\n  \"candidateSha256\": \"17e3106145a640a38824781155e69b6342df6a0200159c52b46941668cde33b6\",\n  \"candidatePositions\": {\n    \"spec\": \"building-loop-candidate-positions/1\",\n    \"provenance\": \"host-derived-explicit-labels\",\n    \"path\": \"DELIVERY.md\",\n    \"candidateSha256\": \"17e3106145a640a38824781155e69b6342df6a0200159c52b46941668cde33b6\",\n    \"errorExampleLines\": [],\n    \"hypothesisLines\": []\n  },\n  \"goal\": {\n    \"sha256\": \"fecb3017490d550fa31c142f6126e851cbf38602911227e1900923d5e478d157\",\n    \"files\": [\n      {\n        \"file\": \"PROJECT-GOAL.md\",\n        \"sha256\": \"22e0bf23ac58eda57303c2af4259600e9b9b14861a81d1384047da8b75f95b14\"\n      }\n    ]\n  },\n  \"goalFit\": {\n    \"pass\": true,\n    \"basis\": \"DELIVERY.md 第 3–10 行提供含“| 编号 | 值 | 依据 |”的表，E1–E6 每项恰好一行、值格只写 ALLOW/DENY/HOLD、依据格填 A1–A4 材料编号，第 12 行以“大白话：”收尾，满足 PROJECT-GOAL.md 第 7 行的交付要求；六个判定值逐一与事件 9 材料对得上，写法的唯一小问题不影响目标达成。\"\n  },\n  \"unsupported\": [\n    \"B14-ed39d4d2\"\n  ],\n  \"qualityRejected\": [\n    \"plain\"\n  ],\n  \"checks\": [\n    {\n      \"id\": \"B14-ed39d4d2\",\n      \"status\": \"unsupported\",\n      \"line\": 12,\n      \"basis\": \"大白话称 E5 读的是“脱敏汇总”，但 A2 原文与事件 9 材料均无“脱敏”一词，只说“无原件字段的内部汇总”，属引入未经原文支持的新概念；其余判定块均已核支持。\",\n      \"finding\": {\n        \"kind\": \"missing-evidence\",\n        \"quote\": \"E5 分析员读的是脱敏汇总\",\n        \"fix\": \"改为“E5 分析员读的是无原件字段的内部汇总”\"\n      }\n    }\n  ],\n  \"calculations\": [],\n  \"coverage\": {\n    \"version\": 1,\n    \"candidateSha256\": \"17e3106145a640a38824781155e69b6342df6a0200159c52b46941668cde33b6\",\n    \"total\": 27,\n    \"pending\": [],\n    \"rejected\": [\n      {\n        \"block\": \"B14-ed39d4d2\",\n        \"line\": 12,\n        \"text\": \"E5 分析员读的是脱敏汇总，增补条款正好给了许可；\",\n        \"lineText\": \"大白话：E1 所有者读自己项目的原件，明摆着允许；E5 分析员读的是脱敏汇总，增补条款正好给了许可；E4 是把原件往公网送，现有规则明确禁止，未生效的 G18 撑不起这个授权，所以禁止。E2、E3、E6 都是恢复快照，规则要求\\\"归属、华北落点、签名、30 天内生成\\\"四项全齐，它们各缺一项（分别缺落点、缺归属、缺生成时间），所以先挂起取证，不是拒绝也不是放行。\",\n        \"basis\": \"A2 原文只说“无原件字段的内部汇总”，材料中无“脱敏”一词，也无文字把“无原件字段”等同于“脱敏”，候选引入未经原文支持的新概念。后半“增补条款正好给了许可”有 A2 支持。\",\n        \"repair\": \"改为“E5 分析员读的是无原件字段的内部汇总”\",\n        \"finding\": {\n          \"kind\": \"missing-evidence\",\n          \"quote\": \"E5 分析员读的是脱敏汇总\",\n          \"fix\": \"改为“E5 分析员读的是无原件字段的内部汇总”\"\n        },\n        \"status\": \"unsupported\",\n        \"proofObject\": \"external\",\n        \"repairBaseline\": {\n          \"version\": 1,\n          \"quote\": \"E5 分析员读的是脱敏汇总\",\n          \"line\": 12,\n          \"start\": 25,\n          \"end\": 38,\n          \"candidateSha256\": \"17e3106145a640a38824781155e69b6342df6a0200159c52b46941668cde33b6\",\n          \"kind\": \"missing-evidence\",\n          \"scopeMarkers\": [],\n          \"refs\": [\n            {\n              \"file\": \"CONVERSATION-INPUT.md\",\n              \"start\": 18,\n              \"end\": 18,\n              \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n              \"rangeHash\": \"13f4780da2ef67d68f1a07e3b1f61b6464615fb7d1087d2490bd59788531e34b\",\n              \"lineHashes\": [\n                \"a78a30941bf42e97f4dc8a4c63a06350581be349e4bd4a96a2c1d957f55f5b69\"\n              ]\n            }\n          ]\n        },\n        \"findingId\": \"ffed826ba5babe1e00cbcd218f5a2fdb4e572a5bca212fd238fcdabf6059aaca\",\n        \"proofBinding\": \"0b47fad8e3217d5e9374756e107191d4c5b6283d8e93405c98393854c64de668\"\n      }\n    ],\n    \"quotations\": [],\n    \"reusedProofs\": [],\n    \"receiptSha256\": \"9872ddba346f6a555b4594fd56de4b2734938bf551a335c6674ba830b2f5fa25\"\n  },\n  \"formatIssues\": [\n    \"正文末尾须有代码/HTML/引用块之外的独立行‘大白话：…’或‘直白说明：…’，可直接接在列表后；其解释之后不能再放错例、附录或其他段落。\"\n  ],\n  \"qualityChecks\": {\n    \"sources\": {\n      \"pass\": true,\n      \"basis\": \"资料仅为本会话事件 9 的合成材料，已登记在 CONVERSATION-INPUT.md 第 10、18、26、34 行（G17 生效条、G17 增补、G18 预览稿、解密/哈希与标签约束），核验时逐句比对原文而非二手概括；E2–E6 的申请描述取自同一事件 9 指令原文。仍待证的部分：E2 的华北落点、E3 的项目归属证明、E6 的快照生成时间，材料确未提供，只能维持 HOLD，无法判定为满足或不满足。\"\n    },\n    \"conclusion\": {\n      \"pass\": true,\n      \"basis\": \"六项判定值 E1 ALLOW、E2 HOLD、E3 HOLD、E4 DENY、E5 ALLOW、E6 HOLD 均与材料可推出结果一致：E1 落在“仅项目所有者可读取原件”且范围含华北内网；E4 被“华北内网不能导出原件”明确禁止，未生效 G18 与哈希/公开标签均不补授权；E2、E3、E6 各缺 A1 四项之一，按“缺一先挂起”为 HOLD。唯一需修订处是大白话把 E5 的“无原件字段的内部汇总”写成“脱敏汇总”，原文无“脱敏”概念，属引入新概念，应改回原文措辞。\"\n    },\n    \"method\": {\n      \"pass\": true,\n      \"basis\": \"逐块读完 DELIVERY.md 全文 27 块并与事件 9 材料逐句对齐，独立拆出复合句（表格依据列、大白话三段、说明各条）分别判断；对“缺一即 HOLD”“未写明即未知”“未生效不授权”三项规则做了条件与反例检查，确认无可用例外套用导致结论反转的情形。局限：只依据本条消息内的合成材料，未做外部核实，也不判断材料本身在真实业务中是否合理。\"\n    },\n    \"alternatives\": {\n      \"pass\": true,\n      \"basis\": \"可行备选是在表内依据列直接写出四项条件的勾选算式（如 E3：归属× 华北落点✓ 签名✓ 30天✓→HOLD），读者不用下翻说明即可核对；现稿用编号加说明也能成立，属风格取舍无需强制。\"\n    },\n    \"detail\": {\n      \"pass\": true,\n      \"basis\": \"先给结论：表格 E1–E6 每项恰好一行、值格仅 ALLOW/DENY/HOLD、依据列统一引用 A1–A4，结构完全满足 PROJECT-GOAL.md 第 7 行的交付要求；末行“大白话：”总结通俗准确，说明部分进一步交代了每项缺项与规则出处。再给依据：E1（第 5 行）、E4（第 8 行）、E5（第 9 行）的判定链条均有原文直引；E2（第 6 行）、E3（第 7 行）、E6（第 10 行）的缺项分析与 A1“四项缺一先挂起”严格对应。唯一瑕疵在第 12 行大白话“脱敏汇总”一词，与原文“无原件字段的内部汇总”不等价，属最小措辞修正，不影响结论。\"\n    },\n    \"plain\": {\n      \"pass\": false,\n      \"basis\": \"正文末尾须有代码/HTML/引用块之外的独立行‘大白话：…’或‘直白说明：…’，可直接接在列表后；其解释之后不能再放错例、附录或其他段落。\"\n    }\n  },\n  \"assessmentProvenance\": {\n    \"quality\": \"executor-model-assessment\",\n    \"qualityChecks\": \"reviewer-model-assessment\",\n    \"goalFit\": \"reviewer-model-assessment\",\n    \"proseVerifiedAsToolExecution\": false,\n    \"toolExecutionSources\": [\n      \"actualReads\",\n      \"searchObservations\"\n    ],\n    \"candidatePositionSource\": \"candidatePositions\"\n  },\n  \"observedSources\": [\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 10,\n      \"end\": 10,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"7d3a0cf65c70a6952a34d3aace07261fa05b7b0be3c8c5ed8e94846dfbcfa7a2\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 18,\n      \"end\": 18,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"7d3a0cf65c70a6952a34d3aace07261fa05b7b0be3c8c5ed8e94846dfbcfa7a2\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 26,\n      \"end\": 26,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"7d3a0cf65c70a6952a34d3aace07261fa05b7b0be3c8c5ed8e94846dfbcfa7a2\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 34,\n      \"end\": 34,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"7d3a0cf65c70a6952a34d3aace07261fa05b7b0be3c8c5ed8e94846dfbcfa7a2\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    }\n  ],\n  \"actualReads\": [\n    {\n      \"file\": \"DELIVERY.md\",\n      \"sha256\": \"17e3106145a640a38824781155e69b6342df6a0200159c52b46941668cde33b6\",\n      \"ranges\": [\n        [\n          1,\n          24\n        ]\n      ],\n      \"current\": true\n    },\n    {\n      \"file\": \"INDEX.md\",\n      \"sha256\": \"573f7acd617db9f9542030647b7f8490bab9fa2420716d2fdd1e08a710dad895\",\n      \"ranges\": [\n        [\n          1,\n          7\n        ]\n      ],\n      \"current\": true\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"ranges\": [\n        [\n          1,\n          37\n        ]\n      ],\n      \"current\": true\n    },\n    {\n      \"file\": \"PROJECT-GOAL.md\",\n      \"sha256\": \"22e0bf23ac58eda57303c2af4259600e9b9b14861a81d1384047da8b75f95b14\",\n      \"ranges\": [\n        [\n          1,\n          17\n        ]\n      ],\n      \"current\": true\n    }\n  ],\n  \"searchObservations\": {\n    \"spec\": \"building-loop-search-observations/1\",\n    \"provenance\": \"host-observed-tool-execution\",\n    \"actor\": \"child-2\",\n    \"phase\": \"first-review\",\n    \"limit\": 16,\n    \"omitted\": 0,\n    \"entries\": [],\n    \"boundary\": \"Only successful searches retained in this role's current checkpoint; omitted entries are counted. Search results are not read stamps or semantic verification, and an empty list is not proof that no earlier search occurred.\"\n  },\n  \"unlisted\": [],\n  \"unverifiedSources\": [\n    \"E2 快照的华北落点：事件 9 材料未写明，无法核实\",\n    \"E3 的银杉项目归属证明：材料明确称没有，无法核实其存在\",\n    \"E6 快照的生成时间：材料只说记录了上一次访问时间，生成时间未知\"\n  ],\n  \"revisions\": [],\n  \"suggestions\": [\n    \"大白话中的“脱敏汇总”改为原文“无原件字段的内部汇总”，避免引入材料未有的概念后容易被误读为额外的脱敏工序要求。\",\n    \"若想更易核对，可在表内依据列直接写成四项勾选算式，免去下翻说明。\"\n  ]\n}\n",
+            "kind": "building-loop-receipt"
+          },
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 11685
+            },
+            {
+              "kind": "completed",
+              "ms": 32219
+            },
+            {
+              "kind": "completed",
+              "ms": 122219
+            }
+          ],
+          "toolErrors": [
+            {
+              "actor": "child-2",
+              "seq": 113,
+              "ms": 107097,
+              "detail": "Error: B14-ed39d4d2 的 unsupported 须提供 finding.kind、finding.quote 和 finding.fix；kind 须为 missing-evidence、contradiction 或 scope。候选第 12 行正文为 \"大白话：E1 所有者读自己项目的原件，明摆着允许；E5 分析员读的是脱敏汇总，增补条款正好给了许可；E4 是把原件往公网送，现有规则明确禁止，未生效的 G18 撑不起这个授权，所以禁止。E2、E3、E6 都是恢复快照，规则要求\\\"归属、华北落点、签名、30 天内生成\\\"四项全齐，它们各缺一项（分别缺落点、缺归属、缺生成时间），所以先挂起取证，不是拒绝也不是放行。\"，从该行复制实际有问题的片段"
+            },
+            {
+              "actor": "child-1",
+              "seq": 119,
+              "ms": 148696,
+              "detail": "Error: [building-loop/preflight] B14-ed39d4d2 需要保留唯一的编号断言行"
+            }
+          ],
+          "streamErrors": [],
+          "roleCount": 3,
+          "usageAtPrimary": {
+            "inputTokens": 11816,
+            "cacheReadTokens": 41344,
+            "cacheWriteTokens": 0,
+            "outputTokens": 2648,
+            "totalTokens": 55808,
+            "providerMessages": 9,
+            "withUsage": 9,
+            "cacheReadPercent": 77.77
+          },
+          "usageObserved": {
+            "inputTokens": 71536,
+            "cacheReadTokens": 773632,
+            "cacheWriteTokens": 0,
+            "outputTokens": 15915,
+            "totalTokens": 861083,
+            "providerMessages": 44,
+            "withUsage": 44,
+            "cacheReadPercent": 91.54
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 15,
+              "ms": 4332,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1167,
+                "outputTokens": 530,
+                "cacheReadTokens": 1408,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3105
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 24,
+              "ms": 6176,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2721,
+                "outputTokens": 38,
+                "cacheReadTokens": 2688,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5447
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 31,
+              "ms": 10102,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1759,
+                "outputTokens": 323,
+                "cacheReadTokens": 5376,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7458
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 11684,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1237,
+                "outputTokens": 31,
+                "cacheReadTokens": 7424,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8692
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 19,
+              "ms": 11887,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1615,
+                "outputTokens": 47,
+                "cacheReadTokens": 2048,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3710
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 25,
+              "ms": 13599,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2042,
+                "outputTokens": 68,
+                "cacheReadTokens": 3584,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5694
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 31,
+              "ms": 18982,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 170,
+                "outputTokens": 800,
+                "cacheReadTokens": 5632,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6602
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 37,
+              "ms": 21046,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 166,
+                "outputTokens": 58,
+                "cacheReadTokens": 6528,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6752
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 43,
+              "ms": 26722,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 939,
+                "outputTokens": 753,
+                "cacheReadTokens": 6656,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8348
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 50,
+              "ms": 28436,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1328,
+                "outputTokens": 38,
+                "cacheReadTokens": 8576,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9942
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 58,
+              "ms": 31023,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 732,
+                "outputTokens": 329,
+                "cacheReadTokens": 9856,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10917
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 66,
+              "ms": 32218,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1265,
+                "outputTokens": 24,
+                "cacheReadTokens": 10880,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12169
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 19,
+              "ms": 32681,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2964,
+                "outputTokens": 46,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8002
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 25,
+              "ms": 34266,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 5103,
+                "outputTokens": 87,
+                "cacheReadTokens": 7936,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13126
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 31,
+              "ms": 37046,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 630,
+                "outputTokens": 264,
+                "cacheReadTokens": 13056,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13950
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 40,
+              "ms": 48257,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2645,
+                "outputTokens": 701,
+                "cacheReadTokens": 14208,
+                "cacheWriteTokens": 0,
+                "totalTokens": 17554
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 47,
+              "ms": 52624,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2820,
+                "outputTokens": 780,
+                "cacheReadTokens": 17536,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21136
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 56,
+              "ms": 64241,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2733,
+                "outputTokens": 1017,
+                "cacheReadTokens": 21248,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24998
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 63,
+              "ms": 69543,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3336,
+                "outputTokens": 446,
+                "cacheReadTokens": 24704,
+                "cacheWriteTokens": 0,
+                "totalTokens": 28486
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 69,
+              "ms": 73863,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 850,
+                "outputTokens": 643,
+                "cacheReadTokens": 28416,
+                "cacheWriteTokens": 0,
+                "totalTokens": 29909
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 75,
+              "ms": 79745,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 848,
+                "outputTokens": 903,
+                "cacheReadTokens": 29824,
+                "cacheWriteTokens": 0,
+                "totalTokens": 31575
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 81,
+              "ms": 83061,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1869,
+                "outputTokens": 403,
+                "cacheReadTokens": 30848,
+                "cacheWriteTokens": 0,
+                "totalTokens": 33120
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 87,
+              "ms": 86589,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 827,
+                "outputTokens": 568,
+                "cacheReadTokens": 33024,
+                "cacheWriteTokens": 0,
+                "totalTokens": 34419
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 93,
+              "ms": 91791,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 836,
+                "outputTokens": 1001,
+                "cacheReadTokens": 34304,
+                "cacheWriteTokens": 0,
+                "totalTokens": 36141
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 99,
+              "ms": 95061,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 741,
+                "outputTokens": 534,
+                "cacheReadTokens": 36096,
+                "cacheWriteTokens": 0,
+                "totalTokens": 37371
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 105,
+              "ms": 103323,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1057,
+                "outputTokens": 1307,
+                "cacheReadTokens": 36992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 39356
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 111,
+              "ms": 107086,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2149,
+                "outputTokens": 291,
+                "cacheReadTokens": 38272,
+                "cacheWriteTokens": 0,
+                "totalTokens": 40712
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 117,
+              "ms": 109884,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 210,
+                "outputTokens": 363,
+                "cacheReadTokens": 40704,
+                "cacheWriteTokens": 0,
+                "totalTokens": 41277
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 77,
+              "ms": 112293,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1318,
+                "outputTokens": 38,
+                "cacheReadTokens": 12160,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13516
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 85,
+              "ms": 113955,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 5496,
+                "outputTokens": 38,
+                "cacheReadTokens": 13440,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18974
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 91,
+              "ms": 116313,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 5395,
+                "outputTokens": 93,
+                "cacheReadTokens": 18944,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24432
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 97,
+              "ms": 119374,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 348,
+                "outputTokens": 265,
+                "cacheReadTokens": 24320,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24933
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 57,
+              "ms": 121238,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1486,
+                "outputTokens": 48,
+                "cacheReadTokens": 8320,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9854
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 104,
+              "ms": 122219,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1511,
+                "outputTokens": 56,
+                "cacheReadTokens": 24832,
+                "cacheWriteTokens": 0,
+                "totalTokens": 26399
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 63,
+              "ms": 123635,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 7552,
+                "outputTokens": 131,
+                "cacheReadTokens": 9728,
+                "cacheWriteTokens": 0,
+                "totalTokens": 17411
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 69,
+              "ms": 128817,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 266,
+                "outputTokens": 851,
+                "cacheReadTokens": 17408,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18525
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 75,
+              "ms": 130216,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 186,
+                "outputTokens": 58,
+                "cacheReadTokens": 18432,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18676
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 81,
+              "ms": 131568,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 984,
+                "outputTokens": 67,
+                "cacheReadTokens": 18560,
+                "cacheWriteTokens": 0,
+                "totalTokens": 19611
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 87,
+              "ms": 133147,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 135,
+                "outputTokens": 82,
+                "cacheReadTokens": 19584,
+                "cacheWriteTokens": 0,
+                "totalTokens": 19801
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 93,
+              "ms": 137596,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 447,
+                "outputTokens": 850,
+                "cacheReadTokens": 19712,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21009
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 99,
+              "ms": 139378,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 238,
+                "outputTokens": 56,
+                "cacheReadTokens": 20864,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21158
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 105,
+              "ms": 141237,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 179,
+                "outputTokens": 58,
+                "cacheReadTokens": 21120,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21357
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 111,
+              "ms": 143295,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 984,
+                "outputTokens": 56,
+                "cacheReadTokens": 21248,
+                "cacheWriteTokens": 0,
+                "totalTokens": 22288
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 117,
+              "ms": 148681,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 252,
+                "outputTokens": 775,
+                "cacheReadTokens": 22144,
+                "cacheWriteTokens": 0,
+                "totalTokens": 23171
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "paired-metrics",
+      "description": "重复修订、配对数据与门槛",
+      "arms": [
+        {
+          "mode": "standard",
+          "preset": "standard",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": false,
+          "instructionPackets": [],
+          "observedMs": 150075,
+          "firstArtifactMs": 12216,
+          "firstArtifact": {
+            "sha256": "7b35017e3aa33c372d61f16142d33e9b76f3d379fd4af5c52c84eec7ef33f300",
+            "bytes": 1118,
+            "text": "# 时延核算与放行判定\n\n| 编号 | 值 | 依据 |\n|---|---|---|\n| N1 | A,B,E | [M1] 按 ID 取最大修订：N 组 A1、B2、C2、D1(缺失)、E1；C2 为 withdrawn 剔除，D1 后观测缺失剔除 → A、B、E |\n| N2 | 620 | (320−198)/320×10000=3812.5 → 3813，超过 350 基点，通过 |\n| N3 | 937 | (290−250)/290×10000≈1379.31 → 1379，超过 350 基点，通过 |\n| N4 | 1490 | (610−519)/610×10000≈1490.16 → 1490，≥400 通过 |\n| N5 | −11 | 单任务差：A −14、B −10、E −6、I −11；中位数 (−11−10)/2 = −11 |\n| N6 | BLOCK | [M2] 组改善≥350 ✔（N2 3813、N3 1379）；全体≥400 ✔（1490）；有效任务≥2 ✔（3 个、5 个）；但 S 组 J 后值−前值=+5，I=+11（I2 缺失），S 组 5 个有效任务中有 2 个超 10 ms → 失败门槛：单任务增幅≤10 ms |\n\n大白话：整体和两组都降得不少，但 S 组有两个任务反而变慢，J 慢 5 ms、I 慢 11 ms（I 的修订 2 后观测缺失，按规则回落到修订 1），触发了“单任务增幅不超过 10 ms”的界限，因此不通过，不能放行。\n",
+            "kind": "standard-file"
+          },
+          "primary": {
+            "correct": 1,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "N1",
+                "expected": "A,B,E,F,G,H,J",
+                "values": [
+                  {
+                    "raw": "A,B,E",
+                    "value": "A,B,E",
+                    "explanation": "[M1] 按 ID 取最大修订：N 组 A1、B2、C2、D1(缺失)、E1；C2 为 withdrawn 剔除，D1 后观测缺失剔除 → A、B、E"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N2",
+                "expected": "333",
+                "values": [
+                  {
+                    "raw": "620",
+                    "value": "620",
+                    "explanation": "(320−198)/320×10000=3812.5 → 3813，超过 350 基点，通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N3",
+                "expected": "500",
+                "values": [
+                  {
+                    "raw": "937",
+                    "value": "937",
+                    "explanation": "(290−250)/290×10000≈1379.31 → 1379，超过 350 基点，通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N4",
+                "expected": "417",
+                "values": [
+                  {
+                    "raw": "1490",
+                    "value": "1490",
+                    "explanation": "(610−519)/610×10000≈1490.16 → 1490，≥400 通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N5",
+                "expected": "-6",
+                "values": [
+                  {
+                    "raw": "−11",
+                    "value": "−11",
+                    "explanation": "单任务差：A −14、B −10、E −6、I −11；中位数 (−11−10)/2 = −11"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N6",
+                "expected": "BLOCK",
+                "values": [
+                  {
+                    "raw": "BLOCK",
+                    "value": "BLOCK",
+                    "explanation": "[M2] 组改善≥350 ✔（N2 3813、N3 1379）；全体≥400 ✔（1490）；有效任务≥2 ✔（3 个、5 个）；但 S 组 J 后值−前值=+5，I=+11（I2 缺失），S 组 5 个有效任务中有 2 个超 10 ms → 失败门槛：单任务增幅≤10 ms"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 1,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "N1",
+                "expected": "A,B,E,F,G,H,J",
+                "values": [
+                  {
+                    "raw": "A,B,E",
+                    "value": "A,B,E",
+                    "explanation": "[M1] 按 ID 取最大修订：N 组 A1、B2、C2、D1(缺失)、E1；C2 为 withdrawn 剔除，D1 后观测缺失剔除 → A、B、E"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N2",
+                "expected": "333",
+                "values": [
+                  {
+                    "raw": "620",
+                    "value": "620",
+                    "explanation": "(320−198)/320×10000=3812.5 → 3813，超过 350 基点，通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N3",
+                "expected": "500",
+                "values": [
+                  {
+                    "raw": "937",
+                    "value": "937",
+                    "explanation": "(290−250)/290×10000≈1379.31 → 1379，超过 350 基点，通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N4",
+                "expected": "417",
+                "values": [
+                  {
+                    "raw": "1490",
+                    "value": "1490",
+                    "explanation": "(610−519)/610×10000≈1490.16 → 1490，≥400 通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N5",
+                "expected": "-6",
+                "values": [
+                  {
+                    "raw": "−11",
+                    "value": "−11",
+                    "explanation": "单任务差：A −14、B −10、E −6、I −11；中位数 (−11−10)/2 = −11"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N6",
+                "expected": "BLOCK",
+                "values": [
+                  {
+                    "raw": "BLOCK",
+                    "value": "BLOCK",
+                    "explanation": "[M2] 组改善≥350 ✔（N2 3813、N3 1379）；全体≥400 ✔（1490）；有效任务≥2 ✔（3 个、5 个）；但 S 组 J 后值−前值=+5，I=+11（I2 缺失），S 组 5 个有效任务中有 2 个超 10 ms → 失败门槛：单任务增幅≤10 ms"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "7b35017e3aa33c372d61f16142d33e9b76f3d379fd4af5c52c84eec7ef33f300",
+            "bytes": 1118,
+            "text": "# 时延核算与放行判定\n\n| 编号 | 值 | 依据 |\n|---|---|---|\n| N1 | A,B,E | [M1] 按 ID 取最大修订：N 组 A1、B2、C2、D1(缺失)、E1；C2 为 withdrawn 剔除，D1 后观测缺失剔除 → A、B、E |\n| N2 | 620 | (320−198)/320×10000=3812.5 → 3813，超过 350 基点，通过 |\n| N3 | 937 | (290−250)/290×10000≈1379.31 → 1379，超过 350 基点，通过 |\n| N4 | 1490 | (610−519)/610×10000≈1490.16 → 1490，≥400 通过 |\n| N5 | −11 | 单任务差：A −14、B −10、E −6、I −11；中位数 (−11−10)/2 = −11 |\n| N6 | BLOCK | [M2] 组改善≥350 ✔（N2 3813、N3 1379）；全体≥400 ✔（1490）；有效任务≥2 ✔（3 个、5 个）；但 S 组 J 后值−前值=+5，I=+11（I2 缺失），S 组 5 个有效任务中有 2 个超 10 ms → 失败门槛：单任务增幅≤10 ms |\n\n大白话：整体和两组都降得不少，但 S 组有两个任务反而变慢，J 慢 5 ms、I 慢 11 ms（I 的修订 2 后观测缺失，按规则回落到修订 1），触发了“单任务增幅不超过 10 ms”的界限，因此不通过，不能放行。\n",
+            "kind": "standard-file"
+          },
+          "latestObserved": {
+            "correct": 1,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "N1",
+                "expected": "A,B,E,F,G,H,J",
+                "values": [
+                  {
+                    "raw": "A,B,E",
+                    "value": "A,B,E",
+                    "explanation": "[M1] 按 ID 取最大修订：N 组 A1、B2、C2、D1(缺失)、E1；C2 为 withdrawn 剔除，D1 后观测缺失剔除 → A、B、E"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N2",
+                "expected": "333",
+                "values": [
+                  {
+                    "raw": "620",
+                    "value": "620",
+                    "explanation": "(320−198)/320×10000=3812.5 → 3813，超过 350 基点，通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N3",
+                "expected": "500",
+                "values": [
+                  {
+                    "raw": "937",
+                    "value": "937",
+                    "explanation": "(290−250)/290×10000≈1379.31 → 1379，超过 350 基点，通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N4",
+                "expected": "417",
+                "values": [
+                  {
+                    "raw": "1490",
+                    "value": "1490",
+                    "explanation": "(610−519)/610×10000≈1490.16 → 1490，≥400 通过"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N5",
+                "expected": "-6",
+                "values": [
+                  {
+                    "raw": "−11",
+                    "value": "−11",
+                    "explanation": "单任务差：A −14、B −10、E −6、I −11；中位数 (−11−10)/2 = −11"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N6",
+                "expected": "BLOCK",
+                "values": [
+                  {
+                    "raw": "BLOCK",
+                    "value": "BLOCK",
+                    "explanation": "[M2] 组改善≥350 ✔（N2 3813、N3 1379）；全体≥400 ✔（1490）；有效任务≥2 ✔（3 个、5 个）；但 S 组 J 后值−前值=+5，I=+11（I2 缺失），S 组 5 个有效任务中有 2 个超 10 ms → 失败门槛：单任务增幅≤10 ms"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": null,
+          "coverage": null,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 12216
+            }
+          ],
+          "toolErrors": [],
+          "streamErrors": [],
+          "roleCount": 1,
+          "usageAtPrimary": {
+            "inputTokens": 1654,
+            "cacheReadTokens": 29440,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1301,
+            "totalTokens": 32395,
+            "providerMessages": 3,
+            "withUsage": 3,
+            "cacheReadPercent": 94.68
+          },
+          "usageObserved": {
+            "inputTokens": 1654,
+            "cacheReadTokens": 29440,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1301,
+            "totalTokens": 32395,
+            "providerMessages": 3,
+            "withUsage": 3,
+            "cacheReadPercent": 94.68
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 17,
+              "ms": 2630,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1238,
+                "outputTokens": 88,
+                "cacheReadTokens": 8832,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10158
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 25,
+              "ms": 7028,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 240,
+                "outputTokens": 502,
+                "cacheReadTokens": 9984,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10726
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 31,
+              "ms": 12211,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 176,
+                "outputTokens": 711,
+                "cacheReadTokens": 10624,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11511
+              }
+            }
+          ]
+        },
+        {
+          "mode": "building-loop",
+          "preset": "building-loop",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": true,
+          "instructionPackets": [
+            {
+              "actor": "child-1",
+              "seq": 21,
+              "role": "executor",
+              "phase": "intake",
+              "declaredSha256": "1e58be5d6d9de5d15d1c28c0cedaf50bf2a944be83e27acd7d405603272890f7",
+              "actualSha256": "1e58be5d6d9de5d15d1c28c0cedaf50bf2a944be83e27acd7d405603272890f7",
+              "actualCodePoints": 804,
+              "exactPrompt": true
+            },
+            {
+              "actor": "child-2",
+              "seq": 21,
+              "role": "reviewer",
+              "phase": "first-review",
+              "declaredSha256": "1e58be5d6d9de5d15d1c28c0cedaf50bf2a944be83e27acd7d405603272890f7",
+              "actualSha256": "1e58be5d6d9de5d15d1c28c0cedaf50bf2a944be83e27acd7d405603272890f7",
+              "actualCodePoints": 804,
+              "exactPrompt": true
+            }
+          ],
+          "observedMs": 150075,
+          "firstArtifactMs": 38933,
+          "firstArtifact": {
+            "sha256": "2f3cc9de55ef422184dec6a50c6ba530dc76cbb0400ed4960486ef28ef2e3679",
+            "bytes": 1277,
+            "text": "# 交付稿：两组处理时延改善核算与放行结论\n\n有效任务：A(N)、B(N，取 rev2)、E(N)、F(S)、G(S)、H(S)、I(S，取 rev2)、J(S)。C 取 rev2 但为 withdrawn，整条剔除；D 取 rev1 且前值缺失，剔除；B rev1、C rev1、I rev1 因存在更大修订不回退。\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| N1 | A,B,E,F,G,H,I,J | M1 按最大修订后剔除 withdrawn 与缺失观测：C(rev2 withdrawn)、D(rev1 前值缺失)、I(rev2 后值缺失) 剔除 |\n| N2 | 333 | M1 N 组有效 A/B(rev2)/E：前 100+80+120=300，后 86+90+114=290，10000×(300−290)÷300=333.33… |\n| N3 | 1069 | M1 S 组有效 F/G/H/I(rev2)：前 50+50+100+90=290，后 44+41+95+79=259，10000×(290−259)÷290=1068.97… |\n| N4 | 695 | 前后全体：前合计 590，后合计 549，10000×(590−549)÷590=694.92… |\n| N5 | -6 | 后−前：A -14，B +10，E -6，F -6，G -9，H -5，I -11，J +5；排序 -14,-11,-9,-6,-6,-5,5,10，中位 (-6-6)/2=-6 |\n| N6 | BLOCK | M2 门槛：N 组 333.33<350；S 组 1068.97≥350 通过，全体 694.92≥400 通过，单任务最大 +10 未超 10 ms |\n\n大白话：B 取 rev2 后后值回升到 90，N 组只净降 10 ms、改善约 333 基点，没到每组 350 的及格线，所以整体不放行（BLOCK）。",
+            "kind": "building-loop-durable",
+            "source": "native-tool-result-review-ready",
+            "observedAt": 1794484125837
+          },
+          "primary": {
+            "correct": 3,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "N1",
+                "expected": "A,B,E,F,G,H,J",
+                "values": [
+                  {
+                    "raw": "A,B,E,F,G,H,I,J",
+                    "value": "A,B,E,F,G,H,I,J",
+                    "explanation": "M1 按最大修订后剔除 withdrawn 与缺失观测：C(rev2 withdrawn)、D(rev1 前值缺失)、I(rev2 后值缺失) 剔除"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N2",
+                "expected": "333",
+                "values": [
+                  {
+                    "raw": "333",
+                    "value": "333",
+                    "explanation": "M1 N 组有效 A/B(rev2)/E：前 100+80+120=300，后 86+90+114=290，10000×(300−290)÷300=333.33…"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "N3",
+                "expected": "500",
+                "values": [
+                  {
+                    "raw": "1069",
+                    "value": "1069",
+                    "explanation": "M1 S 组有效 F/G/H/I(rev2)：前 50+50+100+90=290，后 44+41+95+79=259，10000×(290−259)÷290=1068.97…"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N4",
+                "expected": "417",
+                "values": [
+                  {
+                    "raw": "695",
+                    "value": "695",
+                    "explanation": "前后全体：前合计 590，后合计 549，10000×(590−549)÷590=694.92…"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N5",
+                "expected": "-6",
+                "values": [
+                  {
+                    "raw": "-6",
+                    "value": "-6",
+                    "explanation": "后−前：A -14，B +10，E -6，F -6，G -9，H -5，I -11，J +5；排序 -14,-11,-9,-6,-6,-5,5,10，中位 (-6-6)/2=-6"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "N6",
+                "expected": "BLOCK",
+                "values": [
+                  {
+                    "raw": "BLOCK",
+                    "value": "BLOCK",
+                    "explanation": "M2 门槛：N 组 333.33<350；S 组 1068.97≥350 通过，全体 694.92≥400 通过，单任务最大 +10 未超 10 ms"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 3,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "N1",
+                "expected": "A,B,E,F,G,H,J",
+                "values": [
+                  {
+                    "raw": "A,B,E,F,G,H,I,J",
+                    "value": "A,B,E,F,G,H,I,J",
+                    "explanation": "M1 按最大修订后剔除 withdrawn 与缺失观测：C(rev2 withdrawn)、D(rev1 前值缺失)、I(rev2 后值缺失) 剔除"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N2",
+                "expected": "333",
+                "values": [
+                  {
+                    "raw": "333",
+                    "value": "333",
+                    "explanation": "M1 N 组有效 A/B(rev2)/E：前 100+80+120=300，后 86+90+114=290，10000×(300−290)÷300=333.33…"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "N3",
+                "expected": "500",
+                "values": [
+                  {
+                    "raw": "1069",
+                    "value": "1069",
+                    "explanation": "M1 S 组有效 F/G/H/I(rev2)：前 50+50+100+90=290，后 44+41+95+79=259，10000×(290−259)÷290=1068.97…"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N4",
+                "expected": "417",
+                "values": [
+                  {
+                    "raw": "695",
+                    "value": "695",
+                    "explanation": "前后全体：前合计 590，后合计 549，10000×(590−549)÷590=694.92…"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N5",
+                "expected": "-6",
+                "values": [
+                  {
+                    "raw": "-6",
+                    "value": "-6",
+                    "explanation": "后−前：A -14，B +10，E -6，F -6，G -9，H -5，I -11，J +5；排序 -14,-11,-9,-6,-6,-5,5,10，中位 (-6-6)/2=-6"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "N6",
+                "expected": "BLOCK",
+                "values": [
+                  {
+                    "raw": "BLOCK",
+                    "value": "BLOCK",
+                    "explanation": "M2 门槛：N 组 333.33<350；S 组 1068.97≥350 通过，全体 694.92≥400 通过，单任务最大 +10 未超 10 ms"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "2f3cc9de55ef422184dec6a50c6ba530dc76cbb0400ed4960486ef28ef2e3679",
+            "bytes": 1277,
+            "text": "# 交付稿：两组处理时延改善核算与放行结论\n\n有效任务：A(N)、B(N，取 rev2)、E(N)、F(S)、G(S)、H(S)、I(S，取 rev2)、J(S)。C 取 rev2 但为 withdrawn，整条剔除；D 取 rev1 且前值缺失，剔除；B rev1、C rev1、I rev1 因存在更大修订不回退。\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| N1 | A,B,E,F,G,H,I,J | M1 按最大修订后剔除 withdrawn 与缺失观测：C(rev2 withdrawn)、D(rev1 前值缺失)、I(rev2 后值缺失) 剔除 |\n| N2 | 333 | M1 N 组有效 A/B(rev2)/E：前 100+80+120=300，后 86+90+114=290，10000×(300−290)÷300=333.33… |\n| N3 | 1069 | M1 S 组有效 F/G/H/I(rev2)：前 50+50+100+90=290，后 44+41+95+79=259，10000×(290−259)÷290=1068.97… |\n| N4 | 695 | 前后全体：前合计 590，后合计 549，10000×(590−549)÷590=694.92… |\n| N5 | -6 | 后−前：A -14，B +10，E -6，F -6，G -9，H -5，I -11，J +5；排序 -14,-11,-9,-6,-6,-5,5,10，中位 (-6-6)/2=-6 |\n| N6 | BLOCK | M2 门槛：N 组 333.33<350；S 组 1068.97≥350 通过，全体 694.92≥400 通过，单任务最大 +10 未超 10 ms |\n\n大白话：B 取 rev2 后后值回升到 90，N 组只净降 10 ms、改善约 333 基点，没到每组 350 的及格线，所以整体不放行（BLOCK）。",
+            "kind": "building-loop-durable"
+          },
+          "latestObserved": {
+            "correct": 3,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "N1",
+                "expected": "A,B,E,F,G,H,J",
+                "values": [
+                  {
+                    "raw": "A,B,E,F,G,H,I,J",
+                    "value": "A,B,E,F,G,H,I,J",
+                    "explanation": "M1 按最大修订后剔除 withdrawn 与缺失观测：C(rev2 withdrawn)、D(rev1 前值缺失)、I(rev2 后值缺失) 剔除"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N2",
+                "expected": "333",
+                "values": [
+                  {
+                    "raw": "333",
+                    "value": "333",
+                    "explanation": "M1 N 组有效 A/B(rev2)/E：前 100+80+120=300，后 86+90+114=290，10000×(300−290)÷300=333.33…"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "N3",
+                "expected": "500",
+                "values": [
+                  {
+                    "raw": "1069",
+                    "value": "1069",
+                    "explanation": "M1 S 组有效 F/G/H/I(rev2)：前 50+50+100+90=290，后 44+41+95+79=259，10000×(290−259)÷290=1068.97…"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N4",
+                "expected": "417",
+                "values": [
+                  {
+                    "raw": "695",
+                    "value": "695",
+                    "explanation": "前后全体：前合计 590，后合计 549，10000×(590−549)÷590=694.92…"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "N5",
+                "expected": "-6",
+                "values": [
+                  {
+                    "raw": "-6",
+                    "value": "-6",
+                    "explanation": "后−前：A -14，B +10，E -6，F -6，G -9，H -5，I -11，J +5；排序 -14,-11,-9,-6,-6,-5,5,10，中位 (-6-6)/2=-6"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "N6",
+                "expected": "BLOCK",
+                "values": [
+                  {
+                    "raw": "BLOCK",
+                    "value": "BLOCK",
+                    "explanation": "M2 门槛：N 组 333.33<350；S 组 1068.97≥350 通过，全体 694.92≥400 通过，单任务最大 +10 未超 10 ms"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": "first-review",
+          "coverage": 16,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 15306
+            },
+            {
+              "kind": "completed",
+              "ms": 46745
+            }
+          ],
+          "toolErrors": [
+            {
+              "actor": "root",
+              "seq": 17,
+              "ms": 4507,
+              "detail": "Error: 会话材料须为本会话用户实际提供的逐字摘录"
+            },
+            {
+              "actor": "child-1",
+              "seq": 35,
+              "ms": 20451,
+              "detail": "Error: 需要改动理由"
+            },
+            {
+              "actor": "child-2",
+              "seq": 43,
+              "ms": 62438,
+              "detail": "Error: B2-5b8f253a: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B3-3afccb21: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B4-57c2bafe: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B5-c26bfba7: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替"
+            },
+            {
+              "actor": "child-2",
+              "seq": 67,
+              "ms": 78157,
+              "detail": "Error: B8-dd955049: 直接事实须给 evidence 原文及逐字 quote"
+            },
+            {
+              "actor": "child-2",
+              "seq": 79,
+              "ms": 86404,
+              "detail": "Error: B10-0ecbfdf2: B10-0ecbfdf2 的拆分遗漏或改写了原文，请连续覆盖整个块。[coverage-span] {\"block\":\"B10-0ecbfdf2\",\"line\":9,\"part\":1,\"reason\":\"gap-before-part\",\"offsetUnit\":\"UTF-16\",\"cursor\":0,\"blockLength\":104,\"firstMismatch\":{\"blockOffset\":0,\"partOffset\":0,\"expected\":\"|\",\"received\":\"M\"},\"blockText\":{\"from\":0,\"text\":\"| N3 | 1069 | M1 S 组有效 F/G/H/I(rev2)：前 50+50+100+90=290，后 44+41+95+79=259，10000×(290−259)÷290=1068.97… |\",\"truncated\":false},\"expectedSuffix\":{\"from\":"
+            },
+            {
+              "actor": "child-2",
+              "seq": 109,
+              "ms": 109451,
+              "detail": "Error: B15-2c385cb3: B15-2c385cb3 的拆分遗漏或改写了原文，请连续覆盖整个块。[coverage-span] {\"block\":\"B15-2c385cb3\",\"line\":12,\"part\":2,\"reason\":\"gap-before-part\",\"offsetUnit\":\"UTF-16\",\"cursor\":35,\"blockLength\":56,\"firstMismatch\":{\"blockOffset\":35,\"partOffset\":0,\"expected\":\"，\",\"received\":\"单\"},\"blockText\":{\"from\":0,\"text\":\"S 组 1068.97≥350 通过，全体 694.92≥400 通过，单任务最大 +10 未超 10 ms |\",\"truncated\":false},\"expectedSuffix\":{\"from\":35,\"text\":\"，单任务最大 +10 未超 10 ms |\",\"truncated\":"
+            },
+            {
+              "actor": "child-2",
+              "seq": 127,
+              "ms": 128337,
+              "detail": "Error: 每项 revise 都须有 revisions 的具体改动和要求出处"
+            },
+            {
+              "actor": "child-2",
+              "seq": 133,
+              "ms": 134780,
+              "detail": "Error: 请给出质量项 alternatives 的具体内容或适用边界"
+            },
+            {
+              "actor": "child-2",
+              "seq": 139,
+              "ms": 142652,
+              "detail": "Error: 资料引用不在本轮证据授权中 PROJECT-GOAL.md"
+            },
+            {
+              "actor": "child-2",
+              "seq": 145,
+              "ms": 148942,
+              "detail": "Error: 质量退回须引用已读的当前目标或规则原文，选做建议请放 suggestions"
+            }
+          ],
+          "streamErrors": [],
+          "roleCount": 3,
+          "usageAtPrimary": {
+            "inputTokens": 15220,
+            "cacheReadTokens": 81920,
+            "cacheWriteTokens": 0,
+            "outputTokens": 5036,
+            "totalTokens": 102176,
+            "providerMessages": 14,
+            "withUsage": 14,
+            "cacheReadPercent": 84.33
+          },
+          "usageObserved": {
+            "inputTokens": 55457,
+            "cacheReadTokens": 731904,
+            "cacheWriteTokens": 0,
+            "outputTokens": 20635,
+            "totalTokens": 807996,
+            "providerMessages": 38,
+            "withUsage": 38,
+            "cacheReadPercent": 92.96
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 15,
+              "ms": 4499,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1188,
+                "outputTokens": 759,
+                "cacheReadTokens": 1408,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3355
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 21,
+              "ms": 7806,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 182,
+                "outputTokens": 485,
+                "cacheReadTokens": 3200,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3867
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 30,
+              "ms": 8988,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3542,
+                "outputTokens": 38,
+                "cacheReadTokens": 2688,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6268
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 37,
+              "ms": 12179,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1918,
+                "outputTokens": 248,
+                "cacheReadTokens": 6144,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8310
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 19,
+              "ms": 13540,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1598,
+                "outputTokens": 44,
+                "cacheReadTokens": 2048,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3690
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 45,
+              "ms": 13580,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1358,
+                "outputTokens": 38,
+                "cacheReadTokens": 8192,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9588
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 25,
+              "ms": 15174,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1723,
+                "outputTokens": 146,
+                "cacheReadTokens": 3584,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5453
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 51,
+              "ms": 15305,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 773,
+                "outputTokens": 16,
+                "cacheReadTokens": 9472,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10261
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 33,
+              "ms": 20440,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 928,
+                "outputTokens": 650,
+                "cacheReadTokens": 5376,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6954
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 39,
+              "ms": 24295,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 188,
+                "outputTokens": 607,
+                "cacheReadTokens": 6784,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7579
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 45,
+              "ms": 25571,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 250,
+                "outputTokens": 58,
+                "cacheReadTokens": 7424,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7732
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 51,
+              "ms": 29563,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 679,
+                "outputTokens": 613,
+                "cacheReadTokens": 7680,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8972
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 57,
+              "ms": 31169,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 233,
+                "outputTokens": 58,
+                "cacheReadTokens": 8832,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9123
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 63,
+              "ms": 38887,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 660,
+                "outputTokens": 1276,
+                "cacheReadTokens": 9088,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11024
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 62,
+              "ms": 40807,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1270,
+                "outputTokens": 38,
+                "cacheReadTokens": 10240,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11548
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 70,
+              "ms": 44890,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 740,
+                "outputTokens": 270,
+                "cacheReadTokens": 11520,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12530
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 78,
+              "ms": 46745,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1390,
+                "outputTokens": 17,
+                "cacheReadTokens": 12416,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13823
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 19,
+              "ms": 47174,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3023,
+                "outputTokens": 52,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8067
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 25,
+              "ms": 48721,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3970,
+                "outputTokens": 87,
+                "cacheReadTokens": 8064,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12121
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 34,
+              "ms": 57842,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2817,
+                "outputTokens": 824,
+                "cacheReadTokens": 13440,
+                "cacheWriteTokens": 0,
+                "totalTokens": 17081
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 41,
+              "ms": 62424,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2985,
+                "outputTokens": 643,
+                "cacheReadTokens": 17024,
+                "cacheWriteTokens": 0,
+                "totalTokens": 20652
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 47,
+              "ms": 63792,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 185,
+                "outputTokens": 93,
+                "cacheReadTokens": 20608,
+                "cacheWriteTokens": 0,
+                "totalTokens": 20886
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 53,
+              "ms": 68850,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 267,
+                "outputTokens": 749,
+                "cacheReadTokens": 20864,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21880
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 59,
+              "ms": 74771,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 267,
+                "outputTokens": 890,
+                "cacheReadTokens": 21760,
+                "cacheWriteTokens": 0,
+                "totalTokens": 22917
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 65,
+              "ms": 78103,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 505,
+                "outputTokens": 397,
+                "cacheReadTokens": 22912,
+                "cacheWriteTokens": 0,
+                "totalTokens": 23814
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 71,
+              "ms": 82229,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 166,
+                "outputTokens": 379,
+                "cacheReadTokens": 23680,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24225
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 77,
+              "ms": 86389,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 807,
+                "outputTokens": 472,
+                "cacheReadTokens": 24192,
+                "cacheWriteTokens": 0,
+                "totalTokens": 25471
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 83,
+              "ms": 90178,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 508,
+                "outputTokens": 428,
+                "cacheReadTokens": 25344,
+                "cacheWriteTokens": 0,
+                "totalTokens": 26280
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 89,
+              "ms": 94327,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1553,
+                "outputTokens": 708,
+                "cacheReadTokens": 26240,
+                "cacheWriteTokens": 0,
+                "totalTokens": 28501
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 95,
+              "ms": 99320,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2952,
+                "outputTokens": 557,
+                "cacheReadTokens": 28416,
+                "cacheWriteTokens": 0,
+                "totalTokens": 31925
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 101,
+              "ms": 103498,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3635,
+                "outputTokens": 262,
+                "cacheReadTokens": 31872,
+                "cacheWriteTokens": 0,
+                "totalTokens": 35769
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 107,
+              "ms": 109389,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3581,
+                "outputTokens": 1135,
+                "cacheReadTokens": 35712,
+                "cacheWriteTokens": 0,
+                "totalTokens": 40428
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 113,
+              "ms": 115234,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 665,
+                "outputTokens": 1133,
+                "cacheReadTokens": 40320,
+                "cacheWriteTokens": 0,
+                "totalTokens": 42118
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 119,
+              "ms": 119451,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 4180,
+                "outputTokens": 635,
+                "cacheReadTokens": 42112,
+                "cacheWriteTokens": 0,
+                "totalTokens": 46927
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 125,
+              "ms": 128325,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 4218,
+                "outputTokens": 1443,
+                "cacheReadTokens": 46848,
+                "cacheWriteTokens": 0,
+                "totalTokens": 52509
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 131,
+              "ms": 134770,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 185,
+                "outputTokens": 1371,
+                "cacheReadTokens": 52352,
+                "cacheWriteTokens": 0,
+                "totalTokens": 53908
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 137,
+              "ms": 142641,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 174,
+                "outputTokens": 1529,
+                "cacheReadTokens": 53760,
+                "cacheWriteTokens": 0,
+                "totalTokens": 55463
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 143,
+              "ms": 148930,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 194,
+                "outputTokens": 1487,
+                "cacheReadTokens": 55296,
+                "cacheWriteTokens": 0,
+                "totalTokens": 56977
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "change-schedule",
+      "description": "资源互斥、最早排程与反事实",
+      "arms": [
+        {
+          "mode": "standard",
+          "preset": "standard",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": false,
+          "instructionPackets": [],
+          "observedMs": 150075,
+          "firstArtifactMs": 16851,
+          "firstArtifact": {
+            "sha256": "91af1073be280c9d57f0ae23185df92862d36307a7ada8bc0fe6b164eee07a68",
+            "bytes": 653,
+            "text": "| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| Q1 | H | 逐任务最早排程 S1：C 在 2–5，H 在 5–7；D 要等 B(2–6)与C(5)都完成，且 OPS 在 5–8 被 H 占，所以 D 最早 7 开始 |\n| Q2 | 5 | H 在 C 结束后开工 5 |\n| Q3 | 7 | max(B末6, C末5) = 6，OPS 忙到 8，所以顺延到 7 |\n| Q4 | 9 | max(D末9, E末9, H末7) = 9 |\n| Q5 | 12 | G 在 F(9–10)之后，IO 从 10 起空闲，所以 G 在 10–12 |\n| Q6 | 14 | E 变为 6–11，所以 F 最早 11–12，G 在 12–14 |\n\n大白话：基线里 OPS 的瓶颈是 H 夹在 C 和 D 之间，最早 12 收工；E 一拉长，F 后移，最早结束时间就变成 14。\n",
+            "kind": "standard-file"
+          },
+          "primary": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "逐任务最早排程 S1：C 在 2–5，H 在 5–7；D 要等 B(2–6)与C(5)都完成，且 OPS 在 5–8 被 H 占，所以 D 最早 7 开始"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "H 在 C 结束后开工 5"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "max(B末6, C末5) = 6，OPS 忙到 8，所以顺延到 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "max(D末9, E末9, H末7) = 9"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "G 在 F(9–10)之后，IO 从 10 起空闲，所以 G 在 10–12"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "E 变为 6–11，所以 F 最早 11–12，G 在 12–14"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "逐任务最早排程 S1：C 在 2–5，H 在 5–7；D 要等 B(2–6)与C(5)都完成，且 OPS 在 5–8 被 H 占，所以 D 最早 7 开始"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "H 在 C 结束后开工 5"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "max(B末6, C末5) = 6，OPS 忙到 8，所以顺延到 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "max(D末9, E末9, H末7) = 9"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "G 在 F(9–10)之后，IO 从 10 起空闲，所以 G 在 10–12"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "E 变为 6–11，所以 F 最早 11–12，G 在 12–14"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "91af1073be280c9d57f0ae23185df92862d36307a7ada8bc0fe6b164eee07a68",
+            "bytes": 653,
+            "text": "| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| Q1 | H | 逐任务最早排程 S1：C 在 2–5，H 在 5–7；D 要等 B(2–6)与C(5)都完成，且 OPS 在 5–8 被 H 占，所以 D 最早 7 开始 |\n| Q2 | 5 | H 在 C 结束后开工 5 |\n| Q3 | 7 | max(B末6, C末5) = 6，OPS 忙到 8，所以顺延到 7 |\n| Q4 | 9 | max(D末9, E末9, H末7) = 9 |\n| Q5 | 12 | G 在 F(9–10)之后，IO 从 10 起空闲，所以 G 在 10–12 |\n| Q6 | 14 | E 变为 6–11，所以 F 最早 11–12，G 在 12–14 |\n\n大白话：基线里 OPS 的瓶颈是 H 夹在 C 和 D 之间，最早 12 收工；E 一拉长，F 后移，最早结束时间就变成 14。\n",
+            "kind": "standard-file"
+          },
+          "latestObserved": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "逐任务最早排程 S1：C 在 2–5，H 在 5–7；D 要等 B(2–6)与C(5)都完成，且 OPS 在 5–8 被 H 占，所以 D 最早 7 开始"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "H 在 C 结束后开工 5"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "max(B末6, C末5) = 6，OPS 忙到 8，所以顺延到 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "max(D末9, E末9, H末7) = 9"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "G 在 F(9–10)之后，IO 从 10 起空闲，所以 G 在 10–12"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "E 变为 6–11，所以 F 最早 11–12，G 在 12–14"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": null,
+          "coverage": null,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 16851
+            }
+          ],
+          "toolErrors": [],
+          "streamErrors": [],
+          "roleCount": 1,
+          "usageAtPrimary": {
+            "inputTokens": 1903,
+            "cacheReadTokens": 52992,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1838,
+            "totalTokens": 56733,
+            "providerMessages": 5,
+            "withUsage": 5,
+            "cacheReadPercent": 96.53
+          },
+          "usageObserved": {
+            "inputTokens": 1903,
+            "cacheReadTokens": 52992,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1838,
+            "totalTokens": 56733,
+            "providerMessages": 5,
+            "withUsage": 5,
+            "cacheReadPercent": 96.53
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 17,
+              "ms": 4505,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1147,
+                "outputTokens": 501,
+                "cacheReadTokens": 8832,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10480
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 25,
+              "ms": 8313,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 210,
+                "outputTokens": 445,
+                "cacheReadTokens": 10368,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11023
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 33,
+              "ms": 12262,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 215,
+                "outputTokens": 376,
+                "cacheReadTokens": 10880,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11471
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 13694,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 153,
+                "outputTokens": 96,
+                "cacheReadTokens": 11392,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11641
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 46,
+              "ms": 16848,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 178,
+                "outputTokens": 420,
+                "cacheReadTokens": 11520,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12118
+              }
+            }
+          ]
+        },
+        {
+          "mode": "building-loop",
+          "preset": "building-loop",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": true,
+          "instructionPackets": [
+            {
+              "actor": "child-1",
+              "seq": 21,
+              "role": "executor",
+              "phase": "intake",
+              "declaredSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualCodePoints": 659,
+              "exactPrompt": true
+            },
+            {
+              "actor": "child-1",
+              "seq": 56,
+              "role": "executor",
+              "phase": "intake",
+              "declaredSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualCodePoints": 659,
+              "exactPrompt": true
+            },
+            {
+              "actor": "child-2",
+              "seq": 21,
+              "role": "reviewer",
+              "phase": "first-review",
+              "declaredSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualCodePoints": 659,
+              "exactPrompt": true
+            }
+          ],
+          "observedMs": 150075,
+          "firstArtifactMs": 64646,
+          "firstArtifact": {
+            "sha256": "4dba6cc59deaab6e10182d1d723d1e088a5fe8dfac3baf7630e18a93a80db5f9",
+            "bytes": 992,
+            "text": "# 交付稿\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| 1 | H | 最优字典序排程 A[0,2) B[2,6) C[2,5) H[5,7) D[7,9) E[6,9) F[9,10) G[10,12)，H 起 5 早于 D 起 7 |\n| 2 | 5 | H 需 C 完成；C≥2，OPS 上 C 后须排 D(2)、H(2)、F(1)，D≥max(B,C)=6，取最小 D=7 时 H 只能占 [5,7) |\n| 3 | 7 | D 需 B、C 完成（≥6）；D=6 会令 H≥8、F≥10、结束 13>12，故 D 最小可行值为 7 |\n| 4 | 9 | F 在 OPS 上须等 D、E、H 全完：max(D 完 9, E 完 9, H 完 7)=9 |\n| 5 | 12 | 下界：C≥2 结束 5，OPS 上 C 后 D+H+F=2+2+1=5 → OPS 结束≥10，G 在 IO 再 +2 → ≥12；上述排程达到 12 |\n| 6 | 14 | E 改为 5：B[2,6)，E[6,11)，F≥11 → F[11,12)，G[12,14)；F 受 E 完成时刻 11 约束为下界 |\n\n大白话：基线最快 12 结束，且要字母序最早就先做 H 再做 D（H 从 5 开始、D 从 7 开始、F 从 9 开始）；E 一旦变成 5 个时间单位，就变成卡脖子的活，整体最早要 14 才结束。\n",
+            "kind": "building-loop-durable",
+            "source": "native-tool-result-review-ready",
+            "observedAt": 1794484151550
+          },
+          "primary": {
+            "correct": 0,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [],
+                "status": "missing"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "最优字典序排程 A[0,2) B[2,6) C[2,5) H[5,7) D[7,9) E[6,9) F[9,10) G[10,12)，H 起 5 早于 D 起 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "H 需 C 完成；C≥2，OPS 上 C 后须排 D(2)、H(2)、F(1)，D≥max(B,C)=6，取最小 D=7 时 H 只能占 [5,7)"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "D 需 B、C 完成（≥6）；D=6 会令 H≥8、F≥10、结束 13>12，故 D 最小可行值为 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "F 在 OPS 上须等 D、E、H 全完：max(D 完 9, E 完 9, H 完 7)=9"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "下界：C≥2 结束 5，OPS 上 C 后 D+H+F=2+2+1=5 → OPS 结束≥10，G 在 IO 再 +2 → ≥12；上述排程达到 12"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "E 改为 5：B[2,6)，E[6,11)，F≥11 → F[11,12)，G[12,14)；F 受 E 完成时刻 11 约束为下界"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": true
+          },
+          "latestArtifact": {
+            "sha256": "4dba6cc59deaab6e10182d1d723d1e088a5fe8dfac3baf7630e18a93a80db5f9",
+            "bytes": 992,
+            "text": "# 交付稿\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| 1 | H | 最优字典序排程 A[0,2) B[2,6) C[2,5) H[5,7) D[7,9) E[6,9) F[9,10) G[10,12)，H 起 5 早于 D 起 7 |\n| 2 | 5 | H 需 C 完成；C≥2，OPS 上 C 后须排 D(2)、H(2)、F(1)，D≥max(B,C)=6，取最小 D=7 时 H 只能占 [5,7) |\n| 3 | 7 | D 需 B、C 完成（≥6）；D=6 会令 H≥8、F≥10、结束 13>12，故 D 最小可行值为 7 |\n| 4 | 9 | F 在 OPS 上须等 D、E、H 全完：max(D 完 9, E 完 9, H 完 7)=9 |\n| 5 | 12 | 下界：C≥2 结束 5，OPS 上 C 后 D+H+F=2+2+1=5 → OPS 结束≥10，G 在 IO 再 +2 → ≥12；上述排程达到 12 |\n| 6 | 14 | E 改为 5：B[2,6)，E[6,11)，F≥11 → F[11,12)，G[12,14)；F 受 E 完成时刻 11 约束为下界 |\n\n大白话：基线最快 12 结束，且要字母序最早就先做 H 再做 D（H 从 5 开始、D 从 7 开始、F 从 9 开始）；E 一旦变成 5 个时间单位，就变成卡脖子的活，整体最早要 14 才结束。\n",
+            "kind": "building-loop-durable"
+          },
+          "latestObserved": {
+            "correct": 0,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [],
+                "status": "missing"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": "first-review",
+          "coverage": 15,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 13542
+            },
+            {
+              "kind": "completed",
+              "ms": 46294
+            },
+            {
+              "kind": "completed",
+              "ms": 71976
+            }
+          ],
+          "toolErrors": [
+            {
+              "actor": "child-1",
+              "seq": 50,
+              "ms": 55401,
+              "detail": "Error: 请先用 prepare 获取本阶段完整的用户开工指令原文"
+            },
+            {
+              "actor": "child-2",
+              "seq": 33,
+              "ms": 94966,
+              "detail": "Error: B4-d8432e22: 每段须声明 kind 与 supported/unsupported/uncertain；B6-e60edcac: 每段须声明 kind 与 supported/unsupported/uncertain；B8-77bd91ec: 每段须声明 kind 与 supported/unsupported/uncertain；B9-8691ca8b: 每段须声明 kind 与 supported/unsupported/uncertain"
+            },
+            {
+              "actor": "child-2",
+              "seq": 39,
+              "ms": 105770,
+              "detail": "Error: B4-d8432e22: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B6-e60edcac: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B8-77bd91ec: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B9-8691ca8b: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替"
+            }
+          ],
+          "streamErrors": [],
+          "roleCount": 3,
+          "usageAtPrimary": {
+            "inputTokens": 21339,
+            "cacheReadTokens": 139392,
+            "cacheWriteTokens": 0,
+            "outputTokens": 9050,
+            "totalTokens": 169781,
+            "providerMessages": 16,
+            "withUsage": 16,
+            "cacheReadPercent": 86.72
+          },
+          "usageObserved": {
+            "inputTokens": 38475,
+            "cacheReadTokens": 351104,
+            "cacheWriteTokens": 0,
+            "outputTokens": 25798,
+            "totalTokens": 415377,
+            "providerMessages": 28,
+            "withUsage": 28,
+            "cacheReadPercent": 90.12
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 15,
+              "ms": 6020,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1097,
+                "outputTokens": 605,
+                "cacheReadTokens": 1408,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3110
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 24,
+              "ms": 7761,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2719,
+                "outputTokens": 38,
+                "cacheReadTokens": 2688,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5445
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 31,
+              "ms": 9754,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1740,
+                "outputTokens": 139,
+                "cacheReadTokens": 5376,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7255
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 11189,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1277,
+                "outputTokens": 38,
+                "cacheReadTokens": 7168,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8483
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 19,
+              "ms": 11374,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1429,
+                "outputTokens": 46,
+                "cacheReadTokens": 2048,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3523
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 45,
+              "ms": 13542,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 615,
+                "outputTokens": 40,
+                "cacheReadTokens": 8448,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9103
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 25,
+              "ms": 36163,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1770,
+                "outputTokens": 4096,
+                "cacheReadTokens": 3456,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9322
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 55,
+              "ms": 38321,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 5352,
+                "outputTokens": 38,
+                "cacheReadTokens": 9088,
+                "cacheWriteTokens": 0,
+                "totalTokens": 14478
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 61,
+              "ms": 42285,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 604,
+                "outputTokens": 330,
+                "cacheReadTokens": 14464,
+                "cacheWriteTokens": 0,
+                "totalTokens": 15398
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 68,
+              "ms": 43855,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1235,
+                "outputTokens": 38,
+                "cacheReadTokens": 15360,
+                "cacheWriteTokens": 0,
+                "totalTokens": 16633
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 36,
+              "ms": 46178,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 431,
+                "outputTokens": 553,
+                "cacheReadTokens": 9216,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10200
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 74,
+              "ms": 46294,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 701,
+                "outputTokens": 16,
+                "cacheReadTokens": 16512,
+                "cacheWriteTokens": 0,
+                "totalTokens": 17229
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 42,
+              "ms": 47730,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 444,
+                "outputTokens": 58,
+                "cacheReadTokens": 9856,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10358
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 48,
+              "ms": 55389,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 689,
+                "outputTokens": 1389,
+                "cacheReadTokens": 10240,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12318
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 54,
+              "ms": 56777,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 568,
+                "outputTokens": 38,
+                "cacheReadTokens": 11776,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12382
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 60,
+              "ms": 64597,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 668,
+                "outputTokens": 1588,
+                "cacheReadTokens": 12288,
+                "cacheWriteTokens": 0,
+                "totalTokens": 14544
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 85,
+              "ms": 65897,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1283,
+                "outputTokens": 38,
+                "cacheReadTokens": 17152,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18473
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 93,
+              "ms": 68219,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 674,
+                "outputTokens": 148,
+                "cacheReadTokens": 18432,
+                "cacheWriteTokens": 0,
+                "totalTokens": 19254
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 19,
+              "ms": 69742,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2963,
+                "outputTokens": 66,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8021
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 101,
+              "ms": 70372,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1269,
+                "outputTokens": 38,
+                "cacheReadTokens": 19200,
+                "cacheWriteTokens": 0,
+                "totalTokens": 20507
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 107,
+              "ms": 71976,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 607,
+                "outputTokens": 10,
+                "cacheReadTokens": 20480,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21097
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 25,
+              "ms": 82488,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3987,
+                "outputTokens": 2772,
+                "cacheReadTokens": 7936,
+                "cacheWriteTokens": 0,
+                "totalTokens": 14695
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 31,
+              "ms": 94950,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2445,
+                "outputTokens": 3265,
+                "cacheReadTokens": 12544,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18254
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 37,
+              "ms": 105695,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2574,
+                "outputTokens": 2879,
+                "cacheReadTokens": 15744,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21197
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 43,
+              "ms": 109627,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 215,
+                "outputTokens": 113,
+                "cacheReadTokens": 21120,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21448
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 49,
+              "ms": 120574,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 345,
+                "outputTokens": 2721,
+                "cacheReadTokens": 21376,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24442
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 55,
+              "ms": 137638,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 244,
+                "outputTokens": 3962,
+                "cacheReadTokens": 24320,
+                "cacheWriteTokens": 0,
+                "totalTokens": 28526
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 61,
+              "ms": 142113,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 530,
+                "outputTokens": 736,
+                "cacheReadTokens": 28416,
+                "cacheWriteTokens": 0,
+                "totalTokens": 29682
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "phaseTimeline": [
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "intake",
+      "coverage": 0,
+      "ms": 9831
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "intake",
+      "coverage": 0,
+      "ms": 10205
+    },
+    {
+      "caseId": "paired-metrics",
+      "mode": "building-loop",
+      "phase": "intake",
+      "coverage": 0,
+      "ms": 12261
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "review-ready",
+      "coverage": 0,
+      "ms": 26832
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "first-review",
+      "coverage": 0,
+      "ms": 31125
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "blocked",
+      "coverage": 0,
+      "ms": 36193
+    },
+    {
+      "caseId": "paired-metrics",
+      "mode": "building-loop",
+      "phase": "review-ready",
+      "coverage": 0,
+      "ms": 38996
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "intake",
+      "coverage": 0,
+      "ms": 42326
+    },
+    {
+      "caseId": "paired-metrics",
+      "mode": "building-loop",
+      "phase": "first-review",
+      "coverage": 0,
+      "ms": 44924
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "review-ready",
+      "coverage": 0,
+      "ms": 64664
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "first-review",
+      "coverage": 0,
+      "ms": 68381
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "supplement-ready",
+      "coverage": 27,
+      "ms": 110115
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "supplement",
+      "coverage": 0,
+      "ms": 119441
+    }
+  ]
+}

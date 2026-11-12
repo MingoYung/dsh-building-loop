@@ -5,6 +5,7 @@ import { withWorkspaceLock } from "./transactions.mjs";
 
 const SPEC = "building-loop-conversation-start/1";
 const LIMIT = 64 * 1024;
+const DIRECT_LIMIT = 8000;
 const ID = /^[0-9a-f]{64}$/u;
 const PHASES = new Set(["proposed", "discussing", "starting", "started"]);
 const APPROVALS = new Set(["owner-message", "owner-button"]);
@@ -16,10 +17,10 @@ const META_OR_NEGATION = /(?:先别|别|不要|不用|无需|不必)\s*(?:真的
 const QUESTION_ABOUT_COMMAND = /是什么(?:意思)?|什么意思|(?:词|句|说法|表达|措辞|这几个字)的(?:含义|意思|用法)|这个词|这句话|怎么(?:用|说|判断|理解)|如何(?:用|说|判断|理解)|要不要|是不是|会怎样|^(?:怎么|如何|的意思)/u;
 const TEMPORAL_TAIL = /^(?:之前|以后|之后|前(?:[，,的\s]|我们|我|需要|先|要|做什么|有)|后(?:[，,的\s]|我们|我|需要|先|要|会)|的时候|时[，,\s]|需要先|应该先|指的是)/u;
 const TEXT_CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f]/u;
+const UNPAIRED_SURROGATE = /\p{Surrogate}/u;
 
-/** Only explicit text from a native human event can waive a click. Other intent is assessed by the model and proposed for confirmation. */
-function authorizationOf(input) {
-  if (!input || input.length > 8000 || TEXT_CONTROL.test(input) || META_OR_NEGATION.test(input)) return { kind: "none" };
+function startIntent(input) {
+  if (!input || TEXT_CONTROL.test(input) || META_OR_NEGATION.test(input)) return { kind: "none" };
   if (STANDALONE.test(input)) return { kind: "existing" };
   const prior = FOLLOW_PRIOR.exec(input);
   if (prior && /^[。.!！]?$/u.test(input.slice(prior[0].length).trim())) return { kind: "existing" };
@@ -33,6 +34,11 @@ function authorizationOf(input) {
     return { kind: "direct" };
   }
   return { kind: "none" };
+}
+
+/** Only bounded explicit text from a native human event can waive a click. */
+function authorizationOf(input) {
+  return input.length > DIRECT_LIMIT || UNPAIRED_SURROGATE.test(input) ? { kind: "none" } : startIntent(input);
 }
 
 function ownHuman(event, inheritedEventCount) {
@@ -142,8 +148,11 @@ function fields(task) {
   return details;
 }
 
-function proposalId(sessionId, user, details, materials, directive) {
-  return digest(JSON.stringify([sessionId, user.seq, user.sha256, details, materials, directive]));
+function proposalId(sessionId, user, details, materials, directive, instruction) {
+  const identity = [sessionId, user.seq, user.sha256, details, materials, directive];
+  // Preserve every existing proposal ID, including approved records awaiting a retry.
+  if (instruction !== undefined) identity.push(instruction);
+  return digest(JSON.stringify(identity));
 }
 
 /** The activation can point only to a session-private project or the host's canonical workspace. */
@@ -182,8 +191,14 @@ function load(root, file, sessionId) {
     throw new Error("Building-loop 开工记录无效");
   }
   const details = fields(record.proposal), materials = checkedMaterials(record.proposal.materials ?? []);
+  const { instruction } = record.proposal;
   const directive = record.proposal.directive === undefined ? null : field(record.proposal.directive, "开工原文摘录", 512);
-  if (record.proposal.id !== proposalId(sessionId, record.source, details, materials, directive) || materials.some(item => item.seq > record.source.seq)) {
+  if (instruction !== undefined && (directive !== null || typeof instruction !== "string" || instruction !== instruction.trim() ||
+    authorizationOf(instruction).kind !== "direct" || digest(instruction) !== record.source.sha256)) {
+    throw new Error("开工指令原文与会话版本不符");
+  }
+  if (record.proposal.id !== proposalId(sessionId, record.source, details, materials, directive, instruction) ||
+    materials.some(item => item.seq > record.source.seq)) {
     throw new Error("Building-loop 开工记录与会话版本不符");
   }
   if (record.phase === "started") {
@@ -250,14 +265,17 @@ export function proposeConversationTask(hostHome, sessionId, current, task, exce
     if (visible.status !== "idle") return visible;
     if (record && current.seq <= record.source.seq) throw new Error("当前会话消息版本已经变化");
     const original = trustedText(current);
-    const direct = authorizationOf(original).kind === "direct";
+    const direct = startIntent(original).kind === "direct";
     if (!direct && record?.phase === "discussing" && JSON.stringify(fields(record.proposal)) === JSON.stringify(details)) {
       return { status: "discussing", proposal: record.proposal };
     }
-    // Preserve a bounded exact prefix of the user's direct command beside the AI summary.
-    const directive = direct ? Array.from(original).slice(0, 256).join("").trimEnd() : null;
-    const id = proposalId(sessionId, current, details, materials, directive);
-    const proposal = { id, userSeq: current.seq, ...details, ...(directive ? { directive } : {}), ...(materials.length ? { materials } : {}) };
+    if (direct && original.length > DIRECT_LIMIT) {
+      throw new Error("开工指令原文最多 " + DIRECT_LIMIT + " 个 UTF-16 码元，请缩短指令并重新发送");
+    }
+    if (direct && UNPAIRED_SURROGATE.test(original)) throw new Error("开工指令含无效 Unicode，请重新发送");
+    const instruction = direct ? original : undefined;
+    const id = proposalId(sessionId, current, details, materials, null, instruction);
+    const proposal = { id, userSeq: current.seq, ...details, ...(instruction ? { instruction } : {}), ...(materials.length ? { materials } : {}) };
     save(root, file, { spec: SPEC, phase: "proposed", source: source(current), proposal }, bytes);
     return { status: "proposed", proposal };
   });

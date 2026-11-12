@@ -33,6 +33,7 @@ const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, LEDGER, COVERAGE, START];
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
+const PREPARE_BYTE_LIMIT = 32 * 1024;
 const AUTO_BOOK_RETRY_MS = 3000;
 const settleOnly = () => undefined;
 const EMPTY = { read: [], write: [] };
@@ -690,7 +691,18 @@ export function apply(ctx, config = {}) {
       if(spec)refreshCheckpoints(frame,current,spec);
       const order = [...new Set([...frame.policy.goalContext,...frame.policy.instructions,
         ...(spec?[spec.candidate]:[]),...frame.reads])].filter(file=>includes(frame.reads,file));
-      const files=[], pending=[];let bytesUsed=0;
+      const files=[], pending=[];
+      let bytesUsed=0, instruction;
+      const original = frame.started?.proposal.instruction;
+      if (assignment && original && current.instructionReadSerial !== current.serial) {
+        // The owner command comes from the host state, outside workspace grants and evidence.
+        // Count it in the same packet limit and only mark it when the complete text is returned.
+        instruction = { seq: frame.started.source.seq, sha256: frame.started.source.sha256, text: original };
+        bytesUsed = Buffer.byteLength(JSON.stringify(instruction));
+        if (bytesUsed > PREPARE_BYTE_LIMIT) throw new Error("完整开工指令原文超过读包上限");
+        current.instructionReadSerial = current.serial;
+        frame.changed = true;
+      }
       for (const file of order) {
         const bytes=readBytes(frame.root,file);
         if (!bytes) continue; // Future receipts may be authorized before they exist.
@@ -702,7 +714,7 @@ export function apply(ctx, config = {}) {
         const start=unread[0];const returned=[];
         for(let line=start;line<=lines.length&&returned.length<250;line++) {
           const row=[line,lines[line-1]],size=Buffer.byteLength(JSON.stringify(row));
-          if(bytesUsed+size>32*1024)break;
+          if(bytesUsed+size>PREPARE_BYTE_LIMIT)break;
           returned.push(row);bytesUsed+=size;
         }
         if(returned.length) {
@@ -732,6 +744,7 @@ export function apply(ctx, config = {}) {
         : phase==="ledger-review" ? "ledger read 后逐项 ledger review"
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付";
       return {role:frame.role,phase,unit:assignment?.[0],files,pending,complete:pending.length===0,
+        ...(instruction ? { instruction } : {}),
         ...reconciliationNotice(frame,current),
         ...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
         ...(manuscriptCounts?.length?{citationLineCounts:manuscriptCounts}:{}),
@@ -1277,6 +1290,9 @@ export function apply(ctx, config = {}) {
       if (!frame.assignment) throw new Error("当前会话没有可交付阶段");
       const [id, active] = frame.assignment;
       if (args.unit !== undefined && args.unit !== id) throw new Error("unit 与本会话授权不匹配，当前单元为 " + id);
+      if (args.action !== "block" && frame.started?.proposal.instruction && active.instructionReadSerial !== active.serial) {
+        throw new Error("请先用 prepare 获取本阶段完整的用户开工指令原文");
+      }
       const spec = unitOf(frame, id);
       const binding=refreshCheckpoints(frame,active,spec);
       if (["reviewer", "auditor"].includes(frame.role) && active.goal?.sha256 !== goalSnapshot(frame).sha256) {
@@ -1621,6 +1637,7 @@ export function apply(ctx, config = {}) {
           ...(phase === "final-review" && assignment[1].quality ? { executionQuality: assignment[1].quality } : {}),
         } : units;
         return [descriptor, rule, "本阶段先 building_loop prepare 获取真实可见读包和参数契约；pending仍有页就继续prepare或按行read。已读且版本未变不需重复读。交付后宿主结束本轮，不额外收尾或通知。",
+          ...(assignment && confirmed?.instruction ? ["prepare 的 instruction 是所有者开工时的完整任务指令，补足当时的摘要；后续已确认变更以当前目标为准。它不是证据文件，权限仍由现有授权决定。"] : []),
           ...(frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
           ...(frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 完成后最终只提交 building_loop {"action":"audit"}，unit可省略；不要重复发送 checks、quality、note 或全文。宿主从已落盘证明生成回执。'] : []),
           ...(["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
