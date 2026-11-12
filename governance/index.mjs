@@ -19,7 +19,9 @@ import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, co
   pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
 import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 import { conversationDiscussion, decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask, startedConversationProject } from "./conversation-start.mjs";
-import { initializeConversationProject, privateProjectRoot, requirePrivateDraft } from "./conversation-project.mjs";
+import { initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable, requirePrivateDraft } from "./conversation-project.mjs";
+import { captureCodeIntake, prepareCodeIntake, verifyCodeIntake } from "./code-intake.mjs";
+import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQuery"];
@@ -692,13 +694,17 @@ export function apply(ctx, config = {}) {
       const order = [...new Set([...frame.policy.goalContext,...frame.policy.instructions,
         ...(spec?[spec.candidate]:[]),...frame.reads])].filter(file=>includes(frame.reads,file));
       const files=[], pending=[];
-      let bytesUsed=0, instruction;
+      let bytesUsed=0, instruction, deliverableTable;
       const original = frame.started?.proposal.instruction;
       if (assignment && original && current.instructionReadSerial !== current.serial) {
         // The owner command comes from the host state, outside workspace grants and evidence.
         // Count it in the same packet limit and only mark it when the complete text is returned.
         instruction = { seq: frame.started.source.seq, sha256: frame.started.source.sha256, text: original };
         bytesUsed = Buffer.byteLength(JSON.stringify(instruction));
+        if (frame.role === "executor" && phase === "intake" && /\.(?:md|markdown)$/iu.test(spec.candidate)) {
+          deliverableTable = deliverableTableContract(original);
+          if (deliverableTable) bytesUsed += Buffer.byteLength(JSON.stringify(deliverableTable));
+        }
         if (bytesUsed > PREPARE_BYTE_LIMIT) throw new Error("完整开工指令原文超过读包上限");
         current.instructionReadSerial = current.serial;
         frame.changed = true;
@@ -745,6 +751,9 @@ export function apply(ctx, config = {}) {
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付";
       return {role:frame.role,phase,unit:assignment?.[0],files,pending,complete:pending.length===0,
         ...(instruction ? { instruction } : {}),
+        ...(phase === "intake" && assignment && current.codeIntake ?
+          { codeTask: prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) } : {}),
+        ...(deliverableTable ? { deliverableTable } : {}),
         ...reconciliationNotice(frame,current),
         ...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
         ...(manuscriptCounts?.length?{citationLineCounts:manuscriptCounts}:{}),
@@ -880,6 +889,10 @@ export function apply(ctx, config = {}) {
         // Current hashes are rechecked by every evidence/goal/candidate consumer.
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
       };
+      if (plan.phase === "intake" && !plan.prior) {
+        const codeIntake = captureCodeIntake(frame, spec);
+        if (codeIntake) record.codeIntake = codeIntake;
+      }
       // A new activation cannot consume an earlier turn/end from the same
       // native session, even if that event is delivered again after the resume.
       if (Number.isSafeInteger(resident?.session.seq)) record.activationStartSeq = resident.session.seq;
@@ -933,6 +946,7 @@ export function apply(ctx, config = {}) {
       frame.state.units[id] = record;
       trackUnit(frame, id, record);
       frame.changed = true;
+      const ownerTableIntake = plan.phase === "intake" && frame.managed && privateProjectUsesOwnerTable(frame.root);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
         + (record.receipt && plan.phase === "supplement" ? "。请读取退回回执 " + record.receipt : "")
         + "。执行前依据已注入的阶段规则与授权范围。"
@@ -940,6 +954,7 @@ export function apply(ctx, config = {}) {
         // note, which can contain previous verdicts or proposed answers. Required
         // user changes belong in authorized project files, read at the new stage.
         + (plan.role!=="executor"?"独立依据当前授权目标、候选和原始材料核验，不预设结论。"
+          : ownerTableIntake ? "先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。"
           : args.note===undefined?"":"\n本次任务要求 "+requireText(args.note,"任务说明"));
       return { workspace: frame.root, phase: plan.phase, serial: plan.serial, brief };
     });
@@ -1316,6 +1331,16 @@ export function apply(ctx, config = {}) {
           requireGoalRead(frame, active, true);
           requirePrivateDraft(bytes);
         }
+        if (active.phase === "intake" && active.codeIntake) {
+          const goal = requireGoalRead(frame, active, true);
+          active.codeIntake.qualification = verifyCodeIntake(frame, id, active, spec, goal,
+            (file, currentBytes) => candidateReadComplete(active, file, currentBytes));
+        }
+        if (active.phase === "intake" && /\.(?:md|markdown)$/iu.test(spec.candidate)) {
+          const table = deliverableTableContract(frame.started?.proposal.instruction);
+          const issues = deliverableTableIssues(bytes, table);
+          if (issues.length) throw new Error("[building-loop/deliverable-table] " + issues.join("；"));
+        }
         if (active.phase === "supplement") {
           const goal = requireGoalRead(frame, active, true);
           const preflight = preflightCandidate(frame,active,id,spec,bytes,goal);
@@ -1617,6 +1642,8 @@ export function apply(ctx, config = {}) {
           ? (current?.reason==="classification-reconciliation-unresolved"?current.reasonNote:current?.goalStale ? COORDINATOR["goal-review-ready"] : COORDINATOR[phase] ?? "等待当前阶段交付或核验回执。") + " 总控只读写白名单内的中央文件和回执。"
           : frame.managed && phase === "intake"
             ? "接单。按已确认总纲和索引撰写第一版交付稿，只写 DELIVERY.md。会话原文是用户提供的材料，不能证明外部事实。材料不足时注明待核事项。完整读回目标和新正文后 submit。"
+            : phase === "intake" && assignment?.[1].codeIntake
+              ? "接单执行已确认的代码任务。读完整当前目标和授权实现，在已授予的写入路径内落实变更。读回变更文件与候选后 submit。保持原实现需要维护者提供本次受信测试回执，模型自报通过、注释排版或仅改测试不算实现。"
             : RULES[phase] ?? "本子会话当前无工作授权，等待总控。";
         const descriptor = "building-loop role=" + frame.role + " phase=" + phase;
         if (frame.role === "idle") return descriptor + "\n" + rule + " 宿主已负责阶段通知，直接结束本轮，不再调用工具或复述正文。";

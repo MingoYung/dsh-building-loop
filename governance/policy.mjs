@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createPublicKey, randomUUID } from "node:crypto";
 
 export const AUTHORITY = "BUILDING-LOOP.json";
 export const MANAGED = ".building-loop";
@@ -162,6 +162,42 @@ export function includes(paths, name) {
   return paths.some(item => keyOf(item) === keyOf(name));
 }
 
+/** A named test or fixture cannot qualify as implementation work. */
+export function isImplementationPath(file) {
+  const parts = file.toLowerCase().split("/");
+  const name = parts.pop();
+  return !parts.some(part => /^(?:tests?|__tests__|specs?|fixtures?)$/u.test(part)) &&
+    !/^(?:tests?|conftest|spec)(?:[._-]|$)|[._-](?:tests?|spec)\.[^.]+$/u.test(name) &&
+    /\.(?:py|js|jsx|mjs|cjs|ts|tsx|mts|cts|go|rs|java|kt|cs|c|cc|cpp|h|hpp|rb|php|swift)$/u.test(name);
+}
+
+function codeTaskPolicy(value, intake) {
+  object(value, "代码任务契约", ["sources", "tests"]);
+  const sources = pathList(value.sources);
+  if (!sources.length || sources.some(file => !isImplementationPath(file) || !includes(intake.read, file) || !includes(intake.write, file))) {
+    throw new Error("代码任务须登记接单阶段精确可读写的实现文件，不能用测试或文档充当实现");
+  }
+  if (value.tests === undefined) {
+    if (sources.some(file => !/\.py$/iu.test(file))) throw new Error("未支持结构比较的实现文件须配置受信测试回执");
+    return { sources };
+  }
+  const entry = object(value.tests, "受信测试契约", ["file", "publicKey", "previousSuiteSha256", "suiteSha256", "requiredCases"]);
+  const file = relativeName(entry.file);
+  const { publicKey, previousSuiteSha256, suiteSha256, requiredCases } = entry;
+  if (!Array.isArray(requiredCases) || !requiredCases.length || requiredCases.length > 80 ||
+    requiredCases.some(id => typeof id !== "string" || !id || id.length > 120 || id.trim() !== id || /[\x00-\x1f]/u.test(id)) ||
+    new Set(requiredCases).size !== requiredCases.length || !/^[a-f0-9]{64}$/u.test(suiteSha256 ?? "") ||
+    !/^[a-f0-9]{64}$/u.test(previousSuiteSha256 ?? "") || previousSuiteSha256 === suiteSha256) {
+    throw new Error("受信测试须登记唯一的新增必测用例和不同的新旧测试套件 SHA-256");
+  }
+  try {
+    const der = Buffer.from(publicKey, "base64");
+    if (der.toString("base64") !== publicKey || der.length !== 44 ||
+      createPublicKey({ key: der, type: "spki", format: "der" }).asymmetricKeyType !== "ed25519") throw new Error();
+  } catch { throw new Error("受信测试须登记 Base64 编码的 Ed25519 SPKI 公钥"); }
+  return { sources, tests: { file, publicKey, previousSuiteSha256, suiteSha256, requiredCases } };
+}
+
 /** 解析项目权威清单，核角色隔离、证据只读和来源凭据。 */
 export function authority(root) {
   const bytes = readBytes(root, AUTHORITY, 64 * 1024);
@@ -191,7 +227,7 @@ export function parseAuthority(bytes) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask"]);
     if (value.plainLast !== undefined && typeof value.plainLast !== "boolean") throw new Error("plainLast 须为布尔值；非文字产物由项目维护者明确关闭");
     if (value.cacheReadRotationThreshold !== undefined && (!Number.isSafeInteger(value.cacheReadRotationThreshold) || value.cacheReadRotationThreshold < 1)) {
       throw new Error("cacheReadRotationThreshold 须为正整数；未配置时不按用量轮换");
@@ -257,9 +293,10 @@ export function parseAuthority(bytes) {
       }
       calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
     }
+    const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases.intake);
     units[id] = { candidate, claims, continuation, phases, calculations, covers,
       requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
-      cacheReadRotationThreshold: value.cacheReadRotationThreshold };
+      cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}) };
   }
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
@@ -303,6 +340,12 @@ export function parseAuthority(bytes) {
   if(ledgerDocument&&(!includes(coordinator.write,ledgerDocument)
     ||includes([...goalContext,...ledgerContext,...protectedFiles,...Object.values(units).map(unit=>unit.candidate)],ledgerDocument))) {
     throw new Error("ledgerDocument 须在 coordinator.write 精确授权，并与目标、现状依据、指令、候选、来源及验收回执分开");
+  }
+  const modelFiles = [...coordinator.read, ...mutable, ...protectedFiles, ...goalContext, ...ledgerContext,
+    ...Object.values(units).flatMap(unit => Object.values(unit.phases).flatMap(grant => grant.read))];
+  const testProofPaths = Object.values(units).flatMap(unit => unit.codeTask?.tests ? [unit.codeTask.tests.file] : []);
+  if (new Set(testProofPaths.map(keyOf)).size !== testProofPaths.length || testProofPaths.some(file => includes(modelFiles, file))) {
+    throw new Error("受信测试回执须是唯一的宿主读取路径，不得进入模型授权或作为证据");
   }
   // Auditors inherit only the relevant candidate/evidence read scope. Review receipts
   // are removed, so an independent pass cannot read the first model's verdict.

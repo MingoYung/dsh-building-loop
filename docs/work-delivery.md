@@ -8,6 +8,7 @@
 | 看 DSH 预设、工具和模式约束 | [预设配置](../cordis.patch.yml) |
 | 设置文件授权与阶段 | [项目配置和工具说明](../governance/README.md) · [宿主机制](../governance/index.mjs) · [路径与权限检查](../governance/policy.mjs) |
 | 检查退回项、数字复算和交付质量 | [提交预检](../governance/preflight.mjs) |
+| 写必要注释并核对注释与实际行为 | [代码注释验收](code-comment-acceptance.md) |
 | 核全文覆盖、概念一致和逐条推导 | [规则与边界](../governance/full-coverage.md) · [覆盖与证明实现](../governance/coverage.mjs) · [覆盖回归](../test/coverage.test.mjs) |
 | 降低调用浪费、核共同误判或设置滚动交接 | [调用成本与交接机制](../governance/efficiency.md) · [成本与边界回归](../test/efficiency.test.mjs) |
 | 核实际读取、来源凭据与每轮账本复盘 | [核验与账本](../governance/verification.md) · [来源检查](../governance/evidence.mjs) · [目标版本](../governance/goals.mjs) · [账本机制](../governance/ledger.mjs) |

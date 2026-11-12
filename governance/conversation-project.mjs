@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { AUTHORITY, MANAGED, MissingProjectAuthority, authority, digest, keyOf, parseAuthority, readBytes, replaceWithHistory, text, workspaceRoot } from "./policy.mjs";
 import { sessionProjectMode } from "./session-mode.mjs";
+import { deliverableTableContract } from "./deliverable-table.mjs";
 
 export const GOAL = "PROJECT-GOAL.md";
 export const INDEX = "INDEX.md";
@@ -12,6 +13,7 @@ export const STARTER = "# 交付稿\n\n<!-- 由接单执行方在此写入第一
 const FIRST = "receipts/K01-first.json";
 const FINAL = "receipts/K01-final.json";
 const IDENTITY = MANAGED + "/conversation-start.json";
+const OWNER_TABLE = "owner-table/1";
 
 /** Only exact, ordinary host-owned paths can become private project roots. */
 function directory(file) {
@@ -33,13 +35,22 @@ export function privateProjectRoot(hostHome, sessionId, proposalId) {
   const { base, root } = projectLocation(hostHome, sessionId);
   directory(base);
   directory(root);
-  const bytes = readBytes(root, IDENTITY, 2048);
-  if (!bytes) throw new Error("会话项目缺少宿主开工记录");
-  const record = JSON.parse(text(bytes));
+  const record = privateIdentity(root);
   if (record.spec !== "building-loop-private-project/1" || record.sessionId !== sessionId || record.proposalId !== proposalId) {
     throw new Error("会话项目与已确认的任务不一致");
   }
   return root;
+}
+
+function privateIdentity(root) {
+  const bytes = readBytes(root, IDENTITY, 2048);
+  if (!bytes) throw new Error("会话项目缺少宿主开工记录");
+  return JSON.parse(text(bytes));
+}
+
+/** Only newly initialized, already bound private projects opt into this intake. */
+export function privateProjectUsesOwnerTable(root) {
+  return privateIdentity(root).intakeAuthority === OWNER_TABLE;
 }
 
 /** Keep every permission fixed by the host. Model text is used only for the goal and acceptance criteria. */
@@ -71,6 +82,21 @@ function materialDocument(materials) {
     }), ""].join("\n");
 }
 
+function goalDocument(proposal, ownerTable) {
+  const task = ownerTable ? [
+    "## 目标", "完成用户直接确认的开工任务，逐项依据完整开工原文和授权材料判断。", "",
+    "## 交付与验收", "按原文明确的表头与编号提交。先核对每项输入、适用规则和依赖条件，交付前复核答案、依据与编号。", "",
+    "## 已确认范围", "工作范围以用户直接开工原文和当前项目授权为准。", "",
+  ] : ["## 目标", proposal.goal, "", "## 交付与验收", proposal.deliverable,
+    "", "## 已确认范围", proposal.scope, ""];
+  return ["# 项目总纲", "", ...task,
+    ...(proposal.instruction ? ["## 用户直接开工指令",
+      "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 " + proposal.userSeq + "）。", ""] : []),
+    ...(proposal.directive ? ["## 用户直接开工指令摘录（会话事件 " + proposal.userSeq + "）",
+      ...proposal.directive.split(/\r?\n/u).map(line => "> " + line), ""] : []),
+    "## 分块入口", "[项目索引](INDEX.md)", ""].join("\n");
+}
+
 /** Build in a sibling staging directory, then publish the complete set with one rename. */
 function createPrivateProject(hostHome, sessionId, proposal) {
   const { base, root } = projectLocation(hostHome, sessionId);
@@ -82,24 +108,22 @@ function createPrivateProject(hostHome, sessionId, proposal) {
   }
   const stage = fs.mkdtempSync(path.join(base, "." + path.basename(root) + "-stage-"));
   try {
+    // The accepted direct instruction is already bound to the owner's native event.
+    // An explicit table task can therefore use host text instead of a proposed answer.
+    const ownerTable = !!deliverableTableContract(proposal.instruction);
     const input = materialDocument(proposal.materials);
     const manifest = JSON.stringify(privatePolicy(sessionId, input), null, 2) + "\n";
     parseAuthority(Buffer.from(manifest));
     const files = {
-      [GOAL]: ["# 项目总纲", "", "## 目标", proposal.goal, "", "## 交付与验收", proposal.deliverable,
-        "", "## 已确认范围", proposal.scope, "",
-        ...(proposal.instruction ? ["## 用户直接开工指令",
-          "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 " + proposal.userSeq + "）。", ""] : []),
-        ...(proposal.directive ? ["## 用户直接开工指令摘录（会话事件 " + proposal.userSeq + "）",
-          ...proposal.directive.split(/\r?\n/u).map(line => "> " + line), ""] : []),
-        "## 分块入口", "[项目索引](INDEX.md)", ""].join("\n"),
+      [GOAL]: goalDocument(proposal, ownerTable),
       [INDEX]: "# 项目索引\n\n- [项目总纲](PROJECT-GOAL.md)\n- K01 · [交付稿](DELIVERY.md)\n- [任务账本](TASK-LEDGER.md)\n" +
         (input ? "- [会话提供的材料](CONVERSATION-INPUT.md)\n" : ""),
       [DELIVERY]: STARTER,
       [BOOK]: "# 任务账本\n\n- K01 已确认，待派单。目标与范围见 [项目总纲](PROJECT-GOAL.md)。\n",
       [AUTHORITY]: manifest,
       ...(input ? { [MATERIALS]: input } : {}),
-      [IDENTITY]: JSON.stringify({ spec: "building-loop-private-project/1", sessionId, proposalId: proposal.id }) + "\n",
+      [IDENTITY]: JSON.stringify({ spec: "building-loop-private-project/1", sessionId, proposalId: proposal.id,
+        ...(ownerTable ? { intakeAuthority: OWNER_TABLE } : {}) }) + "\n",
     };
     const markers = Object.create(null);
     for (const [file, content] of Object.entries(files)) {
