@@ -103,9 +103,9 @@ Building-loop 结合本会话已明确的目标、验收条件和范围提议开
 
 ### 已有代码接到新需求
 
-对于所有者确认开工的新单元，候选是已授权写入的 Python 实现文件时，宿主在第一次派单前记录接单读写白名单内的 Python 实现基线。维护者可显式用 `codeTask: {sources: ["src/main.py", "src/storage.py"]}` 指定精确路径，或让非代码的候选与代码实现关联。执行方须完整读取当前目标、候选及变更的实现文件。宿主只允许实际代码结构有变更，或有当前要求的受信测试回执，才将稿件送入原有首审；只改注释、排版、文档或测试文件，不能冒充实现改动。旧版已在途接单不追溯建基线。
+所有者确认开工后，新的受控代码单元要先固定旧行为，才能派发。维护者用 `codeTask.sources` 指定精确的实现路径，用 `codeTask.tests` 配置独立测试运行者。宿主记录改前字节和已通过的旧用例。送审时以当前候选字节重跑旧、新用例。改前通过的旧用例和本轮新增必测用例必须全部通过；之前已知失败的用例仍记录实际结果。测试门槛通过后进入原有审核。旧版已在途记录按原方式恢复。
 
-如果原实现已经满足新需求，维护者可以给 `codeTask` 增加 `tests`：登记回执 `file`、Ed25519 SPKI Base64 `publicKey`、不同的 `previousSuiteSha256` 与 `suiteSha256`、针对本轮新增的 `requiredCases`。独立运行者比较新旧测试，确认这些用例是新增且覆盖当前要求，实际运行通过后才签发回执。宿主不凭两份摘要推断用例含义。签名私钥和回执文件不进入模型权限；挑战从 `prepare.codeTask.testProof` 取得。签发时取挑战的 `file` 与 `requiredCases` 以外各字段，添加本次 `runId` 与按登记顺序的 `passedCases`，对 `codeTestSigningBytes` 编码后的字节签名，签名用 Base64 放入 `signature`，最后由运行者写到回执路径。宿主核对开工随机数、当前目标和授权摘要、新旧套件、用例和实际被测交付字节后才承认结果。非 Python 实现暂不做结构比较，显式启用时也使用受信测试。结构比较只证明存在实现变化，不证明功能正确或已经完成；仍应跑真实测试并通过原有审核。代码中的必要说明可按[代码注释验收](../docs/code-comment-acceptance.md)检查。
+测试配置登记候选回执 `file`、Ed25519 SPKI Base64 `publicKey`、旧套件 `previousSuiteSha256`、新套件 `suiteSha256`、新增必测 `requiredCases` 和 `regression: {baselineFile, previousCases}`。独立运行者在派单前对改前源码运行旧用例，保存签名基线。执行方从 `prepare.codeTask.regressionProof` 获取当前挑战。候选回执填写实际运行的每项结果，并绑定当前授权、目标、基线回执与交付字节。签名私钥及回执文件在模型授权之外。独立运行者负责确认新用例覆盖本轮需求，并按项目的正常测试命令执行；插件不会调用任意项目命令。具体格式见[代码回归契约](code-regression.md)。代码中的必要说明可按[代码注释验收](../docs/code-comment-acceptance.md)检查。
 
 ### 所有者指定的表格编号
 

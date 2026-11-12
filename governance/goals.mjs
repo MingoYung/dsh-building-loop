@@ -2,6 +2,7 @@ import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { lineList, plainLastIssues, requiredLineMarkdown } from "./preflight.mjs";
 import { sourceVersionCurrent } from "./evidence.mjs";
 import { candidateCitationProfiles, requireStoredCalculations, requireStoredFootnoteBindings, requireStoredObjectChecks } from "./coverage.mjs";
+import { reviewedCodeArtifactsCurrent } from "./code-intake.mjs";
 
 const REQUIRED_MARKERS = new Set(["[稿件自述]", "[摘录范围]"]);
 const LEADING_MARKER = /^ {0,3}(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)?(\[(?:稿件自述|摘录范围)\])(?!\(|\[|:)/u;
@@ -205,6 +206,9 @@ export function acceptedVersion(frame, id, active) {
   if (!candidate || receipt.candidateSha256 !== digest(candidate) || receipt.decision !== "accept") {
     throw new Error("当前候选与通过回执不一致，请总控 advance 重新独立验收");
   }
+  if (!reviewedCodeArtifactsCurrent(frame, id, active, receipt)) {
+    throw new Error("已验收代码的交付文件发生变化，须重新取得签名回归结果和独立验收");
+  }
   if(active.phase!=="closed"){
     const preservation=requiredLineCheck(frame,id,candidate,current);
     if(preservation.issues.length)throw new Error(preservation.issues.join("；"));
@@ -239,7 +243,7 @@ export function needsRevalidation(frame, id, active) {
   if (["first-audit", "final-audit", "first-audit-ready", "final-audit-ready"].includes(phase)) {
     const pending = active.pendingReceipt;
     const candidate = readBytes(frame.root, frame.policy.units[id].candidate);
-    if (!pending || !candidate || pending.candidateSha256 !== digest(candidate)) return true;
+    if (!pending || !candidate || pending.candidateSha256 !== digest(candidate) || !reviewedCodeArtifactsCurrent(frame, id, active, pending)) return true;
     try { requireStoredFootnoteBindings(frame.policy.units[id],[pending.coverage],candidate,pending.phase); }
     catch { return true; }
     for (const ref of [...(pending.checks ?? []), ...(pending.observedSources ?? [])]) {

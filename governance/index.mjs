@@ -20,8 +20,9 @@ import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, co
 import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 import { conversationDiscussion, decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask, startedConversationProject } from "./conversation-start.mjs";
 import { initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable, requirePrivateDraft } from "./conversation-project.mjs";
-import { captureCodeIntake, prepareCodeIntake, verifyCodeIntake } from "./code-intake.mjs";
+import { captureCodeIntake, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake } from "./code-intake.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
+import { addHierarchyModule, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQuery"];
@@ -396,7 +397,7 @@ export function apply(ctx, config = {}) {
     const policy = allowedAuthority(binding, old);
     if (!inspection && !lockedFile && hasPendingLedgerEvents(stateHome,file)) return change(agent, frame => frame);
     if (!inspection && hasLedgerJournal(stateHome,file)) {
-      const settle=()=>recoverLedgerJournal(stateHome,file,root,lockedFile ? policy : allowedAuthority(coordinates(agent)));
+      const settle=()=>recoverLedgerJournal(stateHome,file,root,lockedFile ? policy : allowedAuthority(coordinates(agent)),binding.managed);
       if (lockedFile) settle();
       else withWorkspaceLock(stateHome,file,settle,warnCleanup);
       old = readBytes(stateHome, file, STATE_LIMIT);
@@ -419,7 +420,8 @@ export function apply(ctx, config = {}) {
     const role = child ? !assignment ? "idle" : isAudit(assignment[1].phase) ? "auditor" : isReview(assignment[1].phase) ? "reviewer" : "executor" : "coordinator";
     const grant = assignment ? unitOf({ policy }, assignment[0]).phases[assignment[1].phase] : child ? EMPTY : policy.coordinator;
     // goalContext explicitly grants read-only central context to working roles.
-    const reads = role === "idle" ? [] : [...new Set([...grant.read, ...policy.instructions, ...policy.goalContext])];
+    const moduleReads = role === "coordinator" ? hierarchyReadPaths({ policy, state, managed: binding.managed }) : [];
+    const reads = role === "idle" ? [] : [...new Set([...grant.read, ...policy.instructions, ...policy.goalContext, ...moduleReads])];
     // The authority grants the host permission to generate this projection;
     // model file writes cannot replace a complete state-derived snapshot.
     const writes=grant.write.filter(file=>!policy.ledgerDocument||keyOf(file)!==keyOf(policy.ledgerDocument));
@@ -462,6 +464,7 @@ export function apply(ctx, config = {}) {
         // A projection can be regenerated without changing any ledger item.
         // Give each actual publication a distinct authoritative commit point.
         if (frame.ledgerWrites?.length) frame.state.ledgerCommit = randomUUID();
+        if (frame.hierarchyWrites) frame.state.hierarchyCommit = randomUUID();
         commitWorkspaceState(stateHome,frame,buffer(frame.state),warnCleanup);
       }
       if (invalidation) throw invalidation;
@@ -742,8 +745,11 @@ export function apply(ctx, config = {}) {
           candidatePositions=candidatePositionSummary(spec.candidate,bytes);
         } catch(error) { coverage={pendingRead:true,reason:error.message}; }
       }
+      const codeTask = frame.role === "executor" && assignment && current.codeIntake &&
+        (phase === "intake" || current.codeIntake.regression) ? prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) : null;
       const next = frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
+        : codeTask?.regressionProof ? "落实当前目标，读回改动和候选，取得当前版本的签名回归回执后 submit"
         : phase==="supplement" ? "按退回项修改，读回、preflight、submit"
         : frame.role==="executor"&&phase==="intake" ? (frame.managed ? "按当前目标写出首稿，完整读回后 submit" : "保留原稿 submit")
         : phase==="blocked" ? "核对阻塞原因；可恢复时用 advance 续派到原子会话"
@@ -751,8 +757,7 @@ export function apply(ctx, config = {}) {
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付";
       return {role:frame.role,phase,unit:assignment?.[0],files,pending,complete:pending.length===0,
         ...(instruction ? { instruction } : {}),
-        ...(phase === "intake" && assignment && current.codeIntake ?
-          { codeTask: prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) } : {}),
+        ...(codeTask ? { codeTask } : {}),
         ...(deliverableTable ? { deliverableTable } : {}),
         ...reconciliationNotice(frame,current),
         ...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
@@ -776,8 +781,25 @@ export function apply(ctx, config = {}) {
     });
   }
 
+  /** Capture the actual local owner's latest message before entering the workspace transaction. */
+  async function addModule(args, exec) {
+    const { agent } = exec;
+    if (!agent || isChild(agent) || !ctx.sessionQuery?.observeSession) throw new Error("只有当前项目的总控可执行所有者批准的新增模块");
+    const observed = await ctx.sessionQuery.observeSession(agent.id, { projectionMode: "none" });
+    let approval, cursor;
+    try {
+      const current = latestConversationUser(observed.events, observed.inheritedEventCount);
+      approval = ownerModuleApproval(current, args.module, args.title);
+      cursor = observed.cursor;
+    } finally { observed[Symbol.dispose](); }
+    exec.signal?.throwIfAborted();
+    if (ctx.agents.get(agent.id) !== agent || agent.session.seq !== cursor + 1) throw new Error("会话在新增模块授权检查期间已经变化");
+    return change(agent, frame => addHierarchyModule(frame, args, approval, requireText(args.note, "改动理由", 500)));
+  }
+
   /** 文件入口集中执行白名单、实际已读行记录、日志和滚动备份。 */
   function fileAction(args, exec) {
+    if (args.action === "add-module") return addModule(args, exec);
     return change(exec.agent, frame => {
       if (frame.role === "idle") throw new Error("当前子会话没有已授权的工作阶段");
       if (args.action === "list") return { read: frame.reads, write: frame.writes };
@@ -811,6 +833,7 @@ export function apply(ctx, config = {}) {
         if (!includes(frame.writes, file)) throw new Error("该文件不在当前写白名单");
         if (typeof args.content !== "string") throw new Error("需要 UTF-8 正文");
         const note = requireText(args.note, "改动理由", 500);
+        checkHierarchyWrite(frame, file, args.content, args.heading);
         const result = replaceWithHistory(frame.root, file, args.content, note, tag(frame), frame.state.markers);
         frame.changed = result.changed;
         return result;
@@ -844,12 +867,21 @@ export function apply(ctx, config = {}) {
     if (Object.entries(frame.state.units).some(([key, unit]) => key !== id && !TERMINAL.has(unit.phase) && unit.phase !== "blocked")) {
       throw new Error("当前工作区另有未结单的单元");
     }
-    if(prior?.reconciliationExhausted&&reconciliationNotice(frame,prior).reason) {
+    const revalidating = needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted;
+    const planned = revalidating ? "final-review"
+      : prior?.phase === "blocked" ? prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
+    const priorPhase = prior?.phase === "blocked" ? prior.resumePhase : prior?.phase;
+    const isReviewPhase = phase => typeof phase === "string" && (isAudit(phase) || isReview(phase));
+    const codeReview = prior?.codeIntake?.regression && (isReviewPhase(planned) || isReviewPhase(priorPhase));
+    let regressionRetry = false;
+    if (codeReview) {
+      try { requireCodeRegressionCurrent(frame, id, prior, spec, goalSnapshot(frame)); }
+      catch { regressionRetry = true; }
+    }
+    if (!regressionRetry && prior?.reconciliationExhausted && reconciliationNotice(frame,prior).reason) {
       throw new Error("当前版本的分类定向重核已结束且仍未一致，请先由维护者明确争议范围或更新有效材料");
     }
-    const revalidating = needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted;
-    const phase = revalidating ? "final-review"
-      : prior?.phase === "blocked" ? prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
+    const phase = regressionRetry ? prior.codeIntake.qualification?.submittedPhase ?? "intake" : planned;
     if (!phase) throw new Error("当前阶段尚未交付或已经关单");
     const role = isAudit(phase) ? "auditor" : isReview(phase) ? "reviewer" : "executor";
     const threshold=spec.cacheReadRotationThreshold;
@@ -858,10 +890,10 @@ export function apply(ctx, config = {}) {
     // checkpoint, reviewer or auditor always resumes its bound identity.
     const rotate=phase==="supplement" && prior?.phase!=="blocked" && spec.continuation==="reuse"
       && threshold!==undefined && used>=threshold;
-    const reusable = revalidating ? prior?.reviewer : prior?.phase === "blocked" ? prior.actor
+    const reusable = regressionRetry ? prior.executor : revalidating ? prior?.reviewer : prior?.phase === "blocked" ? prior.actor
       : rotate ? undefined
       : phase === "supplement" && spec.continuation === "fresh" ? undefined : prior?.[role];
-    return { prior, phase, role, reusable, rotate, used, threshold, serial: (prior?.serial ?? 0) + 1 };
+    return { prior, phase, role, reusable, rotate, used, threshold, regressionRetry, serial: (prior?.serial ?? 0) + 1 };
   }
 
   /** 先绑定阶段和执行身份再唤醒子会话，派发失败恢复原状态。 */
@@ -876,7 +908,8 @@ export function apply(ctx, config = {}) {
     const childId = prepared.reusable ?? randomUUID();
     const next = change(agent, frame => {
       const plan = prepare(frame, id);
-      if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable) {
+      if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable ||
+        plan.regressionRetry !== prepared.regressionRetry) {
         throw new Error("工作单元已经由其他调用推进");
       }
       const spec = unitOf(frame, id),binding=checkpointBinding(frame,spec);
@@ -890,9 +923,10 @@ export function apply(ctx, config = {}) {
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
       };
       if (plan.phase === "intake" && !plan.prior) {
-        const codeIntake = captureCodeIntake(frame, spec);
+        const codeIntake = captureCodeIntake(frame, spec, id);
         if (codeIntake) record.codeIntake = codeIntake;
       }
+      if (plan.role !== "executor") requireCodeRegressionCurrent(frame, id, record, spec, record.goal);
       // A new activation cannot consume an earlier turn/end from the same
       // native session, even if that event is delivered again after the resume.
       if (Number.isSafeInteger(resident?.session.seq)) record.activationStartSeq = resident.session.seq;
@@ -914,6 +948,10 @@ export function apply(ctx, config = {}) {
       if (!resumeSame) delete record.interruptions;
       if (!resumeSame) delete record.restoredCheckpointBinding;
       if (!resumeSame) delete record.reusedProofMaterials;
+      if (plan.regressionRetry) {
+        for (const key of ["proof", "pendingReceipt", "reviewerCheckpoint", "auditorCheckpoint", "reconciliation", "reconciliationBinding",
+          "reconciliationRound", "reconciliationExhausted"]) delete record[key];
+      }
       const saved=record[plan.role+"Checkpoint"];
       if(record.reconciliation?.length&&saved?.actor===childId&&saved.phase===plan.phase&&plan.prior?.phase!=="blocked") {
         // Restore only this role's own observed lines and proofs. The disputed
@@ -948,6 +986,7 @@ export function apply(ctx, config = {}) {
       frame.changed = true;
       const ownerTableIntake = plan.phase === "intake" && frame.managed && privateProjectUsesOwnerTable(frame.root);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
+        + (plan.regressionRetry ? "。当前代码或目标需要重新取得受信回归回执并提交，改前通过的用例集合保持固定。" : "")
         + (record.receipt && plan.phase === "supplement" ? "。请读取退回回执 " + record.receipt : "")
         + "。执行前依据已注入的阶段规则与授权范围。"
         // Reviewer/auditor activation never consumes the coordinator's free-text
@@ -1317,6 +1356,8 @@ export function apply(ctx, config = {}) {
         frame.changed = true;
         return { unit: id, phase: active.phase, parent: active.owner, reason: "目标变更，原验收停止，advance 重新验收当前目标" };
       }
+      const codeRegression = ["review", "audit"].includes(args.action) && ["reviewer", "auditor"].includes(frame.role)
+        ? requireCodeRegressionCurrent(frame, id, active, spec, active.goal) : undefined;
       if (args.action === "block") {
         pause(active, requireText(args.note, "阻塞原因、责任人和恢复条件"));
         if(active.reconciliationRound)active.reconciliationExhausted=true;
@@ -1331,10 +1372,11 @@ export function apply(ctx, config = {}) {
           requireGoalRead(frame, active, true);
           requirePrivateDraft(bytes);
         }
-        if (active.phase === "intake" && active.codeIntake) {
+        if (active.codeIntake && (active.phase === "intake" || active.codeIntake.regression)) {
           const goal = requireGoalRead(frame, active, true);
           active.codeIntake.qualification = verifyCodeIntake(frame, id, active, spec, goal,
             (file, currentBytes) => candidateReadComplete(active, file, currentBytes));
+          if (active.codeIntake.regression) active.codeIntake.qualification.submittedPhase = active.phase;
         }
         if (active.phase === "intake" && /\.(?:md|markdown)$/iu.test(spec.candidate)) {
           const table = deliverableTableContract(frame.started?.proposal.instruction);
@@ -1403,6 +1445,7 @@ export function apply(ctx, config = {}) {
         active.rejected = rejectedClaims(frame.root, spec, lines, checked.filter(check => check.status !== "supported"), frame.reads);
         const receipt = {
           unit: id, phase: active.phase, reviewer: exec.agent.id, decision, candidateSha256: hash,
+          ...(codeRegression ? { codeRegression } : {}),
           candidatePositions:candidatePositionSummary(spec.candidate,bytes),
           goal: active.goal, goalFit: active.assessment?.goalFit,
           unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage),
@@ -1577,8 +1620,11 @@ export function apply(ctx, config = {}) {
     materials: { type: "array", maxItems: 4, items: { ...string, maxLength: 1200 }, description: "可选。与任务直接相关的用户消息逐字摘录；不填模型生成内容或文件路径。" },
   }, propose, ["goal", "deliverable", "scope"]), { when: ({ agent }) => mayPropose(agent) });
 
-  register(tool(FILE, "按当前角色的准确路径白名单列出、读取、字面搜索或原子写入 UTF-8 文件。写入自动维护一份改前备份和逐文件日志。history 取授权文件的最近更新。", ["list", "read", "search", "write", "history"], {
+  register(tool(FILE, "按准确路径白名单列出、读取、字面搜索或写入 UTF-8 文件。write 和 add-module 自动保留一份改前备份及逐文件日志；history 取最近更新。三级项目的 add-module 只供总控在所有者明确请求后使用，同批写入正文和两级导航。", ["list", "read", "search", "write", "history", "add-module"], {
     path: string, query: string, content: string, note: string, start: number, count: number,
+    module: { ...string, description: "add-module：所有者明确指定的小写模块编号" },
+    title: { ...string, description: "add-module：所有者明确指定的模块标题" },
+    heading: { ...string, description: "write 修改受管中央文件时填写实际修改的已有章节标题" },
   }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor"])});
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
@@ -1642,6 +1688,8 @@ export function apply(ctx, config = {}) {
           ? (current?.reason==="classification-reconciliation-unresolved"?current.reasonNote:current?.goalStale ? COORDINATOR["goal-review-ready"] : COORDINATOR[phase] ?? "等待当前阶段交付或核验回执。") + " 总控只读写白名单内的中央文件和回执。"
           : frame.managed && phase === "intake"
             ? "接单。按已确认总纲和索引撰写第一版交付稿，只写 DELIVERY.md。会话原文是用户提供的材料，不能证明外部事实。材料不足时注明待核事项。完整读回目标和新正文后 submit。"
+            : frame.role === "executor" && assignment?.[1].codeIntake?.regression
+              ? "按当前目标修改授权代码。先用 prepare 读目标和当前文件，完成后读回改动，并 prepare 当前版本回归请求。签名运行者须证明改前通过的旧用例和新增必测用例都通过；回退时按失败用例修复后重跑再 submit。"
             : phase === "intake" && assignment?.[1].codeIntake
               ? "接单执行已确认的代码任务。读完整当前目标和授权实现，在已授予的写入路径内落实变更。读回变更文件与候选后 submit。保持原实现需要维护者提供本次受信测试回执，模型自报通过、注释排版或仅改测试不算实现。"
             : RULES[phase] ?? "本子会话当前无工作授权，等待总控。";
@@ -1677,6 +1725,7 @@ export function apply(ctx, config = {}) {
             "当前会话已确认的任务见下。使用原项目的现行总纲和授权。若目标或权限有冲突，先向用户确认如何处理；不得自行改写已有目标或扩大文件范围。",
             JSON.stringify({ goal: confirmed.goal, deliverable: confirmed.deliverable, scope: confirmed.scope, directive: confirmed.directive }),
           ] : []),
+          ...(frame.policy.hierarchy && frame.role === "coordinator" ? ["三级文件的导航由宿主维护。收到所有者明确的新增模块消息（格式：新增模块 restore-policy：恢复策略），用 building_loop_file add-module 提交同一编号、标题、实际正文和改动理由，再从总纲沿返回路径读到正文。write 修改中央文件时在 heading 指明实际修改的已有章节，只在该处就地改。"] : []),
           ...(assignment && unitOf(frame,assignment[0]).plainLast ? ["正文最后一个实质段须明确标为大白话或直白说明，错例、出处和附录放在它之前。"] : []),
           "文件与阶段用 building_loop 和 building_loop_file。" + (frame.role === "reviewer" ? "质量判断用 building_loop_quality。" : ""),
           ...(frame.role === "coordinator" ? ["计划、临时需求和中断事项记入 building_loop_ledger。用户消息已自动登记待判定，结合现状分类处置。",

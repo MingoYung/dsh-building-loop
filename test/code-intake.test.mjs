@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { test } from "node:test";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
-import { codeTestSigningBytes } from "../governance/code-intake.mjs";
+import { codeRegressionArtifacts, codeRegressionSigningBytes, codeTestSigningBytes, prepareCodeIntake, verifyCodeIntake } from "../governance/code-intake.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import { pythonStructure } from "../governance/python-structure.mjs";
 import { fixture, host } from "./helpers.mjs";
@@ -12,6 +12,7 @@ const module = "parser.py";
 const testArtifact = "test_parser.py";
 const requirements = "SPEC.md";
 const proofFile = "trusted-test-result.json";
+const baselineFile = "trusted-regression-baseline.json";
 const source = "def parse(value):\n    return value + 1\n";
 
 function setup(root, write, codeTask) {
@@ -56,75 +57,131 @@ test("Python structure ignores comments, layout, simple quote style, and docstri
   assert.equal(pythonStructure(Buffer.from("def f(:\n  return 1\n")), null);
 });
 
-test("approved writable Python intake requires a functional edit even if comments, formatting or tests changed", () => fixture(async (root, write) => {
+test("new authorized code work refuses dispatch without a regression contract even when code already exists", () => fixture(async (root, write) => {
   setup(root, write);
   approve(root);
   const harness = host(root, { automaticCoverage: false });
-  const { childId } = await harness.flow("root", "advance");
-  assert.match(harness.prompt(childId), /接单执行已确认的代码任务/);
-  assert.deepEqual((await harness.flow(childId, "prepare")).codeTask.sources.map(entry => entry.path), [solution, module]);
-  await assert.rejects(harness.flow(childId, "submit"), /未发现实现结构变更/);
-  await harness.file(childId, "write", module, { content: "# note\n\ndef parse(value,):\n  return (value+1) # comment\n", note: "format" });
-  await harness.file(childId, "write", testArtifact, { content: "assert 1 + 1 == 2\n", note: "add test" });
-  await harness.flow(childId, "prepare");
-  await assert.rejects(harness.flow(childId, "submit"), /注释、排版和测试文件/);
-  await harness.flow(childId, "block", { note: "暂停以验证接单基线" });
-  assert.equal((await harness.flow("root", "advance")).childId, childId);
-  const resumed = await harness.flow(childId, "prepare");
-  assert.equal(resumed.codeTask.sources.find(entry => entry.path === module).baselineSha256, digest(source));
-  await harness.file(childId, "write", module, { content: "def parse(value):\n    return value + 2\n", note: "implement required increment" });
-  await assert.rejects(harness.flow(childId, "submit"), /完整读回已修改的实现文件/);
-  await harness.file(childId, "read", module);
-  assert.equal((await harness.flow(childId, "submit")).phase, "review-ready");
+  await assert.rejects(harness.flow("root", "advance"), /先配置 codeTask\.tests\.regression/);
+  assert.equal(harness.activations.length, 0);
 }));
 
-test("same bytes need an authentic current passing receipt with every owner-pinned case", () => fixture(async (root, write) => {
+function regressionConfig(keys) {
+  return { file: proofFile, publicKey: keys.publicKey.export({ type: "spki", format: "der" }).toString("base64"),
+    previousSuiteSha256: digest("previous suite"), suiteSha256: digest("complete suite for checkpoint 2"),
+    requiredCases: ["new-case"], regression: { baselineFile, previousCases: ["old-pass", "old-fail"], inputs: ["settings.json"] } };
+}
+
+function signedRegression(write, file, proof, keys) {
+  write(file, JSON.stringify({ ...proof, signature: sign(null, codeRegressionSigningBytes(proof), keys.privateKey).toString("base64") }));
+}
+
+function caseRows(entries) {
+  return Object.entries(entries).map(([id, status]) => ({ id, status }));
+}
+
+test("dispatch checks trusted full baseline against pre-edit artifacts and keeps the passing case set across resume", () => fixture(async (root, write) => {
   const keys = generateKeyPairSync("ed25519");
   const wrong = generateKeyPairSync("ed25519");
-  const tests = { file: proofFile, publicKey: keys.publicKey.export({ type: "spki", format: "der" }).toString("base64"),
-    previousSuiteSha256: digest("previous checkpoint suite"), suiteSha256: digest("checkpoint test suite"),
-    requiredCases: ["new-case-a", "new-case-b"] };
+  const tests = regressionConfig(keys);
   setup(root, write, { sources: [module], tests });
+  write("settings.json", '{"behavior":"public"}');
   const harness = host(root, { automaticCoverage: false });
   await assert.rejects(harness.flow("root", "advance"), /所有者在当前会话确认开工/);
   approve(root);
+  const policy = authority(root);
+  const baseline = { spec: "building-loop-code-regression-baseline/1", unit: "K01", policySha256: policy.hash,
+    suiteSha256: tests.previousSuiteSha256, artifacts: codeRegressionArtifacts(root, policy.units.K01), runId: "pre-edit-1",
+    cases: caseRows({ "old-pass": "passed", "old-fail": "failed" }) };
+  await assert.rejects(harness.flow("root", "advance"), /缺少改前回归基线签名回执/);
+  signedRegression(write, baselineFile, baseline, wrong);
+  await assert.rejects(harness.flow("root", "advance"), /改前回归基线签名回执.*不符/);
+  signedRegression(write, baselineFile, { ...baseline, cases: baseline.cases.slice(0, 1) }, keys);
+  await assert.rejects(harness.flow("root", "advance"), /改前回归基线签名回执.*不符/);
+  signedRegression(write, baselineFile, baseline, keys);
+  write("settings.json", '{"behavior":"changed"}');
+  await assert.rejects(harness.flow("root", "advance"), /改前回归基线签名回执.*不符/);
+  assert.equal(harness.activations.length, 0);
+  write("settings.json", '{"behavior":"public"}');
   const { childId } = await harness.flow("root", "advance");
-  const challenge = async () => (await harness.flow(childId, "prepare")).codeTask.testProof;
+  assert.match(harness.prompt(childId), /改前通过的旧用例和新增必测用例/);
+  const challenge = async () => (await harness.flow(childId, "prepare")).codeTask.regressionProof;
   const original = await challenge();
   assert.equal(original.file, proofFile);
-  assert.deepEqual(original.artifacts.map(row => row.path), [module, solution, testArtifact]);
-  await assert.rejects(harness.flow(childId, "submit"), /未发现.*受信测试回执/);
+  assert.deepEqual(original.protectedCases, ["old-pass"]);
+  assert.deepEqual(original.artifacts.map(row => row.path), [module, "settings.json", solution, testArtifact]);
+  await assert.rejects(harness.file(childId, "write", baselineFile, { content: "{}", note: "forge" }), /写白名单/);
+  await assert.rejects(harness.file(childId, "read", baselineFile), /读白名单/);
   await assert.rejects(harness.file(childId, "write", proofFile, { content: "{}", note: "forge" }), /写白名单/);
-  await assert.rejects(harness.file(childId, "read", proofFile), /读白名单/);
+  await harness.flow(childId, "block", { note: "验证接单恢复保留改前证据" });
+  signedRegression(write, baselineFile, { ...baseline, cases: caseRows({ "old-pass": "failed", "old-fail": "passed" }) }, keys);
+  assert.equal((await harness.flow("root", "advance")).childId, childId);
+  assert.deepEqual((await challenge()).protectedCases, ["old-pass"]);
+  assert.equal((await challenge()).baselineReceiptSha256, original.baselineReceiptSha256);
+}));
 
-  function receipt(input, changes = {}, key = keys.privateKey) {
-    const { file, requiredCases, ...binding } = input;
-    const proof = { ...binding, runId: "native-checkpoint-2", passedCases: requiredCases, ...changes };
-    write(file, JSON.stringify({ ...proof, signature: sign(null, codeTestSigningBytes(proof), key).toString("base64") }));
+test("changed code is returned for regression or failed new requirements, and a passing receipt is pinned through review", () => fixture(async (root, write) => {
+  const keys = generateKeyPairSync("ed25519");
+  const tests = regressionConfig(keys);
+  setup(root, write, { sources: [module], tests });
+  approve(root);
+  const policy = authority(root);
+  signedRegression(write, baselineFile, { spec: "building-loop-code-regression-baseline/1", unit: "K01", policySha256: policy.hash,
+    suiteSha256: tests.previousSuiteSha256, artifacts: codeRegressionArtifacts(root, policy.units.K01), runId: "pre-edit-2",
+    cases: caseRows({ "old-pass": "passed", "old-fail": "failed" }) }, keys);
+  const harness = host(root, { automaticCoverage: false });
+  const { childId } = await harness.flow("root", "advance");
+  const challenge = async () => (await harness.flow(childId, "prepare")).codeTask.regressionProof;
+  const original = await challenge();
+  const intended = { "old-pass": "passed", "old-fail": "failed", "new-case": "passed" };
+  function receipt(input, statuses = intended, changes = {}) {
+    const { file, previousCases, requiredCases, protectedCases, ...binding } = input;
+    signedRegression(write, file, { ...binding, runId: "post-edit-2", cases: caseRows(statuses), ...changes }, keys);
   }
-  for (const change of [{ passedCases: ["new-case-a"] }, { suiteSha256: digest("swapped tests") },
-    { previousSuiteSha256: digest("another previous suite") },
-    { nonce: "old-assignment" }, { goalSha256: digest("stale target") }]) {
-    receipt(original, change);
-    await assert.rejects(harness.flow(childId, "submit"), /受信测试回执不符/);
-  }
-  receipt(original, {}, wrong.privateKey);
-  await assert.rejects(harness.flow(childId, "submit"), /受信测试回执不符/);
-
+  await harness.file(childId, "write", module, { content: "def parse(value):\n    return value + 2\n", note: "implement new requirement" });
+  await assert.rejects(harness.flow(childId, "submit"), /缺少当前交付的回归签名回执/);
   receipt(original);
+  await assert.rejects(harness.flow(childId, "submit"), /当前交付的回归签名回执.*不符/);
+  const changed = await challenge();
+  receipt(changed, { ...intended, "old-pass": "skipped", "new-case": "failed" });
+  await assert.rejects(harness.flow(childId, "submit"), /旧用例回退：old-pass \(skipped\).*新增必测用例未通过：new-case \(failed\)/);
+  receipt(changed, { "old-pass": "passed", "new-case": "passed" });
+  await assert.rejects(harness.flow(childId, "submit"), /当前交付的回归签名回执.*不符/);
+
   write(requirements, "# SPEC\nThis requirement changed since the tests ran.\n");
+  receipt(changed);
   const movedGoal = await challenge();
-  assert.notEqual(movedGoal.goalSha256, original.goalSha256);
-  await assert.rejects(harness.flow(childId, "submit"), /受信测试回执不符/);
-  receipt(movedGoal);
-  await harness.file(childId, "write", testArtifact, { content: "assert False\n", note: "adversarial changed artifact" });
-  const changedArtifact = await challenge();
-  await assert.rejects(harness.flow(childId, "submit"), /受信测试回执不符/);
-  assert.notDeepEqual(movedGoal.artifacts, changedArtifact.artifacts);
-  await harness.file(childId, "write", testArtifact, { content: "assert True\n", note: "restore tested bytes" });
-  await challenge();
+  assert.notEqual(movedGoal.goalSha256, changed.goalSha256);
+  await assert.rejects(harness.flow(childId, "submit"), /当前交付的回归签名回执.*不符/);
   receipt(movedGoal);
   assert.equal((await harness.flow(childId, "submit")).phase, "review-ready");
+  write("settings.json", '{"behavior":"changed after submit"}');
+  const retry = await harness.flow("root", "advance");
+  assert.equal(retry.childId, childId);
+  assert.equal(retry.phase, "intake");
+  const retried = await challenge();
+  assert.deepEqual(retried.protectedCases, movedGoal.protectedCases);
+  assert.notDeepEqual(retried.artifacts, movedGoal.artifacts);
+  await assert.rejects(harness.flow(childId, "submit"), /当前交付的回归签名回执.*不符/);
+  receipt(retried);
+  assert.equal((await harness.flow(childId, "submit")).phase, "review-ready");
+  assert.equal((await harness.flow("root", "advance")).phase, "first-review");
+  await assert.rejects(harness.flow("root", "advance"), /当前阶段尚未交付/);
+  write(requirements, "# SPEC\nNew goal while reviewer is working.\n");
+  assert.equal((await harness.flow("root", "advance")).childId, childId);
+  assert.equal((await challenge()).baselineReceiptSha256, retried.baselineReceiptSha256);
+}));
+
+test("stored intake using the earlier signed-test contract remains readable", () => fixture(async (root, write) => {
+  const keys = generateKeyPairSync("ed25519");
+  const { regression, ...tests } = regressionConfig(keys);
+  setup(root, write, { sources: [module], tests });
+  const policy = authority(root), spec = policy.units.K01, goal = { sha256: digest("old goal") };
+  const frame = { root, policy, started: { proposal: { id: "old-proposal" } } };
+  const active = { codeIntake: { openingId: "old-proposal", nonce: "old-nonce", sources: [{ path: module, sha256: digest(source) }] } };
+  const { file, requiredCases, ...binding } = prepareCodeIntake(frame, "K01", active, spec, goal).testProof;
+  const proof = { ...binding, runId: "previous-host", passedCases: requiredCases };
+  write(file, JSON.stringify({ ...proof, signature: sign(null, codeTestSigningBytes(proof), keys.privateKey).toString("base64") }));
+  assert.equal(verifyCodeIntake(frame, "K01", active, spec, goal, () => true).kind, "trusted-tests");
 }));
 
 test("code task paths cannot authorize tests as implementation or allow model access to the trusted receipt", () => fixture(async (root, write) => {
@@ -142,5 +199,10 @@ test("code task paths cannot authorize tests as implementation or allow model ac
   manifest.units.K01.phases.intake.write.pop();
   manifest.units.K01.phases["first-review"].read.push(proofFile);
   write("BUILDING-LOOP.json", JSON.stringify(manifest));
+  assert.throws(() => authority(root), /不得进入模型授权/);
+  const regression = regressionConfig({ publicKey });
+  const protectedManifest = setup(root, write, { sources: [solution], tests: regression });
+  protectedManifest.units.K01.phases.supplement.read.push(baselineFile);
+  write("BUILDING-LOOP.json", JSON.stringify(protectedManifest));
   assert.throws(() => authority(root), /不得进入模型授权/);
 }));

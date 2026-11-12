@@ -1,0 +1,879 @@
+{
+  "spec": "building-loop-native-gates/1",
+  "candidateSha256": "cdfeab90d3e11813c961519ed237205efcae9ce83128ad07a9530c5b450c47a6",
+  "observations": {
+    "hierarchy": {
+      "scenario": "hierarchy",
+      "archiveSha256": "cdfeab90d3e11813c961519ed237205efcae9ce83128ad07a9530c5b450c47a6",
+      "carrier": "Windows DSH NEXT, isolated native profile and deterministic loopback model",
+      "actions": [
+        {
+          "role": "owner",
+          "step": 0,
+          "name": "building_loop_propose",
+          "action": "propose",
+          "visible": true
+        },
+        {
+          "role": "owner",
+          "step": 1,
+          "name": "building_loop_file",
+          "action": "add-module",
+          "visible": true
+        },
+        {
+          "role": "owner",
+          "step": 2,
+          "visible": false
+        },
+        {
+          "role": "authorized-module",
+          "step": 0,
+          "name": "building_loop_file",
+          "action": "write",
+          "visible": true
+        },
+        {
+          "role": "authorized-module",
+          "step": 1,
+          "name": "building_loop_file",
+          "action": "add-module",
+          "visible": true
+        },
+        {
+          "role": "authorized-module",
+          "step": 2,
+          "name": "building_loop_file",
+          "action": "read",
+          "visible": true
+        },
+        {
+          "role": "authorized-module",
+          "step": 3,
+          "name": "building_loop_file",
+          "action": "read",
+          "visible": true
+        },
+        {
+          "role": "authorized-module",
+          "step": 4,
+          "name": "building_loop_file",
+          "action": "read",
+          "visible": true
+        },
+        {
+          "role": "authorized-module",
+          "step": 5,
+          "visible": false
+        }
+      ],
+      "testRuns": [],
+      "phase": "route-read",
+      "toolErrors": [
+        {
+          "role": "owner",
+          "seq": 26,
+          "detail": "Error: 新增模块须由当前会话所有者明确请求，例如：新增模块 restore-policy：恢复策略"
+        },
+        {
+          "role": "owner",
+          "seq": 41,
+          "detail": "Error: 导航章节由 add-module 就地更新，不能直接覆盖"
+        }
+      ],
+      "route": [
+        "PROJECT-GOAL.md",
+        "INDEX.md",
+        "modules/restore-policy.md"
+      ],
+      "outsideAnchorAndDeliveryByteExact": true,
+      "before": {
+        "PROJECT-GOAL.md": "3b3d67676eb5f3f505c330c8442462ce07b5d32e63092396678d5f97ca95f172",
+        "INDEX.md": "80e609ab81f7187f2e63bfd5cecf8dc27a87d94ccabe1e2f5b2c376164f7f275",
+        "DELIVERY.md": "63aa3e7a02f3c759121d79f0a01b9cf45b5d3bb51f792a1334222ef5fa1d02b2"
+      },
+      "after": {
+        "PROJECT-GOAL.md": "3b3d67676eb5f3f505c330c8442462ce07b5d32e63092396678d5f97ca95f172",
+        "INDEX.md": "7bb8f3966401f73645d066ff39dd2160e28772e72fb123c1d8e4ebdcaaad612f",
+        "modules/restore-policy.md": "b177fcfad657fc97a03271793e5526a913f38d7e0afc52c2f506ca25b0b2248d",
+        "DELIVERY.md": "63aa3e7a02f3c759121d79f0a01b9cf45b5d3bb51f792a1334222ef5fa1d02b2"
+      },
+      "status": "passed",
+      "formalProfileUnchanged": true
+    },
+    "regression": {
+      "scenario": "regression",
+      "archiveSha256": "cdfeab90d3e11813c961519ed237205efcae9ce83128ad07a9530c5b450c47a6",
+      "carrier": "Windows DSH NEXT, isolated native profile and deterministic loopback model",
+      "actions": [
+        {
+          "role": "owner",
+          "step": 0,
+          "name": "building_loop_propose",
+          "action": "propose",
+          "visible": true
+        },
+        {
+          "role": "owner",
+          "step": 1,
+          "name": "building_loop",
+          "action": "prepare",
+          "visible": true
+        },
+        {
+          "role": "owner",
+          "step": 2,
+          "name": "building_loop",
+          "action": "advance",
+          "visible": true
+        },
+        {
+          "role": "owner",
+          "step": 3,
+          "visible": false
+        },
+        {
+          "role": "executor",
+          "step": 0,
+          "name": "building_loop",
+          "action": "prepare",
+          "visible": true
+        },
+        {
+          "role": "executor",
+          "step": 1,
+          "name": "building_loop_file",
+          "action": "write",
+          "visible": true
+        },
+        {
+          "role": "executor",
+          "step": 2,
+          "name": "building_loop",
+          "action": "prepare",
+          "visible": true
+        },
+        {
+          "role": "executor",
+          "step": 3,
+          "name": "building_loop",
+          "action": "submit",
+          "visible": true
+        },
+        {
+          "role": "executor",
+          "step": 4,
+          "name": "building_loop_file",
+          "action": "write",
+          "visible": true
+        },
+        {
+          "role": "executor",
+          "step": 5,
+          "name": "building_loop",
+          "action": "prepare",
+          "visible": true
+        },
+        {
+          "role": "executor",
+          "step": 6,
+          "name": "building_loop",
+          "action": "submit",
+          "visible": true
+        },
+        {
+          "role": "owner",
+          "step": 3,
+          "visible": false
+        },
+        {
+          "role": "owner",
+          "step": 3,
+          "visible": false
+        }
+      ],
+      "testRuns": [
+        {
+          "label": "baseline",
+          "digest": "ba41e733aade08724d345ac841856c8a1154581d34bf2db17d88caa2a721a964",
+          "cases": [
+            {
+              "id": "test_existing_failure",
+              "status": "failed"
+            },
+            {
+              "id": "test_lowercase",
+              "status": "passed"
+            },
+            {
+              "id": "test_punctuation",
+              "status": "passed"
+            }
+          ],
+          "exitCode": 1
+        },
+        {
+          "label": "broken",
+          "digest": "08be5bbd15cdae01177603462768047fa471414d4f2e5fa709b01e4cb11db9f5",
+          "cases": [
+            {
+              "id": "test_collapse_spaces",
+              "status": "passed"
+            },
+            {
+              "id": "test_existing_failure",
+              "status": "failed"
+            },
+            {
+              "id": "test_lowercase",
+              "status": "passed"
+            },
+            {
+              "id": "test_punctuation",
+              "status": "failed"
+            }
+          ],
+          "exitCode": 1
+        },
+        {
+          "label": "fixed",
+          "digest": "f8df3163f161f56330f1d157babf8a13696100a28ba92d3923d157aee9065062",
+          "cases": [
+            {
+              "id": "test_collapse_spaces",
+              "status": "passed"
+            },
+            {
+              "id": "test_existing_failure",
+              "status": "failed"
+            },
+            {
+              "id": "test_lowercase",
+              "status": "passed"
+            },
+            {
+              "id": "test_punctuation",
+              "status": "passed"
+            }
+          ],
+          "exitCode": 1
+        }
+      ],
+      "phase": "review-ready",
+      "toolErrors": [
+        {
+          "role": "executor",
+          "seq": 39,
+          "detail": "Error: [building-loop/code-regression] 已通过的旧用例回退：test_punctuation (failed)"
+        }
+      ],
+      "qualification": {
+        "kind": "trusted-regression",
+        "receiptSha256": "5e870ad803c7c33414d72f2ff7510970617760c56c5f397b272d8739c136f58f",
+        "runId": "native-fixed",
+        "suiteSha256": "6b8c6e24ac55c3518959bc3e292b4205af14e464173783dfadf2be52bad5f228",
+        "goalSha256": "69f679ec46ed343d91f7cb1c4a61ccfdd462fa00ecf2e8a8accb3d9be2e2ee56",
+        "artifacts": [
+          {
+            "path": "normalize.py",
+            "sha256": "f8df3163f161f56330f1d157babf8a13696100a28ba92d3923d157aee9065062"
+          }
+        ],
+        "protectedCases": [
+          "test_lowercase",
+          "test_punctuation"
+        ],
+        "requiredCases": [
+          "test_collapse_spaces"
+        ],
+        "cases": [
+          {
+            "id": "test_collapse_spaces",
+            "status": "passed"
+          },
+          {
+            "id": "test_existing_failure",
+            "status": "failed"
+          },
+          {
+            "id": "test_lowercase",
+            "status": "passed"
+          },
+          {
+            "id": "test_punctuation",
+            "status": "passed"
+          }
+        ],
+        "submittedPhase": "intake"
+      },
+      "backupIsExactPreEdit": true,
+      "status": "passed",
+      "formalProfileUnchanged": true
+    },
+    "independentRegression": {
+      "carrier": "Installed Windows DSH NEXT native Web CLI, isolated profile and deterministic loopback provider",
+      "archiveSha256": "c46aaa8fe460aff60bf8a87995311850c7759c35f739384143410127f3ccaa47",
+      "requests": [
+        {
+          "role": "owner",
+          "prior": 0,
+          "action": "propose",
+          "offered": true
+        },
+        {
+          "role": "owner",
+          "prior": 1,
+          "action": "prepare",
+          "offered": true
+        },
+        {
+          "role": "owner",
+          "prior": 2,
+          "action": "advance",
+          "offered": true
+        },
+        {
+          "role": "owner",
+          "prior": 3,
+          "offered": false
+        },
+        {
+          "role": "child",
+          "prior": 0,
+          "action": "prepare",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 1,
+          "action": "write",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 2,
+          "action": "prepare",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 3,
+          "action": "submit",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 4,
+          "action": "submit",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 5,
+          "action": "write",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 6,
+          "action": "prepare",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 7,
+          "action": "submit",
+          "offered": true
+        },
+        {
+          "role": "child",
+          "prior": 8,
+          "action": "submit",
+          "offered": true
+        },
+        {
+          "role": "owner",
+          "prior": 3,
+          "offered": false
+        },
+        {
+          "role": "owner",
+          "prior": 3,
+          "offered": false
+        }
+      ],
+      "tests": {
+        "previousSuiteSha256": "52acefe4270a65f8d336af3edecc09c4ddde8561b8fcacca3a02e20f7fe08cb7",
+        "suiteSha256": "8e85834b51aaa0f653323d1b03665f864076b21e6e5b2ac34e419f6e7327a699",
+        "requiredCases": [
+          "trim-outer-spaces"
+        ],
+        "previous": {
+          "command": "python -m pytest -v --color=no -p no:cacheprovider test_checkpoint.py",
+          "pytestVersion": "9.1.1",
+          "exitCode": 1,
+          "cases": [
+            {
+              "id": "lowercase",
+              "status": "passed"
+            },
+            {
+              "id": "collapse-internal-spaces-known-failure",
+              "status": "failed"
+            }
+          ]
+        },
+        "regressed": {
+          "command": "python -m pytest -v --color=no -p no:cacheprovider test_checkpoint.py",
+          "pytestVersion": "9.1.1",
+          "exitCode": 1,
+          "cases": [
+            {
+              "id": "lowercase",
+              "status": "failed"
+            },
+            {
+              "id": "collapse-internal-spaces-known-failure",
+              "status": "failed"
+            },
+            {
+              "id": "trim-outer-spaces",
+              "status": "passed"
+            }
+          ]
+        },
+        "repaired": {
+          "command": "python -m pytest -v --color=no -p no:cacheprovider test_checkpoint.py",
+          "pytestVersion": "9.1.1",
+          "exitCode": 1,
+          "cases": [
+            {
+              "id": "lowercase",
+              "status": "passed"
+            },
+            {
+              "id": "collapse-internal-spaces-known-failure",
+              "status": "failed"
+            },
+            {
+              "id": "trim-outer-spaces",
+              "status": "passed"
+            }
+          ]
+        }
+      },
+      "fixtures": {
+        "oldCases": [
+          {
+            "id": "lowercase",
+            "input": "ABC",
+            "expected": "abc"
+          },
+          {
+            "id": "collapse-internal-spaces-known-failure",
+            "input": "a  b",
+            "expected": "a b"
+          }
+        ],
+        "newCases": [
+          {
+            "id": "lowercase",
+            "input": "ABC",
+            "expected": "abc"
+          },
+          {
+            "id": "collapse-internal-spaces-known-failure",
+            "input": "a  b",
+            "expected": "a b"
+          },
+          {
+            "id": "trim-outer-spaces",
+            "input": " abc ",
+            "expected": "abc"
+          }
+        ],
+        "baselineSha256": "c8f23d9d2d6671f816e6ade532371c0a19b343cab5f5bee4add83b0e5255c3ec",
+        "regressionSha256": "9dddc7b60600c6f6e45190da9fe055d16883d9d13c3ec00479245255c2978459",
+        "acceptedSha256": "ba41e733aade08724d345ac841856c8a1154581d34bf2db17d88caa2a721a964",
+        "specSha256": "2c86109aa8d4aa76a8cfee73566b93f7d1f4420b7f7be9274c2b93a02b96eccb",
+        "runnerCodeSha256": "70e93a33c31c4c505e9c19a515d6668b3cea936ec0ae6e558b15c739a776b942"
+      },
+      "installedCodeIntakeSha256": "4a9c7e2d383984c642d560419d40b822b2a5bc255e6549aa4e415e001f017c4d",
+      "native": {
+        "phase": "review-ready",
+        "qualification": {
+          "kind": "trusted-regression",
+          "receiptSha256": "c3f89c29ba1539d47d778ab3da93d6be75cb6d25427d2ea370ffaa7bd7976146",
+          "runId": "native-pytest-repaired",
+          "suiteSha256": "8e85834b51aaa0f653323d1b03665f864076b21e6e5b2ac34e419f6e7327a699",
+          "goalSha256": "6e922e9d1ad58ba31a13812b8f564d0b322d64e4c76e3d9c20da82bf431a216d",
+          "artifacts": [
+            {
+              "path": "solution.py",
+              "sha256": "ba41e733aade08724d345ac841856c8a1154581d34bf2db17d88caa2a721a964"
+            }
+          ],
+          "protectedCases": [
+            "lowercase"
+          ],
+          "requiredCases": [
+            "trim-outer-spaces"
+          ],
+          "cases": [
+            {
+              "id": "lowercase",
+              "status": "passed"
+            },
+            {
+              "id": "collapse-internal-spaces-known-failure",
+              "status": "failed"
+            },
+            {
+              "id": "trim-outer-spaces",
+              "status": "passed"
+            }
+          ],
+          "submittedPhase": "intake"
+        },
+        "rows": [
+          {
+            "role": "owner",
+            "event": "tool/result",
+            "seq": 17,
+            "error": false,
+            "status": "started"
+          },
+          {
+            "role": "owner",
+            "event": "tool/result",
+            "seq": 26,
+            "error": false,
+            "phase": "dispatch"
+          },
+          {
+            "role": "owner",
+            "event": "tool/result",
+            "seq": 34,
+            "error": false,
+            "phase": "intake"
+          },
+          {
+            "role": "owner",
+            "event": "turn/end",
+            "reason": "completed"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 21,
+            "error": false,
+            "phase": "intake"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 27,
+            "error": false
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 33,
+            "error": false,
+            "phase": "intake"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 39,
+            "error": true,
+            "text": "Error: [building-loop/code-regression] 缺少当前交付的回归签名回执，请让受信运行者完成测试"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 45,
+            "error": true,
+            "text": "Error: [building-loop/code-regression] 已通过的旧用例回退：lowercase (failed)"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 51,
+            "error": false
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 57,
+            "error": false,
+            "phase": "intake"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 63,
+            "error": true,
+            "text": "Error: [building-loop/code-regression] 当前交付的回归签名回执与授权、文件字节或用例清单不符，请让受信运行者重跑"
+          },
+          {
+            "role": "child",
+            "event": "tool/result",
+            "seq": 69,
+            "error": false,
+            "phase": "review-ready"
+          },
+          {
+            "role": "child",
+            "event": "turn/end",
+            "reason": "completed"
+          }
+        ]
+      },
+      "rollingBackupMatchesBaseline": true,
+      "status": "passed",
+      "formalDesktopProfileUnchanged": true
+    },
+    "formalProfileCloneUpgrade": {
+      "version": "0.7.18",
+      "archiveSha256": "cdfeab90d3e11813c961519ed237205efcae9ce83128ad07a9530c5b450c47a6",
+      "runtimeFilesMatched": 41,
+      "otherDirectDependencies": 18,
+      "action": "rehearse",
+      "refresh": true
+    }
+  },
+  "failedSetupAttempts": [
+    {
+      "scope": "provisional hierarchy witness",
+      "outcome": "incorrect fixture sequence",
+      "cause": "Fixture initially classified the system example of an add-module message as if it were a direct owner request."
+    },
+    {
+      "scope": "pre-final regression profile creation",
+      "outcome": "not evaluated",
+      "cause": "Native Windows profile bootstrap hit EPERM on staging directory rename before plugin tests. Retried only in a new isolated profile."
+    },
+    {
+      "scope": "exact-package first regression witness",
+      "outcome": "not evaluated",
+      "cause": "The test harness regular expression merged adjacent JUnit testcase records. Replaced with an XML parser and reran; no plugin source change."
+    }
+  ],
+  "precedingProbeSha256": "c46aaa8fe460aff60bf8a87995311850c7759c35f739384143410127f3ccaa47",
+  "nodeTests": {
+    "passed": 313,
+    "failed": 0,
+    "rollup": "node --test"
+  },
+  "externalEditorCases": [],
+  "additionalFailureProbes": [
+    "An out-of-band preimage edit could be overwritten before the preimage check.",
+    "An out-of-band edit after staged publication could leave an incomplete route before the final staged digest check."
+  ],
+  "changedPackageFilesSincePair": [
+    "governance/code-regression.md",
+    "governance/project-hierarchy.md",
+    "governance/project-hierarchy.mjs",
+    "governance/transactions.mjs"
+  ],
+  "performance": {
+    "performance-1-london.json": [
+      {
+        "checkpoint": 1,
+        "timezone": "Europe/London",
+        "files": 500,
+        "warmup": {
+          "reference": {
+            "status": "observed",
+            "seconds": 0.04719564200001969,
+            "eventCount": 504,
+            "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+          },
+          "standard": {
+            "status": "observed",
+            "seconds": 0.06965187699995568,
+            "eventCount": 504,
+            "eventSha256": "523762a2547094e9009af693f3374c0abb652ccc3be85e57946604bcfe753942"
+          },
+          "building-loop": {
+            "status": "observed",
+            "seconds": 0.05367720800006737,
+            "eventCount": 504,
+            "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+          }
+        },
+        "matchesReference": {
+          "reference": true,
+          "standard": false,
+          "building-loop": true
+        },
+        "modes": {
+          "building-loop": {
+            "samples": [
+              {
+                "status": "observed",
+                "seconds": 0.05315915200003474,
+                "eventCount": 504,
+                "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.05317836799997622,
+                "eventCount": 504,
+                "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.05709597100008068,
+                "eventCount": 504,
+                "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.05787546199996996,
+                "eventCount": 504,
+                "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.05583442099998592,
+                "eventCount": 504,
+                "eventSha256": "f3db2a4abd433d7548a1e863978a8cc847005847f0c50b3e6a57c5c6dc3ca50e"
+              }
+            ],
+            "medianSeconds": 0.05583442099998592
+          }
+        }
+      },
+      {
+        "checkpoint": 1,
+        "timezone": "Europe/London",
+        "files": 2000,
+        "warmup": {
+          "reference": {
+            "status": "observed",
+            "seconds": 0.05710389099999702,
+            "eventCount": 2004,
+            "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+          },
+          "standard": {
+            "status": "observed",
+            "seconds": 0.07863237900005515,
+            "eventCount": 2004,
+            "eventSha256": "0341ac4d849aafb7b1bccdaba5de69ff24cc8c6835aad9772da05cbb05720783"
+          },
+          "building-loop": {
+            "status": "observed",
+            "seconds": 0.06537729199999376,
+            "eventCount": 2004,
+            "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+          }
+        },
+        "matchesReference": {
+          "reference": true,
+          "standard": false,
+          "building-loop": true
+        },
+        "modes": {
+          "building-loop": {
+            "samples": [
+              {
+                "status": "observed",
+                "seconds": 0.0643274560000009,
+                "eventCount": 2004,
+                "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.06452204999993683,
+                "eventCount": 2004,
+                "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.0654920489999995,
+                "eventCount": 2004,
+                "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.06620616499992593,
+                "eventCount": 2004,
+                "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+              },
+              {
+                "status": "observed",
+                "seconds": 0.06729752999990524,
+                "eventCount": 2004,
+                "eventSha256": "63aad6814f4357e1c140a49b3e3b603b04c4646674a0ea8a2706d9e6099c5f63"
+              }
+            ],
+            "medianSeconds": 0.0654920489999995
+          }
+        }
+      }
+    ],
+    "performance-4-london.json": [
+      {
+        "checkpoint": 4,
+        "timezone": "Europe/London",
+        "files": 500,
+        "warmup": {
+          "reference": {
+            "status": "observed",
+            "seconds": 0.06603276999999252,
+            "eventCount": 1006,
+            "eventSha256": "5cf1acb68aafc45113acf772e7cc53ffd1e6f59d90614e824f4ef229c3f0fc4d"
+          },
+          "standard": {
+            "status": "observed",
+            "seconds": 0.09054156000001967,
+            "eventCount": 1006,
+            "eventSha256": "1484f10d723b9b63ab120845abf173a2dc7d2ed409e061244d5cfa3ea415d537"
+          },
+          "building-loop": {
+            "status": "invalid-output",
+            "exit": 1
+          }
+        },
+        "matchesReference": {
+          "reference": true,
+          "standard": false,
+          "building-loop": false
+        },
+        "modes": {}
+      },
+      {
+        "checkpoint": 4,
+        "timezone": "Europe/London",
+        "files": 2000,
+        "warmup": {
+          "reference": {
+            "status": "observed",
+            "seconds": 0.1066532959999904,
+            "eventCount": 4006,
+            "eventSha256": "c7f3dd54d985572285af013eba098388513de1212644e4b701848abe15951315"
+          },
+          "standard": {
+            "status": "observed",
+            "seconds": 0.11428299399995012,
+            "eventCount": 4006,
+            "eventSha256": "e4c26c9bef1f3ccc99f60f1de875c5eabe4aefed3e4f587c0b0270149b69f37b"
+          },
+          "building-loop": {
+            "status": "invalid-output",
+            "exit": 1
+          }
+        },
+        "matchesReference": {
+          "reference": true,
+          "standard": false,
+          "building-loop": false
+        },
+        "modes": {}
+      }
+    ]
+  },
+  "rollingBackupImplementationSha256": "ba0150ade8ba5777b8a2fb41a54b2deb92c5dd4c88cecbd517206c0c3b4b10aa"
+}

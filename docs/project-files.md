@@ -5,6 +5,7 @@
 | 想做什么 | 读哪份正文 |
 |---|---|
 | 新建项目、接手或插入新内容 | [项目索引契约](../skills/project-index/SKILL.md) |
+| 更新受保护章节、增加模块并同步三层 | [受控项目结构](../governance/project-hierarchy.md) |
 | 核对索引里的文件、哈希和日志 | [PowerShell 7 校验器](../skills/project-index/check.ps1) |
 | 核对本仓库所登记的文件 | [机器索引](../INDEX.json) |
 | 查某个文件改过什么 | [逐文件日志](../changes/) |

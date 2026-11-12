@@ -162,6 +162,47 @@ export function includes(paths, name) {
   return paths.some(item => keyOf(item) === keyOf(name));
 }
 
+export const hierarchyModuleId = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/u;
+
+/** Resolve a module only through a trusted exact grant or the host's private namespace. */
+export function hierarchyBodyPath(hierarchy, id, managed) {
+  if (!hierarchy || typeof id !== "string" || !hierarchyModuleId.test(id)) throw new Error("模块编号须为不超过 40 字符的小写字母、数字和短横线");
+  if (hierarchy.private && managed) return relativeName("modules/" + id + ".md");
+  if (!Object.hasOwn(hierarchy.modules, id)) throw new Error("模块正文没有明确路径授权");
+  return hierarchy.modules[id];
+}
+
+function hierarchyPolicy(value, coordinator, goalContext, protectedFiles, ledgerDocument) {
+  object(value, "三级文件契约", ["overview", "index", "modules", "private"]);
+  if (value.private !== undefined && value.private !== true) throw new Error("三级文件私有路径标记无效");
+  const anchor = entry => {
+    object(entry, "导航章节", ["path", "heading"]);
+    const file = relativeName(entry.path);
+    const { heading } = entry;
+    if (!/\.md$/iu.test(file) || !includes(coordinator.read, file) || typeof heading !== "string" ||
+      !heading.trim() || heading !== heading.trim() || heading.length > 80 || /[\x00-\x1f]/u.test(heading)) {
+      throw new Error("导航章节须指定总控可读的 Markdown 文件和准确标题");
+    }
+    return { path: file, heading };
+  };
+  const overview = anchor(value.overview), index = anchor(value.index);
+  if (!includes(goalContext, overview.path) || includes(goalContext, index.path) ||
+    [overview.path, index.path].some(file => includes(protectedFiles, file) || file === ledgerDocument)) {
+    throw new Error("一级总纲须在目标清单内，二级索引不得与目标、账本、指令、证据或回执重合");
+  }
+  const modules = Object.create(null);
+  const declared = Object.entries(object(value.modules ?? {}, "模块路径授权"));
+  if (declared.length > 40 || value.private && declared.length) throw new Error("模块路径授权数量或来源无效");
+  for (const [id, name] of declared) {
+    const file = relativeName(name);
+    if (!hierarchyModuleId.test(id) || !/\.md$/iu.test(file) || !includes(coordinator.read, file) ||
+      !includes(coordinator.write, file) || includes([...goalContext, index.path, ...protectedFiles, ...Object.values(modules)], file) ||
+      ledgerDocument && includes([ledgerDocument], file)) throw new Error("模块正文须有唯一的总控精确读写授权且独立于中央文件");
+    modules[id] = file;
+  }
+  return { overview, index, modules, private: value.private === true };
+}
+
 /** A named test or fixture cannot qualify as implementation work. */
 export function isImplementationPath(file) {
   const parts = file.toLowerCase().split("/");
@@ -171,22 +212,28 @@ export function isImplementationPath(file) {
     /\.(?:py|js|jsx|mjs|cjs|ts|tsx|mts|cts|go|rs|java|kt|cs|c|cc|cpp|h|hpp|rb|php|swift)$/u.test(name);
 }
 
-function codeTaskPolicy(value, intake) {
+function testCaseIds(ids, minimum, maximum) {
+  return Array.isArray(ids) && ids.length >= minimum && ids.length <= maximum &&
+    ids.every(id => typeof id === "string" && id && id.length <= 120 && id.trim() === id && !/[\x00-\x1f]/u.test(id)) &&
+    new Set(ids).size === ids.length;
+}
+
+function codeTaskPolicy(value, phases) {
   object(value, "代码任务契约", ["sources", "tests"]);
   const sources = pathList(value.sources);
-  if (!sources.length || sources.some(file => !isImplementationPath(file) || !includes(intake.read, file) || !includes(intake.write, file))) {
-    throw new Error("代码任务须登记接单阶段精确可读写的实现文件，不能用测试或文档充当实现");
+  const grants = value.tests?.regression ? [phases.intake, phases.supplement] : [phases.intake];
+  if (!sources.length || sources.some(file => !isImplementationPath(file) ||
+    !grants.some(grant => includes(grant.read, file) && includes(grant.write, file)))) {
+    throw new Error("代码任务须登记执行阶段精确可读写的实现文件，不能用测试或文档充当实现");
   }
   if (value.tests === undefined) {
     if (sources.some(file => !/\.py$/iu.test(file))) throw new Error("未支持结构比较的实现文件须配置受信测试回执");
     return { sources };
   }
-  const entry = object(value.tests, "受信测试契约", ["file", "publicKey", "previousSuiteSha256", "suiteSha256", "requiredCases"]);
+  const entry = object(value.tests, "受信测试契约", ["file", "publicKey", "previousSuiteSha256", "suiteSha256", "requiredCases", "regression"]);
   const file = relativeName(entry.file);
   const { publicKey, previousSuiteSha256, suiteSha256, requiredCases } = entry;
-  if (!Array.isArray(requiredCases) || !requiredCases.length || requiredCases.length > 80 ||
-    requiredCases.some(id => typeof id !== "string" || !id || id.length > 120 || id.trim() !== id || /[\x00-\x1f]/u.test(id)) ||
-    new Set(requiredCases).size !== requiredCases.length || !/^[a-f0-9]{64}$/u.test(suiteSha256 ?? "") ||
+  if (!testCaseIds(requiredCases, 1, 80) || !/^[a-f0-9]{64}$/u.test(suiteSha256 ?? "") ||
     !/^[a-f0-9]{64}$/u.test(previousSuiteSha256 ?? "") || previousSuiteSha256 === suiteSha256) {
     throw new Error("受信测试须登记唯一的新增必测用例和不同的新旧测试套件 SHA-256");
   }
@@ -195,7 +242,18 @@ function codeTaskPolicy(value, intake) {
     if (der.toString("base64") !== publicKey || der.length !== 44 ||
       createPublicKey({ key: der, type: "spki", format: "der" }).asymmetricKeyType !== "ed25519") throw new Error();
   } catch { throw new Error("受信测试须登记 Base64 编码的 Ed25519 SPKI 公钥"); }
-  return { sources, tests: { file, publicKey, previousSuiteSha256, suiteSha256, requiredCases } };
+  let regression;
+  if (entry.regression !== undefined) {
+    const definition = object(entry.regression, "代码回归契约", ["baselineFile", "previousCases", "inputs"]);
+    const baselineFile = relativeName(definition.baselineFile);
+    const { previousCases } = definition;
+    const inputs = pathList(definition.inputs);
+    if (!testCaseIds(previousCases, 0, 240) || previousCases.some(id => requiredCases.includes(id))) {
+      throw new Error("代码回归契约须登记完整且不与新增必测用例重叠的旧测试编号");
+    }
+    regression = { baselineFile, previousCases, inputs };
+  }
+  return { sources, tests: { file, publicKey, previousSuiteSha256, suiteSha256, requiredCases, ...(regression ? { regression } : {}) } };
 }
 
 /** 解析项目权威清单，核角色隔离、证据只读和来源凭据。 */
@@ -208,7 +266,7 @@ export function authority(root) {
 /** 新建授权也通过现有宿主解析器，写入前就检查角色隔离。 */
 export function parseAuthority(bytes) {
   if (bytes.length > 64 * 1024) throw new Error("授权文件超过大小上限");
-  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "sessionOptIn", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument", "requiredLinesGoal"]);
+  const source = object(JSON.parse(text(bytes)), "授权文件", ["spec", "sessionOptIn", "instructions", "coordinator", "units", "sourcePins", "ledgerContext", "goalContext", "ledgerDocument", "requiredLinesGoal", "hierarchy"]);
   if (source.spec !== "building-loop/1") throw new Error("不支持的授权文件版本");
   if (source.sessionOptIn !== undefined && typeof source.sessionOptIn !== "boolean") throw new Error("sessionOptIn 须为布尔值");
   const coordinator = grants(source.coordinator, "总控");
@@ -293,7 +351,7 @@ export function parseAuthority(bytes) {
       }
       calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
     }
-    const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases.intake);
+    const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases);
     units[id] = { candidate, claims, continuation, phases, calculations, covers,
       requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
       cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}) };
@@ -343,8 +401,13 @@ export function parseAuthority(bytes) {
   }
   const modelFiles = [...coordinator.read, ...mutable, ...protectedFiles, ...goalContext, ...ledgerContext,
     ...Object.values(units).flatMap(unit => Object.values(unit.phases).flatMap(grant => grant.read))];
-  const testProofPaths = Object.values(units).flatMap(unit => unit.codeTask?.tests ? [unit.codeTask.tests.file] : []);
-  if (new Set(testProofPaths.map(keyOf)).size !== testProofPaths.length || testProofPaths.some(file => includes(modelFiles, file))) {
+  const testProofPaths = Object.values(units).flatMap(unit => {
+    const tests = unit.codeTask?.tests;
+    return tests ? [tests.file, ...(tests.regression ? [tests.regression.baselineFile] : [])] : [];
+  });
+  const testInputs = Object.values(units).flatMap(unit => unit.codeTask?.tests?.regression?.inputs ?? []);
+  if (new Set(testProofPaths.map(keyOf)).size !== testProofPaths.length ||
+    testProofPaths.some(file => includes([...modelFiles, ...testInputs], file))) {
     throw new Error("受信测试回执须是唯一的宿主读取路径，不得进入模型授权或作为证据");
   }
   // Auditors inherit only the relevant candidate/evidence read scope. Review receipts
@@ -353,7 +416,8 @@ export function parseAuthority(bytes) {
     const grant = unit.phases[prefix + "-review"];
     unit.phases[prefix + "-audit"] = { ...grant, write: [], read: grant.read.filter(file => !receiptsSeen.has(keyOf(file))) };
   }
-  return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal };
+  const hierarchy = source.hierarchy === undefined ? undefined : hierarchyPolicy(source.hierarchy, coordinator, goalContext, protectedFiles, ledgerDocument);
+  return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }
 
 /** Return only the managed history paths derived from an exact project file. */

@@ -61,6 +61,7 @@ function privatePolicy(sessionId, input) {
     spec: "building-loop/1",
     coordinator: { read: [GOAL, INDEX, FIRST, FINAL], write: [GOAL, BOOK] },
     goalContext: [GOAL], ledgerContext: [GOAL, INDEX], ledgerDocument: BOOK,
+    hierarchy: { private: true, overview: { path: GOAL, heading: "分块入口" }, index: { path: INDEX, heading: "模块正文" } },
     ...(input ? { sourcePins: { [MATERIALS]: { sha256: digest(input), kind: "primary", locator: "dsh-session/" + encodeURIComponent(sessionId) } } } : {}),
     units: { K01: { candidate: DELIVERY, requireSourcePins: true, phases: {
       intake: { read, write: [DELIVERY] },
@@ -116,7 +117,7 @@ function createPrivateProject(hostHome, sessionId, proposal) {
     parseAuthority(Buffer.from(manifest));
     const files = {
       [GOAL]: goalDocument(proposal, ownerTable),
-      [INDEX]: "# 项目索引\n\n- [项目总纲](PROJECT-GOAL.md)\n- K01 · [交付稿](DELIVERY.md)\n- [任务账本](TASK-LEDGER.md)\n" +
+      [INDEX]: "# 项目索引\n\n- [项目总纲](PROJECT-GOAL.md)\n- [任务账本](TASK-LEDGER.md)\n\n## 模块正文\n\n- K01 · [交付稿](DELIVERY.md)\n" +
         (input ? "- [会话提供的材料](CONVERSATION-INPUT.md)\n" : ""),
       [DELIVERY]: STARTER,
       [BOOK]: "# 任务账本\n\n- K01 已确认，待派单。目标与范围见 [项目总纲](PROJECT-GOAL.md)。\n",

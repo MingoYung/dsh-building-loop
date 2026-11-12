@@ -1,13 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { AUTHORITY, digest, historyPaths, keyOf, readBytes, replaceBytes, text } from "./policy.mjs";
+import { AUTHORITY, digest, hierarchyBodyPath, historyPaths, keyOf, readBytes, replaceBytes, text } from "./policy.mjs";
 
 export const STATE_LIMIT = 8 * 1024 * 1024;
 export const LEDGER_TURN_ENDS = Object.freeze(["error", "max-tokens", "blocked", "completed", "aborted", "interrupted"]);
 const JOURNAL_LIMIT = 2 * STATE_LIMIT;
 const FILE_LIMIT = 256 * 1024;
 const JOURNAL_SPEC = "building-loop-ledger-transaction/1";
+const MODULE_JOURNAL_SPEC = "building-loop-module-transaction/1";
 const EVENT_SPEC = "building-loop-ledger-event/1";
 const EVENT_LIMIT = 4096;
 const EVENT_NAME = /^[a-f0-9]{64}\.[a-f0-9-]{36}\.json$/u;
@@ -202,28 +203,34 @@ function policyCurrent(root, expected) {
   if (stateDigest(readBytes(root, AUTHORITY)) !== expected) throw new Error("未完成账本事务的授权清单已变化，需维护者核对");
 }
 
-/** Reconcile a single generated-ledger transaction under its workspace lock.
+/** Reconcile a generated ledger or module transaction under its workspace lock.
  * The authoritative state rename is the commit point. Before it, restore only
  * known transaction bytes; after it, require that all published bytes match.
  */
-export function recoverLedgerJournal(home, file, root, policy) {
+export function recoverLedgerJournal(home, file, root, policy, managed = false) {
   const name = journalName(file);
   const raw = readBytes(home, name, JOURNAL_LIMIT);
   if (!raw) return;
   let journal;
   try { journal = JSON.parse(text(raw)); }
   catch { throw new Error("未完成账本事务的日志损坏，需维护者核对"); }
-  if (!journal || journal.spec !== JOURNAL_SPEC || journal.policy !== policy.hash ||
-      typeof policy.ledgerDocument !== "string" || journal.ledger !== policy.ledgerDocument) {
+  if (!journal || journal.policy !== policy.hash) {
     throw new Error("未完成账本事务的授权清单或日志不匹配，需维护者核对");
   }
+  let required, optional = [];
+  if (journal.spec === MODULE_JOURNAL_SPEC && policy.hierarchy && (!policy.hierarchy.private || managed)) {
+    required = [hierarchyBodyPath(policy.hierarchy, journal.module, managed), policy.hierarchy.index.path];
+    optional = [policy.hierarchy.overview.path];
+  } else if (journal.spec === JOURNAL_SPEC && typeof policy.ledgerDocument === "string" && journal.ledger === policy.ledgerDocument) {
+    required = [journal.ledger];
+  } else throw new Error("未完成账本或模块事务的授权清单与日志不匹配，需维护者核对");
   const isDigest = value => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
   if (!isDigest(journal.after) || journal.before !== null && !isDigest(journal.before) ||
-      !Array.isArray(journal.writes) || journal.writes.length < 2 || journal.writes.length > 4) {
+      !Array.isArray(journal.writes) || journal.writes.length < required.length * 2 ||
+      journal.writes.length > (required.length + optional.length) * 4) {
     throw new Error("未完成账本事务的版本记录无效，需维护者核对");
   }
-  const managed = historyPaths(journal.ledger);
-  const allowed = new Set([journal.ledger, managed.log, managed.backup, managed.logBackup]);
+  const allowed = new Set([...required, ...optional].flatMap(item => [item, ...Object.values(historyPaths(item))]));
   const state = stateDigest(readBytes(home, file, STATE_LIMIT));
   // Older publications could have identical state bytes on both sides. With
   // no durable commit point, restore their known before images for a safe retry.
@@ -233,7 +240,10 @@ export function recoverLedgerJournal(home, file, root, policy) {
     if (!item || !allowed.delete(item.file) || !isDigest(item.after)) throw new Error("未完成账本事务的写入范围无效，需维护者核对");
     return { root, file: item.file, before: storedBytes(item.before, FILE_LIMIT), after: item.after, limit: FILE_LIMIT };
   });
-  if (allowed.has(journal.ledger) || allowed.has(managed.log)) throw new Error("未完成账本事务的正文或更新日志记录缺失");
+  if (required.some(item => allowed.has(item) || allowed.has(historyPaths(item).log)) ||
+      optional.some(item => allowed.has(item) !== allowed.has(historyPaths(item).log))) {
+    throw new Error("未完成账本或模块事务的正文或更新日志记录缺失");
+  }
   const backupBefore = storedBytes(journal.backupBefore, STATE_LIMIT);
   if (journal.before !== null) targets.push({ root: home, file: file + ".bak", before: backupBefore, after: journal.before, limit: STATE_LIMIT });
   // Read and classify every target before modifying any of them. Unknown edits
@@ -257,37 +267,51 @@ export function recoverLedgerJournal(home, file, root, policy) {
   replaceBytes(home, name, null, raw, JOURNAL_LIMIT);
 }
 
-/** Persist generated ledger files before the authoritative state, with one
+/** Persist generated ledger or module files before the authoritative state, with one
  * recoverable journal. Ordinary state-only transactions retain their path.
  */
 export function commitWorkspaceState(home, frame, next, warnCleanup) {
   if (next.length > STATE_LIMIT) throw new Error("内容超过受控工具的大小上限");
-  const { file, root, policy, old, ledgerWrites } = frame;
+  const { file, root, policy, old, ledgerWrites, hierarchyWrites } = frame;
+  const writes = hierarchyWrites?.writes ?? ledgerWrites;
   // Idempotent retry must not replace the one rolling pre-commit backup.
-  if (!ledgerWrites?.length && old?.equals(next)) return;
+  if (!writes?.length && old?.equals(next)) return;
   const backup = file + ".bak";
   const backupBefore = old ? readBytes(home, backup, STATE_LIMIT) : null;
-  if (!ledgerWrites?.length) {
+  if (!writes?.length) {
     if (old) replaceBytes(home, backup, old, backupBefore, STATE_LIMIT);
     replaceBytes(home, file, next, old, STATE_LIMIT);
     return;
   }
   const name = journalName(file);
-  const raw = Buffer.from(JSON.stringify({ spec: JOURNAL_SPEC, policy: policy.hash, ledger: policy.ledgerDocument,
+  const operation = hierarchyWrites ? { spec: MODULE_JOURNAL_SPEC, module: hierarchyWrites.module }
+    : { spec: JOURNAL_SPEC, ledger: policy.ledgerDocument };
+  const raw = Buffer.from(JSON.stringify({ ...operation, policy: policy.hash,
     before: stateDigest(old), after: digest(next), backupBefore: recordBytes(backupBefore),
-    writes: ledgerWrites.map(item => ({ file: item.file, before: recordBytes(item.before), after: digest(item.after) })) }));
+    writes: writes.map(item => ({ file: item.file, before: recordBytes(item.before), after: digest(item.after) })) }));
   policyCurrent(root, policy.hash);
   replaceBytes(home, name, raw, null, JOURNAL_LIMIT);
   try {
-    for (const item of ledgerWrites) {
+    for (const item of writes) {
       policyCurrent(root, policy.hash);
       replaceBytes(root, item.file, item.after, item.before);
     }
     if (old) replaceBytes(home, backup, old, backupBefore, STATE_LIMIT);
     policyCurrent(root, policy.hash);
+    if (hierarchyWrites) {
+      // The workspace lock serializes host tools. Verify published targets again
+      // because another editor can still change them before the state commit.
+      const expected = [{ file: policy.hierarchy.overview.path, sha256: hierarchyWrites.overviewSha256 },
+        ...writes.map(item => ({ file: item.file, sha256: digest(item.after) }))];
+      for (const item of expected) {
+        if (stateDigest(readBytes(root, item.file, FILE_LIMIT)) !== item.sha256) {
+          throw new Error("新增模块期间文件发生外部修改，请核对后重试 " + item.file);
+        }
+      }
+    }
     replaceBytes(home, file, next, old, STATE_LIMIT);
   } catch (error) {
-    try { recoverLedgerJournal(home, file, root, policy); }
+    try { recoverLedgerJournal(home, file, root, policy, frame.managed); }
     catch (failure) { throw new AggregateError([error, failure], "宿主提交失败，未完成账本事务仍待核对", { cause: error }); }
     throw error;
   }
