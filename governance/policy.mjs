@@ -219,7 +219,15 @@ function testCaseIds(ids, minimum, maximum) {
 }
 
 function codeTaskPolicy(value, phases) {
-  object(value, "代码任务契约", ["sources", "tests"]);
+  object(value, "代码任务契约", ["sources", "tests", "diagnostics"]);
+  let diagnostics;
+  if (value.diagnostics !== undefined) {
+    const { checkSet } = object(value.diagnostics, "快速诊断授权", ["checkSet"]);
+    if (!value.tests?.regression || typeof checkSet !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(checkSet)) {
+      throw new Error("快速诊断须在签名回归契约中登记受信检查集编号");
+    }
+    diagnostics = { checkSet };
+  }
   const sources = pathList(value.sources);
   const grants = value.tests?.regression ? [phases.intake, phases.supplement] : [phases.intake];
   if (!sources.length || sources.some(file => !isImplementationPath(file) ||
@@ -253,7 +261,8 @@ function codeTaskPolicy(value, phases) {
     }
     regression = { baselineFile, previousCases, inputs };
   }
-  return { sources, tests: { file, publicKey, previousSuiteSha256, suiteSha256, requiredCases, ...(regression ? { regression } : {}) } };
+  return { sources, tests: { file, publicKey, previousSuiteSha256, suiteSha256, requiredCases, ...(regression ? { regression } : {}) },
+    ...(diagnostics ? { diagnostics } : {}) };
 }
 
 /** 解析项目权威清单，核角色隔离、证据只读和来源凭据。 */
@@ -426,10 +435,51 @@ export function historyPaths(file) {
   return { log, backup: MANAGED + "/latest_backup/" + file, logBackup: MANAGED + "/latest_backup/" + log };
 }
 
+/** Match every literal fragment against the same original UTF-8 file. */
+export function scopedEditContent(before, { beforeSha256, oldText, newText, edits }) {
+  if (before === null) throw new Error("局部编辑只适用于已有文件，新建文件请用 write");
+  if (digest(before) !== beforeSha256) throw new Error("局部编辑的文件摘要不匹配，请先读取当前文件再重试");
+  if (edits !== undefined && (oldText !== undefined || newText !== undefined)) {
+    throw new Error("局部编辑须使用 oldText/newText 或 edits，不能同时使用");
+  }
+  const replacements = edits ?? [{ oldText, newText }];
+  if (!Array.isArray(replacements) || replacements.length < 1 || replacements.length > 32) {
+    throw new Error("一次局部编辑须提供 1 到 32 项替换");
+  }
+  // Keep the BOM and existing line endings outside the explicitly replaced spans.
+  const decoded = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(before);
+  const bom = decoded.startsWith("\uFEFF") ? "\uFEFF" : "";
+  const current = decoded.slice(bom.length);
+  // read returns numbered lines. Match those lines in the file's CRLF form when it has uniform CRLF.
+  const crlf = current.includes("\r\n") && !/(?<!\r)\n|\r(?!\n)/u.test(current);
+  const fileNewlines = value => crlf ? value.replace(/\r?\n/gu, "\r\n") : value;
+  const ranges = replacements.map((row, index) => {
+    const old = row?.oldText, next = row?.newText;
+    if (typeof old !== "string" || typeof next !== "string" || !old.isWellFormed() || !next.isWellFormed() ||
+        (!old && (current || replacements.length !== 1))) {
+      throw new Error("第 " + (index + 1) + " 项须提供 oldText 和 newText；仅空文件允许空 oldText");
+    }
+    const from = fileNewlines(old);
+    const start = current.indexOf(from);
+    if (start < 0 || (from !== "" && current.indexOf(from, start + 1) !== -1)) {
+      throw new Error("第 " + (index + 1) + " 项 oldText 须在当前文件中恰好出现一次");
+    }
+    return { start, end: start + from.length, to: fileNewlines(next) };
+  }).sort((a, b) => a.start - b.start);
+  const pieces = [];
+  let cursor = 0;
+  for (const { start, end, to } of ranges) {
+    if (start < cursor) throw new Error("同一次局部编辑的替换范围不能重叠");
+    pieces.push(current.slice(cursor, start), to);
+    cursor = end;
+  }
+  return bom + pieces.join("") + current.slice(cursor);
+}
+
 /** Plan or publish the same bounded document, rolling backup and history bytes. */
 export function replaceWithHistory(root, file, content, note, tag, markers, stage) {
   const before = readBytes(root, file);
-  const after = Buffer.from(content, "utf8");
+  const after = Buffer.from(typeof content === "function" ? content(before) : content, "utf8");
   if (equal(before, after)) return { path: file, changed: false, sha256: digest(after) };
   const { log, backup, logBackup } = historyPaths(file);
   const oldLog = readBytes(root, log);

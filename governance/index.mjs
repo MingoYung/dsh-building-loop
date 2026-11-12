@@ -4,8 +4,8 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
-  AUTHORITY, MANAGED, PHASES, MissingProjectAuthority, authority, digest, includes, keyOf, readBytes, relativeName,
-  replaceWithHistory, text, workspaceRoot,
+  AUTHORITY, MANAGED, PHASES, MissingProjectAuthority, authority, digest, includes, isImplementationPath, keyOf, readBytes,
+  relativeName, replaceWithHistory, scopedEditContent, text, workspaceRoot,
 } from "./policy.mjs";
 import {
   QUALITY, citation, claimRow, deliveryQuality, lineList, numericChecks, plainLastIssues,
@@ -21,6 +21,7 @@ import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 import { conversationDiscussion, decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask, startedConversationProject } from "./conversation-start.mjs";
 import { initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable, requirePrivateDraft } from "./conversation-project.mjs";
 import { captureCodeIntake, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake } from "./code-intake.mjs";
+import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeDiagnostics, runCodeDiagnostics } from "./code-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { addHierarchyModule, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 
@@ -249,6 +250,7 @@ export function apply(ctx, config = {}) {
   const presetId = config.presetId ?? "building-loop";
   const hostHome = path.resolve(process.env.DSH_HOME || path.join(os.homedir(), ".dsh"));
   const stateHome = path.join(hostHome, "building-loop-state");
+  const diagnosticRunner = diagnosticRunnerConfig(process.env);
   fs.mkdirSync(stateHome, { recursive: true });
   const restrictedAgents = new WeakSet();
   const automaticWrites = new Map();
@@ -800,7 +802,8 @@ export function apply(ctx, config = {}) {
   /** 文件入口集中执行白名单、实际已读行记录、日志和滚动备份。 */
   function fileAction(args, exec) {
     if (args.action === "add-module") return addModule(args, exec);
-    return change(exec.agent, frame => {
+    let diagnosticJob;
+    const result = change(exec.agent, frame => {
       if (frame.role === "idle") throw new Error("当前子会话没有已授权的工作阶段");
       if (args.action === "list") return { read: frame.reads, write: frame.writes };
       if (args.action === "search") {
@@ -828,14 +831,30 @@ export function apply(ctx, config = {}) {
         return { matches, searchObservation };
       }
       const file = relativeName(args.path);
-      if (args.action === "write") {
+      if (args.action === "write" || args.action === "edit") {
         if(frame.policy.ledgerDocument&&keyOf(file)===keyOf(frame.policy.ledgerDocument))throw new Error("该文件是宿主生成的完整账本快照，只能由 building_loop_ledger export/review 更新，不能手写覆盖");
         if (!includes(frame.writes, file)) throw new Error("该文件不在当前写白名单");
-        if (typeof args.content !== "string") throw new Error("需要 UTF-8 正文");
+        const edit = args.action === "edit";
+        if (edit) {
+          if (frame.role !== "executor") throw new Error("只有当前执行者可以局部编辑");
+          if (!includes(frame.reads, file)) throw new Error("该文件不在当前读白名单");
+          if (args.content !== undefined) throw new Error("局部编辑不能使用整文件 content");
+        } else if (typeof args.content !== "string") throw new Error("需要 UTF-8 正文");
         const note = requireText(args.note, "改动理由", 500);
-        checkHierarchyWrite(frame, file, args.content, args.heading);
-        const result = replaceWithHistory(frame.root, file, args.content, note, tag(frame), frame.state.markers);
+        const requiresEdit = frame.role === "executor" && frame.assignment?.[1].codeIntake?.regression && isImplementationPath(file);
+        const validate = next => {
+          checkHierarchyWrite(frame, file, next, args.heading);
+          return next;
+        };
+        const content = edit || requiresEdit ? before => {
+          if (!edit && requiresEdit && before !== null) {
+            throw new Error("回归代码任务的已有实现文件须用 edit 局部编辑；先读取当前文件获取 beforeSha256");
+          }
+          return validate(edit ? scopedEditContent(before, args) : args.content);
+        } : validate(args.content);
+        const result = replaceWithHistory(frame.root, file, content, note, tag(frame), frame.state.markers);
         frame.changed = result.changed;
+        if (result.changed) diagnosticJob = prepareCodeDiagnostics(frame, file, result.sha256, diagnosticRunner);
         return result;
       }
       if (!includes(frame.reads, file)) throw new Error("该文件不在当前读白名单");
@@ -855,6 +874,21 @@ export function apply(ctx, config = {}) {
       seenLines(frame,file,bytes,start,Math.min(start+count-1,lines.length));
       return { path: file, totalLines: lines.length, sha256: digest(bytes),
         lines: lines.slice(start - 1, start - 1 + count).map((line, index) => [start + index, line]) };
+    });
+    if (!diagnosticJob) return result;
+    if (diagnosticJob.result) return { ...result, diagnostics: diagnosticJob.result };
+    // Test on the captured bytes only after committing the edit. Reacquire
+    // the lock to check freshness, so slow tests never block workspace work.
+    return runCodeDiagnostics(diagnosticJob, diagnosticRunner, exec.signal).then(diagnostics => {
+      let current = false;
+      try {
+        const { file } = coordinates(exec.agent);
+        current = withWorkspaceLock(stateHome, file, () =>
+          codeDiagnosticsCurrent(scope(exec.agent, { lockedFile: file, inspection: true }), diagnosticJob), warnCleanup);
+      } catch {
+        // No result can be tied to the active edit when its state is unavailable.
+      }
+      return { ...result, diagnostics: current ? diagnostics : { status: "superseded" } };
     });
   }
 
@@ -1620,8 +1654,17 @@ export function apply(ctx, config = {}) {
     materials: { type: "array", maxItems: 4, items: { ...string, maxLength: 1200 }, description: "可选。与任务直接相关的用户消息逐字摘录；不填模型生成内容或文件路径。" },
   }, propose, ["goal", "deliverable", "scope"]), { when: ({ agent }) => mayPropose(agent) });
 
-  register(tool(FILE, "按准确路径白名单列出、读取、字面搜索或写入 UTF-8 文件。write 和 add-module 自动保留一份改前备份及逐文件日志；history 取最近更新。三级项目的 add-module 只供总控在所有者明确请求后使用，同批写入正文和两级导航。", ["list", "read", "search", "write", "history", "add-module"], {
+  const editFragment = {
+    type: "object", properties: {
+      oldText: { ...string, description: "当前文件中恰好出现一次的逐字片段，含缩进和换行；空文件可传空字符串" },
+      newText: { ...string, description: "替换片段，空字符串表示删除该片段" },
+    }, required: ["oldText", "newText"], additionalProperties: false,
+  };
+  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。启用回归的代码任务用 edit 修改已有实现文件，用 write 新建实现文件。edit 按 beforeSha256 精确替换唯一旧片段，传 oldText/newText 或 edits；单批 edits 匹配同一原文件，范围不能重叠。write、edit 和 add-module 保留改前备份及逐文件日志。三级项目的 add-module 只供总控在所有者明确请求后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
     path: string, query: string, content: string, note: string, start: number, count: number,
+    beforeSha256: { ...string, description: "edit 必填：当前目标文件的完整 SHA-256，可从 read 获取" },
+    ...editFragment.properties,
+    edits: { type: "array", items: editFragment, minItems: 1, maxItems: 32 },
     module: { ...string, description: "add-module：所有者明确指定的小写模块编号" },
     title: { ...string, description: "add-module：所有者明确指定的模块标题" },
     heading: { ...string, description: "write 修改受管中央文件时填写实际修改的已有章节标题" },

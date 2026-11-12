@@ -26,3 +26,13 @@
 3. **由可信运行者签名。** 两种回执均调用 `governance/code-intake.mjs` 导出的 `codeRegressionSigningBytes(receipt)`，用 Ed25519 签名并将 Base64 写入 `signature`，再放到配置的回执路径。回执应原子发布，避免宿主读到半份。签名证明谁对这组运行结果负责；运行者还要保证套件来源、执行环境和用例本身可信。
 
 绿地单元没有旧行为时，旧清单用空数组，仍需要基线及新增必测结果。配置须覆盖会影响行为的实现、配置和依赖。缺少可信运行者时，新的受控代码单元应先完成接入，宿主会报告缺少的配置或回执。
+
+## 局部编辑与即时诊断
+
+启用签名回归的代码单元里，执行方修改已有实现文件时，通过 `building_loop_file` 的 `edit` 提交。先 `read` 取得文件当前的 `sha256`，再传 `path`、`beforeSha256`、`oldText`、`newText` 和 `note`。原文片段在当前版本必须唯一。也可以用 `edits` 一次提交同一文件内的多个改动，每段都以同一份原文定位，全部匹配后才落盘。新建已授权文件仍用 `write`。
+
+维护者可以在 `codeTask` 增加 `"diagnostics": {"checkSet": "unit-smoke-v1"}`。其中 `checkSet` 要填运行器已登记的检查组编号。DSH 宿主通过 `DSH_BUILDING_LOOP_DIAGNOSTICS_URL` 指定带端口的 `http://127.0.0.1:端口/路径`，通过 `DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN` 指定 32–256 位凭证（字母、数字或 `._~-`）。`DSH_BUILDING_LOOP_DIAGNOSTICS_TIMEOUT_MS` 默认为 12000，可设为 500–30000。受信运行器按登记的 `checkSet` 执行固定用例，在隔离目录运行实际收到的文件版本。
+
+- 宿主在每次有效落盘后发起带 Bearer 凭证的 JSON POST。请求包含 `spec`（固定为 `building-loop/diagnostics/1`）、`requestId`、`checkSet`、`unit`、`phase`、`policySha256`、`goalSha256`、`snapshotSha256`、`changed`（`path` 和 `sha256`）及 `artifacts`（每项为 `path`、`sha256`、`contentBase64`）。未创建文件的摘要和内容均为 `null`。宿主最多发送 256 份文件和 4 MiB 原始内容。
+- 运行器返回 HTTP 200 和 JSON，回显 `spec`、`requestId`、`snapshotSha256`，并设置 `status` 为 `passed`、`failed` 或 `unavailable`。失败时用 `firstError` 给出第一条真实失败的 `caseId` 和 `message`。可带执行方能读取的工件相对 `path`，带路径时可附 `line`。日志先去除凭证和无关信息。
+- 工具把 `diagnostics` 随写入结果送给执行方。配置缺失、超时或结果过期时，返回对应状态，写入结果独立保留。目标、阶段、授权或相关工件改变后，旧反馈作废。送审仍由原有签名回归检查全部旧通过项和新增必测项。
