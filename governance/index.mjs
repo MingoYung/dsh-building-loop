@@ -21,7 +21,7 @@ import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 import { conversationDiscussion, decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask, startedConversationProject } from "./conversation-start.mjs";
 import { initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable, requirePrivateDraft } from "./conversation-project.mjs";
 import { captureCodeIntake, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake } from "./code-intake.mjs";
-import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeDiagnostics, runCodeDiagnostics } from "./code-diagnostics.mjs";
+import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeDiagnostics, prepareCodeReproduction, runCodeDiagnostics } from "./code-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { addHierarchyModule, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 
@@ -29,11 +29,12 @@ export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQuery"];
 const WORKFLOW = "building_loop";
 const FILE = "building_loop_file";
+const REPRODUCE = "building_loop_reproduce";
 const ASSESS = "building_loop_quality";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
 const START = "building_loop_propose";
-const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, LEDGER, COVERAGE, START];
+const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, LEDGER, COVERAGE, START, REPRODUCE];
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
@@ -251,6 +252,7 @@ export function apply(ctx, config = {}) {
   const hostHome = path.resolve(process.env.DSH_HOME || path.join(os.homedir(), ".dsh"));
   const stateHome = path.join(hostHome, "building-loop-state");
   const diagnosticRunner = diagnosticRunnerConfig(process.env);
+  const reproductions = new WeakSet();
   fs.mkdirSync(stateHome, { recursive: true });
   const restrictedAgents = new WeakSet();
   const automaticWrites = new Map();
@@ -277,14 +279,15 @@ export function apply(ctx, config = {}) {
   }
 
   /** Registration admission is recalculated each step; it never grants file rights. */
-  function visible(roles) {
+  function visible(roles, eligible = () => true) {
     return ({ agent }) => {
       try {
         // DSH snapshots tool schemas before evaluating runtime-context text.
         // Admission runs earlier, so restrict here even on a fresh child's first
         // request; the later context/pre-step calls remain idempotent fallbacks.
         restrictVisible(agent);
-        return roles.includes(scope(agent,{inspection:true}).role);
+        const frame = scope(agent, { inspection: true });
+        return roles.includes(frame.role) && eligible(frame);
       } catch { return false; }
     };
   }
@@ -876,20 +879,50 @@ export function apply(ctx, config = {}) {
         lines: lines.slice(start - 1, start - 1 + count).map((line, index) => [start + index, line]) };
     });
     if (!diagnosticJob) return result;
-    if (diagnosticJob.result) return { ...result, diagnostics: diagnosticJob.result };
+    return completeDiagnostics(diagnosticJob, exec).then(diagnostics => ({ ...result, diagnostics }));
+  }
+
+  async function completeDiagnostics(job, exec) {
+    if (job.result) return job.result;
     // Test on the captured bytes only after committing the edit. Reacquire
     // the lock to check freshness, so slow tests never block workspace work.
-    return runCodeDiagnostics(diagnosticJob, diagnosticRunner, exec.signal).then(diagnostics => {
-      let current = false;
-      try {
-        const { file } = coordinates(exec.agent);
-        current = withWorkspaceLock(stateHome, file, () =>
-          codeDiagnosticsCurrent(scope(exec.agent, { lockedFile: file, inspection: true }), diagnosticJob), warnCleanup);
-      } catch {
-        // No result can be tied to the active edit when its state is unavailable.
-      }
-      return { ...result, diagnostics: current ? diagnostics : { status: "superseded" } };
-    });
+    const diagnostics = await runCodeDiagnostics(job, diagnosticRunner, exec.signal);
+    try {
+      const { file } = coordinates(exec.agent);
+      if (withWorkspaceLock(stateHome, file, () =>
+        codeDiagnosticsCurrent(scope(exec.agent, { lockedFile: file, inspection: true }), job), warnCleanup)) return diagnostics;
+    } catch {
+      // A result whose authority cannot be verified is treated as obsolete.
+    }
+    return { status: "superseded" };
+  }
+
+  function reproductionPolicy(frame) {
+    const [unit, active] = frame.assignment ?? [];
+    if (frame.role !== "executor" || !active?.codeIntake?.regression) return;
+    const diagnostics = frame.policy.units[unit].codeTask?.diagnostics;
+    if (diagnostics?.protocol === 2) return diagnostics;
+  }
+
+  /** Capture the active executor's bytes under lock, then run on a copy. */
+  async function reproduce(args, exec) {
+    const { agent, signal } = exec;
+    signal?.throwIfAborted();
+    const { file } = coordinates(agent);
+    const { job, recipes } = withWorkspaceLock(stateHome, file, () => {
+      const frame = scope(agent, { lockedFile: file, inspection: true });
+      const policy = reproductionPolicy(frame);
+      if (!policy) throw new Error("仅已登记复现的当前代码任务执行方可以运行");
+      return { job: prepareCodeReproduction(frame, args, diagnosticRunner), recipes: policy.recipes ?? [] };
+    }, warnCleanup);
+    if (reproductions.has(agent)) return { status: "busy" };
+    reproductions.add(agent);
+    try {
+      const result = await completeDiagnostics(job, exec);
+      return args.action === "check" && result.status !== "superseded" ? { ...result, recipes } : result;
+    } finally {
+      reproductions.delete(agent);
+    }
   }
 
   /** 只允许拥有该单元的总控推进，阻塞单元可保留待后续处理。 */
@@ -1669,6 +1702,16 @@ export function apply(ctx, config = {}) {
     title: { ...string, description: "add-module：所有者明确指定的模块标题" },
     heading: { ...string, description: "write 修改受管中央文件时填写实际修改的已有章节标题" },
   }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor"])});
+
+  register(tool(REPRODUCE, "在当前实现的隔离副本上复现。check 返回旧回归首错、各新增必测及可用配方。probe 选已登记配方，用参数、标准输入或小型相对路径文件构造最小用例，返回退出码、输出和候选源码堆栈。", ["check", "probe"], {
+    recipe: { ...string, maxLength: 128, description: "probe 的配方编号，见 check 返回的 recipes" },
+    args: { type: "array", maxItems: 24, items: { ...string, maxLength: 512 }, description: "作为数据传给配方的参数数组" },
+    stdin: { ...string, maxLength: 8192, description: "可选的小型标准输入文本" },
+    files: { type: "array", maxItems: 12, items: {
+      type: "object", properties: { path: { ...string, maxLength: 160 }, content: { ...string, maxLength: 16384 } },
+      required: ["path", "content"], additionalProperties: false,
+    }, description: "在临时目录生成的用例文件，相对路径以 / 分隔" },
+  }, reproduce), { when: visible(["executor"], reproductionPolicy) });
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
   register(tool(COVERAGE, "按宿主全文清单逐块核验。inventory分页取全文；record每次1–12块，部分错误只重交invalid块；status默认只给进度，可用block取单块证明。", ["inventory", "record", "status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"])});

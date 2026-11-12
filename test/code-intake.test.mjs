@@ -273,7 +273,11 @@ test("code task paths cannot authorize tests as implementation or allow model ac
 async function startDiagnosticTask(root, write, diagnostics) {
   const keys = generateKeyPairSync("ed25519");
   const tests = regressionConfig(keys);
-  setup(root, write, { sources: [module], tests, diagnostics });
+  const manifest = setup(root, write, { sources: [module], tests, diagnostics });
+  if (diagnostics.protocol === 2) {
+    manifest.units.K01.phases.intake.read.push("settings.json");
+    write("BUILDING-LOOP.json", JSON.stringify(manifest));
+  }
   write("settings.json", '{"mode":"isolated"}');
   approve(root);
   const policy = authority(root);
@@ -362,6 +366,7 @@ test("a landed edit returns the runner's first real error directly, but cannot r
     send(snapshot.includes("value + 3") ? { status: "passed" } : { status: "failed", firstError });
   }, async () => {
     task = await startDiagnosticTask(root, write, { checkSet: "fixture-small" });
+    assert.equal(task.harness.visible(task.childId).includes("building_loop_reproduce"), false);
     const bad = await task.edit(1, 2);
     assert.equal(bad.changed, true);
     assert.deepEqual(bad.diagnostics, { status: "failed", snapshotSha256: requests[0].snapshotSha256, firstError });
@@ -409,4 +414,95 @@ test("stale, malformed, out-of-scope and timed-out diagnostics preserve the edit
     assert.equal(latest.diagnostics.status, "passed");
     assert.deepEqual((await pending).diagnostics, { status: "superseded" });
   }, 1500);
+}));
+
+test("the assigned executor can check both groups and run a bounded reproduction on a pinned snapshot", () => fixture(async (root, write) => {
+  const requests = [];
+  const stack = [{ path: module, line: 2, function: "parse" }];
+  const oldError = { caseId: "old-pass", message: "Expected the original parsed value", stack };
+  const newError = { caseId: "new-case", message: "ValueError: empty input", stack };
+  await withDiagnosticRunner((body, send) => {
+    requests.push(body);
+    assert.equal(body.spec, "building-loop/diagnostics/2");
+    assert.deepEqual(body.protectedCases, ["old-pass"]);
+    assert.deepEqual(body.requiredCases, ["new-case"]);
+    if (body.operation === "probe") {
+      assert.equal(body.changed, undefined);
+      assert.equal(body.probe.recipe, "parser-cli");
+      assert.deepEqual(body.probe.args, ["data/input.txt"]);
+      assert.deepEqual(body.probe.files, [{ path: "data/input.txt", content: "bad data" }]);
+      assert.equal(body.probe.stdin, "input");
+      return send({ status: "failed", probe: { exitCode: 1, stderr: "ValueError: empty input", stack } });
+    }
+    send({ status: "failed", old: { status: "failed", firstError: oldError },
+      required: [{ caseId: "new-case", status: "failed", error: newError }] });
+  }, async () => {
+    const { harness, childId, edit } = await startDiagnosticTask(root, write, {
+      checkSet: "fixture-small", protocol: 2, recipes: ["parser-cli"],
+    });
+    const invoke = (id, args) => harness.invoke(id, "building_loop_reproduce", args);
+    assert.equal(harness.visible("root").includes("building_loop_reproduce"), false);
+    assert.equal(harness.visible(childId).includes("building_loop_reproduce"), true);
+    assert.match(harness.guard(childId, "pwsh"), /禁止直接调用/u);
+    await assert.rejects(invoke("root", { action: "check" }), /执行方/u);
+    for (const args of [
+      { action: "probe", recipe: "arbitrary-program" },
+      { action: "probe", recipe: "parser-cli", command: "python -c ..." },
+      { action: "probe", recipe: "parser-cli", files: [{ path: "../outside.txt", content: "x" }] },
+      { action: "probe", recipe: "parser-cli", files: [{ path: module, content: "x" }] },
+      { action: "probe", recipe: "parser-cli", args: ["x".repeat(513)] },
+    ]) await assert.rejects(invoke(childId, args));
+    assert.equal(requests.length, 0);
+
+    const change = await edit(1, 2);
+    assert.deepEqual(change.diagnostics.old.firstError, oldError);
+    assert.deepEqual(change.diagnostics.required[0].error, newError);
+    assert.equal(requests[0].changed.sha256, change.sha256);
+    const check = await invoke(childId, { action: "check" });
+    assert.deepEqual(check.recipes, ["parser-cli"]);
+    assert.deepEqual(check.required[0].error, newError);
+    const probe = await invoke(childId, { action: "probe", recipe: "parser-cli", args: ["data/input.txt"],
+      files: [{ path: "data/input.txt", content: "bad data" }], stdin: "input" });
+    assert.deepEqual(probe.probe, { exitCode: 1, stderr: "ValueError: empty input", stack });
+    assert.notEqual(check.snapshotSha256, probe.snapshotSha256);
+    assert.equal(fs.existsSync(path.join(root, "data", "input.txt")), false);
+    assert.equal((await harness.file(childId, "read", module)).sha256, change.sha256);
+    await assert.rejects(harness.flow(childId, "submit"), /缺少当前交付的回归签名回执/);
+  });
+}));
+
+test("manual reproduction serializes per executor and drops obsolete and out-of-scope feedback", () => fixture(async (root, write) => {
+  const waiting = Promise.withResolvers();
+  let complete;
+  const healthy = { status: "passed", old: { status: "passed" }, required: [{ caseId: "new-case", status: "passed" }] };
+  let checks = 0;
+  await withDiagnosticRunner((body, send) => {
+    if (body.operation === "probe") {
+      complete = () => send({ status: "passed", probe: { exitCode: 0, stdout: "obsolete" } });
+      waiting.resolve();
+      return;
+    }
+    if (body.changed) return send(healthy);
+    if (++checks === 1) return send({ status: "failed", old: { status: "failed", firstError: {
+      caseId: "new-case", message: "wrong group",
+    } }, required: healthy.required });
+    return send({ status: "failed", old: healthy.old, required: [{ caseId: "new-case", status: "failed", error: {
+      caseId: "new-case", message: "outside source", stack: [{ path: "settings.json", line: 1 }],
+    } }] });
+  }, async () => {
+    const { harness, childId, edit } = await startDiagnosticTask(root, write, {
+      checkSet: "fixture-small", protocol: 2, recipes: ["parser-cli"],
+    });
+    const invoke = args => harness.invoke(childId, "building_loop_reproduce", args);
+    for (let n = 0; n < 2; n++) {
+      const result = await invoke({ action: "check" });
+      assert.equal(result.reason, "invalid-runner-reply");
+    }
+    const old = invoke({ action: "probe", recipe: "parser-cli" });
+    await Promise.race([waiting.promise, old.then(() => assert.fail("probe did not reach the runner"))]);
+    assert.deepEqual(await invoke({ action: "check" }), { status: "busy" });
+    assert.equal((await edit(1, 2)).diagnostics.status, "passed");
+    complete();
+    assert.deepEqual(await old, { status: "superseded" });
+  });
 }));

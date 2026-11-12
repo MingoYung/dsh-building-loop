@@ -222,11 +222,16 @@ function codeTaskPolicy(value, phases) {
   object(value, "代码任务契约", ["sources", "tests", "diagnostics"]);
   let diagnostics;
   if (value.diagnostics !== undefined) {
-    const { checkSet } = object(value.diagnostics, "快速诊断授权", ["checkSet"]);
-    if (!value.tests?.regression || typeof checkSet !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(checkSet)) {
+    const { checkSet, protocol, recipes } = object(value.diagnostics, "快速诊断授权", ["checkSet", "protocol", "recipes"]);
+    const runnerId = id => typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(id);
+    if (!value.tests?.regression || !runnerId(checkSet) || protocol !== undefined && protocol !== 1 && protocol !== 2) {
       throw new Error("快速诊断须在签名回归契约中登记受信检查集编号");
     }
-    diagnostics = { checkSet };
+    if (recipes !== undefined && (protocol !== 2 || !Array.isArray(recipes) || recipes.length > 16 ||
+      new Set(recipes).size !== recipes.length || !recipes.every(runnerId))) {
+      throw new Error("复现配方须在第二版诊断契约中登记唯一的受信配方编号");
+    }
+    diagnostics = { checkSet, ...(protocol === 2 ? { protocol, recipes: recipes ?? [] } : {}) };
   }
   const sources = pathList(value.sources);
   const grants = value.tests?.regression ? [phases.intake, phases.supplement] : [phases.intake];

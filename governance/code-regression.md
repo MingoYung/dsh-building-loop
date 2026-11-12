@@ -36,3 +36,12 @@
 - 宿主在每次有效落盘后发起带 Bearer 凭证的 JSON POST。请求包含 `spec`（固定为 `building-loop/diagnostics/1`）、`requestId`、`checkSet`、`unit`、`phase`、`policySha256`、`goalSha256`、`snapshotSha256`、`changed`（`path` 和 `sha256`）及 `artifacts`（每项为 `path`、`sha256`、`contentBase64`）。未创建文件的摘要和内容均为 `null`。宿主最多发送 256 份文件和 4 MiB 原始内容。
 - 运行器返回 HTTP 200 和 JSON，回显 `spec`、`requestId`、`snapshotSha256`，并设置 `status` 为 `passed`、`failed` 或 `unavailable`。失败时用 `firstError` 给出第一条真实失败的 `caseId` 和 `message`。可带执行方能读取的工件相对 `path`，带路径时可附 `line`。日志先去除凭证和无关信息。
 - 工具把 `diagnostics` 随写入结果送给执行方。配置缺失、超时或结果过期时，返回对应状态，写入结果独立保留。目标、阶段、授权或相关工件改变后，旧反馈作废。送审仍由原有签名回归检查全部旧通过项和新增必测项。
+
+## 执行方受控复现
+
+在诊断配置登记 `"diagnostics": {"checkSet": "unit-smoke-v2", "protocol": 2, "recipes": ["app-cli"]}`。检查组和配方由维护者在受信运行器端登记。版本 2 仍使用上节的宿主地址和凭证。已有版本 1 配置继续使用上节契约。
+
+- 当前接单或补查的执行方可以调用 `building_loop_reproduce`。用 `{"action":"check"}` 重跑当前候选的快检并获取可用配方。用 `{"action":"probe","recipe":"app-cli","args":["input.txt"],"files":[{"path":"input.txt","content":"sample"}]}` 跑一个临时最小用例。也可传 `stdin`。配方参数作为数据传给维护者选定的入口，输入文件只出现在临时目录。
+- 自动写后检查和手动复现都绑定当前工件版本。版本 2 请求用 `building-loop/diagnostics/2`，复用版本 1 的单元、授权、目标、摘要和工件字段，额外传 `operation`（`check` 或 `probe`）、`protectedCases`、`requiredCases`。自动检查带 `changed`，手动探针带 `probe`（配方、参数和样例）。探针需要当前执行方可读取整个运行快照。
+- `check` 的回复包含 `old` 和 `required`。前者报告旧通过集合的首个失败 `firstError`，后者每个新增必测返回 `{caseId,status,error?}`。旧用例短路后仍须运行各新增必测。只有实际通过才填 `passed`，基础设施异常填 `unavailable`。错误带 `caseId`、`message`，可附源码位置和 `stack` 中的 `{path,line,function?}`。将详细错误限定为可公开的用例和执行方有权读取的候选源码，先清除密钥、私有夹具和绝对路径。
+- `probe` 的回复包含 `probe.exitCode`、可选 `stdout`、`stderr`、`stack` 和 `truncated`。运行器将候选工件只读挂载、在独立目录生成样例、清除继承环境、隔离文件和网络并限制耗时与输出。入口与运行时由受信配置固定，按配方检查参数，禁止拼接命令。签名私钥和完整受信用例保存在独立的签名运行器。快检与复现结果只用于修复，送审仍凭当前工件的签名回执。
