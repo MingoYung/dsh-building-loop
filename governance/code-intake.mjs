@@ -144,6 +144,12 @@ function verifyRegression(frame, id, active, spec, goal) {
     artifacts: binding.artifacts, protectedCases, requiredCases, cases: [...cases].map(([id, status]) => ({ id, status })) };
 }
 
+/** A readiness check verifies the same receipt without granting review admission. */
+export function verifySignedCodeSubmission(frame, id, active, spec, goal) {
+  if (frame.started?.proposal.id !== active.codeIntake.openingId) throw new Error("代码接单基线与所有者确认的开工记录不符");
+  return verifyRegression(frame, id, active, spec, goal);
+}
+
 function checkTestProof(frame, spec, challenge) {
   if (!challenge) throw new Error("未发现实现结构变更。注释、排版和测试文件改动不能代替实现；无改动交付须由维护者配置受信测试回执");
   const bytes = readBytes(frame.root, challenge.file, 64 * 1024);
@@ -169,9 +175,8 @@ function checkTestProof(frame, spec, challenge) {
 }
 
 export function verifyCodeIntake(frame, id, active, spec, goal, completeRead) {
-  if (frame.started?.proposal.id !== active.codeIntake.openingId) throw new Error("代码接单基线与所有者确认的开工记录不符");
   if (active.codeIntake.regression) {
-    const qualification = verifyRegression(frame, id, active, spec, goal);
+    const qualification = verifySignedCodeSubmission(frame, id, active, spec, goal);
     const previous = active.codeIntake.regression.artifacts;
     for (const file of spec.codeTask.sources) {
       const row = qualification.artifacts.find(item => keyOf(item.path) === keyOf(file));
@@ -183,6 +188,7 @@ export function verifyCodeIntake(frame, id, active, spec, goal, completeRead) {
     }
     return qualification;
   }
+  if (frame.started?.proposal.id !== active.codeIntake.openingId) throw new Error("代码接单基线与所有者确认的开工记录不符");
   const changes = [];
   for (const baseline of active.codeIntake.sources) {
     const bytes = readBytes(frame.root, baseline.path);

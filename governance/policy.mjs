@@ -441,7 +441,7 @@ export function historyPaths(file) {
 }
 
 /** Match every literal fragment against the same original UTF-8 file. */
-export function scopedEditContent(before, { beforeSha256, oldText, newText, edits }) {
+export function scopedEditContent(before, { beforeSha256, oldText, newText, edits }, recordSplice) {
   if (before === null) throw new Error("局部编辑只适用于已有文件，新建文件请用 write");
   if (digest(before) !== beforeSha256) throw new Error("局部编辑的文件摘要不匹配，请先读取当前文件再重试");
   if (edits !== undefined && (oldText !== undefined || newText !== undefined)) {
@@ -472,13 +472,26 @@ export function scopedEditContent(before, { beforeSha256, oldText, newText, edit
     return { start, end: start + from.length, to: fileNewlines(next) };
   }).sort((a, b) => a.start - b.start);
   const pieces = [];
-  let cursor = 0;
+  const untouched = [];
+  let cursor = 0, position = 0;
+  function keepThrough(end) {
+    if (end === cursor) return;
+    const kept = current.slice(cursor, end);
+    pieces.push(kept);
+    untouched.push({ oldStart: cursor, newStart: position, newEnd: position + kept.length });
+    position += kept.length;
+  }
   for (const { start, end, to } of ranges) {
     if (start < cursor) throw new Error("同一次局部编辑的替换范围不能重叠");
-    pieces.push(current.slice(cursor, start), to);
+    keepThrough(start);
+    pieces.push(to);
+    position += to.length;
     cursor = end;
   }
-  return bom + pieces.join("") + current.slice(cursor);
+  keepThrough(current.length);
+  const after = pieces.join("");
+  recordSplice?.({ before: current, after, beforeSha256, untouched });
+  return bom + after;
 }
 
 /** Plan or publish the same bounded document, rolling backup and history bytes. */

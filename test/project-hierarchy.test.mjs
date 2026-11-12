@@ -206,3 +206,49 @@ test("configured projects authorize exact module files and can insert both missi
   assert.equal(actualSecond.replace("\r\n- [恢复策略](../reference/recovery%20notes.md)\r\n\r\n", ""), second);
   assert.equal((await host.file({ action: "read", path: body })).sha256, digest(moduleArgs.content));
 }));
+
+test("a declared existing module can be maintained through its live three-level route", () => fixture(async (cwd, write) => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(cwd, "BUILDING-LOOP.json"), "utf8"));
+  manifest.coordinator.read.push("docs/index.md", modulePath);
+  manifest.coordinator.write = ["overview.md", modulePath];
+  manifest.hierarchy = { overview: { path: "overview.md", heading: "导航" }, index: { path: "docs/index.md", heading: "正文" },
+    modules: { [id]: modulePath } };
+  write("BUILDING-LOOP.json", JSON.stringify(manifest));
+  const current = latestConversationUser([user(1, "开始建设：维护现有恢复策略")]);
+  const home = process.env.DSH_HOME;
+  const { proposal } = proposeConversationTask(home, "root", current, { goal: "恢复策略", deliverable: "更新正文", scope: "既有项目" });
+  decideConversationStart(home, "root", current, proposal.id, "start",
+    accepted => initializeConversationProject(home, "root", cwd, accepted), { typed: true });
+  for (const directory of ["docs", "modules"]) fs.mkdirSync(path.join(cwd, directory));
+  const overview = "# 总纲\n\n## 导航\n\n- [项目索引](docs/index.md)\n\n## 范围\n\n保留。\n";
+  const index = "# 分块\n\n## 正文\n\n- [恢复策略](../modules/restore-policy.md)\n\n## 待办\n\n保留。\n";
+  const before = "# 恢复策略\n\n现有说明。\n";
+  const after = "# 恢复策略\n\n补充校验条件。\n";
+  write("overview.md", overview);
+  write("docs/index.md", index);
+  write(modulePath, before);
+  const host = native(cwd, user(20, "更新现有恢复策略。"));
+  const update = { action: "write", path: modulePath, note: "补充现有模块的校验条件", content: after };
+  await assert.rejects(host.file(update, host.child), /没有已授权的工作阶段|不在当前写白名单/u);
+  assert.equal((await host.file(update)).changed, true);
+  assert.equal(fs.readFileSync(path.join(cwd, modulePath), "utf8"), after);
+  const { backup, log } = historyPaths(modulePath);
+  assert.equal(fs.readFileSync(path.join(cwd, backup), "utf8"), before);
+  const history = fs.readFileSync(path.join(cwd, log));
+  assert.equal(fs.readFileSync(path.join(cwd, "overview.md"), "utf8"), overview);
+  assert.equal(fs.readFileSync(path.join(cwd, "docs/index.md"), "utf8"), index);
+
+  // A successful edit does not register the module or waive later live route checks.
+  const again = { ...update, content: "# 恢复策略\n\n未经导航核验的更新。\n" };
+  write("overview.md", overview.replace("- [项目索引](docs/index.md)", "无导航。"));
+  await assert.rejects(host.file(again), /完整导航/u);
+  write("overview.md", overview);
+  write("docs/index.md", index.replace("## 正文", "## 其他").replace("## 待办", "## 正文"));
+  await assert.rejects(host.file(again), /须唯一且位于/u);
+  write("docs/index.md", index + "\n- [重复入口](../modules/restore-policy.md)\n");
+  await assert.rejects(host.file(again), /须唯一且位于/u);
+  write("docs/index.md", index);
+  await assert.rejects(host.file({ ...again, content: "<!-- 空正文 -->\n" }), /可读的 UTF-8 Markdown 正文/u);
+  assert.equal(fs.readFileSync(path.join(cwd, modulePath), "utf8"), after);
+  assert.deepEqual(fs.readFileSync(path.join(cwd, log)), history);
+}));

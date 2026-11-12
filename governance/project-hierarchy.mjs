@@ -105,12 +105,30 @@ function requiredDocument(root, file) {
   return document(file, decoder.decode(bytes));
 }
 
+function readableModuleBody(source) {
+  return typeof source === "string" && source.trim() && !/[\p{Surrogate}\x00]/u.test(source) &&
+    fromMarkdown(source, options).children.some(node => !["html", "definition", "footnoteDefinition"].includes(node.type));
+}
+
 /** Central-file edits can replace one existing section, preserving the route and every other section. */
 export function checkHierarchyWrite(frame, file, proposed, requestedHeading) {
   const hierarchy = frame.policy.hierarchy;
   if (!hierarchy || hierarchy.private && !frame.managed) return;
   if (includes(Object.values(hierarchy.modules), file) && !hierarchyReadPaths(frame).some(body => keyOf(body) === keyOf(file))) {
-    throw new Error("请先用 add-module 同步总纲、索引和正文，不能先单独写模块正文");
+    const current = frame.role === "coordinator" && includes(frame.writes, file) && readBytes(frame.root, file);
+    if (!current || !readableModuleBody(decoder.decode(current))) {
+      throw new Error("请先用 add-module 同步总纲、索引和正文，不能先单独写模块正文");
+    }
+    // A maintainer-declared module can predate the host's publication record.
+    // Verify both live links on every edit instead of manufacturing that record.
+    const { overview, index } = hierarchy;
+    const top = requiredDocument(frame.root, overview.path), middle = requiredDocument(frame.root, index.path);
+    if (!routeExists(top, section(top, overview.heading), index.path) ||
+      !routeExists(middle, section(middle, index.heading), file)) {
+      throw new Error("已有模块须保留从总纲经索引到正文的完整导航");
+    }
+    if (!readableModuleBody(proposed)) throw new Error("模块修改须保留可读的 UTF-8 Markdown 正文");
+    return;
   }
   const anchor = [hierarchy.overview, hierarchy.index].find(item => keyOf(item.path) === keyOf(file));
   if (!anchor) return;
@@ -148,8 +166,7 @@ export function addHierarchyModule(frame, args, approval, note) {
   if (frame.role !== "coordinator" || !hierarchy || hierarchy.private && !frame.managed) throw new Error("当前项目没有授予总控新增模块权限");
   const file = hierarchyBodyPath(hierarchy, args.module, frame.managed);
   const { overview, index } = hierarchy;
-  if (typeof args.content !== "string" || !args.content.trim() || /[\p{Surrogate}\x00]/u.test(args.content) ||
-    !fromMarkdown(args.content, options).children.some(node => !["html", "definition", "footnoteDefinition"].includes(node.type))) {
+  if (!readableModuleBody(args.content)) {
     throw new Error("新增模块须提供可读的 UTF-8 Markdown 正文");
   }
   const current = readBytes(frame.root, file);

@@ -1,0 +1,354 @@
+{
+  "archiveSha256": "c9d2bac0a3041c4bd8f7976923cbd60e58f983e9acc52fd445e60d1c4e11a3ba",
+  "scope": "Exploratory only. Does not change the frozen benchmark rubric or score.",
+  "retentionInterpretation": "Traverse full graph, then retain only applied ancestors. The specification does not explicitly discuss an unapplied intermediate, so applied-subgraph-only is a possible narrower interpretation. The frozen case has every dependency applied.",
+  "cases": [
+    {
+      "id": "invalid-environment-array",
+      "basis": "SPEC.md:3,5,7",
+      "input": {
+        "environment": [],
+        "action": "plan",
+        "budget": 5,
+        "changes": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "invalid-environment",
+        "actions": [],
+        "units": 0
+      }
+    },
+    {
+      "id": "invalid-environment-object",
+      "basis": "SPEC.md:3,5,7",
+      "input": {
+        "environment": {
+          "target": "production"
+        },
+        "action": "plan",
+        "budget": 5,
+        "changes": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "invalid-environment",
+        "actions": [],
+        "units": 0
+      }
+    },
+    {
+      "id": "retention-transitive-through-unapplied-intermediate",
+      "basis": "CHANGE-G2.md:7",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "b",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "a"
+            ]
+          },
+          {
+            "id": "c",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "b"
+            ]
+          }
+        ],
+        "applied": [
+          "a",
+          "c"
+        ],
+        "retain": [
+          "c"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      }
+    }
+  ],
+  "results": [
+    {
+      "run": "r-99rbRD",
+      "mode": "standard",
+      "stage": "g1",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-array",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "standard",
+      "stage": "g1",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-object",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "standard",
+      "stage": "g2",
+      "frozenTerminal": "completed",
+      "case": "invalid-environment-array",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "standard",
+      "stage": "g2",
+      "frozenTerminal": "completed",
+      "case": "invalid-environment-object",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "standard",
+      "stage": "g2",
+      "frozenTerminal": "completed",
+      "case": "retention-transitive-through-unapplied-intermediate",
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "a"
+        ],
+        "units": 1
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "building-loop",
+      "stage": "g1",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-array",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "building-loop",
+      "stage": "g1",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-object",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "building-loop",
+      "stage": "g2",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-array",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "building-loop",
+      "stage": "g2",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-object",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+      "status": "failed"
+    },
+    {
+      "run": "r-99rbRD",
+      "mode": "building-loop",
+      "stage": "g2",
+      "frozenTerminal": "cap",
+      "case": "retention-transitive-through-unapplied-intermediate",
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "c",
+          "a"
+        ],
+        "units": 2
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "standard",
+      "stage": "g1",
+      "frozenTerminal": "completed",
+      "case": "invalid-environment-array",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "standard",
+      "stage": "g1",
+      "frozenTerminal": "completed",
+      "case": "invalid-environment-object",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "standard",
+      "stage": "g2",
+      "frozenTerminal": "completed",
+      "case": "invalid-environment-array",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "standard",
+      "stage": "g2",
+      "frozenTerminal": "completed",
+      "case": "invalid-environment-object",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "standard",
+      "stage": "g2",
+      "frozenTerminal": "completed",
+      "case": "retention-transitive-through-unapplied-intermediate",
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "a"
+        ],
+        "units": 1
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "building-loop",
+      "stage": "g1",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-array",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "building-loop",
+      "stage": "g1",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-object",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "building-loop",
+      "stage": "g2",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-array",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "building-loop",
+      "stage": "g2",
+      "frozenTerminal": "cap",
+      "case": "invalid-environment-object",
+      "actual": null,
+      "exitCode": 1,
+      "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+      "status": "failed"
+    },
+    {
+      "run": "r-IKgRKa",
+      "mode": "building-loop",
+      "stage": "g2",
+      "frozenTerminal": "cap",
+      "case": "retention-transitive-through-unapplied-intermediate",
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "a"
+        ],
+        "units": 1
+      },
+      "exitCode": 0,
+      "error": null,
+      "status": "failed"
+    }
+  ],
+  "pending": []
+}
