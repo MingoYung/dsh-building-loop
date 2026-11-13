@@ -1,0 +1,812 @@
+{
+  "spec": "building-loop-0.7.25-local-evidence/1",
+  "nativePreflight": {
+    "metadata": {
+      "archiveSha256": "d1e6bcde1fdf14332fca83c24007c554b75c01a66a7ff34d64d041a41742f701",
+      "fixtureSha256": "b8caccd7ed5fbaadc407b10bef7af204456784aa7ecd00f97bcc9154c43aa8bf",
+      "ownerSpecSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+      "reviewRunnerSha256": "51d329f36cb6deb766d08f1c66c377cc39885f8fb28f4b98a47a1a6cb635bb69",
+      "sandboxRunnerSha256": "8495686c407ea0f229803e4c5cd9d6ed53109d554334e7a4cdd9a28237f042a9",
+      "syntaxRecipeSha256": "54f543c5cc992b5da187af995fe97fe05818d091400d9cf76cd77f03fccfc48b",
+      "rep": "0",
+      "modeOrder": [
+        "building-loop",
+        "standard-checklist",
+        "standard"
+      ],
+      "capMs": 300000,
+      "completionMs": 600000,
+      "preflight": true,
+      "businessStageMap": {
+        "g1": "G3",
+        "g2": "G4"
+      },
+      "seedSha256": "4e3f8bac2e57811a62f67727f5a54f0a30b76829f72a65ede3c7afd4f30800a0",
+      "suiteIdentity": "099d6b1c5220eb4ac9c0d099940b526bbb74b7b6122459a9b8ef3c4492d64ec7",
+      "startedAt": "2026-11-13T08:40:48.650Z",
+      "isolation": {
+        "drive": "G:",
+        "runner": "run.mjs",
+        "output": "r-zCENyy",
+        "home": "h",
+        "profile": "h/profiles/qa",
+        "temp": "tmp",
+        "pnpmStore": "pnpm-store",
+        "wslTmpdir": "/mnt/g/CodexProjects/DSH/outputs/building-loop-0.7.25/hard-ab/r-zCENyy/tmp"
+      },
+      "version": "0.7.25",
+      "status": "observed",
+      "isolatedHostStopped": true,
+      "finishedAt": "2026-11-13T08:40:59.832Z",
+      "formalProfileFingerprintsUnchanged": true
+    },
+    "observation": {
+      "model": {
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "reasoningEffort": "off"
+      },
+      "capMs": 300000,
+      "lanes": [],
+      "preflight": {
+        "presets": [
+          "standard",
+          "building-loop"
+        ],
+        "baseline": {
+          "stage": "base",
+          "cases": [
+            {
+              "id": "stable-sort",
+              "status": "passed"
+            },
+            {
+              "id": "empty-plan",
+              "status": "passed"
+            },
+            {
+              "id": "budget-denied",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-transport",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-request",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-environment",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-budget",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-change",
+              "status": "passed"
+            },
+            {
+              "id": "dependency-order",
+              "status": "passed"
+            },
+            {
+              "id": "replay-before-budget",
+              "status": "passed"
+            },
+            {
+              "id": "replay-identity-conflict",
+              "status": "passed"
+            },
+            {
+              "id": "unknown-dependency",
+              "status": "passed"
+            },
+            {
+              "id": "unknown-applied",
+              "status": "passed"
+            },
+            {
+              "id": "cycle",
+              "status": "passed"
+            },
+            {
+              "id": "rollback-order",
+              "status": "passed"
+            },
+            {
+              "id": "rollback-only-applied",
+              "status": "passed"
+            },
+            {
+              "id": "production-frozen-plan",
+              "status": "passed"
+            },
+            {
+              "id": "production-frozen-before-graph",
+              "status": "passed"
+            },
+            {
+              "id": "staging-quota-current",
+              "status": "passed"
+            },
+            {
+              "id": "retention-transitive",
+              "status": "passed"
+            },
+            {
+              "id": "retention-validation",
+              "status": "passed"
+            }
+          ],
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_changes",
+                "read_retain"
+              ],
+              "lineCount": 67
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "build_graph",
+                "failure",
+                "plan",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 95
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 19
+            }
+          }
+        }
+      }
+    }
+  },
+  "logs": [
+    {
+      "name": "full-verified.log",
+      "sha256": "46a2913feae12b1d8c7d436dda3f1e483f1cd46c5b60c2440918ab729390f72e",
+      "terminal": [
+        "ℹ tests 361",
+        "ℹ suites 0",
+        "ℹ pass 361",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 194131.9911"
+      ]
+    },
+    {
+      "name": "source-coverage.log",
+      "sha256": "59495f69981705eb9295f4453f72d6767ea50fa4446505d2c5379d47b85dbcbe",
+      "terminal": [
+        "ℹ tests 126",
+        "ℹ suites 0",
+        "ℹ pass 126",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 66066.7239"
+      ]
+    },
+    {
+      "name": "reject-evidence/final-targeted.log",
+      "sha256": "4a5b190997b79b8e59c42755f5b9d5c24238586b0ab9fedea5f5c03adb7b400b",
+      "terminal": [
+        "ℹ tests 24",
+        "ℹ suites 0",
+        "ℹ pass 24",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 13467.1616"
+      ]
+    },
+    {
+      "name": "architecture-combined.log",
+      "sha256": "18b3f2a04be6f22eec4ea47bc90e7fc6ad55d7a78903b75ac4bf0f6c02d03d08",
+      "terminal": [
+        "ℹ tests 9",
+        "ℹ suites 0",
+        "ℹ pass 9",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 9698.6512"
+      ]
+    },
+    {
+      "name": "input-integration.log",
+      "sha256": "02cf5610b6a4e90e079eb4d1da6146e15ce74407a6784895b4841c9edf3b9770",
+      "terminal": [
+        "ℹ tests 14",
+        "ℹ suites 0",
+        "ℹ pass 14",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 7008.8663"
+      ]
+    }
+  ],
+  "earlierAttemptUsage": {
+    "early": [
+      {
+        "mode": "standard",
+        "token210": 923555,
+        "cache210": 97.1414,
+        "tokenAll": 923555,
+        "cacheAll": 97.1414,
+        "usage": {
+          "comparison": {
+            "inputTokens": 25674,
+            "cacheReadTokens": 872448,
+            "cacheWriteTokens": 0,
+            "outputTokens": 25433,
+            "totalTokens": 923555,
+            "known": 60,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        },
+        "totalUsage": {
+          "inputTokens": 25674,
+          "cacheReadTokens": 872448,
+          "cacheWriteTokens": 0,
+          "outputTokens": 25433,
+          "totalTokens": 923555,
+          "known": 60,
+          "missing": 0
+        }
+      },
+      {
+        "mode": "standard-checklist",
+        "token210": 3872397,
+        "cache210": 98.4242,
+        "tokenAll": 5424589,
+        "cacheAll": 98.7342,
+        "usage": {
+          "comparison": {
+            "inputTokens": 59974,
+            "cacheReadTokens": 3745920,
+            "cacheWriteTokens": 0,
+            "outputTokens": 66503,
+            "totalTokens": 3872397,
+            "known": 120,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 7684,
+            "cacheReadTokens": 1531520,
+            "cacheWriteTokens": 0,
+            "outputTokens": 12988,
+            "totalTokens": 1552192,
+            "known": 23,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        },
+        "totalUsage": {
+          "inputTokens": 67658,
+          "cacheReadTokens": 5277440,
+          "cacheWriteTokens": 0,
+          "outputTokens": 79491,
+          "totalTokens": 5424589,
+          "known": 143,
+          "missing": 0
+        }
+      },
+      {
+        "mode": "building-loop",
+        "token210": 3729817,
+        "cache210": 93.1168,
+        "tokenAll": 5888714,
+        "cacheAll": 94.4018,
+        "usage": {
+          "comparison": {
+            "inputTokens": 252108,
+            "cacheReadTokens": 3410560,
+            "cacheWriteTokens": 0,
+            "outputTokens": 67149,
+            "totalTokens": 3729817,
+            "known": 178,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 72450,
+            "cacheReadTokens": 2062464,
+            "cacheWriteTokens": 0,
+            "outputTokens": 23983,
+            "totalTokens": 2158897,
+            "known": 57,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 1
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        },
+        "totalUsage": {
+          "inputTokens": 324558,
+          "cacheReadTokens": 5473024,
+          "cacheWriteTokens": 0,
+          "outputTokens": 91132,
+          "totalTokens": 5888714,
+          "known": 235,
+          "missing": 1
+        }
+      }
+    ],
+    "candidate2": [
+      {
+        "mode": "standard",
+        "token210": 3863897,
+        "cache210": 97.9276,
+        "tokenAll": 5220919,
+        "cacheAll": 98.3284,
+        "usage": {
+          "comparison": {
+            "inputTokens": 79201,
+            "cacheReadTokens": 3742464,
+            "cacheWriteTokens": 0,
+            "outputTokens": 42232,
+            "totalTokens": 3863897,
+            "known": 129,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 7220,
+            "cacheReadTokens": 1341056,
+            "cacheWriteTokens": 0,
+            "outputTokens": 8746,
+            "totalTokens": 1357022,
+            "known": 24,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        },
+        "totalUsage": {
+          "inputTokens": 86421,
+          "cacheReadTokens": 5083520,
+          "cacheWriteTokens": 0,
+          "outputTokens": 50978,
+          "totalTokens": 5220919,
+          "known": 153,
+          "missing": 0
+        }
+      },
+      {
+        "mode": "standard-checklist",
+        "token210": 3768132,
+        "cache210": 98.1575,
+        "tokenAll": 3923252,
+        "cacheAll": 98.2152,
+        "usage": {
+          "comparison": {
+            "inputTokens": 68051,
+            "cacheReadTokens": 3625344,
+            "cacheWriteTokens": 0,
+            "outputTokens": 74737,
+            "totalTokens": 3768132,
+            "known": 133,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 618,
+            "cacheReadTokens": 153344,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1158,
+            "totalTokens": 155120,
+            "known": 3,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        },
+        "totalUsage": {
+          "inputTokens": 68669,
+          "cacheReadTokens": 3778688,
+          "cacheWriteTokens": 0,
+          "outputTokens": 75895,
+          "totalTokens": 3923252,
+          "known": 136,
+          "missing": 0
+        }
+      },
+      {
+        "mode": "building-loop",
+        "token210": 4679831,
+        "cache210": 93.5267,
+        "tokenAll": 9318555,
+        "cacheAll": 95.0348,
+        "usage": {
+          "comparison": {
+            "inputTokens": 296865,
+            "cacheReadTokens": 4289152,
+            "cacheWriteTokens": 0,
+            "outputTokens": 93814,
+            "totalTokens": 4679831,
+            "known": 224,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 159273,
+            "cacheReadTokens": 4441472,
+            "cacheWriteTokens": 0,
+            "outputTokens": 37979,
+            "totalTokens": 4638724,
+            "known": 126,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        },
+        "totalUsage": {
+          "inputTokens": 456138,
+          "cacheReadTokens": 8730624,
+          "cacheWriteTokens": 0,
+          "outputTokens": 131793,
+          "totalTokens": 9318555,
+          "known": 350,
+          "missing": 0
+        }
+      }
+    ]
+  },
+  "clearAiPreparation": {
+    "scope": "Isolated load and frozen old base only. Zero model stages; no formal deployment or paid ClearAI comparison.",
+    "metadata": {
+      "archiveSha256": "d1e6bcde1fdf14332fca83c24007c554b75c01a66a7ff34d64d041a41742f701",
+      "clearArchiveSha256": "8b20be7a3510e35f66104b165644817276a4285580de77717e4f9f393566fce1",
+      "fixtureSha256": "b8caccd7ed5fbaadc407b10bef7af204456784aa7ecd00f97bcc9154c43aa8bf",
+      "ownerSpecSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+      "reviewRunnerSha256": "51d329f36cb6deb766d08f1c66c377cc39885f8fb28f4b98a47a1a6cb635bb69",
+      "sandboxRunnerSha256": "8495686c407ea0f229803e4c5cd9d6ed53109d554334e7a4cdd9a28237f042a9",
+      "syntaxRecipeSha256": "54f543c5cc992b5da187af995fe97fe05818d091400d9cf76cd77f03fccfc48b",
+      "rep": "0",
+      "modeOrder": [
+        "clearai"
+      ],
+      "capMs": 300000,
+      "completionMs": 600000,
+      "preflight": true,
+      "businessStageMap": {
+        "g1": "G3",
+        "g2": "G4"
+      },
+      "seedSha256": "331780f8d5b01c14bfe0471f18ae239103350242270f1a86965276f74c6cc1fa",
+      "suiteIdentity": "6b6dc66a71fe01be9b38ece41b2f845efedbdbd7b11129e61c9238e12bf1db5a",
+      "startedAt": "2026-11-13T08:52:57.764Z",
+      "isolation": {
+        "drive": "G:",
+        "runner": "run.mjs",
+        "output": "r-8UoEJb",
+        "home": "h",
+        "profile": "h/profiles/qa",
+        "temp": "tmp",
+        "pnpmStore": "../release-preparation/pnpm-store",
+        "wslTmpdir": "/mnt/g/CodexProjects/DSH/outputs/building-loop-0.7.25/clearai-ab/r-8UoEJb/tmp"
+      },
+      "clearVersion": "0.6.0",
+      "clearZodVersion": "4.6.7",
+      "version": "0.7.25",
+      "status": "observed",
+      "isolatedHostStopped": true,
+      "finishedAt": "2026-11-13T08:53:04.552Z",
+      "formalProfileFingerprintsUnchanged": true
+    },
+    "observation": {
+      "model": {
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "reasoningEffort": "off"
+      },
+      "capMs": 300000,
+      "lanes": [],
+      "preflight": {
+        "presets": [
+          "standard",
+          "building-loop",
+          "clearai"
+        ],
+        "baseline": {
+          "stage": "base",
+          "cases": [
+            {
+              "id": "stable-sort",
+              "status": "passed"
+            },
+            {
+              "id": "empty-plan",
+              "status": "passed"
+            },
+            {
+              "id": "budget-denied",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-transport",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-request",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-environment",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-budget",
+              "status": "passed"
+            },
+            {
+              "id": "invalid-change",
+              "status": "passed"
+            },
+            {
+              "id": "dependency-order",
+              "status": "passed"
+            },
+            {
+              "id": "replay-before-budget",
+              "status": "passed"
+            },
+            {
+              "id": "replay-identity-conflict",
+              "status": "passed"
+            },
+            {
+              "id": "unknown-dependency",
+              "status": "passed"
+            },
+            {
+              "id": "unknown-applied",
+              "status": "passed"
+            },
+            {
+              "id": "cycle",
+              "status": "passed"
+            },
+            {
+              "id": "rollback-order",
+              "status": "passed"
+            },
+            {
+              "id": "rollback-only-applied",
+              "status": "passed"
+            },
+            {
+              "id": "production-frozen-plan",
+              "status": "passed"
+            },
+            {
+              "id": "production-frozen-before-graph",
+              "status": "passed"
+            },
+            {
+              "id": "staging-quota-current",
+              "status": "passed"
+            },
+            {
+              "id": "retention-transitive",
+              "status": "passed"
+            },
+            {
+              "id": "retention-validation",
+              "status": "passed"
+            }
+          ],
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_changes",
+                "read_retain"
+              ],
+              "lineCount": 67
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "build_graph",
+                "failure",
+                "plan",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 95
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 19
+            }
+          }
+        }
+      }
+    }
+  }
+}
