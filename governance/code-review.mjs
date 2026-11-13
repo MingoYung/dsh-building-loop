@@ -233,7 +233,8 @@ function proseReviewInventory(frame, spec, architecture, signed) {
   if (!bytes || digest(bytes) !== architecture.sha256) throw new Error("逐段核验须读取当前已登记的架构稿");
   return architectureProseInventory({ source: bytes.toString("utf8"), sections: architecture.sections,
     facts: signed.architectureResponsibilities.rows,
-    protectedHeadings: [spec.architecture.responsibilitiesHeading, spec.architecture.importsHeading].filter(Boolean) });
+    protectedHeadings: [spec.architecture.responsibilitiesHeading, spec.architecture.importsHeading,
+      spec.architecture.rollback?.lockedScope && spec.architecture.rollback.heading].filter(Boolean) });
 }
 
 function plan(frame, active, spec, regression) {

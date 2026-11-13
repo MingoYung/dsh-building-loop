@@ -17,8 +17,9 @@ const dataObject = (value, keys) => value && typeof value === "object" && !Array
 export function parseArchitectureRollback(value, headings, sources, diagnostics, goalContext) {
   if (value === undefined) return;
   const invalid = () => new Error("回退演练须登记当前架构章节、授权源码和完整的回退后公开检查");
-  if (!dataObject(value, ["heading", "files", "contracts", "restore"]) ||
+  if (!dataObject(value, ["heading", "files", "contracts", "restore", "lockedScope"]) ||
     !headings.includes(value.heading) || diagnostics?.protocol !== 2 ||
+    (value.lockedScope !== undefined && typeof value.lockedScope !== "boolean") ||
     !Array.isArray(value.files) || !value.files.length || value.files.length > MAX_FILES ||
     value.files.some(file => !sources.includes(file)) ||
     new Set(value.files.map(keyOf)).size !== value.files.length) throw invalid();
@@ -33,7 +34,19 @@ export function parseArchitectureRollback(value, headings, sources, diagnostics,
   if (!contracts || contracts.some(row => !dataObject(row, ["id", "recipe", "examples"]) ||
     row.examples.some(({ requirement, diagnosticCases }) => !requirement || diagnosticCases !== undefined ||
       relativeName(requirement.file) !== requirement.file || !includes(goalContext, requirement.file)))) throw invalid();
-  return { heading: value.heading, files: value.files, contracts, ...(restore.length ? { restore } : {}) };
+  return { heading: value.heading, files: value.files, contracts, ...(restore.length ? { restore } : {}),
+    ...(value.lockedScope ? { lockedScope: true } : {}) };
+}
+
+/** An opted-in executable section displays the same owner clauses the runner
+ * checks. Keep free-form design notes in a separate section. */
+export function rollbackScopeBody(config, proposal) {
+  const title = "回退副本须满足以下已登记验收条款，实际结果见宿主演练回执。";
+  const quote = value => value.replace(/[\\`*_[\]<>#~]/gu, "\\$&").replace(/\s+/gu, " ").trim();
+  const clauses = [...new Set(inputContractCases(config.contracts).map(({ requirement }) =>
+    "- " + requirement.file + " 第 " + requirement.start + "–" + requirement.end + " 行。" + quote(requirement.quote)))];
+  const fence = "```json building-loop-rollback\n" + JSON.stringify({ proposal }) + "\n```";
+  return [title, "", ...clauses, "", fence].join("\n");
 }
 
 /** JSON.parse accepts duplicate keys. A plan displayed with two different

@@ -1,0 +1,404 @@
+{
+  "scope": "Immutable copy of actually reviewed bytes. Synthetic public inputs only. Groups non-object positives separately from four missing-field negatives.",
+  "run": "r-iHOuis",
+  "stage": "g1",
+  "archiveSha256": "48e0cc57cf63463aff11ecea2478b0302baacddc7c4d6c6eeb73841b55374171",
+  "document": {
+    "file": "modules/architecture.md",
+    "line": 46,
+    "sha256": "97e625cdb6c6c26923daa14ee83e964e33d71106bcd303fc979a8d6c9f3419aa",
+    "text": "- 保持既有接口：非对象/缺字段请求仍为 invalid-request，[非对象请求](#bl-fact-nonobject-request) 不被新校验抢先改写；"
+  },
+  "firstReceiptSha256": "a9f80c67bb22ae745f3e6cfa03f65ec7a55c78e27a60ac15a3faca29c964abca",
+  "block": {
+    "id": "p-bc2ba143443629e0e9-1",
+    "sha256": "35a6452b9c3652e8b3c69d5b7b5060747235cbce99daa987e34147a705d69653",
+    "status": "consistent",
+    "facts": [
+      "nonobject-request"
+    ],
+    "source": {
+      "file": "modules/architecture.md",
+      "start": 46,
+      "end": 47,
+      "sha256": "97e625cdb6c6c26923daa14ee83e964e33d71106bcd303fc979a8d6c9f3419aa"
+    },
+    "basis": "非对象请求优先返回 invalid-request，解析失败走 invalid-json，成功输出恰为三键。",
+    "proof": [
+      {
+        "id": "nonobject-request",
+        "clause": {
+          "file": "SPEC.md",
+          "start": 5,
+          "end": 5,
+          "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d"
+        },
+        "decision": {
+          "file": "planner.py",
+          "start": 34,
+          "end": 34,
+          "sha256": "6e0856d53ed6ff15699757659cc31a0f7882f7ce09f0e5b999ff7143170d7b23"
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "file": "planner.py",
+        "start": 31,
+        "end": 34,
+        "sha256": "6e0856d53ed6ff15699757659cc31a0f7882f7ce09f0e5b999ff7143170d7b23"
+      },
+      {
+        "file": "release.py",
+        "start": 11,
+        "end": 15,
+        "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+      },
+      {
+        "file": "planner.py",
+        "start": 25,
+        "end": 26,
+        "sha256": "6e0856d53ed6ff15699757659cc31a0f7882f7ce09f0e5b999ff7143170d7b23"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "file": "release.py",
+      "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+      "lines": [
+        {
+          "line": 8,
+          "text": "def main():"
+        },
+        {
+          "line": 9,
+          "text": "    try:"
+        },
+        {
+          "line": 10,
+          "text": "        request = json.load(sys.stdin)"
+        },
+        {
+          "line": 11,
+          "text": "    except (ValueError, TypeError):"
+        },
+        {
+          "line": 12,
+          "text": "        result = {\"status\": \"error\", \"error\": \"invalid-json\", \"actions\": [], \"units\": 0}"
+        },
+        {
+          "line": 13,
+          "text": "    else:"
+        },
+        {
+          "line": 14,
+          "text": "        result = plan(request)"
+        },
+        {
+          "line": 15,
+          "text": "    print(json.dumps(result, separators=(\",\", \":\")))"
+        }
+      ]
+    },
+    {
+      "file": "planner.py",
+      "sha256": "6e0856d53ed6ff15699757659cc31a0f7882f7ce09f0e5b999ff7143170d7b23",
+      "lines": [
+        {
+          "line": 29,
+          "text": "def handle(request):"
+        },
+        {
+          "line": 31,
+          "text": "    if not isinstance(request, dict):"
+        },
+        {
+          "line": 32,
+          "text": "        # Protected interface: a non-object request stays invalid-request and"
+        },
+        {
+          "line": 34,
+          "text": "        return failure(\"invalid-request\")"
+        },
+        {
+          "line": 35,
+          "text": "    try:"
+        },
+        {
+          "line": 38,
+          "text": "        # any graph error and stay stable regardless of ``changes`` content."
+        },
+        {
+          "line": 39,
+          "text": "        budget = limit_for(request)"
+        },
+        {
+          "line": 40,
+          "text": "        action = request.get(\"action\")"
+        },
+        {
+          "line": 41,
+          "text": "        unique = canonical(read_changes(request.get(\"changes\")))"
+        }
+      ]
+    },
+    {
+      "file": "policy.py",
+      "sha256": "d74935b98c920915efb4b8259f11e12cbc8647e9e611314ac098f966bd356ea7",
+      "lines": [
+        {
+          "line": 18,
+          "text": "def limit_for(request):"
+        },
+        {
+          "line": 19,
+          "text": "    \"\"\"Return the validated budget; raise PolicyError for an unusable request.\"\"\""
+        },
+        {
+          "line": 20,
+          "text": "    if not isinstance(request.get(\"environment\"), str) or request.get(\"environment\") not in ENVIRONMENTS:"
+        },
+        {
+          "line": 21,
+          "text": "        raise PolicyError(\"invalid-environment\")"
+        },
+        {
+          "line": 22,
+          "text": "    if not isinstance(request.get(\"action\"), str) or request.get(\"action\") not in SUPPORTED_ACTIONS:"
+        },
+        {
+          "line": 24,
+          "text": "        # (including a missing action) is refused before any graph work. The"
+        },
+        {
+          "line": 26,
+          "text": "        # (unhashable) and would escape as a crash instead of an error result."
+        },
+        {
+          "line": 27,
+          "text": "        raise PolicyError(\"unsupported-action\")"
+        },
+        {
+          "line": 28,
+          "text": "    budget = request.get(\"budget\")"
+        },
+        {
+          "line": 30,
+          "text": "    # booleans from every integer field."
+        },
+        {
+          "line": 31,
+          "text": "    if type(budget) is not int or budget < 0:"
+        },
+        {
+          "line": 32,
+          "text": "        raise PolicyError(\"invalid-budget\")"
+        }
+      ]
+    },
+    {
+      "file": "journal.py",
+      "sha256": "ed972701aa8196f4c354a02ffbd19b5d6063e73a3ada7c05377cbb8006e7a32b",
+      "lines": [
+        {
+          "line": 39,
+          "text": "def read_changes(records):"
+        },
+        {
+          "line": 40,
+          "text": "    if not isinstance(records, list):"
+        },
+        {
+          "line": 41,
+          "text": "        raise JournalError(\"invalid-change\")"
+        },
+        {
+          "line": 42,
+          "text": "    changes = []"
+        },
+        {
+          "line": 43,
+          "text": "    for row in records:"
+        },
+        {
+          "line": 44,
+          "text": "        if (not isinstance(row, dict) or not isinstance(row.get(\"id\"), str) or not row[\"id\"]"
+        },
+        {
+          "line": 45,
+          "text": "                or not isinstance(row.get(\"component\"), str) or not row[\"component\"]"
+        }
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "case": "nonobject-list",
+      "input": [],
+      "expectedCurrentCode": "invalid-request",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": true
+    },
+    {
+      "case": "nonobject-null",
+      "input": null,
+      "expectedCurrentCode": "invalid-request",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": true
+    },
+    {
+      "case": "nonobject-number",
+      "input": 23,
+      "expectedCurrentCode": "invalid-request",
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": true
+    },
+    {
+      "case": "missing-environment",
+      "input": {
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "reviewed-shape",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "expectedCurrentCode": "invalid-environment",
+      "actual": {
+        "status": "error",
+        "error": "invalid-environment",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": false
+    },
+    {
+      "case": "missing-action",
+      "input": {
+        "environment": "staging",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "reviewed-shape",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "expectedCurrentCode": "unsupported-action",
+      "actual": {
+        "status": "error",
+        "error": "unsupported-action",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": false
+    },
+    {
+      "case": "missing-budget",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "changes": [
+          {
+            "id": "reviewed-shape",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "expectedCurrentCode": "invalid-budget",
+      "actual": {
+        "status": "error",
+        "error": "invalid-budget",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": false
+    },
+    {
+      "case": "missing-changes",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5
+      },
+      "expectedCurrentCode": "invalid-change",
+      "actual": {
+        "status": "error",
+        "error": "invalid-change",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": false
+    },
+    {
+      "case": "invalid-json-control",
+      "input": "{",
+      "expectedCurrentCode": "invalid-json",
+      "actual": {
+        "status": "error",
+        "error": "invalid-json",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": false
+    },
+    {
+      "case": "valid-object-control",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "reviewed-shape",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "expectedCurrentCode": null,
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "reviewed-shape"
+        ],
+        "units": 1
+      },
+      "exitCode": 0,
+      "supportsInvalidRequestClaim": false
+    }
+  ]
+}

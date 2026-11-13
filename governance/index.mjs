@@ -778,6 +778,7 @@ export function apply(ctx, config = {}) {
     const proposal = active.rollbackProposal;
     if (proposal?.binding.policySha256 === frame.policy.hash && proposal.binding.goalSha256 === qualification.goalSha256 &&
       proposal.binding.originalArtifactsSha256 === digest(JSON.stringify(qualification.artifacts))) return false;
+    if (spec.architecture.rollback.lockedScope) return true;
     const plan = architectureDocument(frame, spec.architecture, spec.codeTask.diagnostics);
     return !plan.rollback || !!plan.rollback.proposal;
   }

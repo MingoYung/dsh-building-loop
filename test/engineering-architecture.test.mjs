@@ -67,7 +67,7 @@ const fileJudgment = { file: candidate, basis: "The cap protects downstream capa
 const constraint = { caseId: "limit", status: "pass", requirement: ref(goal, 3), code: ref(candidate, 3),
   basis: "The signed test checks the cap that is applied before returning." };
 
-test("signed rollback runs off-worktree and returns a failed proposal to the same read-only executor", () => fixture(async (root, write) => {
+for (const lockedScope of [false, true]) test("signed rollback returns a failed proposal to the same executor, locked scope " + lockedScope, () => fixture(async (root, write) => {
   const token = "isolated-test-rollback-runner-token";
   const requests = [];
   const server = createServer(async (request, response) => {
@@ -88,7 +88,7 @@ test("signed rollback runs off-worktree and returns a failed proposal to the sam
   try {
     const { harness, save } = project(root, write, { goalClause: "After rollback, a budget of seven is accepted.",
       diagnostics: { checkSet: "rollback-check", protocol: 2, recipes: ["entry"], reviewRecipes: ["entry"] },
-      rollback: { heading: "回退", files: [candidate], contracts: [{ id: "rehearsal", recipe: "entry", examples: [{
+      rollback: { heading: "回退", files: [candidate], lockedScope, contracts: [{ id: "rehearsal", recipe: "entry", examples: [{
         id: "budget", input: { budget: 7 }, expectedJson: { budget: 7 }, requirement: {
           ...ref(goal, 3), quote: "After rollback, a budget of seven is accepted.",
         },
@@ -109,10 +109,12 @@ test("signed rollback runs off-worktree and returns a failed proposal to the sam
     assert.equal((await harness.flow(executor, "submit")).submission.status, "rollback-proposal-required");
     const wrong = await proposal(executor, "return min(value, 4)");
     assert.equal((await harness.flow(executor, "submit")).phase, "architecture-sync");
-    assert.equal((await harness.flow("root", "architecture")).status, "rollback-plan-required");
     const reference = ({ id }) => plan + "\n```json building-loop-rollback\n" + JSON.stringify({ proposal: id }) + "\n```\n";
     assert.equal((await harness.flow("root", "prepare")).architecture.rollback.proposal.id, wrong.id);
-    await setPlan(reference(wrong));
+    if (!lockedScope) {
+      assert.equal((await harness.flow("root", "architecture")).status, "rollback-plan-required");
+      await setPlan(reference(wrong));
+    }
     const failed = await harness.flow("root", "architecture");
     assert.equal(failed.status, "rollback-failed");
     assert.equal(failed.next.action, "advance");
@@ -130,11 +132,18 @@ test("signed rollback runs off-worktree and returns a failed proposal to the sam
     }] }), /修改失败提议/u);
     const corrected = await proposal(executor, "return value");
     assert.equal(corrected.phase, "architecture-sync");
-    await setPlan(reference(corrected));
+    if (!lockedScope) await setPlan(reference(corrected));
     const registered = await harness.flow("root", "architecture");
     assert.equal(registered.phase, "review-ready");
     assert.equal(registered.architecture.rollbackRehearsal.status, "passed");
     assert.equal(registered.architecture.rollbackRehearsal.binding.proposalId, corrected.id);
+    if (lockedScope) {
+      const document = fs.readFileSync(path.join(root, architecture), "utf8");
+      assert.match(document, /After rollback, a budget of seven is accepted\./u);
+      assert.doesNotMatch(document, /验证旧预算/u);
+      assert.match(document, /入口限制请求预算。/u);
+      await assert.rejects(setPlan(document.replace("a budget of seven", "a budget of nine")), /回退范围由宿主生成/u);
+    }
     assert.equal(requests.length, 2);
     assert.ok(requests.every(({ body, valid }) => valid && body.operation === "probe" && body.phase === "architecture-sync"));
     assert.equal(fs.readFileSync(path.join(root, candidate), "utf8"), current);
@@ -603,6 +612,13 @@ test("architecture locates grouped guards, a literal rejection decision, and a w
     "- `data.py`：计划校验（quantity、owner）。"].join("\n");
   assert.deepEqual(inspectArchitectureProse(ownership, graph).map(({ line, field }) => [line, field]),
     [[1, "quantity"], [1, "owner"]]);
+  const inlineOwnership = ["- `data.py`（记录）：校验 `quantity`/`owner`/`items` 字段并给出错误码。",
+    "- `rules.py`（规则）：校验 `quantity`/`owner` 字段。",
+    "- `data.py`：由规则模块校验 `quantity`/`owner` 字段。",
+    "- `entry.py`：读标准输入，`json.loads` 失败输出 `bad-json`。",
+    "- `entry.py`：读标准输入，`json.load` 失败输出 `bad-json`。"].join("\n");
+  assert.deepEqual(inspectArchitectureProse(inlineOwnership, graph).map(({ line, field, symbol }) => [line, field ?? symbol]),
+    [[1, "quantity"], [1, "owner"], [4, "json.loads"]]);
   write("entry.py", sources["entry.py"].replace("request = codec.load(stream)", "codec = stream\n    request = codec.load(stream)"));
   const rebound = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file,
     sha256: digest(fs.readFileSync(path.join(root, file))) })), { responsibilities: true });

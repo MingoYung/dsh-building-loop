@@ -2,14 +2,14 @@ import { goalSnapshot } from "./goals.mjs";
 import { inspectArchitectureImports } from "./code-review.mjs";
 import { architectureResponsibilitiesCurrent, responsibilityClause } from "./architecture-responsibilities.mjs";
 import { linkedResponsibilityConflicts } from "./architecture-prose-coverage.mjs";
-import { prepareRollbackRehearsal, rollbackRehearsalCurrent } from "./architecture-rollback.mjs";
+import { prepareRollbackRehearsal, rollbackRehearsalCurrent, rollbackScopeBody } from "./architecture-rollback.mjs";
 import { requireCodeRegressionCurrent } from "./code-intake.mjs";
 import { inputContractCases } from "./input-contracts.mjs";
 import { digest, includes, keyOf, readBytes, replaceWithHistory, text } from "./policy.mjs";
 import { architectureDocument, architectureProseLines, generatedArchitectureSection } from "./project-hierarchy.mjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
 
-const declaration = /^(?:[-+*]\s+|\d+[.)]\s+)?(?:\*\*)?\x60?([^\s`:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(][^）)]{1,80}[）)])?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?/iu;
+const declaration = /^(?:[-+*]\s+|\d+[.)]\s+)?(?:\*\*)?\x60?([^\s`:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(](?:\[[^\]\r\n]{1,80}\]\([^()\s]{1,128}\)|[^）)\r\n]){1,80}[）)])?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?/iu;
 const moduleItem = /^(?:\*\*)?\x60?([^\s\x60:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(][^）)]{1,80}[）)])?(?:\*\*)?\s*$/iu;
 const sentence = /[。！？!?；;]|\.(?=\s|$)/u;
 const notCurrent = /(?:不|未|无|禁止|避免|只能|否则|如果|若|计划|拟|将|应|需要|建议|可选|可能|目标|改为|待|示例|例如|比如|回退|反例|误写|旧版|原先|历史|通过|经由|间接|委托|(?:\b(?:does not|never|should|may|could|would|will|planned|previously|formerly|indirectly|via|if|example|incorrect)\b))/iu;
@@ -23,8 +23,9 @@ const implementation = /^(?:(?:当前|实际|负责|直接)\s*)*(?:定义|实现
 const delegated = /(?:通过|经由|间接|委托|delegat\w*|indirectly|\bvia\b)/iu;
 const ownershipNotCurrent = /(?:计划|拟由|拟将|将来|后续|未来|改为|待改|迁移至|移交给|以前|此前|旧版|历史上|示例|反例|误写|尚未|不再|并不(?:负责|实际|直接)|\b(?:formerly|previously|planned|instead|future|would|will|should|example|no longer|used to)\b)/iu;
 const inlineLabel = /\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/gu;
-const groupGuard = /(?:校验|验证|检查|\bvalidates?\b|\bchecks?\b)\s*[（(]\s*([^（()）]{1,160})[）)]/giu;
+const groupGuard = /(?:校验|验证|检查|\bvalidates?\b|\bchecks?\b)\s*(?:[（(]\s*([^（()）]{1,160})[）)]|(\x60[a-z_][a-z0-9_-]*\x60(?:\s*[/、,，]\s*\x60[a-z_][a-z0-9_-]*\x60){1,7})(?!\s*[/、,，]\s*\x60))/giu;
 const guardField = /^(?:\x60([a-z_][a-z0-9_-]*)\x60|([a-z_][a-z0-9_-]*))(?:\s*(?:各自)?(?:字段|类型(?:面|检查)?))?$/iu;
+const explicitGuardDelegate = /由[^。！？,，、；;:\x60]{1,36}(?:校验|验证|检查)|\bvalidated by\b/iu;
 const rejectionDecision = /(?:做|作|给出|执行)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*(?:判定|判断)|\b(?:decides?|determines?)\s+\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const conditionalRejection = /(?:超出|超过|不符(?:合)?|失败|缺失|无效|畸形|否则|对照)[^，,。！？；;\x60]{0,16}(?:给出|返回|抛出|报出)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const shapeRejection = /^(?:(?:当前|实际|负责|直接)\s*)*(?:校验|验证|检查)\s*[\p{L}\p{N}_ -]{1,24}(?:形态|形状|结构|格式|类型)\s*[（(]\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*[）)]/iu;
@@ -35,7 +36,7 @@ const guardedAlternatives = /(?:检查|校验|验证|以及|并核对)\s*[\p{L}\
 const forwardsRejection = /(?:透传|转发|原样|包装|序列化|下游|上游|代为|沿用|保留)/u;
 const documentsResponse = /(?:端到端|对外|调用方(?:收到|看到)|交(?:给|由)|\b(?:pass[- ]?through|forwards?|propagates?|serializes?|end[- ]to[- ]end|caller (?:sees|receives))\b)/iu;
 const explicitJsonDecoder = /(?:调用|使用|通过|(?:→|->)|\b(?:calls?|uses?)\b|\b(?:and|using)\b|(?:并|用))\s*\x60(json\.loads?)\x60(?!\s*(?:\/|或|\bor\b))/iu;
-const failingJsonDecoder = /(?:^|[，,：:])\s*\x60(json\.loads?)\x60\s*(?:解析)?失败(?:时)?\s*(?:直接)?(?:返回|抛出|给出|报出)\s*\x60/iu;
+const failingJsonDecoder = /(?:^|[，,：:])\s*\x60(json\.loads?)\x60\s*(?:解析)?失败(?:时)?\s*(?:直接)?(?:返回|抛出|给出|报出|输出)\s*\x60/iu;
 const checkBeforeRejection = /\x60([\p{ID_Start}_][\p{ID_Continue}_]*)\x60\s*(?:校验|验证|检查|判断|分发)(?:\s*(?:与|和|及)[^，,。！？；;]{1,28}?)?\s*(之前|之后)\s*(?:直接)?(?:返回|抛出|给出|报出)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const rejectionBeforeCode = /^\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*(先于|晚于|\b(?:precedes|follows)\b)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const parseDelegation = /(?:交付(?:给)?|交给|传给|委托(?:给|由)?)\s*(\x60[^\x60]+\x60|[\p{ID_Start}_][\p{ID_Continue}.-]*)\s*(?:解析|解码)|\b(?:hands?|passes?|delegates?)\b[^。;；]{0,60}\bto\s+(\x60[^\x60]+\x60|[\p{ID_Start}_][\p{ID_Continue}.-]*)\s+for\s+(?:JSON\s+)?(?:parsing|decoding)/iu;
@@ -186,11 +187,11 @@ function sourceResponsibilityConflicts(claim, line, from, locate, graph) {
   const hasIdentifier = (file, identifier) => graph.sourceIdentifiers?.find(row => row.file === file)?.identifiers.includes(identifier);
   const hasRejection = (file, code) => graph.localRejections?.some(row => row.file === file && row.codes.includes(code));
   if (uncertain(from)) return result;
-  if (!delegated.test(claim)) {
-    for (const [, group] of claim.matchAll(groupGuard)) {
+  if (!delegated.test(claim) && !explicitGuardDelegate.test(claim)) {
+    for (const [, parenthesized, separated] of claim.matchAll(groupGuard)) {
       // Match exact source identifiers in a bounded enumeration. Other list
       // entries can be prose, so do not infer translations or alternate names.
-      const entries = group.split(/[/、,，]/u);
+      const entries = (parenthesized ?? separated).split(/[/、,，]/u);
       if (entries.length < 2 || entries.length > 8) continue;
       const fields = new Set(entries.flatMap(entry => {
         const match = guardField.exec(entry.trim());
@@ -342,6 +343,21 @@ function architectureSourceInventory(frame, spec) {
   return { rows, truncated: spec.codeTask.sources.length > rows.length };
 }
 
+/** The executable subsection has one source for both displayed scope and
+ * the rehearsal's expectations. Outside it reviewers still check prose. */
+function inspectLockedRollbackScope(frame, spec, active, proposed) {
+  const rollback = spec.architecture.rollback;
+  if (!rollback?.lockedScope || !active?.codeIntake?.qualification || !active.rollbackProposal) return;
+  const section = generatedArchitectureSection(frame, { architecture: { file: spec.architecture.file, heading: rollback.heading } },
+    proposed, "heading");
+  const eol = /\r\n|\n|\r/u.exec(section.source)?.[0] ?? "\n";
+  const expected = rollbackScopeBody(rollback, active.rollbackProposal.id);
+  const current = section.source.slice(section.bodyStart, section.bodyEnd).trim().replace(/\r\n?/gu, "\n");
+  return { match: current === expected, proposed: current === expected ? section.source :
+    section.source.slice(0, section.bodyStart) + eol + eol + expected.replaceAll("\n", eol) +
+      (section.bodyEnd < section.source.length ? eol + eol : eol) + section.source.slice(section.bodyEnd) };
+}
+
 /** Generate a separate factual section; plans and historical claims stay in
  * normal review sections. Do not transfer raw source or trace events. */
 export function inspectArchitectureResponsibilitiesSection(frame, spec, active, proposed) {
@@ -457,7 +473,16 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   }
   const goal = goalSnapshot(frame);
   const diagnostics = spec.codeTask.diagnostics;
-  let plan = architectureDocument(frame, spec.architecture, diagnostics);
+  // An opted-in rollback subsection becomes host-authored once signed. A
+  // stale draft fence cannot prevent replacing it with the current proposal.
+  const bytes = readBytes(frame.root, spec.architecture.file);
+  const source = bytes && text(bytes);
+  const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
+    active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase);
+  const locked = source && !pendingCodeRepair && inspectLockedRollbackScope(frame, spec, active, source);
+  const draftSpec = locked && !locked.match ? { ...spec.architecture, rollback: undefined } : spec.architecture;
+  let plan = architectureDocument(frame, draftSpec, diagnostics);
+  const qualification = active?.codeIntake?.qualification;
   const previous = frame.state.engineeringArchitecture?.[keyOf(plan.file)];
   if (previous?.goalSha256 !== goal.sha256 && previous?.contentsSha256 === plan.contentsSha256) {
     throw new Error("目标已变化，请把受影响的架构、回退与验证计划实际更新到 " + plan.file);
@@ -471,8 +496,6 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   if (presenceConflicts.length) throw new Error(architectureClaimIssues(presenceConflicts).join("\n"));
   // Verified diagnosis may point at code that still cannot parse. Pin only
   // the owner's current plan here; signed submission checks the repaired source.
-  const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
-    active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase);
   const imports = pendingCodeRepair ? undefined : inspectArchitectureImports(frame, spec, active);
   if (!pendingCodeRepair) {
     const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports);
@@ -480,8 +503,10 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   }
   const original = imports?.proposed ?? text(readBytes(frame.root, plan.file));
   const responsibilities = inspectArchitectureResponsibilitiesSection(frame, spec, pendingCodeRepair ? undefined : active, original);
-  const updated = responsibilities?.proposed ?? original;
-  if (updated !== text(readBytes(frame.root, plan.file))) {
+  const withResponsibilities = responsibilities?.proposed ?? original;
+  const rollbackScope = !pendingCodeRepair && inspectLockedRollbackScope(frame, spec, active, withResponsibilities);
+  const updated = rollbackScope?.proposed ?? withResponsibilities;
+  if (updated !== source) {
     replaceWithHistory(frame.root, plan.file, before => {
       if (!before || digest(before) !== plan.sha256) throw new Error("宿主生成架构章节时正文已变化，请重新登记");
       return updated;
@@ -489,12 +514,12 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
     frame.changed = true;
     plan = architectureDocument(frame, spec.architecture, diagnostics);
   }
-  const qualification = active?.codeIntake?.qualification;
   if (spec.architecture.rollback && qualification && !pendingCodeRepair) {
     try {
       const signed = requireCodeRegressionCurrent(frame, unit, active, spec, goal);
       const current = { ...qualification, receiptSha256: signed.receiptSha256 };
       const baseline = active.codeIntake.regression.artifacts;
+      if (spec.architecture.rollback.lockedScope && !active.rollbackProposal) throw new Error("此回退章节须引用执行方登记的当前签名提议");
       if (!rollbackProof) {
         return { unit, phase: active.phase, rehearsal: prepareRollbackRehearsal(frame, spec, current, plan, baseline, active.rollbackProposal) };
       }
@@ -544,6 +569,7 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
     if (spec.architecture.rollback && active?.codeIntake?.qualification) {
       const signed = requireCodeRegressionCurrent(frame, snapshot.unit, active, spec, goalSnapshot(frame));
       const current = { ...active.codeIntake.qualification, receiptSha256: signed.receiptSha256 };
+      if (spec.architecture.rollback.lockedScope && !inspectLockedRollbackScope(frame, spec, active)?.match) return false;
       if (!rollbackRehearsalCurrent(frame, spec, current, plan,
         snapshot.rollbackRehearsal, active.codeIntake.regression.artifacts, active.rollbackProposal)) return false;
     }
@@ -582,10 +608,10 @@ export function engineeringArchitectureStatus(frame, unit) {
     contract.rollback = { heading, files, ...(restore ? { restore: restore.map(({ file }) => file) } : {}),
       checks: inputContractCases(contracts).map(({ id, expected, requirement }) => ({ id, expected, requirement })) };
     if (!signed) {
-      contract.rollback.rule = "派单前本节只写要恢复与保留的行为。执行方签名送审后，宿主会给出可引用的实跑提议和准确围栏。";
+      contract.rollback.rule = rollbackScopeRule(spec.architecture.rollback.lockedScope, false);
     } else if (proposal?.binding.policySha256 === frame.policy.hash && proposal.binding.goalSha256 === goalSnapshot(frame).sha256 &&
       proposal.binding.originalArtifactsSha256 === digest(JSON.stringify(signed.artifacts))) {
-      contract.rollback.rule = "核对提议对应的回退意图，将给出的围栏加入当前回退章节，再用 architecture 实跑。";
+      contract.rollback.rule = rollbackScopeRule(spec.architecture.rollback.lockedScope, true);
       contract.rollback.proposal = { id: proposal.id, files: proposal.files };
       contract.rollback.fence = "```json building-loop-rollback\n" + JSON.stringify({ proposal: proposal.id }) + "\n```";
     } else {
@@ -618,6 +644,13 @@ export function engineeringArchitectureStatus(frame, unit) {
   }
 }
 
+function rollbackScopeRule(locked, signed) {
+  if (locked) return signed ? "此章由宿主按当前提议和授权条款生成。直接用 architecture 实跑。自由说明写到其他架构章节。" :
+    "派单前本节写要恢复与保留的行为。签名后宿主用当前提议和登记条款生成实跑章节。";
+  return signed ? "核对提议对应的回退意图，将给出的围栏加入当前回退章节，再用 architecture 实跑。" :
+    "派单前本节只写要恢复与保留的行为。执行方签名送审后，宿主会给出可引用的实跑提议和准确围栏。";
+}
+
 /** Preserve the designated generated body when the coordinator edits prose. */
 export function requireHostImportSectionUnchanged(frame, file, proposed) {
   const spec = Object.values(frame.policy.units).find(unit => unit.architecture && includes([unit.architecture.file], file));
@@ -627,6 +660,17 @@ export function requireHostImportSectionUnchanged(frame, file, proposed) {
     const next = generatedArchitectureSection(frame, spec, proposed, field);
     if (current.source.slice(current.bodyStart, current.bodyEnd).trim() !== next.source.slice(next.bodyStart, next.bodyEnd).trim()) {
       throw new Error(spec.architecture[field] + " 章节由宿主生成。保留该章节原文，用 building_loop architecture 更新");
+    }
+  }
+  // Apply the extra guard only while this exact unit has current signed code.
+  // The same architecture file may become editable for a later project's plan.
+  for (const [id, active] of Object.entries(frame.state.units)) {
+    const current = frame.policy.units[id];
+    if (!current?.architecture?.rollback?.lockedScope || current.architecture.file !== file ||
+      active.owner !== frame.agent.id || !["architecture-repair", "ledger-review", "review-ready", "final-review-ready"].includes(active.phase) ||
+      active.engineeringArchitecture?.rollbackRehearsal?.status !== "passed") continue;
+    if (!inspectLockedRollbackScope(frame, current, active, proposed)?.match) {
+      throw new Error("已实跑的回退范围由宿主生成。保留该章，其他架构正文可按授权修订");
     }
   }
 }

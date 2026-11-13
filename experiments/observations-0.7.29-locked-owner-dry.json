@@ -1,0 +1,144 @@
+{
+  "scope": "Current working-tree owner policy parse, no packaged host or model. Prompts and private scoring bytes pinned separately.",
+  "observations": [
+    {
+      "lane": "short-expanded",
+      "unit": "K01",
+      "proseReview": true,
+      "linked": [
+        "rollback-order"
+      ],
+      "registeredExamples": 3,
+      "required": 10,
+      "protectedInventory": 8
+    },
+    {
+      "lane": "short-expanded",
+      "unit": "K02",
+      "proseReview": true,
+      "linked": [
+        "rollback-order"
+      ],
+      "registeredExamples": 3,
+      "required": 5,
+      "protectedInventory": 16,
+      "rollback": {
+        "files": [
+          "policy.py"
+        ],
+        "checks": [
+          {
+            "id": "restored-production-plan",
+            "requirement": {
+              "file": "SPEC.md",
+              "start": 14,
+              "end": 14,
+              "quote": "Both environments support plan and rollback in G1."
+            }
+          },
+          {
+            "id": "restored-production-rollback",
+            "requirement": {
+              "file": "SPEC.md",
+              "start": 14,
+              "end": 14,
+              "quote": "Both environments support plan and rollback in G1."
+            }
+          },
+          {
+            "id": "staging-plan-quota-preserved",
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "start": 6,
+              "end": 6,
+              "quote": "For a staging plan, the effective budget is the smaller of the request budget and **3**. A quota violation is `budget-exceeded`, including when the request permits more."
+            }
+          },
+          {
+            "id": "staging-rollback-retention-preserved",
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "start": 7,
+              "end": 7,
+              "quote": "Staging rollback accepts `retain`, default empty. It lists IDs that are already applied and must remain."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "lane": "hard-ab",
+      "unit": "K01",
+      "proseReview": true,
+      "linked": [
+        "rollback-order"
+      ],
+      "registeredExamples": 5,
+      "required": 27,
+      "protectedInventory": 21
+    },
+    {
+      "lane": "hard-ab",
+      "unit": "K02",
+      "proseReview": true,
+      "linked": [
+        "rollback-order"
+      ],
+      "registeredExamples": 6,
+      "required": 24,
+      "protectedInventory": 48
+    },
+    {
+      "lane": "reservation-ab",
+      "unit": "K01",
+      "proseReview": true,
+      "linked": [],
+      "registeredExamples": 5,
+      "required": 42,
+      "protectedInventory": 18
+    },
+    {
+      "lane": "reservation-ab",
+      "unit": "K02",
+      "proseReview": true,
+      "linked": [],
+      "registeredExamples": 6,
+      "required": 44,
+      "protectedInventory": 60,
+      "rollback": {
+        "files": [
+          "ledger.py"
+        ],
+        "checks": [
+          {
+            "id": "closed-field-rejected-again",
+            "requirement": {
+              "file": "SPEC.md",
+              "start": 5,
+              "end": 5,
+              "quote": "未支持的 operation 或额外顶层字段返回 `invalid-request`。"
+            }
+          },
+          {
+            "id": "transfer-still-supported",
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "start": 5,
+              "end": 5,
+              "quote": "事件增加 transfer，有且只有 `event_id,kind,id,resource,owner,start,end,if_revision`，其中 kind 为 transfer，if_revision 是符合旧 revision 字段规则的整数。它用同一 ID 替换预约的资源、所有者、起止时间，并将 revision 加一。先检查形状与身份，再由 ledger 判断预约是否存在以及 revision 是否正好等于 if_revision。版本不符或当前 revision 已达上限，由 ledger 返回 `revision-conflict`。检查目标冲突时排除被替换预约自身。transfer 成功时，results 对该项额外含 `fromRevision,toRevision`，事件重试仍只返回 event_id 与 outcome。其他结果字段保留旧形状。"
+            }
+          },
+          {
+            "id": "inspect-preserved",
+            "requirement": {
+              "file": "SPEC.md",
+              "start": 5,
+              "end": 5,
+              "quote": "成功 inspect 返回 `{\"status\":\"ok\",\"active\":[...],\"results\":[]}`，按 resource、start、end、id 依次排序。"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
