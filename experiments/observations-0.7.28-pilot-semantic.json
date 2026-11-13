@@ -2195,7 +2195,168 @@
         "policy.py": "564f34c8b57c409de773d220b4b08a81d13138131d4eabe05a267f5ddc32b5a6",
         "release.py": "535de104de7f63152b586c6c15ad98a123ffa086011b96f6e5d3580d9d2eadf5"
       },
-      "acceptedArchitectureReceipts": [],
+      "acceptedArchitectureReceipts": [
+        {
+          "file": "K02-first.json",
+          "sha256": "dbd58b3bb116b0f83faef75d5d677b87dc01becb9773cf16bbd0d5d615a73afc",
+          "role": "reviewer",
+          "status": "pass",
+          "sections": [
+            {
+              "heading": "实施顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 13,
+                "end": 34,
+                "sha256": "e177c1b1ff6164d36d609286c267264dccf7faa8bb03f24e296fdf1052244fb4"
+              },
+              "basis": "实施顺序对照源码基本相符，但第 19 行称非对象判定在 planner.py 第 82–83 行，实际为 86–87 行",
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 86,
+                  "end": 87,
+                  "sha256": "e57de82beacc322655e5a3126f786fb30e3e95f8f3cfee54ede46986273af7d7",
+                  "relation": "supports",
+                  "excerptSha256": "a1caf3a065442e88fd244f74cac2cd16a02867629bdfefd3539a5dc503ab73a1"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "回退顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 35,
+                "end": 40,
+                "sha256": "e177c1b1ff6164d36d609286c267264dccf7faa8bb03f24e296fdf1052244fb4"
+              },
+              "basis": "回退顺序（逐文件还原并重跑既有用例）与实际模块与备份机制不矛盾",
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 117,
+                  "end": 127,
+                  "sha256": "e57de82beacc322655e5a3126f786fb30e3e95f8f3cfee54ede46986273af7d7",
+                  "relation": "supports",
+                  "excerptSha256": "ea21a027d8582063f98af49ec413b1f15e32ccd39c0a0bf1b4f6b36f06a7e68e"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "关键验证",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 41,
+                "end": 51,
+                "sha256": "e177c1b1ff6164d36d609286c267264dccf7faa8bb03f24e296fdf1052244fb4"
+              },
+              "basis": "关键验证点与源码实现一致；架构示例非对象请求实测匹配",
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 86,
+                  "end": 87,
+                  "sha256": "e57de82beacc322655e5a3126f786fb30e3e95f8f3cfee54ede46986273af7d7",
+                  "relation": "supports",
+                  "excerptSha256": "a1caf3a065442e88fd244f74cac2cd16a02867629bdfefd3539a5dc503ab73a1"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 47,
+                  "end": 48,
+                  "sha256": "564f34c8b57c409de773d220b4b08a81d13138131d4eabe05a267f5ddc32b5a6",
+                  "relation": "supports",
+                  "excerptSha256": "5a4e50133b45e8f7fa81decef75292a26a019fa34d519ddaf38fb91147f245a5"
+                }
+              ],
+              "status": "pass"
+            }
+          ],
+          "findings": 0
+        },
+        {
+          "file": "K02-first.json",
+          "sha256": "dbd58b3bb116b0f83faef75d5d677b87dc01becb9773cf16bbd0d5d615a73afc",
+          "role": "auditor",
+          "status": "pass",
+          "sections": [
+            {
+              "heading": "实施顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 13,
+                "end": 34,
+                "sha256": "e177c1b1ff6164d36d609286c267264dccf7faa8bb03f24e296fdf1052244fb4"
+              },
+              "basis": "实施顺序描述四模块职责、导入方向与错误码次序,与代码一致;31 行仍提『production 都支持 plan 与 rollback』属 G1 陈述但被 33 行错误次序表承接,需在 33 行反映 retain 校验点",
+              "evidence": [
+                {
+                  "file": "release.py",
+                  "start": 13,
+                  "end": 22,
+                  "sha256": "535de104de7f63152b586c6c15ad98a123ffa086011b96f6e5d3580d9d2eadf5",
+                  "relation": "supports",
+                  "excerptSha256": "9d79fe88f9841e740eb6908d2f9bbba0920fd1bfea1a08db4ec9337f3f214c15"
+                },
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 5,
+                  "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+                  "relation": "supports",
+                  "excerptSha256": "e1b9921273d92a22d7ec2bf0fc71da3601fab83d7726443f00c1d391eb1b2e23"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "回退顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 35,
+                "end": 40,
+                "sha256": "e177c1b1ff6164d36d609286c267264dccf7faa8bb03f24e296fdf1052244fb4"
+              },
+              "basis": "回退顺序章 37–39 行要求按模块备份还原、不新增模块、不改导入方向;与当前四模块与单向导入一致。",
+              "evidence": [
+                {
+                  "file": "release.py",
+                  "start": 13,
+                  "end": 20,
+                  "sha256": "535de104de7f63152b586c6c15ad98a123ffa086011b96f6e5d3580d9d2eadf5",
+                  "relation": "supports",
+                  "excerptSha256": "98a9fec44f4d688df658a3d0debaeca2eeb216b526440712bab743e781f58e60"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "关键验证",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 41,
+                "end": 51,
+                "sha256": "e177c1b1ff6164d36d609286c267264dccf7faa8bb03f24e296fdf1052244fb4"
+              },
+              "basis": "关键验证章 43–50 行覆盖传输、字段、缺省、去重、图谱、顺序与 rollback;传输层行17–20 与 43 行描述一致。",
+              "evidence": [
+                {
+                  "file": "release.py",
+                  "start": 16,
+                  "end": 23,
+                  "sha256": "535de104de7f63152b586c6c15ad98a123ffa086011b96f6e5d3580d9d2eadf5",
+                  "relation": "supports",
+                  "excerptSha256": "68ad7f5522fe5b82fdcf56fde7dab9e810967e464dd885d451a771c70702740c"
+                }
+              ],
+              "status": "pass"
+            }
+          ],
+          "findings": 0
+        }
+      ],
       "contradictions": [
         {
           "id": "guard-location-stale-in-manual-sections",
