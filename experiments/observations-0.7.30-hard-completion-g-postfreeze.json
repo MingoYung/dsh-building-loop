@@ -1,0 +1,2481 @@
+{
+  "spec": "building-loop-frozen-hard-postflight/1",
+  "seedSha256": "50fe6dd20e13dfc67418a68c76c68982099f858f3400588204c5f3a41940f249",
+  "generatorSha256": "e2b053d3c05dcceed7d73ae0c75e4cb07ac21aa647035d5e251836427a9f236e",
+  "proofOfHostExit": {
+    "runIds": [
+      "r-WIRmLz",
+      "r-xQug3N"
+    ],
+    "remainingOwnedProcesses": [],
+    "scope": "exact launcher PIDs and run directory patterns in DSH NEXT.exe, node.exe, wsl.exe",
+    "result": [
+      {
+        "run": "r-WIRmLz",
+        "status": "observed",
+        "isolatedHostStopped": true,
+        "formalProfileFingerprintsUnchanged": true
+      },
+      {
+        "run": "r-xQug3N",
+        "status": "observed",
+        "isolatedHostStopped": true,
+        "formalProfileFingerprintsUnchanged": true
+      }
+    ]
+  },
+  "missingFrozenCandidates": [],
+  "stages": [
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "7cd581c728520a838602c9c325279e219207e276b84a4b9ce04c2568d5688d21"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "036d5d19a09e509562d99fbe32c062feb2268cea0347a55143501bd264b84cd4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "3c5e9283e315c4a74bbecbc24a71859c9f547fdd538b3a4225bc51450117b154"
+        },
+        {
+          "path": "release.py",
+          "sha256": "958d1e74ad1481ea2ed0f8b902d3798d5d085282127507f41ea326da10e69bab"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_read_item",
+            "keyed_fields",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_envelope",
+            "read_item",
+            "read_retain"
+          ],
+          "lineCount": 125
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolved",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 169
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "decide",
+            "limit_for"
+          ],
+          "lineCount": 87
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "invalid_json",
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "1ece2b6d1756efc64f66dab4ff28a6fb5be6f4a1e291388a96d5b836fbd3987d"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f1822d60425672613dc0ebea5307c57af9f4c803719b5ec8f18fdf4cf8f137dd"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "a4183753c6ab57438b636c7a8b221e4db1217bf973f9590f4bab0f761c65f4ae"
+        },
+        {
+          "path": "release.py",
+          "sha256": "958d1e74ad1481ea2ed0f8b902d3798d5d085282127507f41ea326da10e69bab"
+        }
+      ],
+      "passed": 32,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_read_item",
+            "canonical",
+            "fingerprint",
+            "keyed_fields",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_envelope",
+            "read_item",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 222
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolved",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 200
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "batch_limit",
+            "decide",
+            "limit_for"
+          ],
+          "lineCount": 105
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "invalid_json",
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "16882d850e852065eaff",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "991906334036b38ba1e4",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "8de291203a92b52db52e",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "bacace978e9c7a99f050",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "2474e05d89a3f74e9aa5",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "fecef17813f892cabd24",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "c4a138a29aa90045677d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "3de1acc4adfbf92f1c26",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "471ced6b59a941462053",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "8da990f11b68ab947332",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "54c5d25589b4b77a6457",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "e1708821ffca08e299d5",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "5cfe7c4aba6562872e90",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "039822ae6446a3d67b28",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "dc0fc3504dca708b64a0",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        },
+        {
+          "id": "4d7023047bade363eea2",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard-checklist",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "8485ed2e8f7cc075487e93acf65bedeb32e6540bfff212de9925468ec1d27016"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c58f43920eb4019f628ef3de2b184fea8a91ac22e220c6632bee758b8b6cea94"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "de5064950d83037e24b0fcbaad6b99437d9a7cd975e0ddf4ea680cf3be6df71e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "fe810560c41b8130a2cdf0bdeabc3cc3dcaaef8e366fc4746ef67d5f173a65a0"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_items",
+            "_units",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 230
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 71
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard-checklist",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "waiting-user",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "8485ed2e8f7cc075487e93acf65bedeb32e6540bfff212de9925468ec1d27016"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c58f43920eb4019f628ef3de2b184fea8a91ac22e220c6632bee758b8b6cea94"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "de5064950d83037e24b0fcbaad6b99437d9a7cd975e0ddf4ea680cf3be6df71e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "fe810560c41b8130a2cdf0bdeabc3cc3dcaaef8e366fc4746ef67d5f173a65a0"
+        }
+      ],
+      "passed": 0,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_items",
+            "_units",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 230
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 71
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "16882d850e852065eaff",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "991906334036b38ba1e4",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "8de291203a92b52db52e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "bacace978e9c7a99f050",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "2474e05d89a3f74e9aa5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "fecef17813f892cabd24",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "c4a138a29aa90045677d",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "3de1acc4adfbf92f1c26",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "471ced6b59a941462053",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "8da990f11b68ab947332",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "54c5d25589b4b77a6457",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "e1708821ffca08e299d5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "5cfe7c4aba6562872e90",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "039822ae6446a3d67b28",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "dc0fc3504dca708b64a0",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "4d7023047bade363eea2",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        }
+      ]
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "building-loop",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": "first-audit-ready",
+      "terminal": "stalled-idle",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "825e4919ee01769a7153a2ed336abebe0f3d2aba5ac9b1fbcf1af151d4ff6358"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "read_batch_item",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 176
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "building-loop",
+      "stage": "g4",
+      "carry": "frozen-workspace-continuation-after-idle-stall",
+      "phase": "closed",
+      "terminal": "closed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ac11c0fde253acc8a39e6399fe605866a83f28866f6d27ed2b9c14e652a986ed"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 32,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "read_batch_item",
+            "read_operation_id",
+            "request_fingerprint",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 247
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "16882d850e852065eaff",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "991906334036b38ba1e4",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "8de291203a92b52db52e",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "bacace978e9c7a99f050",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "2474e05d89a3f74e9aa5",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "fecef17813f892cabd24",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "c4a138a29aa90045677d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "3de1acc4adfbf92f1c26",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "471ced6b59a941462053",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "8da990f11b68ab947332",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "54c5d25589b4b77a6457",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "e1708821ffca08e299d5",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "5cfe7c4aba6562872e90",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "039822ae6446a3d67b28",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "dc0fc3504dca708b64a0",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        },
+        {
+          "id": "4d7023047bade363eea2",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "af85c2038a0c8c0103f20e619b7a43b6fc3c064b0baf6c9b593eb48deb7b4ee7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "55ea748c007995965c21af479c0dd378e20238a7e0c15d7d0100cb2f11d05fb4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 106
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__str__",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 156
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "e26aad5832f5d1d43f84f9c679b929a78b94111de5fd7678cd20f3aa89ad65f1"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "03dac2bf9194f4391a98bf87d3fd1465c1eeaeef1e5a27a14a525db62ab3637a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "97d949895d18749aa46d573eb05c6c2e3017964af9fb4c3befb3700dcca803fe"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 16,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain",
+            "request_identity"
+          ],
+          "lineCount": 146
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__str__",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 206
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for",
+            "read_batch_limit"
+          ],
+          "lineCount": 83
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "16882d850e852065eaff",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "991906334036b38ba1e4",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "8de291203a92b52db52e",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "bacace978e9c7a99f050",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "2474e05d89a3f74e9aa5",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "fecef17813f892cabd24",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "c4a138a29aa90045677d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "3de1acc4adfbf92f1c26",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "471ced6b59a941462053",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "8da990f11b68ab947332",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "54c5d25589b4b77a6457",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "e1708821ffca08e299d5",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "5cfe7c4aba6562872e90",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "039822ae6446a3d67b28",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "dc0fc3504dca708b64a0",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "4d7023047bade363eea2",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard-checklist",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "630b91d03096dfdb5ae83a437e66714a4d5e39acc66c2456f1896a4aca621523"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f10c674ef4b46cc6ef1b203819512a822779cd80a52bf7e659e16299c1e4365f"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "14f03f59afcd3b4a86bd7b4e620e62d425d9c0a44eccc353a291699e9baf8a3a"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_validated",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 123
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_frozen_early",
+            "_is_batch",
+            "_rollback_item",
+            "_same_rollback",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 244
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_frozen",
+            "is_frozen",
+            "limit_for"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard-checklist",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "a3da876388ceecfc7efc13352dcf04d3c691647a0b0842cbaac8f10ffecf0f77"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "932769b081bba6b98aa629a24ddf6cf765fa066f4d8843cbcf231d53205cab76"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "14f03f59afcd3b4a86bd7b4e620e62d425d9c0a44eccc353a291699e9baf8a3a"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 0,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_validated",
+            "parse_limit",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 185
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_batch_frozen_early",
+            "_is_batch",
+            "_rollback_item",
+            "_same_rollback",
+            "add",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 348
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_frozen",
+            "is_frozen",
+            "limit_for"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "16882d850e852065eaff",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "991906334036b38ba1e4",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "8de291203a92b52db52e",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "bacace978e9c7a99f050",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "2474e05d89a3f74e9aa5",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "fecef17813f892cabd24",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "c4a138a29aa90045677d",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "3de1acc4adfbf92f1c26",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "471ced6b59a941462053",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "8da990f11b68ab947332",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "54c5d25589b4b77a6457",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "e1708821ffca08e299d5",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "5cfe7c4aba6562872e90",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "039822ae6446a3d67b28",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "dc0fc3504dca708b64a0",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        },
+        {
+          "id": "4d7023047bade363eea2",
+          "status": "failed",
+          "exitCode": 1,
+          "failure": "ModuleNotFoundError"
+        }
+      ]
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "building-loop",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": "closed",
+      "terminal": "closed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ea152865248d4c1db9ce553c8dde2a122d7ea3b67f236d14c21ed1f06a1f842b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_item_request",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 170
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 31
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "building-loop",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": "closed",
+      "terminal": "closed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d2ed61d3970a3bb4f6b3209554f8d2160a02e31428341bac0fa14aa55df1a5b4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        }
+      ],
+      "passed": 32,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_item_request",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "request_identity",
+            "retained_closure",
+            "rollback_actions",
+            "tag",
+            "topological_order"
+          ],
+          "lineCount": 265
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 31
+        }
+      },
+      "cases": [
+        {
+          "id": "581add7b2a0952358e0f",
+          "status": "passed"
+        },
+        {
+          "id": "16882d850e852065eaff",
+          "status": "passed"
+        },
+        {
+          "id": "22531819f8c7e4bc3cd5",
+          "status": "passed"
+        },
+        {
+          "id": "991906334036b38ba1e4",
+          "status": "passed"
+        },
+        {
+          "id": "909f4dcd7d7a28f4277a",
+          "status": "passed"
+        },
+        {
+          "id": "8de291203a92b52db52e",
+          "status": "passed"
+        },
+        {
+          "id": "97c7b6894d34feccb7f7",
+          "status": "passed"
+        },
+        {
+          "id": "bacace978e9c7a99f050",
+          "status": "passed"
+        },
+        {
+          "id": "2a25d1c74158828687a8",
+          "status": "passed"
+        },
+        {
+          "id": "2474e05d89a3f74e9aa5",
+          "status": "passed"
+        },
+        {
+          "id": "08d93f88776d107bac46",
+          "status": "passed"
+        },
+        {
+          "id": "fecef17813f892cabd24",
+          "status": "passed"
+        },
+        {
+          "id": "daa7456d70de100cf99d",
+          "status": "passed"
+        },
+        {
+          "id": "c4a138a29aa90045677d",
+          "status": "passed"
+        },
+        {
+          "id": "e24926edeebbf8f14985",
+          "status": "passed"
+        },
+        {
+          "id": "3de1acc4adfbf92f1c26",
+          "status": "passed"
+        },
+        {
+          "id": "456775bcf541b0f1e2e9",
+          "status": "passed"
+        },
+        {
+          "id": "471ced6b59a941462053",
+          "status": "passed"
+        },
+        {
+          "id": "0c098586ce8a675ce44e",
+          "status": "passed"
+        },
+        {
+          "id": "8da990f11b68ab947332",
+          "status": "passed"
+        },
+        {
+          "id": "6b450f125fb61f4d30b0",
+          "status": "passed"
+        },
+        {
+          "id": "54c5d25589b4b77a6457",
+          "status": "passed"
+        },
+        {
+          "id": "0e9ec3cbb0c3ceed2f07",
+          "status": "passed"
+        },
+        {
+          "id": "e1708821ffca08e299d5",
+          "status": "passed"
+        },
+        {
+          "id": "717bdf3964686afd23b8",
+          "status": "passed"
+        },
+        {
+          "id": "5cfe7c4aba6562872e90",
+          "status": "passed"
+        },
+        {
+          "id": "8e40c047335810c05347",
+          "status": "passed"
+        },
+        {
+          "id": "039822ae6446a3d67b28",
+          "status": "passed"
+        },
+        {
+          "id": "c0572581a56d38a6c4b8",
+          "status": "passed"
+        },
+        {
+          "id": "dc0fc3504dca708b64a0",
+          "status": "passed"
+        },
+        {
+          "id": "a3079f16a6bf82f9a0a4",
+          "status": "passed"
+        },
+        {
+          "id": "4d7023047bade363eea2",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}
