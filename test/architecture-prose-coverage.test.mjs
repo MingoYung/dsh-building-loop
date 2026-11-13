@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { architectureBrokenFactLinks, architectureProseInventory, checkArchitectureProseReceipt, linkedResponsibilityConflicts } from "../governance/architecture-prose-coverage.mjs";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
-import { engineeringArchitectureLinkIssues, engineeringArchitectureStatus, registerEngineeringArchitecture,
+import { coordinatorArchitectureSectionContent, engineeringArchitectureLinkIssues, engineeringArchitectureStatus, registerEngineeringArchitecture,
   validateCoordinatorArchitectureEdit } from "../governance/engineering-architecture.mjs";
 import { authority, digest, scopedEditContent } from "../governance/policy.mjs";
 import { fixture, host } from "./helpers.mjs";
@@ -171,6 +171,13 @@ test("scoped coordinator edit retains original headings, BOM, mixed line endings
   assert.throws(() => validate(fixed.replaceAll("\r\n", "\n"), "Implementation"), /指定正文/u);
   assert.throws(() => validate(fixed, "Implementation", { ...frame, agent: { id: "other" } }), /当前单元已授权/u);
   assert.throws(() => validate(fixed, "Implementation", { ...frame, reads: [] }), /当前单元已授权/u);
+
+  const section = (heading, newText, beforeSha256 = digest(before)) =>
+    validate(coordinatorArchitectureSectionContent(before, { heading, newText, beforeSha256 }), heading);
+  assert.equal(section("Extra", "Updated without an anchor."), original.replace("Extra draft.", "Updated without an anchor."));
+  assert.throws(() => section("Extra", "Attempt with stale bytes.", digest("stale")), /版本已变/u);
+  assert.throws(() => section("Extra", "## Unregistered heading\n\nInjected section"), /指定正文/u);
+  assert.throws(() => section("Verified", "Host evidence replacement"), /宿主生成章节/u);
 
   const preamble = original.replace("# Architecture", "# Architecture\r\n\r\nRead [decision](#bl-fact-missing).");
   const preambleBefore = Buffer.from(preamble);
@@ -356,7 +363,8 @@ test("the real code-review path requires two independent block receipts and rout
       assert.deepEqual(preflight.issues, [{ line: 6, end: 6, heading: "Implementation", unknownRefs: ["unregistered"] }]);
       const initialDoc = fs.readFileSync(path.join(root, architecture));
       await harness.file("root", "edit", architecture, { beforeSha256: digest(initialDoc), heading: "Implementation",
-        oldText: broken, newText: wrong, note: "Remove the unknown reference from the initial draft." });
+        newText: "1. Keep the caller's interface simple.\n2. " + wrong,
+        note: "Replace the indicated section without copying an old anchor." });
       assert.equal(fs.readFileSync(path.join(root, architecture), "utf8"), doc);
       await harness.flow("root", "architecture");
       const executor = (await harness.flow("root", "advance")).childId;

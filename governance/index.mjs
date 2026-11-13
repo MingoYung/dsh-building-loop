@@ -41,7 +41,8 @@ import { deliverableTableContract, deliverableTableIssues } from "./deliverable-
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
   requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims, engineeringArchitectureSourceFacts,
-  architectureLinkRepairAction, engineeringArchitectureLinkIssues, validateCoordinatorArchitectureEdit } from "./engineering-architecture.mjs";
+  architectureLinkRepairAction, coordinatorArchitectureSectionContent, engineeringArchitectureLinkIssues,
+  validateCoordinatorArchitectureEdit } from "./engineering-architecture.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQuery"];
@@ -276,7 +277,7 @@ function architectureNext(frame, unit) {
     needsWrite = !!status.conflicts?.length || sameContents && (status.status === "repair" || previous.goalSha256 !== goalSnapshot(frame).sha256);
   } catch { /* Missing or incomplete plans need a concrete write first. */ }
   return { ...status, next: needsWrite ? (scoped ? { tool: FILE, action: "edit", path: status.file,
-    headings: status.editableHeadings, required: ["heading", "beforeSha256", "note", "edits"], then: register }
+    headings: status.editableHeadings, required: ["heading", "beforeSha256", "note", "newText"], then: register }
     : { tool: FILE, action: "write", path: status.file, required: ["content", "note"], then: register }) : register,
     ...(frame.started?.binding.checkpoint?.unit === unit && !frame.state.units[unit] ? { dispatch: advance } : {}) };
 }
@@ -1346,7 +1347,9 @@ export function apply(ctx, config = {}) {
           if (!edit && architectureRequiresEdit && before !== null) {
             throw new Error("已登记或含坏引用的架构稿须使用 edit，指定受影响的 heading 和 beforeSha256");
           }
-          const next = edit ? scopedEditContent(before, args, splice => { plan = splice; }) : args.content;
+          const sectionBody = edit && architectureUnit && args.heading !== undefined && args.oldText === undefined && args.edits === undefined;
+          const next = sectionBody ? coordinatorArchitectureSectionContent(before, args)
+            : edit ? scopedEditContent(before, args, splice => { plan = splice; }) : args.content;
           if (edit && architectureUnit) validateCoordinatorArchitectureEdit(frame, architectureUnit, file, before, next, args.heading);
           return validate(next);
         } : validate(args.content);
@@ -3070,14 +3073,14 @@ export function apply(ctx, config = {}) {
       newText: { ...string, description: "替换片段，空字符串表示删除该片段" },
     }, required: ["oldText", "newText"], additionalProperties: false,
   };
-  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。已有回归代码和已登记的逐段核验架构用 edit；新建文件用 write。edit 用 beforeSha256 和唯一旧片段，架构修订填受影响的 heading（坏引用以宿主 next 为准）。同批 edits 匹配同一原文件且范围不重叠。写入保留一个滚动备份及逐文件日志。add-module 仅在所有者明确批准后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
+  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。已有回归代码和已登记的逐段核验架构用 edit；新建文件用 write。代码局部编辑用 beforeSha256 和唯一旧片段；架构按 heading、beforeSha256、newText 替换该节正文（坏引用按宿主 next）。写入保留一个滚动备份及逐文件日志。add-module 仅在所有者明确批准后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
     path: string, query: string, content: string, note: string, start: number, count: number,
     beforeSha256: { ...string, description: "edit 必填：当前目标文件的完整 SHA-256，可从 read 获取" },
     ...editFragment.properties,
     edits: { type: "array", items: editFragment, minItems: 1, maxItems: 32 },
     module: { ...string, description: "add-module：所有者明确指定的小写模块编号" },
     title: { ...string, description: "add-module：所有者明确指定的模块标题" },
-    heading: { ...string, description: "write 修改受管中央文件时填写实际修改的已有章节标题" },
+    heading: { ...string, description: "架构按节编辑或受管中央文件写入时，填写唯一可见的现有正文标题" },
   }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor","diagnostician"])});
 
   const reproductionInput = {

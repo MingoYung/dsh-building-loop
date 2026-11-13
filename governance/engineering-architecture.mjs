@@ -706,6 +706,23 @@ export function engineeringArchitectureStatus(frame, unit) {
   }
 }
 
+/** A unique visible heading and its current digest address the section
+ * without asking the coordinator to copy long, potentially repeated prose. */
+export function coordinatorArchitectureSectionContent(before, { beforeSha256, heading, newText }) {
+  if (!before || digest(before) !== beforeSha256) throw new Error("架构稿版本已变，请重新读取并提供当前 beforeSha256");
+  if (typeof newText !== "string" || !newText.isWellFormed()) throw new Error("按章节更新须填写正文 newText");
+  const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(before);
+  const sections = architectureHeadingSpans(source).filter(row => row.title === heading);
+  if (sections.length !== 1) throw new Error("架构稿局部编辑须指定一个唯一可见的正文标题");
+  const [{ bodyStart, stop }] = sections;
+  const oldBody = source.slice(bodyStart, stop);
+  const newline = source.includes("\r\n") && !/(?<!\r)\n|\r(?!\n)/u.test(source) ? "\r\n" : "\n";
+  const padding = /^\s*$/u.test(oldBody) ? { before: newline, after: newline + newline }
+    : { before: /^(?:\r\n|\n|\r)*/u.exec(oldBody)[0], after: /(?:\r\n|\n|\r)*$/u.exec(oldBody)[0] };
+  const replacement = newText.replace(/^(?:\r\n|\n|\r)+|(?:\r\n|\n|\r)+$/gu, "").replace(/\r\n|\n|\r/gu, newline);
+  return source.slice(0, bodyStart) + padding.before + replacement + (padding.after || newline) + source.slice(stop);
+}
+
 /** Restrict an already hash-checked splice to the bound coordinator's named authored section. */
 export function validateCoordinatorArchitectureEdit(frame, unit, file, before, proposed, heading) {
   const spec = frame.policy.units[unit];
