@@ -270,7 +270,7 @@ function plan(frame, active, spec, regression) {
 
 /** Packet assembly still verifies each digest and records only bytes it
  * actually displays. A large unchanged source stays available by explicit read. */
-export function codeReviewReadPaths(frame, id, active, spec) {
+export function codeReviewReadPaths(frame, id, active, spec, annotationCandidates = []) {
   const signed = requireCodeRegressionCurrent(frame, id, active, spec, active.goal);
   const { changes, artifacts, responsibilities } = plan(frame, active, spec, signed);
   const changed = new Set(changes.map(row => keyOf(row.path)));
@@ -288,6 +288,12 @@ export function codeReviewReadPaths(frame, id, active, spec) {
     const ranges = lines.map(line => ({ start: line, end: line }));
     if (!existing) paths.push({ file: actual.file, ranges });
     else if (existing.ranges) existing.ranges = [...existing.ranges, ...ranges];
+  }
+  for (const { file, start, end, operationLine } of annotationCandidates) {
+    const existing = paths.find(row => row.file === file);
+    const ranges = [{ start, end }, { start: operationLine, end: operationLine }];
+    if (!existing) paths.push({ file, ranges });
+    else if (existing.ranges) existing.ranges.push(...ranges);
   }
   return paths;
 }
@@ -537,11 +543,11 @@ function syntaxNodes(node) {
   return children;
 }
 
-/** Reject one provable class of stale performance annotations. `bisect`
+/** Locate a potentially stale performance annotation. `bisect`
  * searches in logarithmic time, but its insertion into a built-in list can
- * move all later elements. Uncertain receiver types or bounds stay for
- * independent review. Only the current signed bytes supply evidence. */
-export function signedAnnotationIssues(frame, spec, qualification) {
+ * move all later elements. Only the signed source supplies evidence; input
+ * bounds and invariants still require independent judgment. */
+export function signedAnnotationCandidates(frame, spec, qualification) {
   const issues = [];
   for (const { path: file, sha256 } of qualification.artifacts) {
     if (!sha256 || !/\.py$/iu.test(file) || !includes(spec.codeTask.sources, file)) continue;
@@ -579,7 +585,8 @@ export function signedAnnotationIssues(frame, spec, qualification) {
       // Match an explicit bound on insertion itself, excluding search-only,
       // qualified, negated and amortized descriptions.
       const claim = part(annotation).match(/[^.!?。！？\n]*(?:\binsert(?:ion|ions|s)?\b|插入)[^.!?。！？]{0,190}?O\(\s*(?:log\s*\w+|1)(?:\s*\+[^)]*)?\)/iu);
-      if (!claim || /(?:\b(?:not|except|without|find\w*|search\w*|locat\w*|position|amortized|if|may|would)\b|不是|查找|定位|摊还|假设|可能)/iu.test(claim[0])) return;
+      if (!claim || /\+\s*(?:n|linear)\b/iu.test(claim[0]) ||
+        /(?:\b(?:not|except|without|find\w*|search\w*|locat\w*|position|amortized|if|may|would)\b|不是|查找|定位|摊还|假设|可能)/iu.test(claim[0])) return;
       const methods = owner.name === "ClassDefinition" ? syntaxNodes(body).filter(child => child.name === "FunctionDefinition") : [owner];
       const assignments = methods.flatMap(method => syntaxNodes(method.getChild("Body")).filter(child => child.name === "AssignStatement"));
       for (const method of methods) for (const statement of syntaxNodes(method.getChild("Body"))) {
@@ -593,6 +600,7 @@ export function signedAnnotationIssues(frame, spec, qualification) {
         const mapped = mapping && assignments.filter(row => part(row.firstChild) === mapping);
         const definiteLocal = owner.name === "FunctionDefinition" && local?.length === 1 && local[0].from < statement.from &&
           local[0].lastChild.name === "ArrayComprehensionExpression" &&
+          !syntaxNodes(local[0].lastChild).some(node => node.name === "MemberExpression" && part(node).includes(":")) &&
           !new RegExp("(?:\\b" + expression + "\\s*[:+*\\-/|&^]?=(?!=)|\\bdel\\s+" + expression + "\\b)", "u")
             .test(source.slice(local[0].to, statement.from));
         const definiteBucket = mapped?.length === 1 && part(mapped[0].lastChild).replace(/\s/gu, "") === "{}" &&
@@ -600,12 +608,22 @@ export function signedAnnotationIssues(frame, spec, qualification) {
         if (!definiteLocal && !definiteBucket) continue;
         const at = annotation.from + claim.index;
         issues.push({ file, sha256, start: line(at), end: line(at + claim[0].length - 1),
-          operationLine: line(callee.from), reason: "有序查找和插入是两步：bisect 定位后，内置 list 插入最坏须移动 O(n) 个元素。请修正源码注释或实际实现。" });
+          operationLine: line(callee.from), reason: "内置 list 的插入可能移动后续元素。核对此复杂度是否算入搬移成本，以及列表长度是否受固定上限约束。" });
         return;
       }
     } });
   }
   return issues;
+}
+
+/** Both reviewers must actually see the pinned annotation and operation.
+ * This records observation only; the review still supplies the verdict. */
+export function unreadAnnotationCandidates(frame, active, candidates) {
+  return candidates.filter(({ file, sha256, start, end, operationLine }) => {
+    const seen = active.seen?.[keyOf(file)];
+    return includes(frame.reads, file) && (seen?.hash !== sha256 ||
+      ![[start, end], [operationLine, operationLine]].every(([from, to]) => seen.ranges.some(([a, b]) => a <= from && b >= to)));
+  });
 }
 
 function excerpt(lines, ref) {
@@ -1471,6 +1489,11 @@ export function verifyCodeReview(frame, active, spec, signed) {
   const current = plan(frame, active, spec, signed);
   const draft = reviewDraft(frame, active, current.binding);
   const progress = reviewProgress(frame, active, current, draft);
+  const candidates = signedAnnotationCandidates(frame, spec, active.codeIntake.qualification)
+    .filter(({ file }) => includes(frame.reads, file)).slice(0, 8);
+  const annotationUnread = unreadAnnotationCandidates(frame, active, candidates);
+  if (annotationUnread.length) throw new CodeReviewIncomplete("先读回当前源码里的注释和对应操作，核对它们是否一致。",
+    visibleReviewProgress(progress), { tool: "building_loop_code_review", action: "prepare", annotationCandidates: annotationUnread });
   if (!progress.ready) {
     const missing = [progress.missingFiles.length && "待记录文件 " + progress.missingFiles.join("、"),
       progress.missingCases.length && "待记录必测 " + progress.missingCases.join("、"),
@@ -1515,7 +1538,7 @@ export function currentCodeReview(frame, id, active, spec, receipt, independent 
     const signed = requireCodeRegressionCurrent(frame, id, active, spec, active.goal);
     const architecture = reviewArchitecture(frame, active, false);
     const qualification = active.codeIntake.qualification;
-    if (signedLocalImportBoundary(frame, spec, qualification) || signedAnnotationIssues(frame, spec, qualification).length ||
+    if (signedLocalImportBoundary(frame, spec, qualification) ||
       signedExplicitResponsibilityIssues(frame, spec, qualification, active.goal).length) return false;
     if (spec.architecture?.importsHeading && !inspectArchitectureImports(frame, spec, active).match) return false;
     const binding = proofBinding(signed, active.goal, architecture);

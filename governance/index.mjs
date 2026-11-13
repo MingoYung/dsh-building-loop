@@ -26,7 +26,7 @@ import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./
 import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
   currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview,
-  signedAnnotationIssues, signedLocalImportBoundary, verifyCodeReview } from "./code-review.mjs";
+  signedAnnotationCandidates, signedLocalImportBoundary, unreadAnnotationCandidates, verifyCodeReview } from "./code-review.mjs";
 import { codeDiagnosticsCurrent, compareInputContract, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
   prepareInputContractBatch, prepareReviewReproduction, prepareRollbackBatch, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
 import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
@@ -1044,9 +1044,11 @@ export function apply(ctx, config = {}) {
         frame.changed = true;
       }
       const codeReviewMode = codeReviewRole(frame);
+      const annotationCandidates = codeReviewMode && current.annotationCandidatesSent !== current.serial
+        ? signedAnnotationCandidates(frame, spec, current.codeIntake.qualification).filter(({ file }) => includes(frame.reads, file)).slice(0, 8) : [];
       // Goals, architecture and current changed-source evidence share one
       // read budget. Stamps are recorded only for lines actually returned.
-      const codePaths = codeReviewMode ? codeReviewReadPaths(frame, assignment[0], current, spec) : [];
+      const codePaths = codeReviewMode ? codeReviewReadPaths(frame, assignment[0], current, spec, annotationCandidates) : [];
       const codeRanges = new Map(codePaths.map(({ file, ranges }) => [keyOf(file), ranges]));
       const order = checkpoint ? coordinatorPacketPaths(frame, checkpoint.unit, current) : [...new Set([...frame.policy.goalContext,...frame.policy.instructions,
         ...(codeReviewMode && spec.architecture ? [spec.architecture.file] : []),
@@ -1096,6 +1098,13 @@ export function apply(ctx, config = {}) {
       if (codeReviewMode) {
         if (current.goal?.sha256 !== goalSnapshot(frame).sha256) throw new Error("项目目标已变，请总控 advance 重启当前代码的独立验收");
         codeReview = prepareCodeReview(frame, assignment[0], current, spec, args.codeReviewOffset);
+        if (current.annotationCandidatesSent !== current.serial) {
+          if (annotationCandidates.length) codeReview.annotationCandidates = annotationCandidates;
+          if (!unreadAnnotationCandidates(frame, current, annotationCandidates).length) {
+            current.annotationCandidatesSent = current.serial;
+            frame.changed = true;
+          }
+        }
         const diagnostics = spec.codeTask.diagnostics;
         const { reviewRecipes, syntaxRecipe } = diagnostics ?? {};
         const recipeInputs = visibleRecipeInputs(diagnostics, reviewRecipes);
@@ -2400,7 +2409,7 @@ export function apply(ctx, config = {}) {
         const { pending, qualification, goal } = signedSubmission(frame, id, active, spec);
         // Save runner calls on a known static violation. Publication still
         // checks the boundary again against the current signed bytes.
-        if (pending.length || signedLocalImportBoundary(frame, spec, qualification) || signedAnnotationIssues(frame, spec, qualification).length ||
+        if (pending.length || signedLocalImportBoundary(frame, spec, qualification) ||
           signedExplicitResponsibilityIssues(frame, spec, qualification, goal).length ||
           rollbackProposalNeeded(frame, active, spec, qualification)) return;
       } else {
@@ -2467,9 +2476,8 @@ export function apply(ctx, config = {}) {
           const boundary = signedLocalImportBoundary(frame, spec, qualification);
           if (boundary) return { unit: id, phase: active.phase, submission: boundary };
           const responsibilities = signedExplicitResponsibilityIssues(frame, spec, qualification, goal);
-          const annotations = signedAnnotationIssues(frame, spec, qualification);
-          if (responsibilities.length || annotations.length) return { unit: id, phase: active.phase,
-            submission: { status: "signed-source-check", responsibilities, annotations, next: { tool: WORKFLOW, action: "submit" } } };
+          if (responsibilities.length) return { unit: id, phase: active.phase,
+            submission: { status: "signed-source-check", responsibilities, next: { tool: WORKFLOW, action: "submit" } } };
           if (rollbackProposalNeeded(frame, active, spec, qualification)) {
             return { unit: id, phase: active.phase, submission: { status: "rollback-proposal-required",
               next: { tool: WORKFLOW, action: "rollback-proposal" } } };

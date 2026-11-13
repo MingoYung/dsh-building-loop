@@ -97,7 +97,7 @@ function project(root, write, { importsHeading, examplesHeading, diagnostics, al
   const { proposal } = proposeConversationTask(process.env.DSH_HOME, "root", current,
     { goal: "预算上限", deliverable: "架构和可验证代码", scope: "当前项目" });
   decideConversationStart(process.env.DSH_HOME, "root", current, proposal.id, "start", () => ({ kind: "workspace", root }), { typed: true });
-  return { save, harness: host(root, { automaticCoverage: false }) };
+  return { save, harness: host(root, { automaticCoverage: false, toolTimeoutMs: diagnostics ? 30_000 : 3000 }) };
 }
 
 const fileJudgment = { file: candidate, basis: "The cap protects downstream capacity.",
@@ -120,7 +120,7 @@ for (const lockedScope of [false, true]) test("signed rollback returns a failed 
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const env = { DSH_BUILDING_LOOP_DIAGNOSTICS_URL: `http://127.0.0.1:${server.address().port}/rollback`,
-    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: token };
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: token, DSH_BUILDING_LOOP_DIAGNOSTICS_TIMEOUT_MS: "12000" };
   const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
   try {

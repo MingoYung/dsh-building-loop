@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
-import { inspectArchitectureImports, isCodeReviewUnit, signedAnnotationIssues } from "../governance/code-review.mjs";
+import { inspectArchitectureImports, isCodeReviewUnit, signedAnnotationCandidates, unreadAnnotationCandidates } from "../governance/code-review.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import { fixture, host } from "./helpers.mjs";
@@ -18,16 +18,18 @@ const source = "def bounded(n):\n    # Reject negative batch sizes before enqueu
 const update = "def bounded(n):\n    # Clamp before enqueue to keep downstream memory bounded.\n    return min(5, max(0, n))\n";
 const goalText = "# Queue release\nBound each submitted batch between zero and five items. Output field `size` is at most 5.\n";
 
-test("signed list insertion cost claims account for moving elements; searches and other inserts are unaffected", () => fixture(async (root, write) => {
+test("signed list cost review surfaces exact source and excludes explicit linear or fixed-slice bounds", () => fixture(async (root, write) => {
   const check = (source, current = true) => {
     write(worker, source);
-    return signedAnnotationIssues({ root }, { codeTask: { sources: [worker] } },
+    return signedAnnotationCandidates({ root }, { codeTask: { sources: [worker] } },
       { artifacts: [{ path: worker, sha256: digest(current ? source : "old bytes") }] });
   };
   const code = `from bisect import insort\ndef build(items):\n    \"\"\"Each insertion is O(log n).\"\"\"\n    rows = [item for item in items]\n    insort(rows, 0)\n    return rows\n`;
   const [issue] = check(code);
   assert.deepEqual([issue.file, issue.start, issue.operationLine], [worker, 3, 5]);
   assert.deepEqual(check(code.replace("Each insertion is O(log n).", "Find insertion position in O(log n); moving the suffix costs O(n).")), []);
+  assert.deepEqual(check(code.replace("O(log n)", "O(log n + n)")), []);
+  assert.deepEqual(check(code.replace("item in items", "item in items[:2]").replace("O(log n)", "O(1)")), []);
   assert.deepEqual(check(code.replace("from bisect import insort", "from custom import insort")), []);
   assert.deepEqual(check(code.replace("    insort(rows, 0)", "    if items:\n        rows = make_custom_index()\n    insort(rows, 0)")), []);
   assert.deepEqual(check(code.replace("[item for item in items]", "[]")), []);
@@ -85,6 +87,24 @@ const verified = {
 };
 const codeReview = (harness, actor, action, fields = {}) =>
   harness.invoke(actor, "building_loop_code_review", { action, ...fields });
+
+test("the annotation locator requires the actual signed lines and leaves the decision to each review", () => fixture(async (root, write) => {
+  const { harness, qualify } = prepareProject(root, write);
+  const executor = (await harness.flow("root", "advance")).childId;
+  write(worker, "from bisect import insort\n" + update + "\ndef order(items):\n" +
+    '    """Each insertion is O(log n)."""\n    rows = [item for item in items]\n    insort(rows, 0)\n    return rows\n');
+  assert.equal((await qualify(executor)).phase, "review-ready");
+  const reviewer = (await harness.flow("root", "advance")).childId;
+  const prepared = await codeReview(harness, reviewer, "prepare");
+  const [candidate] = prepared.codeReview.annotationCandidates;
+  assert.deepEqual([candidate.start, candidate.operationLine], [7, 9]);
+  assert.deepEqual(unreadAnnotationCandidates({ reads: [worker] }, { seen: {
+    [worker]: { hash: candidate.sha256, ranges: [[7, 8]] },
+  } }, [candidate]), [candidate]);
+  assert.ok(prepared.files.find(row => row.path === worker).lines.some(([line]) => line === 9));
+  assert.equal((await codeReview(harness, reviewer, "prepare")).codeReview.annotationCandidates, undefined);
+  assert.equal((await codeReview(harness, reviewer, "submit")).next.annotationCandidates, undefined);
+}));
 
 async function prepareReview(harness, actor) {
   const packet = await codeReview(harness, actor, "prepare");
