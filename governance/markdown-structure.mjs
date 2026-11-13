@@ -134,7 +134,7 @@ export function markdownStructure(lines, { collectParagraphs = false } = {}) {
     if (depth || htmlDepth) visible[line] = "";
     if (htmlDepth) standaloneFootnotes[line] = 0;
   }
-  return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, closingRows, standaloneFootnotes, continuedFootnotes,
+  return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, htmlHidden, closingRows, standaloneFootnotes, continuedFootnotes,
     ...(collectParagraphs ? { paragraphs: paragraphs.filter(({ start, end }) =>
       !htmlHidden.slice(start.line - 1, end.line).some(Boolean)) } : {}) };
 }

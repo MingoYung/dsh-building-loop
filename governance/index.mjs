@@ -27,10 +27,11 @@ import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, 
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
   currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview, signedLocalImportBoundary, verifyCodeReview } from "./code-review.mjs";
 import { codeDiagnosticsCurrent, compareInputContract, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
-  prepareInputContractBatch, prepareReviewReproduction, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
+  prepareInputContractBatch, prepareReviewReproduction, prepareRollbackBatch, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
 import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
-import { inputContractCases, publicInputExamples } from "./input-contracts.mjs";
+import { diagnosticInputExamples, inputContractCases, publicInputExamples } from "./input-contracts.mjs";
 import { architectureResponsibilityResult } from "./architecture-responsibilities.mjs";
+import { finishRollbackRehearsal, prepareRollbackProposal } from "./architecture-rollback.mjs";
 import { compareReviewProbe, requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, runtimeExpectation, saveReviewProbe } from "./code-review-probes.mjs";
 import { createStallReproductionProof, DIAGNOSIS_WAIT, observeExecutionDiagnostic, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
@@ -256,6 +257,7 @@ function architectureNext(frame, unit) {
   const status = engineeringArchitectureStatus(frame, unit);
   if (!status?.next) return status;
   const register = { tool: WORKFLOW, ...status.next };
+  if (status.next.action === "advance") return { ...status, next: register };
   if (!["required", "repair", "sync"].includes(status.status) || !includes(frame.writes, status.file)) return { ...status, next: register };
   const previous = frame.state.units[unit]?.engineeringArchitecture ?? frame.state.engineeringArchitecture?.[keyOf(status.file)];
   let needsWrite = true;
@@ -334,6 +336,18 @@ function diagnosisPacket(active, role) {
     ...(triageReason ? { triageReason } : {}), ...(retryReason ? { retryReason } : {}),
     ...(verificationReason ? { verificationReason } : {}),
     ...(evidence ? { evidence: { ...evidence, ...(role === "executor" && row.replay ? { replay: row.replay } : {}) } } : {}) };
+}
+
+/** Prioritize the owner-published reproduction of the failing signed case. */
+function registeredDiagnosis(active, spec) {
+  const record = active?.stallDiagnostic;
+  if (!record || record.layer !== "behavior") return;
+  const examples = diagnosticInputExamples(spec.codeTask?.diagnostics?.inputContracts, record.caseId);
+  if (!examples.length) return;
+  const attempts = record.registeredReplay?.serial === active.serial ? record.registeredReplay.attempts : {};
+  const mismatch = examples.map(({ id }) => attempts[id]).find(row => row?.outcome === "mismatch" && row.proofId);
+  const pending = !mismatch && (examples.find(({ id }) => !attempts[id]) ?? examples.find(({ id }) => attempts[id].outcome !== "match"));
+  return { examples, attempts, mismatch, pending };
 }
 
 /** 安装预设内的工具、强制注入和事件记录，普通模式独立运行。 */
@@ -528,7 +542,8 @@ export function apply(ctx, config = {}) {
     const reads = role === "idle" ? [] : [...new Set([...grant.read, ...policy.instructions, ...policy.goalContext, ...moduleReads])];
     // The authority grants the host permission to generate this projection;
     // model file writes cannot replace a complete state-derived snapshot.
-    const writes=grant.write.filter(file=>!policy.ledgerDocument||keyOf(file)!==keyOf(policy.ledgerDocument));
+    const writes = assignment?.[1].rollbackRepairActive ? [] :
+      grant.write.filter(file=>!policy.ledgerDocument||keyOf(file)!==keyOf(policy.ledgerDocument));
     return { agent, root, policy, file, old, state, role, assignment, reads, writes, managed: binding.managed,
       started: binding.started, startedProject: owner => startedConversationProject(hostHome, owner) };
   }
@@ -757,6 +772,15 @@ export function apply(ctx, config = {}) {
     return { goal, qualification, pending };
   }
 
+  function rollbackProposalNeeded(frame, active, spec, qualification) {
+    if (!spec.architecture?.rollback) return false;
+    const proposal = active.rollbackProposal;
+    if (proposal?.binding.policySha256 === frame.policy.hash && proposal.binding.goalSha256 === qualification.goalSha256 &&
+      proposal.binding.originalArtifactsSha256 === digest(JSON.stringify(qualification.artifacts))) return false;
+    const plan = architectureDocument(frame, spec.architecture, spec.codeTask.diagnostics);
+    return !plan.rollback || !!plan.rollback.proposal;
+  }
+
   /** The executor receives only host-authorized repair instructions, not
    * access to the review receipt or to the reviewer's private evidence. */
   function codeRepairPacket(frame, active) {
@@ -979,6 +1003,10 @@ export function apply(ctx, config = {}) {
       }
       const diagnostic = frame.role === "diagnostician" && reproductionPolicy(frame);
       const diagnosticExamples = diagnostic ? publicInputExamples(diagnostic.inputContracts) : [];
+      const targeted = diagnostic && registeredDiagnosis(current, spec);
+      const targetedNext = targeted?.mismatch ? { tool: DIAGNOSE, action: "submit", proofId: targeted.mismatch.proofId,
+        required: ["cause", "fix", "file", "start", "end"] }
+        : targeted?.pending ? { tool: DIAGNOSTIC_PROBE, action: "example", exampleId: targeted.pending.id } : undefined;
       const stallDiagnostic = ["executor", "diagnostician"].includes(frame.role) ||
         frame.role === "coordinator" && current?.owner === frame.agent.id ? diagnosisPacket(current, frame.role) : undefined;
       const codeTask = frame.role === "executor" && assignment && current.codeIntake &&
@@ -992,12 +1020,20 @@ export function apply(ctx, config = {}) {
         if (spec.architecture?.allowedLocalImports) codeTask.allowedLocalImports = spec.architecture.allowedLocalImports;
         if (spec.architecture?.responsibilities) codeTask.architectureResponsibilities = spec.architecture.responsibilities
           .map(({ id, mode, trigger, owner, exampleId }) => ({ id, mode, trigger, owner, exampleId }));
+        if (spec.architecture?.rollback) {
+          const { heading, files, restore } = spec.architecture.rollback;
+          codeTask.rollback = { heading, files, ...(restore ? { restore: restore.map(({ file }) => file) } : {}),
+            next: { tool: WORKFLOW, action: "rollback-proposal" },
+            rule: "代码签名通过且提交前，登记能撤销当前目标行为、保留其他行为的最小局部替换。总控只收到提议编号和文件路径。" };
+        }
       }
       let submission;
       if (frame.role === "executor" && isCodeReviewUnit(frame, current, spec)) {
         try {
           const { qualification, pending } = signedSubmission(frame, assignment[0], current, spec);
-          submission = (!pending.length && signedLocalImportBoundary(frame, spec, qualification)) ||
+          submission = (!pending.length && (signedLocalImportBoundary(frame, spec, qualification) ||
+            (rollbackProposalNeeded(frame, current, spec, qualification) && { status: "rollback-proposal-required",
+              next: { tool: WORKFLOW, action: "rollback-proposal" } }))) ||
             { status: pending.length ? "read-back" : "ready", receiptSha256: qualification.receiptSha256,
             pending: submissionGaps(pending, current), next: { tool: WORKFLOW, action: "submit" } };
         } catch (error) {
@@ -1006,10 +1042,12 @@ export function apply(ctx, config = {}) {
       }
       const checkpointAdvance = checkpoint?.advance && (["dispatch", "blocked"].includes(phase) || BEGIN[phase])
         ? { tool: WORKFLOW, ...checkpoint.advance } : undefined;
-      const next = codeReview ? codeReview.next : diagnosisNext(current)
-        ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
+      const next = codeReview ? codeReview.next : current?.rollbackRepairActive && frame.role === "executor"
+        ? { tool: WORKFLOW, action: "rollback-proposal" } : diagnosisNext(current)
+        ?? targetedNext ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
         ?? architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
+        : submission?.status === "rollback-proposal-required" ? submission.next
         : submission?.status === "ready" ? "当前签名回归和读回已齐，直接 submit"
         : submission?.status === "read-back" ? "当前签名回归已通过，submit 会返回待读回的准确页"
         : submission?.status === "architecture-import-boundary" ? "按 violations 修正实际越界导入，读回并获取新的签名后 submit"
@@ -1025,10 +1063,14 @@ export function apply(ctx, config = {}) {
         ...(architecture ? { architecture } : {}),
         ...(codeTask ? { codeTask } : {}),
         ...(codeRepair ? { codeRepair } : {}),
+        ...(current?.rollbackRepairActive && frame.role === "executor" ? { rollbackRepair: current.rollbackFailure } : {}),
         ...(stallDiagnostic ? { stallDiagnostic } : {}),
         ...(diagnostic ? { reproduction: { recipes: diagnostic.recipes ?? [], syntaxRecipe: diagnostic.syntaxRecipe,
           recipeInputs: visibleRecipeInputs(diagnostic),
           ...(diagnosticExamples.length ? { publicExamples: diagnosticExamples } : {}),
+          ...(targeted ? { signedCase: { id: current.stallDiagnostic.caseId,
+            examples: targeted.examples.map(({ id }) => ({ id, ...targeted.attempts[id] })),
+            next: targetedNext } } : {}),
           behavior: { tool: DIAGNOSTIC_PROBE, action: "probe",
             note: "用实际配方与最小输入。比较输出字段时给 expectedPointer 和该字段的标量或数组 JSON。退出码足以证伪时省略这两项。",
             example: { expectedExitCode: 0, expectedPointer: "/items", expectedJson: "[]",
@@ -1287,13 +1329,29 @@ export function apply(ctx, config = {}) {
         const evidence = { ...observation, result: diagnostics, expected: investigation?.expected, exampleId: investigation?.exampleId, comparison };
         const layers = [record.layer, ...STALL_LAYERS.filter(layer => layer !== record.layer)];
         const proof = layers.map(layer => createStallReproductionProof({ ...record, layer }, evidence)).find(Boolean);
+        const targeted = registeredDiagnosis(context.active, context.spec);
+        if (comparison && targeted?.examples.some(({ id }) => id === investigation.exampleId)) {
+          // Only authenticated matches and verifiable mismatches advance this
+          // replay gate. A transport failure leaves the registered case open.
+          const outcome = diagnostics.snapshotSha256 && (comparison.outcome === "match" || proof?.layer === "behavior")
+            ? comparison.outcome : "unavailable";
+          record.registeredReplay = { serial: context.active.serial, attempts: { ...targeted.attempts,
+            [investigation.exampleId]: { outcome, ...(proof?.layer === "behavior" ? { proofId: proof.id } : {}) } } };
+          frame.changed = true;
+        }
         if (!proof) return comparison ? { outcome: comparison.outcome, actual: comparison.actual } : {};
         // Replay arguments stay available to the repairing executor; the
         // coordinator receives hashes and locators, never candidate stdout.
         const replay = { ...(observation.input ? { input: observation.input } : {}),
-          ...(investigation ? { expected: investigation.expected, requirement: investigation.requirement } : {}) };
+          ...(investigation ? { expected: investigation.expected, requirement: investigation.requirement,
+            ...(investigation.exampleId ? { exampleId: investigation.exampleId } : {}) } : {}) };
         const entry = { proof, replay };
-        record.probes = [...(record.probes ?? []).filter(item => item.proof.id !== proof.id).slice(-7), entry];
+        const prior = (record.probes ?? []).filter(item => item.proof.id !== proof.id &&
+          (!proof.exampleId || item.proof.exampleId !== proof.exampleId));
+        const pinned = new Set(targeted?.examples.map(({ id }) => record.registeredReplay?.attempts[id]?.proofId).filter(Boolean));
+        const retained = prior.filter(item => pinned.has(item.proof.id));
+        const spare = 7 - retained.length;
+        record.probes = [...retained, ...(spare ? prior.filter(item => !pinned.has(item.proof.id)).slice(-spare) : []), entry];
         frame.changed = true;
         return { proofId: proof.id, provenLayer: proof.layer,
           next: { tool: DIAGNOSE, action: proof.layer === record.layer ? "submit" : "reroute", proofId: proof.id,
@@ -1317,7 +1375,7 @@ export function apply(ctx, config = {}) {
 
   function reproductionPolicy(frame) {
     const [unit, active] = frame.assignment ?? [];
-    if (!["executor", "diagnostician"].includes(frame.role) || !active?.codeIntake?.regression) return;
+    if (!["executor", "diagnostician"].includes(frame.role) || !active?.codeIntake?.regression || active.rollbackRepairActive) return;
     const diagnostics = frame.policy.units[unit].codeTask?.diagnostics;
     if (diagnostics?.protocol === 2) return diagnostics;
   }
@@ -1424,6 +1482,10 @@ export function apply(ctx, config = {}) {
         const layer = args.action === "reroute" ? entry?.proof.layer : record.layer;
         const proof = requireStallReproductionProof({ ...record, layer }, entry?.proof,
           { artifacts: version.artifacts, proofId: args.proofId, layer });
+        const targeted = layer === "behavior" && registeredDiagnosis(active, spec);
+        if (targeted?.pending || targeted?.mismatch && !targeted.examples.some(({ id }) => targeted.attempts[id]?.proofId === proof.id)) {
+          throw new Error("先复现失败签名用例关联的公开示例。已复现不符时，诊断须使用该示例的真实回执");
+        }
         if (args.action === "reroute" && layer === record.layer) throw new Error("同一层的复现须用 submit");
         const cause = requireText(args.cause, "可核实的具体原因", 600);
         const fix = args.action === "submit" ? requireText(args.fix, "原执行方的定点修法或解阻条件", 600) : undefined;
@@ -1496,6 +1558,16 @@ export function apply(ctx, config = {}) {
     if (Object.entries(frame.state.units).some(([key, unit]) => key !== id && !TERMINAL.has(unit.phase) && unit.phase !== "blocked")) {
       throw new Error("当前工作区另有未结单的单元");
     }
+    if (prior?.phase === "architecture-sync" && prior.rollbackFailure ||
+      prior?.phase === "blocked" && prior.rollbackRepairActive) {
+      const failed = prior.rollbackFailure;
+      const signed = requireCodeRegressionCurrent(frame, id, prior, spec, goalSnapshot(frame));
+      const phase = prior.codeIntake.qualification.submittedPhase;
+      if (!failed || !spec.architecture?.rollback || !prior.executor || !["intake", "supplement"].includes(phase) ||
+        signed.receiptSha256 !== failed.receiptSha256) throw new Error("回退退回项已过期，请重新登记当前架构");
+      return { prior, phase, role: "executor", reusable: prior.executor, serial: prior.serial + 1,
+        rollbackRepair: true, rollbackFailureId: failed.id };
+    }
     const stall = prior?.stallDiagnostic;
     if (DIAGNOSIS_WAIT.has(prior?.phase) || prior?.phase === "blocked" && prior.resumePhase === "diagnosis") {
       const version = currentStallVersion(frame, spec);
@@ -1556,7 +1628,8 @@ export function apply(ctx, config = {}) {
     const next = change(agent, frame => {
       const plan = prepare(frame, id);
       if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable ||
-        plan.regressionRetry !== prepared.regressionRetry || plan.stallId !== prepared.stallId) {
+        plan.regressionRetry !== prepared.regressionRetry || plan.stallId !== prepared.stallId ||
+        plan.rollbackFailureId !== prepared.rollbackFailureId) {
         throw new Error("工作单元已经由其他调用推进");
       }
       const spec = unitOf(frame, id),binding=checkpointBinding(frame,spec);
@@ -1569,9 +1642,11 @@ export function apply(ctx, config = {}) {
         // Current hashes are rechecked by every evidence/goal/candidate consumer.
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
       };
+      if (plan.rollbackRepair) record.rollbackRepairActive = true;
+      else delete record.rollbackRepairActive;
       // A stalled implementation may not parse. Reconcile the architecture
       // against repaired code at ordinary submission, never during diagnosis.
-      if (spec.architecture && (!plan.stallId || plan.repair)) {
+      if (spec.architecture && !plan.rollbackRepair && (!plan.stallId || plan.repair)) {
         const needsRepairedSource = !plan.repair &&
           !(plan.prior?.phase === "blocked" && plan.role === "executor");
         record.engineeringArchitecture = requireEngineeringArchitecture(frame, id, spec, plan.prior, needsRepairedSource);
@@ -1657,6 +1732,7 @@ export function apply(ctx, config = {}) {
       frame.changed = true;
       const ownerTableIntake = plan.phase === "intake" && frame.managed && privateProjectUsesOwnerTable(frame.root);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
+        + (plan.rollbackRepair ? "。原执行方只读补正回退方案。先用 prepare 领取失败实证，再用 rollback-proposal 登记新的最小方案。" : "")
         + (plan.repair ? "。原执行会话继续定点修复。prepare 会返回总控核实的诊断、修法和可重跑输入。" : "")
         + (plan.regressionRetry ? "。当前代码或目标需要重新取得受信回归回执并提交，改前通过的用例集合保持固定。" : "")
         + (record.receipt && plan.phase === "supplement" ?
@@ -1670,7 +1746,7 @@ export function apply(ctx, config = {}) {
           + "，工件摘要 " + record.stallDiagnostic.artifactSha256 + "，分层 " + record.stallDiagnostic.layer
           + "。先用 prepare 领取本次版本与复现配方，再取得该版本的实测回执。"
           : plan.role!=="executor"?"独立依据当前授权目标、候选和原始材料核验，不预设结论。"
-          : plan.repair ? ""
+          : plan.repair || plan.rollbackRepair ? ""
           : ownerTableIntake ? "先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。"
           : args.note===undefined?"":"\n本次任务要求 "+requireText(args.note,"任务说明"))
         + (plan.role === "executor" && record.codeIntake ? "\n" + CODE_COMMENT_RULE : "")
@@ -2121,14 +2197,15 @@ export function apply(ctx, config = {}) {
     const batch = withWorkspaceLock(stateHome, file, () => {
       const frame = scope(agent, { lockedFile: file, inspection: true });
       const [id, active] = frame.assignment ?? [];
-      if (frame.role !== "executor" || args.unit !== undefined && args.unit !== id) return;
+      if (frame.role !== "executor" || active.rollbackRepairActive || args.unit !== undefined && args.unit !== id) return;
       const spec = unitOf(frame, id);
       if (!spec.codeTask?.diagnostics?.inputContracts || !active.codeIntake?.regression) return;
       if (isCodeReviewUnit(frame, active, spec)) {
         const { pending, qualification } = signedSubmission(frame, id, active, spec);
         // Save runner calls on a known static violation. Publication still
         // checks the boundary again against the current signed bytes.
-        if (pending.length || signedLocalImportBoundary(frame, spec, qualification)) return;
+        if (pending.length || signedLocalImportBoundary(frame, spec, qualification) ||
+          rollbackProposalNeeded(frame, active, spec, qualification)) return;
       } else {
         verifySignedCodeSubmission(frame, id, active, spec, goalSnapshot(frame));
       }
@@ -2155,6 +2232,7 @@ export function apply(ctx, config = {}) {
       if (args.action !== "block" && frame.started?.proposal.instruction && active.instructionReadSerial !== active.serial) {
         throw new Error("请先用 prepare 获取本阶段完整的用户开工指令原文");
       }
+      if (active.rollbackRepairActive && args.action !== "block") throw new Error("当前只读阶段只接受 rollback-proposal 定点修正回退方案");
       const spec = unitOf(frame, id);
       const binding=refreshCheckpoints(frame,active,spec);
       if (args.action !== "block" && ["reviewer", "auditor"].includes(frame.role) && active.goal?.sha256 !== goalSnapshot(frame).sha256) {
@@ -2187,6 +2265,10 @@ export function apply(ctx, config = {}) {
           if (pending.length) return { unit: id, phase: active.phase, submission: serveSubmissionReadback(frame, active, pending) };
           const boundary = signedLocalImportBoundary(frame, spec, qualification);
           if (boundary) return { unit: id, phase: active.phase, submission: boundary };
+          if (rollbackProposalNeeded(frame, active, spec, qualification)) {
+            return { unit: id, phase: active.phase, submission: { status: "rollback-proposal-required",
+              next: { tool: WORKFLOW, action: "rollback-proposal" } } };
+          }
           signed = { goal, qualification };
         }
         let inputProof, responsibilityProof;
@@ -2272,7 +2354,7 @@ export function apply(ctx, config = {}) {
           }
           active.phase = "review-ready";
         }
-        if (spec.architecture?.responsibilities || spec.architecture?.importsHeading &&
+        if (spec.architecture?.responsibilities || spec.architecture?.rollback || spec.architecture?.importsHeading &&
           (!inspectArchitectureImports(frame, spec, active).match || inspectEngineeringArchitectureClaims(frame, spec, active).conflicts.length)) {
           active.architectureSyncResume = active.phase;
           active.phase = "architecture-sync";
@@ -2373,12 +2455,101 @@ export function apply(ctx, config = {}) {
     }, { claim: args.action !== "block" });
   }
 
+  /** Prepare under lock, run on the signed copy outside it, then verify the
+   * coordinator, phase, policy, source and document again before publishing. */
+  async function registerArchitecture(args, exec) {
+    if (reproductions.has(exec.agent)) return { status: "busy" };
+    const setup = change(exec.agent, frame => {
+      const unit = resolveBoundUnit(frame, args.unit);
+      const spec = unitOf(frame, unit);
+      const registration = registerEngineeringArchitecture(frame, unit, spec, tag(frame));
+      if (!registration.rehearsal) return { result: registration };
+      const active = frame.state.units[unit];
+      const batch = prepareRollbackBatch(frame, unit, active, spec, registration.rehearsal, diagnosticRunner);
+      return { registration, batch, serial: active.serial };
+    }, { requestedUnit: args.unit });
+    if (setup.result) return setup.result;
+    const { unit, phase, rehearsal } = setup.registration;
+    reproductions.add(exec.agent);
+    try {
+      const observed = await runInputContractBatch(setup.batch, diagnosticRunner, exec.signal);
+      if (exec.signal?.aborted) return { status: "cancelled" };
+      const proof = finishRollbackRehearsal(rehearsal, observed);
+      return change(exec.agent, frame => {
+        const active = frame.state.units[unit];
+        const spec = unitOf(frame, unit);
+        if (frame.role !== "coordinator" || active?.owner !== frame.agent.id || active.phase !== phase || active.serial !== setup.serial ||
+          frame.policy.hash !== rehearsal.binding.policySha256 || goalSnapshot(frame).sha256 !== rehearsal.binding.goalSha256 ||
+          digest(readBytes(frame.root, spec.architecture?.file) ?? "") !== rehearsal.binding.architectureSha256 ||
+          digest(JSON.stringify(codeRegressionArtifacts(frame.root, spec))) !== rehearsal.binding.originalArtifactsSha256 ||
+          (rehearsal.binding.proposalId && active.rollbackProposal?.id !== rehearsal.binding.proposalId)) {
+          return { unit, status: "superseded", next: { action: "architecture", unit } };
+        }
+        try {
+          const signed = requireCodeRegressionCurrent(frame, unit, active, spec, goalSnapshot(frame));
+          if (signed.receiptSha256 !== rehearsal.binding.receiptSha256) throw new Error("receipt changed");
+        } catch {
+          return { unit, status: "superseded", next: { action: "architecture", unit } };
+        }
+        if (proof.status === "passed") return registerEngineeringArchitecture(frame, unit, spec, tag(frame), proof);
+        // Raw program output can contain source that the coordinator cannot
+        // read. Report only the owner check, result kind, and content digest.
+        const failures = proof.failures.map(({ id, outcome, status, reason, actual }) => ({ id, outcome, status, reason,
+          ...(actual ? { exitCode: actual.exitCode, actualSha256: digest(JSON.stringify(actual)) } : {}) }));
+        if (proof.status === "failed" && rehearsal.binding.proposalId && active.phase === "architecture-sync") {
+          const rejected = { receiptSha256: rehearsal.binding.receiptSha256, proposalId: rehearsal.binding.proposalId,
+            failures: proof.failures, checkReceipts: proof.receipts };
+          active.rollbackFailure = { id: digest(JSON.stringify(rejected)), ...rejected };
+          frame.changed = true;
+        }
+        return { unit, phase, status: "rollback-" + proof.status,
+          rollback: { total: proof.total, passed: proof.passed, failures },
+          next: { action: active.rollbackFailure && proof.status === "failed" ? "advance" : "architecture", unit } };
+      }, { requestedUnit: args.unit });
+    } finally {
+      reproductions.delete(exec.agent);
+    }
+  }
+
+  async function registerRollbackProposal(args, exec) {
+    if (Object.keys(args).some(key => !["action", "unit", "rollbackEdits", "rollbackRestore"].includes(key))) {
+      throw new Error("回退提议只接受授权源码的局部替换或已登记基线恢复");
+    }
+    const result = change(exec.agent, frame => {
+      const [unit, active] = frame.assignment ?? [];
+      const spec = frame.policy.units[unit];
+      if (frame.role !== "executor" || !spec?.architecture?.rollback || args.unit !== undefined && args.unit !== unit) {
+        throw new Error("只有当前授权的源码执行方可以登记回退提议");
+      }
+      if (frame.started?.proposal.instruction && active.instructionReadSerial !== active.serial) {
+        throw new Error("先用 prepare 读取本阶段完整的用户开工指令");
+      }
+      const { qualification, pending } = signedSubmission(frame, unit, active, spec);
+      if (pending.length) throw new Error("先读回当前签名稿再登记回退提议");
+      const proposal = prepareRollbackProposal(frame, spec, qualification, args.rollbackEdits, args.rollbackRestore,
+        active.codeIntake.regression.artifacts);
+      if (proposal.files.some(file => !includes(spec.phases[active.phase].write, file))) throw new Error("回退提议文件超出当前执行方授权");
+      if (active.rollbackRepairActive) {
+        const rejected = active.rollbackFailure;
+        if (qualification.receiptSha256 !== rejected?.receiptSha256 || proposal.id === rejected.proposalId) {
+          throw new Error("回退补正须沿用当前签名稿并修改失败提议");
+        }
+        active.phase = "architecture-sync";
+        delete active.rollbackRepairActive;
+        delete active.rollbackFailure;
+      }
+      active.rollbackProposal = proposal;
+      frame.changed = true;
+      return { status: "registered", id: proposal.id, files: proposal.files, unit, phase: active.phase,
+        ...(active.phase === "architecture-sync" ? { parent: active.owner } : {}) };
+    });
+    return result.parent ? notifyPhase(exec, result) : result;
+  }
+
   /** 阶段动作统一入口，持久回执成功后再通知父会话。 */
   async function workflow(args, exec) {
-    if (args.action === "architecture") return change(exec.agent, frame => {
-      const unit = resolveBoundUnit(frame, args.unit);
-      return registerEngineeringArchitecture(frame, unit, unitOf(frame, unit), tag(frame));
-    }, { requestedUnit: args.unit });
+    if (args.action === "architecture") return registerArchitecture(args, exec);
+    if (args.action === "rollback-proposal") return registerRollbackProposal(args, exec);
     if (args.action === "prepare") {
       const frame = scope(exec.agent, { inspection: true });
       await recoverOrphanedActivation(frame, exec.signal, frame.started?.binding.checkpoint?.unit);
@@ -2496,8 +2667,8 @@ export function apply(ctx, config = {}) {
   function codeReviewAction(args, exec) {
     const frame = scope(exec.agent);
     if (!codeReviewRole(frame)) throw new Error("当前会话没有纯代码核验授权");
-    const { files, constraints, decisions, findings, observations, architecture, findingsDone, removeFindings, removeObservations, unit } = args;
-    const fields = { files, constraints, decisions, findings, observations, architecture, findingsDone, removeFindings, removeObservations };
+    const { files, constraints, decisions, findings, observations, architecture, proseCoverage, proseFactReview, findingsDone, removeFindings, removeObservations, unit } = args;
+    const fields = { files, constraints, decisions, findings, observations, architecture, proseCoverage, proseFactReview, findingsDone, removeFindings, removeObservations };
     const { assertion, file, exampleId, recipe, stdin, expectedExitCode, expectedJson, expectedPointer, expectedOperator, requirement } = args;
     if (args.action === "probe") {
       if (Object.values(fields).some(value => value !== undefined)) throw new Error("复现动作与回执登记分开调用");
@@ -2709,8 +2880,12 @@ export function apply(ctx, config = {}) {
       basis: {...string,description:LEDGER_BASIS_RULE}, evidence: referenceSchema, coveredBy: string,
     }, required: ["id", "outcome", "basis"], additionalProperties: false } },
   }, (args, exec) => change(exec.agent, frame => ledgerAction(frame, args))), {when:visible(["coordinator"])});
-  register(tool(WORKFLOW, "每阶段先prepare获取授权读包、版本、待读页和契约；重复prepare只给未读或变化内容。architecture 和 advance 仅总控。已登记架构义务的单元，派单前先写实际架构稿并用 architecture 登记版本。preflight/submit仅执行，review仅文稿核验，audit仅文稿独立反证。", ["prepare", "status", "architecture", "advance", "preflight", "submit", "review", "audit", "block"], {
+  register(tool(WORKFLOW, "每阶段先prepare获取授权读包、版本、待读页和契约；重复prepare只给未读或变化内容。architecture 和 advance 仅总控。已登记架构义务的单元，派单前先写实际架构稿并用 architecture 登记版本。preflight/submit/rollback-proposal仅执行，review仅文稿核验，audit仅文稿独立反证。", ["prepare", "status", "architecture", "advance", "preflight", "submit", "rollback-proposal", "review", "audit", "block"], {
     unit: { ...string, description: "工程总控和子会话省略时沿用宿主唯一授权单元；无绑定的总控 advance 需填授权单元。" }, note: string,
+    rollbackEdits: { type: "array", maxItems: 8, items: { type: "object", properties: {
+      file: string, replacements: { type: "array", minItems: 1, maxItems: 16, items: editFragment },
+    }, required: ["file", "replacements"], additionalProperties: false } },
+    rollbackRestore: { type: "array", maxItems: 8, items: string },
     checks: { type: "array", description: "这里只提交 claims/正文 C数字 的事实编号（如 C1/C2/C3）；B开头的全文块只在 building_loop_coverage record 提交，不放这里。", items: {
       type: "object", properties: {
         id: string, status: { type: "string", enum: ["supported", "unsupported"] },

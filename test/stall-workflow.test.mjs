@@ -78,7 +78,7 @@ function signReceipt(write, file, receipt, keys) {
   write(file, JSON.stringify({ ...receipt, signature }));
 }
 
-function configure(root, write, kind, { architecture = false } = {}) {
+function configure(root, write, kind, { architecture = false, registered = false } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = [entry, kind === "syntax" ? syntaxPath : behaviorPath];
   const tests = {
@@ -118,7 +118,12 @@ function configure(root, write, kind, { architecture = false } = {}) {
       },
       codeTask: { sources, tests, diagnostics: {
         checkSet: "registered-host-stalls", protocol: 2, recipes: [syntaxRecipe, behaviorRecipe],
-        reviewRecipes: [syntaxRecipe], syntaxRecipe,
+        reviewRecipes: registered ? [syntaxRecipe, behaviorRecipe] : [syntaxRecipe], syntaxRecipe,
+        ...(registered ? { inputContracts: [{ id: "retained-closure", recipe: behaviorRecipe, examples: [{ id: "through-unapplied",
+          stdin: JSON.stringify(publicRequest), expectedJson: { status: "ok", results: [{ actions: [], units: 0 }], units: 0 },
+          requirement: { file: specFile, start: 2, end: 2,
+            quote: "Keep transitive installed dependencies through unapplied intermediaries; omit kept IDs from rollback actions." },
+          diagnosticCases: [newCase] }] }] } : {}),
         recipeInputs: {
           [syntaxRecipe]: { args: { min: 1, types: ["source"] }, stdin: "forbidden", files: { min: 0, max: 0 } },
           [behaviorRecipe]: { args: { min: 0, types: [] }, stdin: "required", files: { min: 0, max: 0 } },
@@ -312,6 +317,39 @@ async function signCurrent(harness, executor, write, keys, oldStatus = "passed")
   signReceipt(write, file, { ...binding, runId: "registered-stall-candidate",
     cases: [{ id: oldCase, status: oldStatus }, { id: newCase, status: "passed" }] }, keys);
 }
+
+test("signed failure selects its public behavior replay and only that mismatch can route the repair", () =>
+  fixture(async (root, write) => runWithRunner("behavior", async ({ requests }) => {
+    configure(root, write, "behavior", { registered: true });
+    const harness = host(root, { automaticCoverage: false });
+    const { childId: executor } = await harness.flow("root", "advance");
+    await harness.flow(executor, "prepare");
+    await forceStall("behavior", harness, executor, requests);
+    const investigator = await startInvestigation("behavior", harness, executor);
+    const exampleId = "retained-closure:example:through-unapplied";
+    const replay = { action: "example", exampleId };
+    const initial = await harness.flow(investigator, "prepare");
+    assert.deepEqual(initial.next, { tool: behaviorProbe, ...replay });
+    assert.equal(initial.reproduction.signedCase.id, newCase);
+    const finding = submission("behavior");
+    await harness.file(investigator, "read", finding.file, { start: finding.start, count: finding.end - finding.start + 1 });
+    const exploratory = await reproduceFinding("behavior", harness, investigator);
+    await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: exploratory.proofId }), /关联的公开示例/u);
+    const proof = await harness.invoke(investigator, behaviorProbe, replay);
+    assert.equal(proof.outcome, "mismatch");
+    const prepared = await harness.flow(investigator, "prepare");
+    assert.equal(prepared.next.proofId, proof.proofId);
+    await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: exploratory.proofId }), /真实回执/u);
+    const submitted = await harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.proofId });
+    const { evidence } = submitted.stallDiagnostic;
+    assert.equal(evidence.proof.exampleId, exampleId);
+    assert.ok(!JSON.stringify(submitted).includes(JSON.stringify(publicRequest)));
+    await harness.invoke("root", diagnosis, { action: "verify", unit, evidenceId: evidence.id,
+      decision: "confirmed", reason: "The registered case and exact source location identify the dependency traversal defect." });
+    const repair = await harness.flow("root", "advance");
+    assert.equal(repair.childId, executor);
+    assert.equal(repair.reused, true);
+  })));
 
 for (const kind of ["syntax", "behavior"]) {
   test("registered host escalates " + kind + " stalls, verifies bounded proof and resumes the same executor",

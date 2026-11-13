@@ -154,6 +154,33 @@ export function prepareInputContractBatch(frame, spec, runner) {
   });
 }
 
+/** A maintainer-authorized rollback runs the same data-only recipes on a
+ * derived copy. It grants no tool access to the captured source bytes. */
+export function prepareRollbackBatch(frame, unit, active, spec, rehearsal, runner) {
+  const { checkSet, recipes, recipeInputs } = spec.codeTask.diagnostics;
+  const binding = { checkSet, unit, phase: active.phase, policySha256: frame.policy.hash, goalSha256: rehearsal.binding.goalSha256 };
+  const versions = rehearsal.artifacts.map(({ path, sha256 }) => ({ path, sha256 }));
+  const sources = spec.codeTask.sources.filter(path => versions.some(row => row.path === path && row.sha256));
+  return rehearsal.checks.map(check => {
+    if (runner.reason) return { check, job: { result: { status: "unavailable", reason: runner.reason } } };
+    const probe = probeInput(check.input, recipes);
+    const shape = recipeInputs && Object.hasOwn(recipeInputs, probe.recipe) && recipeInputs[probe.recipe];
+    if (shape) {
+      try { validateRecipeInputs(probe, shape, sources); }
+      catch (error) {
+        if (!(error instanceof DiagnosticRecipeInputError)) throw error;
+        return { check, job: { result: error.result } };
+      }
+    }
+    const operation = scopedOperation(spec, active, probe);
+    const request = { spec: SCOPED_SPEC, requestId: randomUUID(), ...binding,
+      snapshotSha256: snapshotId(binding, versions, operation), artifacts: rehearsal.artifacts, ...operation };
+    const sourceLineCounts = new Map(rehearsal.artifacts.filter(row => row.contentBase64 && sources.includes(row.path))
+      .map(row => [row.path, sourceLines(Buffer.from(row.contentBase64, "base64"))]));
+    return { check, job: { request, readablePaths: sources, sourceLineCounts } };
+  });
+}
+
 /** Only an authenticated sandbox result can establish that the candidate
  * exceeded its execution limit. Transport timeout has unknown behavior. */
 export function compareInputContract(check, result) {

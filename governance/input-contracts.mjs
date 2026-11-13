@@ -65,7 +65,8 @@ export function parseInputContracts(value, reviewRecipes, syntaxRecipe) {
       if (!Array.isArray(examples) || !examples.length || examples.length > MAX_EXAMPLES) throw invalid();
       const exampleIds = new Set();
       for (const example of examples) {
-        if (!object(example, ["id", "input", "stdin", "expectedJson", "expectedExitCode", "requirement"]) ||
+        const diagnosticCases = example?.diagnosticCases;
+        if (!object(example, ["id", "input", "stdin", "expectedJson", "expectedExitCode", "requirement", "diagnosticCases"]) ||
           !CONTRACT_ID.test(typeof example.id === "string" ? example.id : "") || exampleIds.has(example.id) ||
           own(example, "input") === own(example, "stdin") ||
           (own(example, "input") ? !boundedJson(example.input, MAX_STDIN - 1) :
@@ -73,7 +74,10 @@ export function parseInputContracts(value, reviewRecipes, syntaxRecipe) {
             INVALID_STDIN_CHARS.test(example.stdin) || Buffer.byteLength(example.stdin) > MAX_STDIN || !example.requirement) ||
           !own(example, "expectedJson") ||
           !boundedJson(example.expectedJson, MAX_JSON) || !validCode(example.expectedExitCode) ||
-          example.requirement !== undefined && !validRequirement(example.requirement)) throw invalid();
+          example.requirement !== undefined && !validRequirement(example.requirement) ||
+          diagnosticCases !== undefined && (!example.requirement || !Array.isArray(diagnosticCases) ||
+            !diagnosticCases.length || diagnosticCases.length > MAX_EXAMPLES || new Set(diagnosticCases).size !== diagnosticCases.length ||
+            diagnosticCases.some(id => typeof id !== "string" || !CONTRACT_ID.test(id)))) throw invalid();
         exampleIds.add(example.id);
         exampleCount++;
       }
@@ -141,10 +145,17 @@ export function inputContractCases(contracts) {
     for (const example of examples) {
       const raw = own(example, "stdin");
       add(id + ":example:" + example.id, raw ? example.stdin : example.input, example.expectedExitCode, example.expectedJson,
-        { publicExample: true, ...(raw ? { raw: true } : {}), ...(example.requirement ? { requirement: example.requirement } : {}) }, raw);
+        { publicExample: true, ...(raw ? { raw: true } : {}), ...(example.requirement ? { requirement: example.requirement } : {}),
+          ...(example.diagnosticCases ? { diagnosticCases: example.diagnosticCases } : {}) }, raw);
     }
   }
   return result;
+}
+
+/** A signed check ID selects only maintainer-published reproductions. */
+export function diagnosticInputExamples(contracts, caseId) {
+  if (!caseId) return [];
+  return inputContractCases(contracts).filter(row => row.diagnosticCases?.includes(caseId));
 }
 
 /** Discovery exposes the owner-approved expectations without regenerating

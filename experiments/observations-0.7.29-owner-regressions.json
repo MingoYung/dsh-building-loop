@@ -1,0 +1,1037 @@
+{
+  "scope": "WSL isolated public synthetic positive and negative controls. No model was called.",
+  "observations": [
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-rollback-order-failure",
+      "id": "reverse-preserves-applied-prerequisite-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": [
+              "b-prerequisite"
+            ]
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "a-consumer",
+          "b-prerequisite"
+        ],
+        "units": 3
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "expectedMatch": false,
+      "qualified": false,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-rollback-order-failure",
+      "id": "reverse-lexical-control-without-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-full-order-good",
+      "id": "reverse-preserves-applied-prerequisite-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": [
+              "b-prerequisite"
+            ]
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "a-consumer",
+          "b-prerequisite"
+        ],
+        "units": 3
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "a-consumer",
+          "b-prerequisite"
+        ],
+        "units": 3
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-full-order-good",
+      "id": "reverse-lexical-control-without-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-selective-revert-too-narrow",
+      "id": "restored-production-plan",
+      "input": {
+        "environment": "production",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "rollback-item",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": []
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "rollback-item"
+        ],
+        "units": 1
+      },
+      "actual": {
+        "status": "error",
+        "error": "unsupported-action",
+        "actions": [],
+        "units": 0
+      },
+      "expectedMatch": false,
+      "qualified": false,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-selective-revert-too-narrow",
+      "id": "restored-production-rollback",
+      "input": {
+        "environment": "production",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "rollback-item",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "rollback-item"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "rollback-item"
+        ],
+        "units": 1
+      },
+      "actual": {
+        "status": "error",
+        "error": "unsupported-action",
+        "actions": [],
+        "units": 0
+      },
+      "expectedMatch": false,
+      "qualified": false,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-selective-revert-too-narrow",
+      "id": "staging-plan-quota-preserved",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 9,
+        "changes": [
+          {
+            "id": "quota-item",
+            "component": "component",
+            "units": 4,
+            "depends_on": []
+          }
+        ],
+        "applied": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "budget-exceeded",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "error",
+        "error": "budget-exceeded",
+        "actions": [],
+        "units": 0
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "recorded-selective-revert-too-narrow",
+      "id": "staging-rollback-retention-preserved",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "rollback-item",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "rollback-item"
+        ],
+        "retain": [
+          "rollback-item"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "selective-revert-positive",
+      "id": "restored-production-plan",
+      "input": {
+        "environment": "production",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "rollback-item",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": []
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "rollback-item"
+        ],
+        "units": 1
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "rollback-item"
+        ],
+        "units": 1
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "selective-revert-positive",
+      "id": "restored-production-rollback",
+      "input": {
+        "environment": "production",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "rollback-item",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "rollback-item"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "rollback-item"
+        ],
+        "units": 1
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "rollback-item"
+        ],
+        "units": 1
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "selective-revert-positive",
+      "id": "staging-plan-quota-preserved",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 9,
+        "changes": [
+          {
+            "id": "quota-item",
+            "component": "component",
+            "units": 4,
+            "depends_on": []
+          }
+        ],
+        "applied": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "budget-exceeded",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "error",
+        "error": "budget-exceeded",
+        "actions": [],
+        "units": 0
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "short-expanded",
+      "classification": "selective-revert-positive",
+      "id": "staging-rollback-retention-preserved",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "rollback-item",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "rollback-item"
+        ],
+        "retain": [
+          "rollback-item"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "h2-closed-supported-control",
+      "id": "closed-field-rejected-again",
+      "input": {
+        "operation": "apply",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "events": [
+          {
+            "event_id": "rehearsal-transfer",
+            "kind": "transfer",
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "if_revision": 1
+          }
+        ],
+        "closed": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "invalid-request",
+        "eventIndex": null,
+        "active": [],
+        "results": []
+      },
+      "actual": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "revision": 2
+          }
+        ],
+        "results": [
+          {
+            "event_id": "rehearsal-transfer",
+            "outcome": "applied",
+            "fromRevision": 1,
+            "toRevision": 2
+          }
+        ]
+      },
+      "expectedMatch": false,
+      "qualified": false,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "h2-closed-supported-control",
+      "id": "transfer-still-supported",
+      "input": {
+        "operation": "apply",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "events": [
+          {
+            "event_id": "rehearsal-transfer",
+            "kind": "transfer",
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "if_revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "revision": 2
+          }
+        ],
+        "results": [
+          {
+            "event_id": "rehearsal-transfer",
+            "outcome": "applied",
+            "fromRevision": 1,
+            "toRevision": 2
+          }
+        ]
+      },
+      "actual": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "revision": 2
+          }
+        ],
+        "results": [
+          {
+            "event_id": "rehearsal-transfer",
+            "outcome": "applied",
+            "fromRevision": 1,
+            "toRevision": 2
+          }
+        ]
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "h2-closed-supported-control",
+      "id": "inspect-preserved",
+      "input": {
+        "operation": "inspect",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "results": []
+      },
+      "actual": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "results": []
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "whole-h1-revert-removes-transfer",
+      "id": "closed-field-rejected-again",
+      "input": {
+        "operation": "apply",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "events": [
+          {
+            "event_id": "rehearsal-transfer",
+            "kind": "transfer",
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "if_revision": 1
+          }
+        ],
+        "closed": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "invalid-request",
+        "eventIndex": null,
+        "active": [],
+        "results": []
+      },
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "eventIndex": null,
+        "active": [],
+        "results": []
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "whole-h1-revert-removes-transfer",
+      "id": "transfer-still-supported",
+      "input": {
+        "operation": "apply",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "events": [
+          {
+            "event_id": "rehearsal-transfer",
+            "kind": "transfer",
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "if_revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "revision": 2
+          }
+        ],
+        "results": [
+          {
+            "event_id": "rehearsal-transfer",
+            "outcome": "applied",
+            "fromRevision": 1,
+            "toRevision": 2
+          }
+        ]
+      },
+      "actual": {
+        "status": "error",
+        "error": "invalid-event",
+        "eventIndex": 0,
+        "active": [],
+        "results": []
+      },
+      "expectedMatch": false,
+      "qualified": false,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "whole-h1-revert-removes-transfer",
+      "id": "inspect-preserved",
+      "input": {
+        "operation": "inspect",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "results": []
+      },
+      "actual": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "results": []
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "h2-selective-closed-revert-positive",
+      "id": "closed-field-rejected-again",
+      "input": {
+        "operation": "apply",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "events": [
+          {
+            "event_id": "rehearsal-transfer",
+            "kind": "transfer",
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "if_revision": 1
+          }
+        ],
+        "closed": []
+      },
+      "expected": {
+        "status": "error",
+        "error": "invalid-request",
+        "eventIndex": null,
+        "active": [],
+        "results": []
+      },
+      "actual": {
+        "status": "error",
+        "error": "invalid-request",
+        "eventIndex": null,
+        "active": [],
+        "results": []
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "h2-selective-closed-revert-positive",
+      "id": "transfer-still-supported",
+      "input": {
+        "operation": "apply",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "events": [
+          {
+            "event_id": "rehearsal-transfer",
+            "kind": "transfer",
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "if_revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "revision": 2
+          }
+        ],
+        "results": [
+          {
+            "event_id": "rehearsal-transfer",
+            "outcome": "applied",
+            "fromRevision": 1,
+            "toRevision": 2
+          }
+        ]
+      },
+      "actual": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "east",
+            "owner": "dispatch",
+            "start": 3,
+            "end": 5,
+            "revision": 2
+          }
+        ],
+        "results": [
+          {
+            "event_id": "rehearsal-transfer",
+            "outcome": "applied",
+            "fromRevision": 1,
+            "toRevision": 2
+          }
+        ]
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    },
+    {
+      "lane": "reservation-ab",
+      "classification": "h2-selective-closed-revert-positive",
+      "id": "inspect-preserved",
+      "input": {
+        "operation": "inspect",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "results": []
+      },
+      "actual": {
+        "status": "ok",
+        "active": [
+          {
+            "id": "owner-rehearsal",
+            "resource": "west",
+            "owner": "ops",
+            "start": 0,
+            "end": 2,
+            "revision": 1
+          }
+        ],
+        "results": []
+      },
+      "expectedMatch": true,
+      "qualified": true,
+      "exitCode": 0
+    }
+  ]
+}

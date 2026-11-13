@@ -1,6 +1,8 @@
 import { goalSnapshot } from "./goals.mjs";
 import { inspectArchitectureImports } from "./code-review.mjs";
 import { architectureResponsibilitiesCurrent, responsibilityClause } from "./architecture-responsibilities.mjs";
+import { prepareRollbackRehearsal, rollbackRehearsalCurrent } from "./architecture-rollback.mjs";
+import { requireCodeRegressionCurrent } from "./code-intake.mjs";
 import { digest, includes, keyOf, readBytes, replaceWithHistory, text } from "./policy.mjs";
 import { architectureDocument, architectureProseLines, generatedArchitectureSection } from "./project-hierarchy.mjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
@@ -346,7 +348,7 @@ export function inspectArchitectureResponsibilitiesSection(frame, spec, active, 
   const modes = { business: "业务判定", fallback: "入口兜底", forwarding: "原结果透传" };
   const expected = ["由宿主按当前签名源码和实际运行生成。其他章节如引用这些职责，请使用编号并保留实际归属。", "",
     ...contract.map(({ id, mode, clause, decision, planned }) =>
-      "- `" + id + "` · " + modes[mode] + " · 条款 " + clause.file + ":" + clause.start + "–" + clause.end +
+      "- " + (spec.architecture.proseReview ? '<a id="bl-fact-' + id + '"></a>' : "") + "`" + id + "` · " + modes[mode] + " · 条款 " + clause.file + ":" + clause.start + "–" + clause.end +
       (decision ? " · 已验证：" + decision.file + ":" + decision.line + "（" + decision.symbol + "）" :
         " · 计划：" + planned.file + "；等待当前签名稿与实际运行")),
     "", "\x60\x60\x60text", ...contract.map(fmt), "\x60\x60\x60"].join("\n");
@@ -425,7 +427,7 @@ export function architectureClaimIssues(conflicts) {
   });
 }
 /** A plan is published by the coordinator under the same lock as dispatch. */
-export function registerEngineeringArchitecture(frame, unit, spec, tag) {
+export function registerEngineeringArchitecture(frame, unit, spec, tag, rollbackProof) {
   const active = frame.state.units[unit];
   if (!spec.architecture || frame.role !== "coordinator" || !includes(frame.writes, spec.architecture.file) ||
     active && active.owner !== frame.agent.id) throw new Error("只有获授权的本单元总控能登记架构稿");
@@ -463,12 +465,31 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag) {
       if (!before || digest(before) !== plan.sha256) throw new Error("宿主生成架构章节时正文已变化，请重新登记");
       return updated;
     }, "宿主按当前证据生成静态导入或关键职责", tag, frame.state.markers);
+    frame.changed = true;
     plan = architectureDocument(frame, spec.architecture, diagnostics);
   }
+  const qualification = active?.codeIntake?.qualification;
+  if (spec.architecture.rollback && qualification && !pendingCodeRepair) {
+    try {
+      const signed = requireCodeRegressionCurrent(frame, unit, active, spec, goal);
+      const current = { ...qualification, receiptSha256: signed.receiptSha256 };
+      const baseline = active.codeIntake.regression.artifacts;
+      if (!rollbackProof) {
+        return { unit, phase: active.phase, rehearsal: prepareRollbackRehearsal(frame, spec, current, plan, baseline, active.rollbackProposal) };
+      }
+      if (!rollbackRehearsalCurrent(frame, spec, current, plan, rollbackProof, baseline, active.rollbackProposal, true)) {
+        return { unit, phase: active.phase, status: "superseded", next: { action: "architecture", unit } };
+      }
+    } catch (error) {
+      return { unit, phase: active.phase, status: "rollback-plan-required", reason: error.message, next: { action: "architecture", unit } };
+    }
+  }
   const snapshot = { ...plan, goalSha256: goal.sha256, unit, owner: frame.agent.id };
+  if (rollbackProof && qualification && !pendingCodeRepair) snapshot.rollbackRehearsal = rollbackProof;
   frame.state.engineeringArchitecture = { ...frame.state.engineeringArchitecture, [keyOf(plan.file)]: snapshot };
   if (active) {
     active.engineeringArchitecture = snapshot;
+    if (rollbackProof) delete active.rollbackFailure;
     if (active.phase === "architecture-sync") {
       active.phase = active.architectureSyncResume;
       delete active.architectureSyncResume;
@@ -499,6 +520,12 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
     // stored examples. The validated data must still be that revision's data.
     if (plan.sha256 !== snapshot.sha256 || JSON.stringify(plan.examples) !== JSON.stringify(snapshot.examples)) return false;
     if (!checkImports) return true;
+    if (spec.architecture.rollback && active?.codeIntake?.qualification) {
+      const signed = requireCodeRegressionCurrent(frame, snapshot.unit, active, spec, goalSnapshot(frame));
+      const current = { ...active.codeIntake.qualification, receiptSha256: signed.receiptSha256 };
+      if (!rollbackRehearsalCurrent(frame, spec, current, plan,
+        snapshot.rollbackRehearsal, active.codeIntake.regression.artifacts, active.rollbackProposal)) return false;
+    }
     if (spec.architecture.responsibilities && !inspectArchitectureResponsibilitiesSection(frame, spec, active).match) return false;
     if (!spec.architecture.importsHeading) return true;
     const imports = inspectArchitectureImports(frame, spec, active);
@@ -524,12 +551,28 @@ export function engineeringArchitectureStatus(frame, unit) {
   const active = frame.state.units[unit];
   const { file, headings, examplesHeading, responsibilitiesHeading } = spec.architecture;
   const contract = { file, headings, ...(examplesHeading ? { examplesHeading } : {}),
-    ...(responsibilitiesHeading ? { responsibilitiesHeading, generated: "关键职责由宿主生成，请保留该章节及原文。其他章节用职责编号引用，说明计划和验证方式；不要另写一份当前判定位置。", responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id) } : {}) };
+    ...(responsibilitiesHeading ? { responsibilitiesHeading, generated: "关键职责由宿主生成，请保留该章节及原文。其他章节用职责编号引用，说明计划和验证方式。" +
+      (spec.architecture.proseReview ? "引用用 [显示文字](#bl-fact-职责编号)。" : "不要另写一份当前判定位置。"),
+      responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id) } : {}) };
+  if (spec.architecture.rollback) {
+    const { heading, files, restore } = spec.architecture.rollback;
+    const proposal = active?.rollbackProposal;
+    contract.rollback = { heading, files, ...(restore ? { restore: restore.map(({ file }) => file) } : {}),
+      rule: "派单前说明回退意图。候选签名后，回退章节放一个 json building-loop-rollback 围栏。宿主在隔离副本上执行围栏中的回退，再运行维护者登记的回退后检查。",
+      ...(proposal?.binding.policySha256 === frame.policy.hash && proposal?.binding.goalSha256 === goalSnapshot(frame).sha256 &&
+        proposal?.binding.originalArtifactsSha256 === digest(JSON.stringify(active.codeIntake?.qualification?.artifacts ?? [])) ?
+        { proposal: { id: proposal.id, files: proposal.files }, example: { proposal: proposal.id } } :
+        { example: { edits: [{ file: files[0], replacements: [{ oldText: "当前版唯一原文", newText: "回退后原文" }] }] } }) };
+  }
   if (active?.phase === "architecture-repair") {
     return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };
   }
   if (active?.phase === "architecture-sync") {
     const sync = { ...contract, status: "sync", next: { action: "architecture", unit } };
+    if (active.rollbackFailure) {
+      sync.rollback.failed = active.rollbackFailure.failures.map(({ id, outcome }) => ({ id, outcome }));
+      sync.next = { action: "advance", unit };
+    }
     try {
       const { conflicts } = inspectEngineeringArchitectureClaims(frame, spec, active);
       const responsibilities = inspectArchitectureResponsibilitiesSection(frame, spec, active);

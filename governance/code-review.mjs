@@ -1,4 +1,5 @@
 import { requireCodeRegressionCurrent } from "./code-intake.mjs";
+import { architectureProseInventory, checkArchitectureProseReceipt, PROSE_REVIEW_STATUSES } from "./architecture-prose-coverage.mjs";
 import { hasConditionalContext, isGroundedRuntimeProof } from "./code-review-probes.mjs";
 import { expectedClaims } from "./evidence.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
@@ -20,7 +21,7 @@ const RECORD_LIMIT = 32;
 const COMPACT_REF_LIMIT = 6;
 const COMPACT_FIELDS = ["id", "basis", "status", "refs", "obligation"];
 const KEYS = ["files", "constraints", "findings", "observations", "architecture"];
-const RECORD_KEYS = [...KEYS, "decisions", "removeFindings", "removeObservations", "findingsDone"];
+const RECORD_KEYS = [...KEYS, "decisions", "removeFindings", "removeObservations", "findingsDone", "proseCoverage", "proseFactReview"];
 const FINDING_KINDS = ["behavior", "maintenance", "annotation", "architecture"];
 const VIOLATION_TYPES = ["requirement", "regression", "annotation", "architecture", "maintainability", "runtime", "syntax"];
 const TYPES_BY_KIND = {
@@ -65,6 +66,17 @@ const compactDecisions = rows(RECORD_LIMIT, {
   status: { enum: ["pass", "revise", "verified", "missing", "not-needed"] },
   refs: { type: "array", maxItems: COMPACT_REF_LIMIT, items: compactRef }, obligation: { enum: COMMENT_OBLIGATIONS },
 }, ["id", "basis", "status"]);
+const proseId = { type: "string", pattern: "^p-[0-9a-f]{18}-[1-9][0-9]*$" };
+const proseFactId = { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$" };
+const proseCoverage = rows(RECORD_LIMIT, {
+  id: proseId, status: { enum: PROSE_REVIEW_STATUSES }, basis: brief,
+  facts: { type: "array", maxItems: 8, items: proseFactId },
+  line: locator.properties.start, refs: { type: "array", maxItems: COMPACT_REF_LIMIT, items: compactRef },
+}, ["id", "status"]);
+const proseFactReview = rows(RECORD_LIMIT, {
+  section: { type: "string", pattern: "^s[1-9][0-9]*$" }, id: proseFactId,
+  blocks: { type: "array", maxItems: 128, items: proseId },
+});
 const reasonEvidence = { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation };
 export const codeReviewProbeRequirement = { ...locator, properties: { ...locator.properties,
   quote: { ...brief, description: "支持预期的当前目标原文，逐字引用。" },
@@ -90,6 +102,8 @@ export const codeReviewSchema = {
       observation: brief, suggestion: brief, evidence: reasonEvidence,
     }, ["file", "start", "end", "kind", "observation", "evidence"]),
     architecture,
+    proseCoverage,
+    proseFactReview,
     removeFindings: { type: "array", maxItems: MAX_FINDINGS, items: findingId },
     removeObservations: { type: "array", maxItems: MAX_FINDINGS, items: findingId },
     findingsDone: { type: "boolean", description: "已记录所有发现，或核验后无发现时填 true。单独提交即可。" },
@@ -209,6 +223,18 @@ export function codeReviewBinding(frame, active, signed) {
   return proofBinding(signed, active.goal, reviewArchitecture(frame, active, true));
 }
 
+function proseReviewInventory(frame, spec, architecture, signed) {
+  if (!spec.architecture?.proseReview) return;
+  if (!architecture || !signed.architectureResponsibilities?.rows?.length) {
+    throw new Error("逐段架构核验须绑定当前架构稿和已验证关键职责");
+  }
+  const bytes = readBytes(frame.root, architecture.file);
+  if (!bytes || digest(bytes) !== architecture.sha256) throw new Error("逐段核验须读取当前已登记的架构稿");
+  return architectureProseInventory({ source: bytes.toString("utf8"), sections: architecture.sections,
+    facts: signed.architectureResponsibilities.rows,
+    protectedHeadings: [spec.architecture.responsibilitiesHeading, spec.architecture.importsHeading].filter(Boolean) });
+}
+
 function plan(frame, active, spec, regression) {
   const before = new Map(active.codeIntake.regression.artifacts.map(row => [keyOf(row.path), row.sha256]));
   const baselines = new Map((active.codeReviewBaseline ?? []).map(row => [keyOf(row.path), row.lines]));
@@ -227,13 +253,14 @@ function plan(frame, active, spec, regression) {
       scope: saved ? "changed-lines" : baselineSha256 === null ? "new-file" : "whole-file-no-baseline-lines" });
   }
   const architecture = reviewArchitecture(frame, active, true);
+  const proseReview = proseReviewInventory(frame, spec, architecture, regression);
   if (signedLocalImportBoundary(frame, spec, active.codeIntake.qualification)) {
     throw new Error("签名源码违反维护者登记的静态导入边界，须由执行方修复");
   }
   if (spec.architecture?.importsHeading && !inspectArchitectureImports(frame, spec, active).match) {
     throw new Error("架构稿中的静态依赖章节与当前签名源码不一致，须由总控同步");
   }
-  return { binding: proofBinding(regression, active.goal, architecture), changes, artifacts, architecture,
+  return { binding: proofBinding(regression, active.goal, architecture), changes, artifacts, architecture, proseReview,
     ...(regression.architectureResponsibilities ? { responsibilities: regression.architectureResponsibilities.rows } : {}),
     requiredCases: active.codeIntake.qualification.requiredCases, signedCases: active.codeIntake.qualification.cases };
 }
@@ -339,6 +366,7 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
   const progress = reviewProgress(frame, active, current, reviewDraft(frame, active, binding));
   const refs = reviewRefs(frame, active, current);
   const pending = pendingReviewRows(frame, current, progress, page, refs);
+  const proseReview = proseSummary(current, progress);
   // Start with the registered examples so the model need not copy each input
   // into an ad hoc runtime request before discovering the required checks.
   const architectureProbe = progress.architectureExamples?.missing.length
@@ -348,13 +376,18 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     requiredCases, signed, goalFiles: active.goal.files.map(({ file }) => file),
     ...(architecture ? { architecture, imports: pythonImportEvidence(frame, current.artifacts) } : {}),
     ...(signed.architectureResponsibilities ? { architectureResponsibilities: signed.architectureResponsibilities.rows } : {}),
-    progress, pending, refs,
+    ...(proseReview ? { proseReview } : {}),
+    progress: visibleReviewProgress(progress), pending, refs,
     ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {
       decisions: "[{id,status,basis,refs?,obligation?}]；id 用 pending 所列编号；只填未核或需更正的项。已读证据写 S1:12、G1:4-6，也可用实际 {file,start,end}。",
       fileDecision: "简表只交 id、status、basis、最多六个 refs（missing 时另填 obligation）。verified 时选实际注释行，不要复制全部变更范围；有唯一 annotationRef 时可省略 refs。源码注释不准确时用 annotation 发现。",
       testDecision: "status=pass|revise。refs 填目标原文及实际源码，各一个。revise 须同 caseId 和条款的已证实 findings。",
       sectionDecision: "status=pass|revise。refs 填支持判断的已读目标或实际源码。宿主携带章节位置并生成架构总判定。revise 应另登记该节真实发现。",
+      ...(proseReview ? {
+        proseCoverage: "按 pendingBlocks 逐项交 {id,status}。plan 只用于未来计划，no-current-claim 用于无现状断言。核对实际断言用 consistent 或 contradiction，写 basis 及适用的 facts:[职责编号]；没有登记职责时引用本段实际源码 refs。contradiction 或 insufficient 必填本段真实 line。能证明的矛盾必须登记 contradiction。",
+        proseFactReview: "逐节对照生成的每项职责，交 {section,id,blocks:[相关正文编号]}。若该节无相关陈述，确认后填 []。先登记正文判断，同批可提交。",
+      } : {}),
       example: "{action:'record',decisions:[{id:'file:1',status:'verified',basis:'这行注释解释为何限制批量大小',refs:['S1:12']},{id:'test:1',status:'pass',basis:'这里比较实际限制条件与原需求',refs:['G1:4','S1:13']}] }；编号和行号须替换成实际 pending 与 refs。",
       commentQuote: COMMENT_QUOTE_RULE,
       findings: "仅需修复的问题 [{id,kind,file,start,end,observation,issue,fix,violation:{type,expected,actual,requirement?,reproduction?,obligation?},evidence:[{file,start,end,relation}]}]。架构稿错误用 kind=architecture、violation.type=architecture，源码注释错误才用 annotation。同一 id 修正；证据复查后确认无需修复时用 removeFindings 明确撤回。" + CODE_REVIEW_REJECTION_RULE,
@@ -363,7 +396,8 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     next: (architectureProbe ? "先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 一次，宿主运行当前角色未完成的已登记示例。不要把示例逐个复制到 runtime。" : "") +
       "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。" + CODE_REVIEW_REJECTION_RULE + CODE_REVIEW_PROBE_RULE +
       (architecture ? "完整读架构稿，对照实际目标和源码判断各节。静态导入仅能证明静态依赖。" : "") +
-      (signed.architectureResponsibilities ? "按编号逐条对照生成的关键职责与全稿。若实施、回退或验证章节把该触发归给其他模块，用该章节原位置和实际源码登记架构退回。计划、兜底和透传分别判断。" : "") +
+      (proseReview ? "逐段检查 proseReview.pendingBlocks 后再核 pendingFacts，单独处理同节的每个项目。用实际条款、触发和源码区分计划、业务判定、兜底和透传。"
+        : signed.architectureResponsibilities ? "按编号逐条对照生成的关键职责与全稿。若实施、回退或验证章节把该触发归给其他模块，用该章节原位置和实际源码登记架构退回。计划、兜底和透传分别判断。" : "") +
       (architecture?.examples ? "登记示例实际有差异时，按原示例位置记录架构退回并链接复现编号。" : "") +
       "每批最多 32 项。发现记齐后填 findingsDone:true，无发现也如此。progress.ready 后空参数 submit。",
     commentRule: CODE_COMMENT_RULE };
@@ -521,7 +555,7 @@ function decisionRows(current) {
   return [
     ...current.changes.map((value, i) => ({ id: "file:" + (i + 1), kind: "file", value })),
     ...current.requiredCases.map((value, i) => ({ id: "test:" + (i + 1), kind: "test", value })),
-    ...(current.architecture?.sections ?? []).map((value, i) => ({ id: "section:" + (i + 1), kind: "section", value })),
+    ...(current.proseReview ? [] : current.architecture?.sections ?? []).map((value, i) => ({ id: "section:" + (i + 1), kind: "section", value })),
   ];
 }
 
@@ -852,10 +886,11 @@ function checkedDecision(row, descriptor, refs, frame, current, readers) {
     status: row.status };
 }
 
-function compactArchitecture(frame, active, current, draft) {
-  if (!draft.compactArchitecture || !current.architecture) return draft.architecture;
+function compactArchitecture(frame, active, current, draft, proseReview) {
+  if ((!draft.compactArchitecture && !current.proseReview) || !current.architecture) return draft.architecture;
+  if (current.proseReview && !["pass", "revise"].includes(proseReview?.status)) return;
   const sections = draft.architectureSections ?? [];
-  if (!current.architecture.sections.every(section => sections.some(row => row.heading === section.heading))) return;
+  if (!current.proseReview && !current.architecture.sections.every(section => sections.some(row => row.heading === section.heading))) return;
   const bytes = readBytes(frame.root, current.architecture.file);
   if (!bytes || digest(bytes) !== current.architecture.sha256) return;
   const lines = lineList(bytes);
@@ -863,8 +898,10 @@ function compactArchitecture(frame, active, current, draft) {
   const seen = active.seen?.[keyOf(current.architecture.file)];
   if (seen?.hash !== current.architecture.sha256 || !seen.ranges.some(([start, last]) => start === 1 && last >= end)) return;
   const source = { file: current.architecture.file, start: 1, end, sha256: seen.hash };
-  const status = sections.some(row => row.status === "revise") || draft.findings.some(row => row.owner === "coordinator") ? "revise" : "pass";
-  return { source, status, basis: "依据各节核验、已读完整架构稿和退回记录生成" };
+  const status = proseReview?.status === "revise" || sections.some(row => row.status === "revise") ||
+    draft.findings.some(row => row.owner === "coordinator") ? "revise" : "pass";
+  return { source, status, basis: current.proseReview ? "依据逐段核验、已读完整架构稿和退回记录生成" :
+    "依据各节核验、已读完整架构稿和退回记录生成" };
 }
 
 /** Save only the actor's own validated rows for this activation and exact proof
@@ -872,8 +909,115 @@ function compactArchitecture(frame, active, current, draft) {
 function reviewDraft(frame, active, binding) {
   const identity = { actor: frame.agent.id, role: frame.role, serial: active.serial, binding };
   const saved = active.codeReviewDraft;
-  if (saved && Object.keys(identity).every(key => saved[key] === identity[key])) return { observations: [], ...saved };
-  return { ...identity, files: [], constraints: [], findings: [], observations: [], findingsDone: false, pendingCorrections: [] };
+  if (saved && Object.keys(identity).every(key => saved[key] === identity[key])) return { observations: [], proseCoverage: [], proseFactReview: [], ...saved };
+  return { ...identity, files: [], constraints: [], findings: [], observations: [], findingsDone: false, pendingCorrections: [],
+    proseCoverage: [], proseFactReview: [] };
+}
+
+function proseSnapshot(current, draft) {
+  return current.proseReview && { binding: current.proseReview.binding, blocks: draft.proseCoverage, facts: draft.proseFactReview };
+}
+
+function proseSummary(current, progress) {
+  if (!current.proseReview) return;
+  const coverage = progress.proseReview;
+  const pending = new Set([...coverage.missing, ...coverage.findings.filter(row => row.status === "insufficient").map(row => row.id)]);
+  for (const { field, id } of progress.pendingCorrections) if (field === "proseCoverage") pending.add(id);
+  const unresolved = current.proseReview.blocks.filter(block => pending.has(block.id));
+  const sections = new Map(current.proseReview.sections.map(section => [section.id, section]));
+  const factPins = new Map(current.proseReview.facts.map(fact => [fact.id, fact]));
+  const factPending = new Set(coverage.missingFacts.map(({ section, id }) => section + ":" + id));
+  for (const { field, id } of progress.pendingCorrections) if (field === "proseFactReview") factPending.add(id);
+  const factRows = [...factPending].slice(0, RECORD_LIMIT).map(key => {
+    const [section, id] = key.split(":");
+    return { section, id };
+  }).map(row => ({
+    ...row, heading: sections.get(row.section)?.heading, reviewedBlocks: coverage.references[row.section]?.[row.id] ?? [],
+  }));
+  const shownFacts = [...new Set(factRows.map(row => row.id))].map(id => {
+    const { clause, decision } = factPins.get(id) ?? {};
+    return { id, anchor: "#bl-fact-" + id,
+      ...(clause ? { clause: { file: clause.file, start: clause.start, end: clause.end } } : {}),
+      ...(decision ? { decision: { file: decision.file, line: decision.line, mode: decision.mode } } : {}) };
+  });
+  return { file: current.architecture.file, status: coverage.status, pendingBlockCount: unresolved.length, pendingFactCount: factPending.size,
+    pendingBlocks: unresolved.slice(0, RECORD_LIMIT).map(({ id, section, heading, kind, start, end, refs, unknownRefs }) => ({
+      id, section, heading, kind, start, end, ...(refs.length ? { factLinks: refs } : {}), ...(unknownRefs ? { unknownFactLinks: unknownRefs } : {}),
+    })),
+    pendingFacts: factRows, factLocations: shownFacts };
+}
+
+function visibleReviewProgress(progress) {
+  const { proseReview, ...rest } = progress;
+  if (!proseReview) return progress;
+  return { ...rest, proseReview: { status: proseReview.status, missingBlocks: proseReview.missing.length,
+    missingFacts: proseReview.missingFacts.length, findings: proseReview.findings.slice(0, RECORD_LIMIT) } };
+}
+
+function exactProseSource(current, readers, start, end = start) {
+  return readers.read({ file: current.architecture.file, start, end }, readers.architecturePaths);
+}
+
+function checkedProseCoverage(row, block, current, readers, aliases) {
+  if (!record(row, ["id", "status", "basis", "facts", "line", "refs"]) || !block || !PROSE_REVIEW_STATUSES.includes(row.status)) {
+    throw new Error("逐段核验使用 proseReview 中的编号和判断");
+  }
+  const facts = row.facts ?? [];
+  const refs = row.refs ?? [];
+  if (!Array.isArray(facts) || facts.length > 8 || new Set(facts).size !== facts.length ||
+    !Array.isArray(refs) || refs.length > COMPACT_REF_LIMIT || block.unknownRefs || block.refs.some(id => !facts.includes(id))) {
+    throw new Error("逐段核验须保留此段链接的真实职责编号，引用最多六处");
+  }
+  const source = exactProseSource(current, readers, block.start, block.end);
+  const proseStatus = row.status;
+  const simple = proseStatus === "plan" || proseStatus === "no-current-claim";
+  if (simple && (facts.length || refs.length || row.line !== undefined)) {
+    throw new Error("计划或无现状陈述仅登记状态；涉及职责的断言须另按事实判断");
+  }
+  if (simple) return { id: block.id, sha256: block.sha256, status: proseStatus, facts, source };
+  const basis = rationale(row.basis, "逐段核验 " + row.id + " 的 basis");
+  const needsLine = proseStatus === "contradiction" || proseStatus === "insufficient";
+  if (needsLine && !Number.isSafeInteger(row.line) || row.line !== undefined &&
+    (!Number.isSafeInteger(row.line) || row.line < block.start || row.line > block.end)) {
+    throw new Error("请定位到此段中有待核对的实际行，不能用同一章节的其他条目");
+  }
+  const proof = facts.map(id => {
+    const fact = current.responsibilities?.find(item => item.id === id);
+    if (!fact) throw new Error("逐段核验只能引用当前签名的关键职责编号");
+    const { clause, actual } = fact;
+    const target = readers.read(clause, readers.goals);
+    const decision = readers.read({ file: actual.file, start: actual.line, end: actual.line }, readers.sources);
+    return { id, clause: target, decision };
+  });
+  const evidence = refs.map(ref => readers.read(chosenRef(ref, aliases), [...readers.goals, ...readers.sources]));
+  if (!facts.length && proseStatus !== "insufficient" &&
+    !evidence.some(item => includes(readers.sources, item.file))) {
+    throw new Error("没有职责编号的现状判断须引用实际已读源码，并说明与本段的关系");
+  }
+  return { id: block.id, sha256: block.sha256, status: proseStatus, facts, source, basis,
+    ...(row.line === undefined ? {} : { line: row.line }), ...(proof.length ? { proof } : {}), ...(evidence.length ? { evidence } : {}) };
+}
+
+function checkedProseFactReview(row, inventory) {
+  if (!record(row, ["section", "id", "blocks"]) || typeof row.section !== "string" || typeof row.id !== "string" ||
+    !inventory.facts.some(fact => fact.id === row.id) || !Array.isArray(row.blocks) ||
+    new Set(row.blocks).size !== row.blocks.length) throw new Error("逐节核对请使用本轮章节和职责编号");
+  const section = inventory.sections.find(item => item.id === row.section);
+  if (!section || row.blocks.some(id => !section.blocks.includes(id))) throw new Error("职责关联位置必须属于当前节");
+  return { section: row.section, id: row.id, blocks: row.blocks };
+}
+
+function proseSectionSummaries(current, draft, progress) {
+  if (!current.proseReview) return draft.architectureSections ?? [];
+  if (!["pass", "revise"].includes(progress.proseReview.status)) return [];
+  return current.architecture.sections.map(({ heading, start, end }) => {
+    const blocks = draft.proseCoverage.filter(({ source }) => source.start >= start && source.end <= end);
+    const evidence = blocks.flatMap(row => [...(row.evidence ?? []), ...(row.proof ?? []).map(item => item.decision)]);
+    return { heading, source: { file: current.architecture.file, start, end, sha256: current.architecture.sha256 },
+      status: blocks.some(row => row.status === "contradiction") ? "revise" : "pass",
+      basis: "逐段判断已登记，按正文位置核对对应职责与证据", evidence: evidence.slice(0, COMPACT_REF_LIMIT),
+    };
+  });
 }
 
 function architectureProbeProgress(frame, active, current, draft, architectureVerdict) {
@@ -923,19 +1067,21 @@ function reviewProgress(frame, active, current, draft) {
     finding.kind === "behavior" && finding.signedCase?.id === row.caseId && sameClause(row.requirement, finding.violation?.requirement) &&
     !pendingCorrections.some(item => item.field === "findings" && item.id === finding.id))).map(row => row.caseId);
   for (const caseId of unsupportedCaseRevisions) requireCorrection("constraints", caseId);
+  const proseReview = current.proseReview && checkArchitectureProseReceipt(current.proseReview, proseSnapshot(current, draft));
   const sections = draft.architectureSections ?? [];
-  const missingArchitectureSections = (current.architecture?.sections ?? []).filter(section =>
+  const missingArchitectureSections = (current.proseReview ? [] : current.architecture?.sections ?? []).filter(section =>
     !sections.some(row => row.heading === section.heading)).map(row => row.heading);
   const sectionFindingsMissing = sections.filter(({ status, source }) => status === "revise" && !draft.findings.some(finding =>
     finding.owner === "coordinator" && finding.sha256 === source.sha256 && finding.file === source.file &&
     finding.start <= source.end && finding.end >= source.start)).map(row => row.heading);
   const unfinishedSections = [...new Set([...missingArchitectureSections, ...sectionFindingsMissing])];
   const candidatePaths = current.artifacts.filter(row => sourceArtifact(row.path)).map(row => row.path);
-  const architectureCodeEvidence = !current.architecture || !current.architecture.sections?.length ||
+  const architectureCodeEvidence = !!current.proseReview || !current.architecture || !current.architecture.sections?.length ||
     sections.some(row => row.evidence.some(item => item.relation !== "contradicts" && includes(candidatePaths, item.file)));
-  const architectureVerdict = compactArchitecture(frame, active, current, draft);
+  const architectureVerdict = compactArchitecture(frame, active, current, draft, proseReview);
+  const hasArchitectureFinding = proseReview?.status === "revise" || draft.findings.some(row => row.owner === "coordinator");
   const architectureIssue = architectureVerdict && draft.findingsDone &&
-    ((architectureVerdict.status === "revise") !== draft.findings.some(row => row.owner === "coordinator"));
+    ((architectureVerdict.status === "revise") !== hasArchitectureFinding);
   const architecture = current.architecture ? architectureVerdict ? architectureIssue ? "inconsistent" : "recorded" : "missing" : "not-required";
   const examples = architectureProbeProgress(frame, active, current, draft, architectureVerdict);
   const responsibilityEvidenceMissing = (current.responsibilities ?? []).flatMap(({ id, clause, actual }) => {
@@ -948,6 +1094,7 @@ function reviewProgress(frame, active, current, draft) {
     return missing.length ? [{ id, missing }] : [];
   });
   return { missingFiles, missingCases, findingIds, observationIds, findingsDone: draft.findingsDone, architecture, pendingCorrections,
+    ...(proseReview ? { proseReview } : {}),
     ...(responsibilityEvidenceMissing.length ? { responsibilityEvidenceMissing } : {}),
     ...(unsupportedCaseRevisions.length ? { unsupportedCaseRevisions } : {}),
     ...(current.architecture ? { missingArchitectureSections: unfinishedSections, architectureCodeEvidence,
@@ -955,6 +1102,7 @@ function reviewProgress(frame, active, current, draft) {
     ...(examples ? { architectureExamples: examples } : {}),
     ready: !missingFiles.length && !missingCases.length && !pendingCorrections.length && !responsibilityEvidenceMissing.length && draft.findingsDone &&
       !unfinishedSections.length && architectureCodeEvidence && !["missing", "inconsistent"].includes(architecture) &&
+      (!proseReview || proseReview.status !== "pending") &&
       (!examples || !examples.missing.length && !examples.unaddressed.length && !examples.passWithMismatch) };
 }
 
@@ -1115,7 +1263,32 @@ function applyReviewRows(frame, active, current, input, signed, resolveReproduct
       forgetCorrection(field, id);
     }
   }
-  if (input.architecture !== undefined) {
+  const aliases = current.proseReview && reviewRefs(frame, active, current);
+  for (const [field, keyOfRow, check] of [
+    ["proseCoverage", row => row?.id, row => checkedProseCoverage(row,
+      current.proseReview.blocks.find(item => item.id === row?.id), current, readers, aliases)],
+    ["proseFactReview", row => typeof row?.section === "string" && typeof row.id === "string" ? row.section + ":" + row.id : undefined,
+      row => checkedProseFactReview(row, current.proseReview)],
+  ]) {
+    if (input[field] === undefined) continue;
+    if (!current.proseReview || !Array.isArray(input[field]) || input[field].length > RECORD_LIMIT) {
+      errors.push({ field, reason: "仅逐段核验单元使用此数组，每批最多 32 项" });
+      continue;
+    }
+    const batch = new Set();
+    for (const row of input[field]) {
+      const key = keyOfRow(row);
+      const match = item => keyOfRow(item) === key;
+      add(field, typeof key === "string" ? key : undefined, () => {
+        if (typeof key !== "string" || batch.has(key)) throw new Error("每个逐段记录须使用真实且唯一的编号");
+        batch.add(key);
+        put(field, match, check(row));
+      }, draft[field].some(match));
+    }
+  }
+  if (input.architecture !== undefined && current.proseReview) {
+    errors.push({ field: "architecture", reason: "本单元按 proseCoverage 和 proseFactReview 逐段核验，整节结论由宿主生成" });
+  } else if (input.architecture !== undefined) {
     const inputArchitecture = input.architecture;
     if (!record(inputArchitecture, ["status", "basis", "source", "sections"])) {
       errors.push({ field: "architecture", reason: "架构回执须使用已登记的字段" });
@@ -1156,7 +1329,7 @@ function applyReviewRows(frame, active, current, input, signed, resolveReproduct
   }
   const progress = reviewProgress(frame, active, current, draft);
   if (progress.architecture === "inconsistent") errors.push({ field: "architecture", id: current.architecture.file,
-    reason: compactArchitecture(frame, active, current, draft)?.status === "revise" ?
+      reason: compactArchitecture(frame, active, current, draft, progress.proseReview)?.status === "revise" ?
       "revise 须有定位到实际架构稿的发现" : "pass 不能同时保留架构退回项" });
   if (progress.architectureExamples?.passWithMismatch) errors.push({ field: "architecture", id: current.architecture.file,
     reason: "已登记架构示例出现可复现差异，须核对并登记关联的架构退回项" });
@@ -1171,7 +1344,7 @@ export function recordCodeReview(frame, active, spec, input, signed, { resolveRe
   active.codeReviewDraft = draft;
   frame.changed = true;
   const refs = reviewRefs(frame, active, current);
-  return { progress, errors, next: reviewNext(frame, current, progress, refs) };
+  return { progress: visibleReviewProgress(progress), errors, next: reviewNext(frame, current, progress, refs) };
 }
 
 function reviewNext(frame, current, progress, refs) {
@@ -1180,16 +1353,19 @@ function reviewNext(frame, current, progress, refs) {
   if (progress.responsibilityEvidenceMissing?.length) return { tool: "building_loop_code_review", action: "prepare",
     responsibilityEvidenceMissing: progress.responsibilityEvidenceMissing };
   const rows = pendingReviewRows(frame, current, progress, current.changes, refs).slice(0, RECORD_LIMIT);
-  if (!rows.length && progress.architecture === "missing" && current.architecture) {
+  const proseReview = proseSummary(current, progress);
+  if (!rows.length && progress.architecture === "missing" && current.architecture && !proseReview?.pendingBlockCount && !proseReview?.pendingFactCount) {
     return { tool: "building_loop_code_review", action: "prepare", read: current.architecture.file };
   }
-  if (!rows.length && !progress.findingsDone && !progress.pendingCorrections.length) {
+  if (!rows.length && !progress.findingsDone && !progress.pendingCorrections.length &&
+    !proseReview?.pendingBlockCount && !proseReview?.pendingFactCount) {
     return { tool: "building_loop_code_review", action: "record", findingsDone: true };
   }
   const findingCorrections = progress.pendingCorrections.flatMap(({ field, id, correction }) =>
     field === "findings" && correction ? [{ id, ...correction }] : []);
   return { tool: "building_loop_code_review", action: "record",
     ...(rows.length ? { pending: rows } : {}),
+    ...(proseReview?.pendingBlockCount || proseReview?.pendingFactCount ? { proseReview } : {}),
     ...(findingCorrections.length ? { findingCorrections } : {}),
     ...(progress.findingsDone ? {} : { findingsDoneRequired: true }) };
 }
@@ -1217,21 +1393,23 @@ export function verifyCodeReview(frame, active, spec, signed) {
       progress.missingArchitectureSections?.length && "待记录架构章节 " + progress.missingArchitectureSections.join("、"),
       progress.architectureCodeEvidence === false && "架构核验缺少实际源码依据",
       progress.responsibilityEvidenceMissing?.length && "关键职责未读回 " + progress.responsibilityEvidenceMissing.map(row => row.id).join("、"),
+      progress.proseReview?.status === "pending" && "逐段架构核验仍有待核的正文或职责关联，请按 next.proseReview 处理",
       progress.architecture === "inconsistent" && "架构判断与发现不一致",
       progress.architectureExamples?.missing.length && "待复现架构示例 " + progress.architectureExamples.missing.join("、") +
         "，先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 批量核验",
       progress.architectureExamples?.unaddressed.length && "架构示例退回未绑定实际差异 " + progress.architectureExamples.unaddressed.join("、"),
       progress.architectureExamples?.passWithMismatch && "架构判断与实际复现不一致"].filter(Boolean);
     throw new CodeReviewIncomplete("代码核验尚不能提交：" + missing.join("；") + "。用 record 补齐这些项。",
-      progress, reviewNext(frame, current, progress, reviewRefs(frame, active, current)));
+      visibleReviewProgress(progress), reviewNext(frame, current, progress, reviewRefs(frame, active, current)));
   }
   const { files, constraints, findings, observations } = draft;
-  const architecture = compactArchitecture(frame, active, current, draft);
+  const architecture = compactArchitecture(frame, active, current, draft, progress.proseReview);
   const missing = files.some(row => (row.comments ?? [row.comment]).some(item => item.status === "missing"));
   const failing = constraints.some(row => row.status === "revise");
   const proof = { version: 1, actor: frame.agent.id, binding: current.binding, files, constraints, findings,
     ...(observations.length ? { observations } : {}),
-    ...(architecture ? { architecture: { ...architecture, sections: draft.architectureSections ?? [],
+    ...(architecture ? { architecture: { ...architecture, sections: proseSectionSummaries(current, draft, progress),
+      ...(current.proseReview ? { proseReview: { ...proseSnapshot(current, draft), findings: progress.proseReview.findings } } : {}),
       ...(progress.architectureExamples ? { examples: progress.architectureExamples.rows } : {}) } } : {}),
     decision: missing || failing || findings.length || architecture?.status === "revise" ? "reject" : "pass" };
   // The accepted receipt stores both independent records under the 256 KiB
@@ -1251,12 +1429,14 @@ export function currentCodeReview(frame, id, active, spec, receipt, independent 
     if (signedLocalImportBoundary(frame, spec, active.codeIntake.qualification)) return false;
     if (spec.architecture?.importsHeading && !inspectArchitectureImports(frame, spec, active).match) return false;
     const binding = proofBinding(signed, active.goal, architecture);
+    const proseReview = proseReviewInventory(frame, spec, architecture, signed);
     const matches = (proof, actor) => proof?.version === 1 && proof.actor === actor &&
       proof.binding === binding && proof.decision === "pass" &&
       (!architecture || proof.architecture?.status === "pass" && proof.architecture.source?.sha256 === architecture.sha256 &&
+        (!proseReview || checkArchitectureProseReceipt(proseReview, proof.architecture.proseReview).status === "pass") &&
         (architecture.sections ?? []).every(section => proof.architecture.sections?.some(row => row.heading === section.heading &&
           row.source?.sha256 === architecture.sha256 && row.source?.start === section.start && row.source?.end === section.end &&
-          row.evidence?.length)) && (architecture.examples?.cases ?? []).every(({ id }) =>
+          (proseReview || row.evidence?.length))) && (architecture.examples?.cases ?? []).every(({ id }) =>
           proof.architecture.examples?.some(row => row.id === id && row.outcome === "match" && typeof row.probeId === "string")));
     if (!receipt.reviewer || receipt.reviewer === active.executor || !matches(receipt.codeReview, receipt.reviewer)) return false;
     if (!independent) return true;

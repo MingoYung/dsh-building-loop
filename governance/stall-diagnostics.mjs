@@ -255,6 +255,7 @@ function behaviorProof({ expected, exampleId, comparison, result }) {
   const { actual } = comparison;
   return {
     kind: "runtime-mismatch", expectedExitCode: expected.exitCode, exitCode: actual.exitCode,
+    ...(safeId(exampleId) ? { exampleId } : {}),
     expectedSha256: digest(JSON.stringify(expected)), actualSha256: digest(JSON.stringify(actual)),
   };
 }

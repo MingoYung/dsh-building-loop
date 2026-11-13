@@ -2,6 +2,7 @@ import path from "node:path";
 import parser from "./vendor/markdown-parser.cjs";
 import { digest, equal, hierarchyBodyPath, includes, keyOf, readBytes, relativeName, replaceWithHistory } from "./policy.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
+import { parseArchitectureRollbackFence } from "./architecture-rollback.mjs";
 
 const { fromMarkdown, gfmFootnoteFromMarkdown, gfmFootnote } = parser;
 const options = { extensions: [gfmFootnote()], mdastExtensions: [gfmFootnoteFromMarkdown()] };
@@ -50,7 +51,7 @@ function localTarget(file, url) {
 
 function document(file, source) {
   const root = fromMarkdown(source, options);
-  const visibility = markdownStructure(source.replace(/^\uFEFF/u, "").split(/\r?\n/u)).visible;
+  const { visible: visibility, htmlHidden } = markdownStructure(source.replace(/^\uFEFF/u, "").split(/\r\n|\n|\r/u));
   const visible = node => visibility[node.position.start.line - 1]?.trim();
   const headings = root.children.filter(node => node.type === "heading" && visible(node)).map(node => ({
     title: headingText(node), depth: node.depth, start: node.position.start.offset, end: node.position.end.offset,
@@ -70,7 +71,7 @@ function document(file, source) {
     }
     if (node.children) pending.push(...node.children.slice().reverse());
   }
-  return { file, source, headings, links };
+  return { file, source, headings, links, htmlHidden };
 }
 
 function section(doc, title) {
@@ -162,7 +163,7 @@ function architectureExamples(nodes, content, heading, firstLine, diagnostics) {
 /** An architecture checkpoint uses the two visible, unique navigation links and
  * substantive Markdown beneath each maintainer-declared heading. */
 export function architectureDocument(frame, spec, diagnostics) {
-  const { file, headings, examplesHeading } = spec;
+  const { file, headings, examplesHeading, rollback: rollbackConfig } = spec;
   const { overview, index } = frame.policy.hierarchy;
   const top = requiredDocument(frame.root, overview.path);
   const middle = requiredDocument(frame.root, index.path);
@@ -176,11 +177,15 @@ export function architectureDocument(frame, spec, diagnostics) {
   const doc = document(file, source);
   if (spec.responsibilitiesHeading) generatedArchitectureSection(frame, { architecture: spec }, source, "responsibilitiesHeading");
   const sections = [];
-  let examples;
+  let examples, rollback;
   const bodies = headings.map(title => {
     const anchor = section(doc, title);
     const content = source.slice(anchor.end, anchor.stop);
     const nodes = fromMarkdown(content, options).children;
+    if (title === rollbackConfig?.heading) {
+      rollback = parseArchitectureRollbackFence(rollbackConfig, nodes, content,
+        source.slice(0, anchor.end).split(/\r\n|\n|\r/u).length, doc.htmlHidden);
+    }
     if (title === examplesHeading) {
       examples = architectureExamples(nodes, content, title, source.slice(0, anchor.end).split(/\r\n|\n|\r/u).length, diagnostics);
     }
@@ -195,10 +200,11 @@ export function architectureDocument(frame, spec, diagnostics) {
     sections.push({ heading: title, start: anchor.line, end });
     // Preserve whitespace inside stdin strings in the meaningful-content
     // digest. Else a goal change could treat different executable inputs as equal.
-    return title === examplesHeading ? examples.cases : normalized;
+    return title === examplesHeading ? examples.cases : title === rollbackConfig?.heading && rollback ?
+      [normalized, rollback.sha256] : normalized;
   });
   return { file, sha256: digest(bytes), headings, sections, contentsSha256: digest(JSON.stringify(bodies)),
-    ...(examples ? { examples } : {}) };
+    ...(examples ? { examples } : {}), ...(rollback ? { rollback } : {}) };
 }
 
 /** Locate the designated generated section through the same visible-heading parser. */

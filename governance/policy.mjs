@@ -4,6 +4,7 @@ import { createHash, createPublicKey, randomUUID } from "node:crypto";
 import { parseInputContracts } from "./input-contracts.mjs";
 import { parseRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
 import { parseArchitectureResponsibilities } from "./architecture-responsibilities.mjs";
+import { parseArchitectureRollback } from "./architecture-rollback.mjs";
 
 export const AUTHORITY = "BUILDING-LOOP.json";
 export const MANAGED = ".building-loop";
@@ -386,9 +387,14 @@ export function parseAuthority(bytes) {
     }
     const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases);
     for (const contract of codeTask?.diagnostics?.inputContracts ?? []) {
-      for (const { requirement } of contract.examples ?? []) {
+      for (const { requirement, diagnosticCases } of contract.examples ?? []) {
         if (requirement && (relativeName(requirement.file) !== requirement.file || !includes(goalContext, requirement.file))) {
           throw new Error("公开示例的预期条款须指向当前目标授权内的规范路径");
+        }
+        const tests = codeTask.tests;
+        if (diagnosticCases && (!tests?.regression || diagnosticCases.some(id =>
+          ![...tests.requiredCases, ...tests.regression.previousCases].includes(id)))) {
+          throw new Error("公开诊断示例须关联当前签名范围内的用例编号");
         }
       }
     }
@@ -461,7 +467,7 @@ export function parseAuthority(bytes) {
   const managedResponsibilitySections = new Map();
   for (const [id, entry] of architectureEntries) {
     object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading", "allowedLocalImports",
-      "responsibilitiesHeading", "responsibilities"]);
+      "responsibilitiesHeading", "responsibilities", "proseReview", "rollback"]);
     const file = hierarchyBodyPath(hierarchy, entry.module, false);
     const unit = units[id];
     const review = [unit.phases["first-review"], unit.phases["final-review"]];
@@ -496,6 +502,14 @@ export function parseAuthority(bytes) {
       }
       responsibilities = parseArchitectureResponsibilities(entry.responsibilities, unit.codeTask.sources, diagnostics);
     }
+    if (entry.proseReview !== undefined && (typeof entry.proseReview !== "boolean" || entry.proseReview && !responsibilities)) {
+      throw new Error("逐段逐项核验须为布尔值，启用时须登记关键职责实证");
+    }
+    const rollback = parseArchitectureRollback(entry.rollback, headings, unit.codeTask.sources, diagnostics, goalContext);
+    if (rollback?.heading === examplesHeading && rollback) throw new Error("回退演练与架构示例须使用各自独立章节");
+    if (rollback?.restore?.some(({ source }) => includes([...modelFiles, ...testInputs, ...testProofPaths], source))) {
+      throw new Error("回退基线副本须使用独立的宿主路径，不得进入模型授权或测试工件");
+    }
     // Executable examples use the maintainer's data-only recipe grants; a
     // compiler recipe accepts a source location and is never an example entry.
     if (examplesHeading !== undefined && (!headings.includes(examplesHeading) || examplesHeading === importsHeading ||
@@ -526,7 +540,8 @@ export function parseAuthority(bytes) {
     managedImportSections.set(keyOf(file), importsHeading);
     managedResponsibilitySections.set(keyOf(file), responsibilitiesHeading);
     unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}), ...(examplesHeading ? { examplesHeading } : {}),
-      ...(allowedLocalImports ? { allowedLocalImports } : {}), ...(responsibilities ? { responsibilitiesHeading, responsibilities } : {}) };
+      ...(allowedLocalImports ? { allowedLocalImports } : {}), ...(responsibilities ? { responsibilitiesHeading, responsibilities } : {}),
+      ...(entry.proseReview ? { proseReview: true } : {}), ...(rollback ? { rollback } : {}) };
   }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }

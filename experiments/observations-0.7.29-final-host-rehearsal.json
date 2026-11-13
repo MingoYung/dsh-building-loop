@@ -1,0 +1,260 @@
+{
+  "archiveSha256": "f4edf64b234b439e0793cab30f105573f5c8cd548066c70aae1ef54b2c6dce6f",
+  "nativePreflightRun": "r-7J25pj",
+  "modelCalls": 0,
+  "scope": "Exact installed host contract, authenticated derived artifacts and actual Windows to WSL isolated candidate execution.",
+  "observations": [
+    {
+      "name": "narrow-direct-plan",
+      "expectedPass": false,
+      "result": {
+        "version": 1,
+        "status": "failed",
+        "binding": {
+          "policySha256": "6f5a4b06c69323beb6a18a73fba09bde740c181bf7a74d7846c39ec8f88e4a28",
+          "goalSha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+          "receiptSha256": "7fa15cb322c0cf4c6b9dc071212b58e6be8d935104df31867127d70e7412b6b4",
+          "originalArtifactsSha256": "b93d7143ed623167c127698372b18619887efff476a78e7b64151b84d5f8938b",
+          "rehearsalArtifactsSha256": "a4ebbbdd3e7e508d86e4e4b0efba30fd759a073299a37b1c022c5a9d877ed37a",
+          "architectureSha256": "2d128419fd2c05e85880764d176f637f4dd58aac06abb001f7fbc4753bae4c85",
+          "rollbackSha256": "c401582709d2eedd63a0f94595a32e698781fb2a769a85fcd579c31c28370e05",
+          "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+            "afterSha256": "a74acae50a2a08d11936c8040a5e0a77b67e25c63d5cfd97061c78a96b787e6b"
+          }
+        ],
+        "total": 4,
+        "passed": 2,
+        "receipts": [
+          {
+            "id": "public-release-reopen-production:example:restored-production-plan",
+            "snapshotSha256": "a819f793635310013e506c3461c964128896fa7d2bbd77316c2798e080c27ef5"
+          },
+          {
+            "id": "public-release-reopen-production:example:restored-production-rollback",
+            "snapshotSha256": "d7c8b9961ec1836cb6bae9958488b0f516f982e5ec861600f4ea820507a13c7b"
+          },
+          {
+            "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+            "snapshotSha256": "c8c699727979f377e614ce5f3dbeed1521fa8d1773b256ac5c43d7ff53384aaa"
+          },
+          {
+            "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+            "snapshotSha256": "613585b3039385241980de7dd8875e3ad6b3b026b896c5f7d8a607023d1679df"
+          }
+        ],
+        "failures": [
+          {
+            "id": "public-release-reopen-production:example:restored-production-plan",
+            "outcome": "mismatch",
+            "actual": {
+              "exitCode": 0,
+              "json": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              }
+            },
+            "stdin": "{\"environment\":\"production\",\"action\":\"plan\",\"budget\":5,\"changes\":[{\"id\":\"rollback-item\",\"component\":\"component\",\"units\":1,\"depends_on\":[]}],\"applied\":[]}\n",
+            "expected": {
+              "exitCode": 0,
+              "json": {
+                "status": "ok",
+                "actions": [
+                  "rollback-item"
+                ],
+                "units": 1
+              }
+            }
+          },
+          {
+            "id": "public-release-reopen-production:example:restored-production-rollback",
+            "outcome": "mismatch",
+            "actual": {
+              "exitCode": 0,
+              "json": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              }
+            },
+            "stdin": "{\"environment\":\"production\",\"action\":\"rollback\",\"budget\":0,\"changes\":[{\"id\":\"rollback-item\",\"component\":\"component\",\"units\":1,\"depends_on\":[]}],\"applied\":[\"rollback-item\"]}\n",
+            "expected": {
+              "exitCode": 0,
+              "json": {
+                "status": "ok",
+                "actions": [
+                  "rollback-item"
+                ],
+                "units": 1
+              }
+            }
+          }
+        ]
+      },
+      "originalPolicyUnchanged": true,
+      "phase": "architecture-sync"
+    },
+    {
+      "name": "executor-proposal",
+      "expectedPass": true,
+      "result": {
+        "version": 1,
+        "status": "passed",
+        "binding": {
+          "policySha256": "6f5a4b06c69323beb6a18a73fba09bde740c181bf7a74d7846c39ec8f88e4a28",
+          "goalSha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+          "receiptSha256": "7fa15cb322c0cf4c6b9dc071212b58e6be8d935104df31867127d70e7412b6b4",
+          "originalArtifactsSha256": "b93d7143ed623167c127698372b18619887efff476a78e7b64151b84d5f8938b",
+          "rehearsalArtifactsSha256": "3a848cfd472e0122d07a5c2318dea91c526d7a9bae6e107c4bf7a70bd02ddcd8",
+          "architectureSha256": "1e210b02fd3e6762a8d24f2b0458d61d6d52b2fd27513aacc6e1b9eeb197b767",
+          "rollbackSha256": "1aaeda6ffe963bf7f067aaa1d03f8321e994d0b3aa7c748a424ded9a56bc0ad6",
+          "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1",
+          "proposalId": "rollback-8deb93c3e60ce8fa7d4737e218ed82f2cb1c8d547258dcd31fbed38131944f68"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+            "afterSha256": "37d998515747a1ce63133782ecc3f952aa9110bedffae8a25319b198f1878030"
+          }
+        ],
+        "total": 4,
+        "passed": 4,
+        "receipts": [
+          {
+            "id": "public-release-reopen-production:example:restored-production-plan",
+            "snapshotSha256": "bb7349691e9dc1c85245572df1bde8fc7a320fc9d725da204739c919e66e8fe1"
+          },
+          {
+            "id": "public-release-reopen-production:example:restored-production-rollback",
+            "snapshotSha256": "fa0e7703aeb6c6dc556a5e2074f00ec53d2c32fc1d4be012bae5ccf78d4c9aec"
+          },
+          {
+            "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+            "snapshotSha256": "15c293d78245652c8fb66d06782d9b4ac2ba4de00ad4f970e573483f995f3ef8"
+          },
+          {
+            "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+            "snapshotSha256": "50e049d5d5be37ed51abdf51479ac15667f5fdfac16189fc9d8eafa1feb9dc1e"
+          }
+        ],
+        "failures": []
+      },
+      "originalPolicyUnchanged": true,
+      "phase": "architecture-sync"
+    }
+  ],
+  "calls": [
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "a819f793635310013e506c3461c964128896fa7d2bbd77316c2798e080c27ef5",
+      "policySha256": "a74acae50a2a08d11936c8040a5e0a77b67e25c63d5cfd97061c78a96b787e6b",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "d7c8b9961ec1836cb6bae9958488b0f516f982e5ec861600f4ea820507a13c7b",
+      "policySha256": "a74acae50a2a08d11936c8040a5e0a77b67e25c63d5cfd97061c78a96b787e6b",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "c8c699727979f377e614ce5f3dbeed1521fa8d1773b256ac5c43d7ff53384aaa",
+      "policySha256": "a74acae50a2a08d11936c8040a5e0a77b67e25c63d5cfd97061c78a96b787e6b",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "613585b3039385241980de7dd8875e3ad6b3b026b896c5f7d8a607023d1679df",
+      "policySha256": "a74acae50a2a08d11936c8040a5e0a77b67e25c63d5cfd97061c78a96b787e6b",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "bb7349691e9dc1c85245572df1bde8fc7a320fc9d725da204739c919e66e8fe1",
+      "policySha256": "37d998515747a1ce63133782ecc3f952aa9110bedffae8a25319b198f1878030",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "fa0e7703aeb6c6dc556a5e2074f00ec53d2c32fc1d4be012bae5ccf78d4c9aec",
+      "policySha256": "37d998515747a1ce63133782ecc3f952aa9110bedffae8a25319b198f1878030",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "15c293d78245652c8fb66d06782d9b4ac2ba4de00ad4f970e573483f995f3ef8",
+      "policySha256": "37d998515747a1ce63133782ecc3f952aa9110bedffae8a25319b198f1878030",
+      "exitCode": 0
+    },
+    {
+      "phase": "architecture-sync",
+      "operation": "probe",
+      "protectedCases": [
+        "rollback-order"
+      ],
+      "requiredCases": [
+        "production-frozen-plan"
+      ],
+      "snapshotSha256": "50e049d5d5be37ed51abdf51479ac15667f5fdfac16189fc9d8eafa1feb9dc1e",
+      "policySha256": "37d998515747a1ce63133782ecc3f952aa9110bedffae8a25319b198f1878030",
+      "exitCode": 0
+    }
+  ]
+}

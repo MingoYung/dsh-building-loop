@@ -22,7 +22,7 @@ const revised = plan.replace("验证旧预算", "重放已发请求并验证旧�
 const ref = (file, start, end = start) => ({ file, start, end });
 
 function project(root, write, { importsHeading, examplesHeading, diagnostics, allowedLocalImports,
-  responsibilitiesHeading, responsibilities, goalClause = "预算最多五项。" } = {}) {
+  responsibilitiesHeading, responsibilities, rollback, goalClause = "预算最多五项。" } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = importsHeading ? [candidate, "limits.py"] : [candidate];
   const files = [...sources, architecture];
@@ -44,7 +44,7 @@ function project(root, write, { importsHeading, examplesHeading, diagnostics, al
     coordinator: { read: [goal, "INDEX.md", architecture, "first.json", "final.json"], write: [architecture] },
     units: { K01: { candidate, plainLast: false, architecture: {
       module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading,
-      examplesHeading, allowedLocalImports, responsibilitiesHeading, responsibilities,
+      examplesHeading, allowedLocalImports, responsibilitiesHeading, responsibilities, rollback,
     },
       codeTask: { sources, tests, diagnostics }, phases: { intake: execute, supplement: execute,
         "first-review": review("first.json"), "final-review": review("final.json") } } } }));
@@ -66,6 +66,85 @@ const fileJudgment = { file: candidate, basis: "The cap protects downstream capa
   comment: { status: "verified", start: 2, end: 2, basis: "This clamp implements the stated limit." } };
 const constraint = { caseId: "limit", status: "pass", requirement: ref(goal, 3), code: ref(candidate, 3),
   basis: "The signed test checks the cap that is applied before returning." };
+
+test("signed rollback runs off-worktree and returns a failed proposal to the same read-only executor", () => fixture(async (root, write) => {
+  const token = "isolated-test-rollback-runner-token";
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const body = JSON.parse(Buffer.concat(chunks));
+    const bytes = Buffer.from(body.artifacts[0].contentBase64, "base64");
+    requests.push({ body, valid: request.headers.authorization === "Bearer " + token && body.artifacts[0].sha256 === digest(bytes) });
+    response.end(JSON.stringify({ spec: body.spec, requestId: body.requestId, snapshotSha256: body.snapshotSha256, status: "passed",
+      probe: { exitCode: 0, stdout: JSON.stringify({ budget: bytes.toString().includes("return value") ? 7 : 4 }) } }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const env = { DSH_BUILDING_LOOP_DIAGNOSTICS_URL: `http://127.0.0.1:${server.address().port}/rollback`,
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: token };
+  const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    const { harness, save } = project(root, write, { goalClause: "After rollback, a budget of seven is accepted.",
+      diagnostics: { checkSet: "rollback-check", protocol: 2, recipes: ["entry"], reviewRecipes: ["entry"] },
+      rollback: { heading: "回退", files: [candidate], contracts: [{ id: "rehearsal", recipe: "entry", examples: [{
+        id: "budget", input: { budget: 7 }, expectedJson: { budget: 7 }, requirement: {
+          ...ref(goal, 3), quote: "After rollback, a budget of seven is accepted.",
+        },
+      }] }] } });
+    const setPlan = content => harness.file("root", "write", architecture, { content, note: "Document the rollback instructions" });
+    await setPlan(plan);
+    await harness.flow("root", "architecture");
+    const executor = (await harness.flow("root", "advance")).childId;
+    const current = "def budget(value):\n    return min(value, 5)\n";
+    write(candidate, current);
+    const { codeTask } = await harness.flow(executor, "prepare");
+    const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
+    save(file, { ...challenge, runId: "signed-rollback-candidate", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+    const proposal = (actor, newText) => harness.invoke(actor, "building_loop", { action: "rollback-proposal", rollbackEdits: [{
+      file: candidate, replacements: [{ oldText: "return min(value, 5)", newText }],
+    }] });
+    await assert.rejects(proposal("root", "return value"), /执行方/u);
+    assert.equal((await harness.flow(executor, "submit")).submission.status, "rollback-proposal-required");
+    const wrong = await proposal(executor, "return min(value, 4)");
+    assert.equal((await harness.flow(executor, "submit")).phase, "architecture-sync");
+    assert.equal((await harness.flow("root", "architecture")).status, "rollback-plan-required");
+    const reference = ({ id }) => plan + "\n```json building-loop-rollback\n" + JSON.stringify({ proposal: id }) + "\n```\n";
+    assert.equal((await harness.flow("root", "prepare")).architecture.rollback.proposal.id, wrong.id);
+    await setPlan(reference(wrong));
+    const failed = await harness.flow("root", "architecture");
+    assert.equal(failed.status, "rollback-failed");
+    assert.equal(failed.next.action, "advance");
+    assert.equal(failed.rollback.failures[0].actual, undefined);
+    const repair = await harness.flow("root", "advance");
+    assert.equal(repair.childId, executor);
+    assert.equal(repair.reused, true);
+    const packet = await harness.flow(executor, "prepare");
+    assert.deepEqual(packet.rollbackRepair.failures[0].actual.json, { budget: 4 });
+    await assert.rejects(harness.file(executor, "write", candidate, { content: "", note: "Attempt source edit" }), /白名单/u);
+    await assert.rejects(harness.flow(executor, "submit"), /只读阶段/u);
+    await assert.rejects(proposal(executor, "return min(value, 4)"), /修改失败提议/u);
+    const corrected = await proposal(executor, "return value");
+    assert.equal(corrected.phase, "architecture-sync");
+    await setPlan(reference(corrected));
+    const registered = await harness.flow("root", "architecture");
+    assert.equal(registered.phase, "review-ready");
+    assert.equal(registered.architecture.rollbackRehearsal.status, "passed");
+    assert.equal(registered.architecture.rollbackRehearsal.binding.proposalId, corrected.id);
+    assert.equal(requests.length, 2);
+    assert.ok(requests.every(({ body, valid }) => valid && body.operation === "probe" && body.phase === "architecture-sync"));
+    assert.equal(fs.readFileSync(path.join(root, candidate), "utf8"), current);
+    await harness.flow("root", "advance");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+}));
 
 test("signed responsibility distinguishes a reached business guard from the same transport fallback code", () => fixture(async (root, write) => {
   const clause = "A request that is not an object returns the invalid-request error.";
