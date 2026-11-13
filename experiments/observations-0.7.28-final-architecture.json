@@ -1,0 +1,4267 @@
+{
+  "scope": "Only frozen snapshots. Black-box supplemental probes use the original read-only WSL bubblewrap evaluator and are excluded from fixed scores.",
+  "observations": [
+    {
+      "run": "r-iAiCGF",
+      "mode": "building-loop",
+      "stage": "g1",
+      "session": "7f60529b3a02",
+      "terminal": "blocked",
+      "nativePhase": "blocked",
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "2a6cff4f1d3403ec9682c69f3cb9827f3afe7e99c243ca8b683e5d15588ec549"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d22ec923c19316dd3a3ae13731833c205ee6c7eadc9b3ce4f953f9dcc59d026e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6b141e244910363c6e9c8bc5409ce73946b05ae45e91b385badc3fddea16a467"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 74
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "ordered_ids",
+            "plan"
+          ],
+          "lineCount": 79
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "check_budget",
+            "limit_for"
+          ],
+          "lineCount": 40
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 14,
+              "end": 33,
+              "name": "_id_list",
+              "docstring": "Read an optional array of change IDs, rejecting anything malformed.\n\n`depends_on` and the caller-supplied `applied` journal both arrive as lists\nof IDs. A non-array, or an element that is not a nonempty string, is broken\ninput rather than a graph problem, so both raise `code`\n(\"invalid-change\"). Duplicates inside the list carry no meaning and are\ncollapsed so membership tests against `applied` stay exact."
+            },
+            {
+              "line": 36,
+              "end": 65,
+              "name": "read_changes",
+              "docstring": "Validate change records and collapse identical duplicates.\n\nDuplicates are compared on id, component, units and the *set* of\ndependencies; order inside `depends_on` is not identity. One record per ID\nsurvives. Records that share an ID but differ in any of those fields are a\nconflict, not a merge: silently keeping one would change what gets\ndeployed, so they fail with `conflicting-change`."
+            },
+            {
+              "line": 68,
+              "end": 74,
+              "name": "read_applied",
+              "docstring": "Read the persisted release journal (`applied`) supplied by the caller.\n\nMembership in this list is what makes a change already deployed for replay;\nmembership tests therefore live with the rest of the identity data here."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Normalize release records at the input boundary.\n\nThis module owns input validation, change identity and replay state. It is the\nonly place that decides what a change record is, so policy can account units\nand planner can build graphs from already-clean, already-deduplicated data. It\nimports no other project module; planner imports it."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 14,
+              "end": 15,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 18,
+              "end": 47,
+              "name": "ordered_ids",
+              "docstring": "Return the full deterministic topological order of all change IDs.\n\nDependencies that are already applied do not hold a change back: replay\nmeans the persisted journal satisfies them. Ties among currently eligible\nchanges are broken by lexicographic ID so the same request always yields\nthe same order. If anything never becomes eligible a cycle exists;\nreporting it here keeps plan and rollback consistent, because rollback\nneeds the full order even though it emits only a subset."
+            },
+            {
+              "line": 50,
+              "end": 79,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              58,
+              "# Unknown IDs are checked before ordering: a dependency on a change that"
+            ],
+            [
+              59,
+              "# was never supplied, or an applied ID that disappears from the request,"
+            ],
+            [
+              60,
+              "# is a journal/data problem, not a cycle."
+            ],
+            [
+              74,
+              "# Budget is checked against the emitted units, after replay and"
+            ],
+            [
+              75,
+              "# deduplication, so already-applied changes never consume new capacity."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nPlanner is the only module that sees the whole request: it asks journal for\nclean records and the applied journal, asks policy for the action and budget,\nbuilds the graph and emits one exact result. Every failure returns the shared\nerror shape, so no caller can observe a partial action list."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 13,
+              "end": 29,
+              "name": "limit_for",
+              "docstring": "Validate environment, action and budget; return the budget.\n\nG1 supports plan and rollback in both environments. A missing or unknown\naction is `unsupported-action`, not a default, so an undefined operation can\nnever fall back into a plan. `budget` is always validated here, and the\nvalue is returned so planner can apply it per action: it caps plan only."
+            },
+            {
+              "line": 32,
+              "end": 40,
+              "name": "check_budget",
+              "docstring": "Enforce the spend cap for the action being emitted.\n\nOnly plan spends new capacity, so only plan can exceed the budget. Rollback\nretires already-applied changes; capping it would leave a release stuck\nrolled halfway, so its validated budget is deliberately not applied here."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Validate release policy before computing actions.\n\nPolicy owns environment and budget rules only. It never inspects the graph or\nthe journal; planner decides what to emit and then asks for the check that\napplies to the chosen action. It imports no other project module."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "modules/architecture.md",
+          "sha256": "ae4078f212ea0d18df08fed57a09045370c854eebf7a010061d365dee2fd902b"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "passed": false
+        },
+        {
+          "case": "self-cycle-in-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": false
+        }
+      ]
+    },
+    {
+      "run": "r-iAiCGF",
+      "mode": "building-loop",
+      "stage": "g2",
+      "session": "245093c1a418",
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "carry": "frozen-workspace-continuation-after-block",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "b4107ec7bec5854ec31d4dcf3181b0c2bee0579c951391a04f4f2cc9a8938389"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "b35e2a46a4f6949699367337c63f64b4a329b5ba7eca6a239e0588b1089afab4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b8ddc556798bc1e6f71084a28d0afda178d2c4600be031c3bbbbfa8193bf5999"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 110
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "ordered_ids",
+            "plan",
+            "retained_ids"
+          ],
+          "lineCount": 118
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "check_budget",
+            "limit_for"
+          ],
+          "lineCount": 69
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 15,
+              "end": 37,
+              "name": "_id_list",
+              "docstring": "Read an optional array of change IDs, rejecting anything malformed.\n\n`depends_on` and the caller-supplied `applied` journal both arrive as lists\nof IDs. A non-array, or an element that is not a nonempty string, is broken\ninput rather than a graph problem, so both raise `code`\n(\"invalid-change\"). Duplicates inside the list carry no meaning and are\ncollapsed so membership tests against `applied` stay exact.\n\nDefaulting is decided by the caller, not here: a JSON `null` is a present\nbut wrong value and stays an error. Callers therefore pass `[]` for a\nmissing key instead of `None`, so an explicit null can never be read as\n\"field omitted\"."
+            },
+            {
+              "line": 40,
+              "end": 69,
+              "name": "read_changes",
+              "docstring": "Validate change records and collapse identical duplicates.\n\nDuplicates are compared on id, component, units and the *set* of\ndependencies; order inside `depends_on` is not identity. One record per ID\nsurvives. Records that share an ID but differ in any of those fields are a\nconflict, not a merge: silently keeping one would change what gets\ndeployed, so they fail with `conflicting-change`."
+            },
+            {
+              "line": 72,
+              "end": 80,
+              "name": "read_applied",
+              "docstring": "Read the persisted release journal (`applied`) supplied by the caller.\n\nMembership in this list is what makes a change already deployed for replay;\nmembership tests therefore live with the rest of the identity data here.\nThe field defaults to empty only when it is absent; an explicit null is\nmalformed (`invalid-change`) like any other non-array."
+            },
+            {
+              "line": 83,
+              "end": 110,
+              "name": "read_retain",
+              "docstring": "Read the G2 `retain` list for a staging rollback.\n\n`retain` names applied changes the caller wants left in place; the default\nis empty, i.e. a plain rollback. It is rollback-only: planner never reads it\nfor a plan, so a stray `retain` on a plan cannot alter the emitted actions.\n\nUnlike `depends_on`/`applied`, malformed input here is `invalid-retain`, a\ndistinct code, because it is a rollback-specific argument and the caller\nneeds to tell it apart from a broken change record. Any ID that is not in\nthe persisted journal is rejected too: retaining something that was never\napplied would silently keep a phantom, so it is a caller mistake.\n\nThe cross-check against `applied` lives here so planner gets a clean,\nalready-validated set and only has to decide the dependency closure.\nDefaulting mirrors the other lists: absent means empty, explicit null is\nmalformed and stays `invalid-retain`."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Normalize release records at the input boundary.\n\nThis module owns input validation, change identity and replay state. It is the\nonly place that decides what a change record is, and what makes a release ID\n\"already applied\", so the interpreter can account units and planner can build\ngraphs from already-clean, already-deduplicated data. It imports no other\nproject module; planner imports it."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 14,
+              "end": 15,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 18,
+              "end": 47,
+              "name": "ordered_ids",
+              "docstring": "Return the full deterministic topological order of all change IDs.\n\nDependencies that are already applied do not hold a change back: replay\nmeans the persisted journal satisfies them. Ties among currently eligible\nchanges are broken by lexicographic ID so the same request always yields\nthe same order. If anything never becomes eligible a cycle exists;\nreporting it here keeps plan and rollback consistent, because rollback\nneeds the full order even though it emits only a subset."
+            },
+            {
+              "line": 50,
+              "end": 73,
+              "name": "retained_ids",
+              "docstring": "Expand `retain` into the applied IDs a rollback must leave in place.\n\nA retained change is useless without its prerequisites, so the set is the\n*transitive* dependency closure of the retained IDs, restricted to changes\nthat are actually applied: an unapplied dependency is not running and\ntherefore needs no retention. Only applied changes can be emitted by\nrollback at all, so anything outside `applied` is irrelevant here.\n\n`retain` itself is already validated (applied membership, shape) by journal;\nthis function adds only the graph walk. The closure terminates because a\ncycle was already rejected before this point."
+            },
+            {
+              "line": 76,
+              "end": 118,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              82,
+              "# `applied` (and later `retain`) default to empty only when the key is"
+            ],
+            [
+              83,
+              "# absent; an explicit JSON null is passed through so journal can reject"
+            ],
+            [
+              84,
+              "# it as malformed instead of silently treating it as \"nothing applied\"."
+            ],
+            [
+              87,
+              "# Unknown IDs are checked before ordering: a dependency on a change that"
+            ],
+            [
+              88,
+              "# was never supplied, or an applied ID that disappears from the request,"
+            ],
+            [
+              89,
+              "# is a journal/data problem, not a cycle."
+            ],
+            [
+              101,
+              "# G2 staging rollback: `retain` is read only here, so a plan can"
+            ],
+            [
+              102,
+              "# never be influenced by it. Validation happens before the walk, and"
+            ],
+            [
+              103,
+              "# kept IDs are subtracted from the reverse order rather than"
+            ],
+            [
+              104,
+              "# re-sorted, so the remaining actions keep the original"
+            ],
+            [
+              105,
+              "# deterministic rollback order."
+            ],
+            [
+              113,
+              "# Budget is checked against the emitted units, after replay and"
+            ],
+            [
+              114,
+              "# deduplication, so already-applied changes never consume new capacity."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nPlanner is the only module that sees the whole request: it asks journal for\nclean records and the applied journal, asks policy for the action and budget,\nbuilds the graph and emits one exact result. Every failure returns the shared\nerror shape, so no caller can observe a partial action list."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 18,
+              "end": 56,
+              "name": "limit_for",
+              "docstring": "Validate environment, action and budget; return the effective budget.\n\nThis is the first policy gate planner calls, before reading changes or the\njournal. Order matters for two G2 rules:\n\n* This release is staging-only. A `production` request is frozen for both\n  plan and rollback and is rejected here, before any graph or change\n  validation, so even a malformed graph in production reports\n  `production-frozen` rather than `invalid-change`/`dependency-cycle`.\n  The environment itself is still validated first: an unknown value stays\n  `invalid-environment`.\n* The returned budget is what plan is capped by: on staging it is the\n  smaller of the request budget and `STAGING_PLAN_QUOTA`. The request value\n  is still validated in full (`invalid-budget`) so a malformed field is\n  reported even when the quota would be the tighter bound.\n\nA missing or unknown action is `unsupported-action`, not a default, so an\nundefined operation can never fall back into a plan.\n\nBoth comparisons use `isinstance(..., str)` first: a JSON array or object\nis unhashable and would raise TypeError inside a set/`in` test, escaping as\na crashed process instead of the error object this service promises to\nalways print."
+            },
+            {
+              "line": 59,
+              "end": 69,
+              "name": "check_budget",
+              "docstring": "Enforce the spend cap for the action being emitted.\n\nOnly plan spends new capacity, so only plan can exceed the budget; for\nstaging plans that budget is already quota-capped by `limit_for`, so the\nquota violation surfaces as the same `budget-exceeded`. Rollback retires\nalready-applied changes; capping it would leave a release stuck rolled\nhalfway, so its validated budget is deliberately not applied here."
+            }
+          ],
+          "comments": [
+            [
+              8,
+              "# G2 release cap: a staging plan may emit at most this many units this cycle,"
+            ],
+            [
+              9,
+              "# whatever the caller asks for. Kept here (and not in planner) because it is a"
+            ],
+            [
+              10,
+              "# spend rule, and planner must stay unaware of policy numbers."
+            ],
+            [
+              46,
+              "# Freeze before action/budget checks: the whole environment is read-only,"
+            ],
+            [
+              47,
+              "# so no other validation error should mask the real reason for refusal."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nPolicy owns environment and budget rules only. It never inspects the graph or\nthe journal; planner decides what to emit and then asks for the check that\napplies to the chosen action. It imports no other project module."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "modules/architecture.md",
+          "sha256": "18a675350d8ca1eb6dc344bc4d5f6c5ca456dfab5d23d79cfa1bfbc5e6d71a08"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "plan-ignores-rollback-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 2,
+                "depends_on": []
+              }
+            ],
+            "retain": [
+              "absent"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "staging-denied-after-replay",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 3,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-iAiCGF",
+      "mode": "standard-checklist",
+      "stage": "g1",
+      "session": "a2d5d9b05666",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "0444fb4926a974c1a53e8e29d94a87b8828a44bdb27120009b56fd875292cfd9"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "a75263407ccdb9bef4621c7922441ba1f0abf50d129fe61731f10beac93e3116"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "e863b3931e9c1abab679b49dada201bb59c4c1857586b4fa3299c73f61e9afb0"
+        },
+        {
+          "path": "release.py",
+          "sha256": "fb8a8c28460b1fcf9d62ecc860ab7f39a0b5610f1e469c1f13e3030751a03c8c"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_field",
+            "_identity",
+            "_record",
+            "_string_list",
+            "check_references",
+            "read_applied",
+            "read_changes",
+            "read_optional_applied",
+            "read_release"
+          ],
+          "lineCount": 149
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "actions_for",
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 95
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "authorize",
+            "limit_for"
+          ],
+          "lineCount": 51
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 39
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 15,
+              "end": 34,
+              "name": "_string_list",
+              "docstring": "Return ``row[key]`` as a list of strings; ``None`` means \"absent\".\n\nA key present with value ``null`` is malformed, not absent: the host's\ntransport contract pins ``depends_on: null`` to invalid-change, and\ndefaulting it would silently accept a record whose author meant something\nelse. A missing key is the only way to request the empty default.\nOnly lists of nonempty strings are accepted. A bare string would otherwise\nbe iterated character by character and silently turn \"ab\" into [\"a\", \"b\"],\nso it is rejected instead of coerced."
+            },
+            {
+              "line": 37,
+              "end": 40,
+              "name": "_field",
+              "docstring": null
+            },
+            {
+              "line": 43,
+              "end": 62,
+              "name": "_record",
+              "docstring": "Validate one change record and return it with a canonical dependency set.\n\n``depends_on`` is stored sorted and de-duplicated because record identity\nis defined by the *set* of dependencies: two records that only differ in\ndependency order (or repeat a dependency) are the same change, not a\nconflict."
+            },
+            {
+              "line": 65,
+              "end": 70,
+              "name": "_identity",
+              "docstring": null
+            },
+            {
+              "line": 73,
+              "end": 94,
+              "name": "read_changes",
+              "docstring": "Validate ``changes`` and collapse identical duplicates.\n\nReturns records in first-appearance order. The order does not affect the\nresult (the planner sorts by ID), but it keeps diagnostics reproducible."
+            },
+            {
+              "line": 97,
+              "end": 111,
+              "name": "read_applied",
+              "docstring": "Validate the persisted journal and return it as a set of change IDs.\n\nUse :func:`read_optional_applied` for the request field: a present ``null``\nis malformed there, while this function only sees an already-vetted list."
+            },
+            {
+              "line": 114,
+              "end": 124,
+              "name": "read_optional_applied",
+              "docstring": "Read an optional list-of-strings field, distinguishing absent from null.\n\n``None`` meant two different things in an early version of this module\n(absent key and JSON ``null``), which silently accepted ``\"applied\": null``.\nThe host's transport contract pins a present ``null`` to ``invalid-change``,\nso the two cases must be separated at the boundary, not deeper down."
+            },
+            {
+              "line": 127,
+              "end": 141,
+              "name": "check_references",
+              "docstring": "Reject unknown dependency targets and unknown applied IDs.\n\nApplied IDs are checked against the same change graph, so a journal entry\nfor a change that is no longer described by the request is treated as a\nbroken reference rather than ignored."
+            },
+            {
+              "line": 144,
+              "end": 149,
+              "name": "read_release",
+              "docstring": "Run the whole boundary: validate, dedupe, replay, check references."
+            }
+          ],
+          "comments": [
+            [
+              54,
+              "# ``type(...) is int`` rather than isinstance: booleans are ints in Python"
+            ],
+            [
+              55,
+              "# and ``True`` must not count as one unit."
+            ],
+            [
+              66,
+              "# Covers id, component, units and the dependency set, exactly the equality"
+            ],
+            [
+              67,
+              "# contract. Components containing \"|\" still compare correctly because the"
+            ],
+            [
+              68,
+              "# tuple is compared element-wise upstream, not by string concatenation."
+            ],
+            [
+              90,
+              "# Identical duplicate: keep one copy so it is accounted once."
+            ],
+            [
+              109,
+              "# A repeated entry in the journal is harmless: replay is a set."
+            ]
+          ],
+          "moduleNote": "Normalize release records at the input boundary.\n\nThis module owns input validation, record identity (deduplication) and replay\nof the caller-supplied ``applied`` journal. It deliberately knows nothing about\nordering, budgets or environments: those belong to ``planner`` and ``policy``.\nKeeping one exception type (and therefore one error code per rule) is what lets\n``planner`` map every boundary failure to an exact SPEC result."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 17,
+              "end": 19,
+              "name": "failure",
+              "docstring": "The one and only error shape. ``actions`` stays empty on every failure."
+            },
+            {
+              "line": 22,
+              "end": 55,
+              "name": "topological_order",
+              "docstring": "Kahn's algorithm with lexicographic ID tie-breaking.\n\nUses a heap over currently eligible IDs, so the order is uniquely\ndetermined by the ID set and the dependency relation -- it never depends\non the input order or on dict/set iteration order.\n\nThe sweep is iterative on purpose: a deep chain of thousands of changes\nmust not hit Python's recursion limit."
+            },
+            {
+              "line": 58,
+              "end": 73,
+              "name": "actions_for",
+              "docstring": "Select and bill the actions for one operation.\n\nplan: unapplied changes in topological order; bill the sum of their units,\n      because applied entries never consume new budget.\nrollback: applied changes in the reverse of the *full* topological order.\n      The full order is needed -- an applied change may depend on a\n      not-yet-applied one, and reversing only the applied sub-sequence\n      would emit a dependency after its dependent. Rollback ignores budget."
+            },
+            {
+              "line": 76,
+              "end": 94,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              12,
+              "# Cycle detection uses Kahn's in-degree sweep rather than DFS colouring: every"
+            ],
+            [
+              13,
+              "# node on a cycle (or downstream of one) keeps a positive in-degree, so a short"
+            ],
+            [
+              14,
+              "# result is exactly \"a cycle exists\". A self-dependency is just the 1-ring case."
+            ],
+            [
+              48,
+              "# Push only when the node becomes eligible, which is what makes"
+            ],
+            [
+              49,
+              "# \"lexicographically smallest among *currently* eligible\" hold."
+            ],
+            [
+              52,
+              "# Every node on a cycle (and everything downstream of it) keeps a"
+            ],
+            [
+              53,
+              "# positive in-degree, so a short fall automatically means a cycle."
+            ],
+            [
+              78,
+              "# Non-object input (array, string, null, number) is a transport-level"
+            ],
+            [
+              79,
+              "# problem, reported before any field could be inspected."
+            ],
+            [
+              89,
+              "# Checked after replay/dedupe and on emitted units only, and only"
+            ],
+            [
+              90,
+              "# for plan. The whole request fails rather than emitting a prefix."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nPlanner owns the graph, the deterministic order, the replay/budget decision and\nthe exact output shape. It is also the only place that converts domain errors\ninto a result object, so no failure path can leak a partial action list."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 22,
+              "end": 43,
+              "name": "authorize",
+              "docstring": "Return ``(action, budget)`` or raise PolicyError.\n\n``budget`` is validated for every action, but it only caps ``plan``: G1\nstates that rollback is emitted in full regardless of budget. The cap is\napplied by the planner against emitted units, not here, because the value\nit must be compared with is only known after replay and deduplication."
+            },
+            {
+              "line": 46,
+              "end": 51,
+              "name": "limit_for",
+              "docstring": "Backwards-compatible helper used by the original plan-only callers."
+            }
+          ],
+          "comments": [
+            [
+              8,
+              "# G1 supports both operations in both environments. The table is the single"
+            ],
+            [
+              9,
+              "# place to narrow that if a later goal restricts operations per environment."
+            ],
+            [
+              31,
+              "# Explicit set membership instead of a string compare: an unhashable value"
+            ],
+            [
+              32,
+              "# (list/dict) must yield invalid-environment, not TypeError."
+            ],
+            [
+              39,
+              "# ``type(...) is int`` excludes booleans deliberately: ``True`` is an int"
+            ],
+            [
+              40,
+              "# in Python but not a valid budget."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nPolicy owns exactly two questions: is this environment/action combination\nallowed, and what budget cap applies. It never inspects ``changes`` so that a\npolicy denial can never emit partial actions."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 13,
+              "end": 35,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              17,
+              "# ``json.load`` raises ValueError for malformed JSON and"
+            ],
+            [
+              18,
+              "# UnicodeDecodeError (a ValueError) for undecodable bytes, so both"
+            ],
+            [
+              19,
+              "# land here as invalid-json instead of a traceback."
+            ],
+            [
+              22,
+              "# Pathologically nested input (e.g. thousands of \"[\") exhausts the"
+            ],
+            [
+              23,
+              "# parser's recursion before it is a document at all. That is still a"
+            ],
+            [
+              24,
+              "# transport problem; without this clause the process would die with a"
+            ],
+            [
+              25,
+              "# traceback and a non-zero exit, breaking the exit-0 contract."
+            ],
+            [
+              31,
+              "# Defence in depth: a bug in a lower layer must still produce the"
+            ],
+            [
+              32,
+              "# documented JSON shape rather than a non-zero exit. The SPEC's"
+            ],
+            [
+              33,
+              "# fallback for an unclassifiable request is invalid-request."
+            ]
+          ],
+          "moduleNote": "JSON transport for the release planner.\n\nThis module owns stdin/stdout only. Every request -- including domain errors and\nunexpected faults -- prints exactly one JSON object and exits 0, which is the\nservice's whole external contract."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "ARCHITECTURE.md",
+          "sha256": "b25af0dc2df587928550f649126c5602737abfb56c3ab5b4dfe51625fb823972"
+        },
+        {
+          "path": "TEST-REPORT.md",
+          "sha256": "71aa9afa20fa60f30ad585b971e4610b3a76ecb67033f0a6cd866d0b35660c09"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "self-cycle-in-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-iAiCGF",
+      "mode": "standard-checklist",
+      "stage": "g2",
+      "session": "7cbab836b0dd",
+      "terminal": "completion-cap",
+      "nativePhase": null,
+      "carry": "same-workspace-new-session",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "700d7a3f7d00b2f9e8f5918053fdaac5935d9eb9af868d6db25805db041e926c"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "0173a767bd56650844a1ea14a2d12f5677b92587bf89dcdc4602ec21a41f829c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6564b3ca63857cee8388e61c68c945b9dc9c84a2953b960d79865110afae4b64"
+        },
+        {
+          "path": "release.py",
+          "sha256": "fb8a8c28460b1fcf9d62ecc860ab7f39a0b5610f1e469c1f13e3030751a03c8c"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_field",
+            "_identity",
+            "_record",
+            "_string_list",
+            "check_references",
+            "read_applied",
+            "read_changes",
+            "read_optional_applied",
+            "read_release",
+            "read_retain",
+            "retained_set"
+          ],
+          "lineCount": 206
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "actions_for",
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 114
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "authorize",
+            "limit_for"
+          ],
+          "lineCount": 84
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 39
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 16,
+              "end": 35,
+              "name": "_string_list",
+              "docstring": "Return ``row[key]`` as a list of strings; ``None`` means \"absent\".\n\nA key present with value ``null`` is malformed, not absent: the host's\ntransport contract pins ``depends_on: null`` to invalid-change, and\ndefaulting it would silently accept a record whose author meant something\nelse. A missing key is the only way to request the empty default.\nOnly lists of nonempty strings are accepted. A bare string would otherwise\nbe iterated character by character and silently turn \"ab\" into [\"a\", \"b\"],\nso it is rejected instead of coerced."
+            },
+            {
+              "line": 38,
+              "end": 41,
+              "name": "_field",
+              "docstring": null
+            },
+            {
+              "line": 44,
+              "end": 64,
+              "name": "_record",
+              "docstring": "Validate one change record and return it with a canonical dependency set.\n\n``depends_on`` is stored sorted and de-duplicated because record identity\nis defined by the *set* of dependencies: two records that only differ in\ndependency order (or repeat a dependency) are the same change, not a\nconflict. Canonicalizing also means the graph is built from one\nrepresentation regardless of how the caller spelled the list."
+            },
+            {
+              "line": 67,
+              "end": 72,
+              "name": "_identity",
+              "docstring": null
+            },
+            {
+              "line": 75,
+              "end": 96,
+              "name": "read_changes",
+              "docstring": "Validate ``changes`` and collapse identical duplicates.\n\nReturns records in first-appearance order. The order does not affect the\nresult (the planner sorts by ID), but it keeps diagnostics reproducible."
+            },
+            {
+              "line": 99,
+              "end": 113,
+              "name": "read_applied",
+              "docstring": "Validate the persisted journal and return it as a set of change IDs.\n\nUse :func:`read_optional_applied` for the request field: a present ``null``\nis malformed there, while this function only sees an already-vetted list."
+            },
+            {
+              "line": 116,
+              "end": 126,
+              "name": "read_optional_applied",
+              "docstring": "Read an optional list-of-strings field, distinguishing absent from null.\n\n``None`` meant two different things in an early version of this module\n(absent key and JSON ``null``), which silently accepted ``\"applied\": null``.\nThe host's transport contract pins a present ``null`` to ``invalid-change``,\nso the two cases must be separated at the boundary, not deeper down."
+            },
+            {
+              "line": 129,
+              "end": 143,
+              "name": "check_references",
+              "docstring": "Reject unknown dependency targets and unknown applied IDs.\n\nApplied IDs are checked against the same change graph, so a journal entry\nfor a change that is no longer described by the request is treated as a\nbroken reference rather than ignored."
+            },
+            {
+              "line": 146,
+              "end": 174,
+              "name": "read_retain",
+              "docstring": "Read and validate the G2 ``retain`` list for a staging rollback.\n\n``retain`` names changes the caller wants left in place. It defaults to\nempty (a plain rollback); a present ``null`` is malformed, matching how\n``depends_on``/``applied`` separate absent from null.\n\nMalformed shape and *nonapplied* IDs both raise ``invalid-retain`` rather\nthan ``invalid-change``/``unknown-dependency``: retain is a\nrollback-specific argument, and the caller needs to tell a bad retain list\napart from a broken change record. Retaining something that was never\napplied would silently keep a phantom change alive, so it is rejected\ninstead of being ignored."
+            },
+            {
+              "line": 177,
+              "end": 198,
+              "name": "retained_set",
+              "docstring": "Return the applied IDs a rollback must leave in place.\n\nThe result is the *transitive* dependency closure of ``retain`` restricted\nto ``applied``. A retained change is useless without its prerequisites, so\nthey must survive with it; but a dependency that was never applied is not\nrunning, and rollback cannot emit it anyway, so it is not added.\n\nThe graph is known to be acyclic by the time this runs (the planner rejects\ncycles first), so the walk terminates. It is iterative because a deep\ndependency chain must not hit Python's recursion limit."
+            },
+            {
+              "line": 201,
+              "end": 206,
+              "name": "read_release",
+              "docstring": "Run the whole boundary: validate, dedupe, replay, check references."
+            }
+          ],
+          "comments": [
+            [
+              56,
+              "# ``type(...) is int`` rather than isinstance: booleans are ints in Python"
+            ],
+            [
+              57,
+              "# and ``True`` must not count as one unit."
+            ],
+            [
+              68,
+              "# Covers id, component, units and the dependency set, exactly the equality"
+            ],
+            [
+              69,
+              "# contract. Components containing \"|\" still compare correctly because the"
+            ],
+            [
+              70,
+              "# tuple is compared element-wise upstream, not by string concatenation."
+            ],
+            [
+              92,
+              "# Identical duplicate: keep one copy so it is accounted once."
+            ],
+            [
+              111,
+              "# A repeated entry in the journal is harmless: replay is a set."
+            ],
+            [
+              171,
+              "# A repeated retain entry is harmless: retention is a set."
+            ]
+          ],
+          "moduleNote": "Normalize release records at the input boundary.\n\nThis module owns input validation, record identity (deduplication), replay of\nthe caller-supplied ``applied`` journal, and the ``retain`` set for a staging\nrollback. It deliberately knows nothing about ordering, budgets or\nenvironments: those belong to ``planner`` and ``policy``. Keeping one\nexception type (and therefore one error code per rule) is what lets\n``planner`` map every boundary failure to an exact SPEC result."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 18,
+              "end": 20,
+              "name": "failure",
+              "docstring": "The one and only error shape. ``actions`` stays empty on every failure."
+            },
+            {
+              "line": 23,
+              "end": 56,
+              "name": "topological_order",
+              "docstring": "Kahn's algorithm with lexicographic ID tie-breaking.\n\nUses a heap over currently eligible IDs, so the order is uniquely\ndetermined by the ID set and the dependency relation -- it never depends\non the input order or on dict/set iteration order.\n\nThe sweep is iterative on purpose: a deep chain of thousands of changes\nmust not hit Python's recursion limit."
+            },
+            {
+              "line": 59,
+              "end": 82,
+              "name": "actions_for",
+              "docstring": "Select and bill the actions for one operation.\n\nplan: unapplied changes in topological order; bill the sum of their units,\n      because applied entries never consume new budget.\nrollback: applied changes in the reverse of the *full* topological order.\n      The full order is needed -- an applied change may depend on a\n      not-yet-applied one, and reversing only the applied sub-sequence\n      would emit a dependency after its dependent.\nretain (G2, rollback only): applied IDs named by ``retain`` plus the\n      transitive dependencies among them are subtracted from that reverse\n      order. Subtraction, not re-sorting, so the remaining actions keep\n      the original deterministic rollback order."
+            },
+            {
+              "line": 85,
+              "end": 114,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              13,
+              "# Cycle detection uses Kahn's in-degree sweep rather than DFS colouring: every"
+            ],
+            [
+              14,
+              "# node on a cycle (or downstream of one) keeps a positive in-degree, so a short"
+            ],
+            [
+              15,
+              "# result is exactly \"a cycle exists\". A self-dependency is just the 1-ring case."
+            ],
+            [
+              49,
+              "# Push only when the node becomes eligible, which is what makes"
+            ],
+            [
+              50,
+              "# \"lexicographically smallest among *currently* eligible\" hold."
+            ],
+            [
+              53,
+              "# Every node on a cycle (and everything downstream of it) keeps a"
+            ],
+            [
+              54,
+              "# positive in-degree, so a short fall automatically means a cycle."
+            ],
+            [
+              76,
+              "# ``retain`` is read and expanded only on this branch: a plan can never"
+            ],
+            [
+              77,
+              "# be influenced by it, and an invalid retain list never masks a plan."
+            ],
+            [
+              87,
+              "# Non-object input (array, string, null, number) is a transport-level"
+            ],
+            [
+              88,
+              "# problem, reported before any field could be inspected."
+            ],
+            [
+              91,
+              "# Policy first and before the journal is touched: ``authorize`` raises"
+            ],
+            [
+              92,
+              "# ``production-frozen`` for a frozen environment, and G2 requires that"
+            ],
+            [
+              93,
+              "# answer even when ``changes`` is malformed or cyclic. Reversing these"
+            ],
+            [
+              94,
+              "# two steps would let a graph error mask the freeze."
+            ],
+            [
+              108,
+              "# Checked after replay/dedupe and on emitted units only, and only"
+            ],
+            [
+              109,
+              "# for plan. ``budget`` is already min(request, quota) on staging."
+            ],
+            [
+              110,
+              "# The whole request fails rather than emitting a prefix."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nPlanner owns the graph, the deterministic order, the replay/budget decision,\nrollback retention and the exact output shape. It is also the only place that\nconverts domain errors into a result object, so no failure path can leak a\npartial action list."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 32,
+              "end": 66,
+              "name": "authorize",
+              "docstring": "Validate environment, action and budget; return ``(action, budget)``.\n\nThe order of the three checks is part of the contract, because it decides\nwhich code wins when a request is wrong in several ways at once:\n\n* ``environment`` first, so a non-string or unknown value is\n  ``invalid-environment`` rather than a TypeError from set membership.\n* ``action`` next: an unknown operation is ``unsupported-action``, never a\n  silent fallback to plan.\n* ``production-frozen`` next, and before the *caller* reads any change.\n  CHANGE-G2 pins that a production request reports the freeze even when the\n  graph is malformed, so this must run before budget/change validation.\n  The budget is therefore deliberately NOT validated here for production:\n  ``budget: true`` on a production request is ``production-frozen``.\n* ``budget`` last: ``type(...) is int`` excludes booleans on purpose\n  (``True`` is an int in Python but is not a valid budget)."
+            },
+            {
+              "line": 69,
+              "end": 84,
+              "name": "limit_for",
+              "docstring": "Return the effective budget for an already-authorized request.\n\nG2: a staging plan is capped by ``STAGING_PLAN_QUOTA``, so the effective\nbudget is ``min(budget, 3)``. A quota violation therefore surfaces as the\nordinary ``budget-exceeded`` raised by the planner's comparison, not as a\nseparate code; the request budget is still validated in full above so a\nmalformed value is reported even when the quota would be the tighter bound.\n\nOnly ``plan`` is capped. Rollback retires already-applied changes; capping\nit would leave a release stuck rolled halfway, so its (validated) budget is\nreturned unchanged and never compared against emitted units."
+            }
+          ],
+          "comments": [
+            [
+              9,
+              "# Actions each environment may request. Production is listed but frozen below;"
+            ],
+            [
+              10,
+              "# the table stays explicit so a later goal can reopen it in one place."
+            ],
+            [
+              18,
+              "# G2: this release is staging-only. Kept as a set rather than an"
+            ],
+            [
+              19,
+              "# ``environment == \"production\"`` test so the frozen scope is data, not"
+            ],
+            [
+              20,
+              "# scattered conditionals, when the freeze is lifted later."
+            ],
+            [
+              23,
+              "# G2: a staging plan may emit at most this many units this cycle, whatever the"
+            ],
+            [
+              24,
+              "# request asks for. Kept here (not in planner) because it is a spend rule."
+            ],
+            [
+              51,
+              "# Explicit membership test instead of a string compare: an unhashable"
+            ],
+            [
+              52,
+              "# value (list/dict) must yield invalid-environment, not TypeError."
+            ],
+            [
+              59,
+              "# The whole environment is read-only, so no other validation error may"
+            ],
+            [
+              60,
+              "# mask the real reason for refusal -- including an invalid budget or a"
+            ],
+            [
+              61,
+              "# cycled graph."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nPolicy owns exactly three questions: is this environment/action combination\nallowed, is the environment frozen, and what budget cap applies. It never\ninspects ``changes`` -- and it is called before the journal is read -- so a\npolicy denial can never emit partial actions or be masked by a graph error."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 13,
+              "end": 35,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              17,
+              "# ``json.load`` raises ValueError for malformed JSON and"
+            ],
+            [
+              18,
+              "# UnicodeDecodeError (a ValueError) for undecodable bytes, so both"
+            ],
+            [
+              19,
+              "# land here as invalid-json instead of a traceback."
+            ],
+            [
+              22,
+              "# Pathologically nested input (e.g. thousands of \"[\") exhausts the"
+            ],
+            [
+              23,
+              "# parser's recursion before it is a document at all. That is still a"
+            ],
+            [
+              24,
+              "# transport problem; without this clause the process would die with a"
+            ],
+            [
+              25,
+              "# traceback and a non-zero exit, breaking the exit-0 contract."
+            ],
+            [
+              31,
+              "# Defence in depth: a bug in a lower layer must still produce the"
+            ],
+            [
+              32,
+              "# documented JSON shape rather than a non-zero exit. The SPEC's"
+            ],
+            [
+              33,
+              "# fallback for an unclassifiable request is invalid-request."
+            ]
+          ],
+          "moduleNote": "JSON transport for the release planner.\n\nThis module owns stdin/stdout only. Every request -- including domain errors and\nunexpected faults -- prints exactly one JSON object and exits 0, which is the\nservice's whole external contract."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "ARCHITECTURE.md",
+          "sha256": "541c6c61870340d1370b955d55dbb4463c873e767e6aee589d9793280deea09e"
+        },
+        {
+          "path": "TEST-REPORT.md",
+          "sha256": "71aa9afa20fa60f30ad585b971e4610b3a76ecb67033f0a6cd866d0b35660c09"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "plan-ignores-rollback-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 2,
+                "depends_on": []
+              }
+            ],
+            "retain": [
+              "absent"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "staging-denied-after-replay",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 3,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-iAiCGF",
+      "mode": "standard",
+      "stage": "g1",
+      "session": "5a3605fdc518",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "9cb3b7641343f1df3fc7a91ac2d165047941ab8d223e100d80a0fe5b9025ee1b"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "deecfb926b63533b0c62fc3f5388bfa5efd9613723dd71a4119630113e740f51"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "69cf6ffc51563a78e1b850a6aa41889bd9ce05ce352f96151fd147c704a40aca"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_nonempty_str",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 62
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_dependents",
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 70
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 19
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "_is_nonempty_str",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 19,
+              "name": "_read_dependencies",
+              "docstring": null
+            },
+            {
+              "line": 22,
+              "end": 29,
+              "name": "read_applied",
+              "docstring": "Return the persisted release journal as an ordered list of change IDs."
+            },
+            {
+              "line": 32,
+              "end": 62,
+              "name": "read_changes",
+              "docstring": "Validate change records and collapse identical duplicates.\n\nDuplicates whose ID, component and units agree but whose dependency sets\nconflict raise ``conflicting-change``."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Normalize release records at the input boundary."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 21,
+              "name": "_dependents",
+              "docstring": "Validate graph targets and return id -> set of dependent change IDs."
+            },
+            {
+              "line": 24,
+              "end": 40,
+              "name": "topological_order",
+              "docstring": "Kahn's algorithm with lexicographic ID tie-breaking."
+            },
+            {
+              "line": 43,
+              "end": 70,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Compose policy and journal data into a plan."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 10,
+              "end": 19,
+              "name": "limit_for",
+              "docstring": "Validate environment, action and budget; return the new-work budget."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Validate release policy before computing actions."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "passed": false
+        },
+        {
+          "case": "self-cycle-in-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-iAiCGF",
+      "mode": "standard",
+      "stage": "g2",
+      "session": "2eca16e6624f",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-workspace-new-session",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "16caa1633716949ff5e849b5c5c27330aa32b9fb4e569190f7a5115fae7a21f0"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "0206e96f2e72c841a67510c07ca6436eacb33494388d5c705c566367281e3f09"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "3766a3ed9284fa03d3b57f7d26db8fad3fc73cbf32a226db67c4ebe9d296fd22"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_nonempty_str",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain",
+            "retain_set"
+          ],
+          "lineCount": 102
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_dependents",
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 79
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for",
+            "read_scope"
+          ],
+          "lineCount": 41
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "_is_nonempty_str",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 19,
+              "name": "_read_dependencies",
+              "docstring": null
+            },
+            {
+              "line": 22,
+              "end": 29,
+              "name": "read_applied",
+              "docstring": "Return the persisted release journal as an ordered list of change IDs."
+            },
+            {
+              "line": 32,
+              "end": 43,
+              "name": "read_retain",
+              "docstring": "Return the rollback retain list as an ordered list of change IDs.\n\nOnly the shape is checked here; whether each ID is applied is settled\nonce the persisted journal is known."
+            },
+            {
+              "line": 46,
+              "end": 69,
+              "name": "retain_set",
+              "docstring": "Return the IDs a rollback must leave applied.\n\nEach retain entry must already be applied, otherwise ``invalid-retain``\nis raised. The result is the requested IDs plus every transitive\ndependency of theirs that is itself applied. The graph is known to be\nacyclic by the time this runs, so the closure terminates."
+            },
+            {
+              "line": 72,
+              "end": 102,
+              "name": "read_changes",
+              "docstring": "Validate change records and collapse identical duplicates.\n\nDuplicates whose ID, component and units agree but whose dependency sets\nconflict raise ``conflicting-change``."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Normalize release records at the input boundary."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 21,
+              "name": "_dependents",
+              "docstring": "Validate graph targets and return id -> set of dependent change IDs."
+            },
+            {
+              "line": 24,
+              "end": 40,
+              "name": "topological_order",
+              "docstring": "Kahn's algorithm with lexicographic ID tie-breaking."
+            },
+            {
+              "line": 43,
+              "end": 79,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Compose policy and journal data into a plan."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 12,
+              "end": 24,
+              "name": "limit_for",
+              "docstring": "Return the new-work budget for an already validated request.\n\n``environment`` and ``action`` come from :func:`read_scope`, which also\nrejects frozen production before any budget or change validation. A\nstaging plan is additionally capped by ``STAGING_PLAN_LIMIT``; a staging\nrollback is validated but never capped."
+            },
+            {
+              "line": 27,
+              "end": 41,
+              "name": "read_scope",
+              "docstring": "Validate environment and action and return them as ``(env, action)``.\n\nProduction is frozen for both plan and rollback, so that failure is\nraised before any budget or change validation and before graph building."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Validate release policy before computing actions."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "plan-ignores-rollback-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 2,
+                "depends_on": []
+              }
+            ],
+            "retain": [
+              "absent"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "staging-denied-after-replay",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 3,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "mode": "building-loop",
+      "stage": "g1",
+      "session": "470a55e618a3",
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_invalid",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 83
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 96
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 44
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 16,
+              "end": 17,
+              "name": "_invalid",
+              "docstring": null
+            },
+            {
+              "line": 20,
+              "end": 32,
+              "name": "_id_list",
+              "docstring": "Read an optional array-of-change-id field, defaulting to empty.\n\nSPEC: depends_on/applied must be arrays of nonempty strings. Shape errors are\nrejected here so graph code can trust the values it receives."
+            },
+            {
+              "line": 35,
+              "end": 65,
+              "name": "read_changes",
+              "docstring": "Validate change records and collapse identical duplicates.\n\nReturns dicts {\"id\",\"component\",\"units\",\"depends_on\"} in first-appearance\norder. SPEC: duplicates are identical only when id, component, units and the\n*set* of dependencies match, hence frozenset(deps) in the dedup key; any other\nrepeat of an id is conflicting-change. Deduplication runs before accounting\nand graph construction so repeated records are never counted twice."
+            },
+            {
+              "line": 68,
+              "end": 83,
+              "name": "read_applied",
+              "docstring": "Validate the persisted release journal against the known change set.\n\n`applied` defaults to empty. Unknown ids mean the caller's journal does not\ndescribe this release set, so replay and ordering would be unsound; SPEC maps\nthat to unknown-dependency (not invalid-change). Malformed shape stays\ninvalid-change via _id_list."
+            }
+          ],
+          "comments": [
+            [
+              62,
+              "# Same id but different identity: the caller's intent is ambiguous, so"
+            ],
+            [
+              63,
+              "# neither record may be chosen silently on its behalf."
+            ],
+            [
+              81,
+              "# Sorted unique: replay is a set of states, and a repeated id must not make"
+            ],
+            [
+              82,
+              "# rollback emit the same action twice or plan count it twice."
+            ]
+          ],
+          "moduleNote": "Normalize release records at the input boundary.\n\nImport direction: journal.py is a leaf module (imports nothing local). It owns\nrecord validation, identity/replay semantics and existence checks; it never\norders changes. planner.py calls it and then ranks the graph.\n\nEvery rejection raises JournalError carrying the SPEC error code as its message,\nso planner converts it into the failure object without inspecting types."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 13,
+              "end": 15,
+              "name": "failure",
+              "docstring": "The single failure shape from SPEC: no partial actions, units always 0."
+            },
+            {
+              "line": 18,
+              "end": 61,
+              "name": "_topological_order",
+              "docstring": "Return every change id in deterministic topological order.\n\nRaises unknown-dependency for dependency targets that are not change ids and\ndependency-cycle when any part of the graph is cyclic (including components\nwith cycles unreachable from an acyclic prefix).\n\nTie-breaking: among changes whose dependencies are all already emitted, the\nlexicographically smallest id goes next. heapq gives that deterministically,\nso the same request always yields the same order regardless of input order.\nThe full order is computed even for `plan` because rollback reverses it and\nplan must still reject cycles it would otherwise only reach via unapplied\nrecords."
+            },
+            {
+              "line": 64,
+              "end": 96,
+              "name": "plan",
+              "docstring": "Validate the request and build the ordered action list.\n\nOrder matters: request shape, then policy (environment/action/budget), then\njournal identity/applied, then graph. Every check raises before any action is\nassembled, so a rejected request can never emit partial actions."
+            }
+          ],
+          "comments": [
+            [
+              37,
+              "# A missing target means the caller's graph references a change this"
+            ],
+            [
+              38,
+              "# request cannot describe, so no safe order exists."
+            ],
+            [
+              42,
+              "# A self-dependency can never be satisfied; treat as a cycle"
+            ],
+            [
+              43,
+              "# instead of silently ignoring the record."
+            ],
+            [
+              57,
+              "# Fewer emitted ids than changes means the leftover set holds or feeds a"
+            ],
+            [
+              58,
+              "# cycle; SPEC requires a cycle anywhere to fail, applied or not."
+            ],
+            [
+              82,
+              "# Rollback walks the full deterministic order backwards and emits only"
+            ],
+            [
+              83,
+              "# what the journal says is live. SPEC: budget is validated but never caps"
+            ],
+            [
+              84,
+              "# a rollback, since undoing work is the recovery path."
+            ],
+            [
+              89,
+              "# plan: applied entries already satisfy their dependencies and cost nothing, so"
+            ],
+            [
+              90,
+              "# they are skipped both as output and in the budget sum decided below."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nImport direction: planner.py is the top of the local stack (journal.py and\npolicy.py import nothing local). It owns graph validation, ordering and the\nresult assembly, and is the only module that builds success/failure objects."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 21,
+              "end": 44,
+              "name": "limit_for",
+              "docstring": "Return the validated budget for an already-confirmed object request.\n\nChecks run in a fixed order (environment, action, budget) so a request with\nseveral defects always reports the same first code. Raises PolicyError whose\nmessage is the SPEC error code; planner turns it into the failure object."
+            }
+          ],
+          "comments": [
+            [
+              9,
+              "# G1 grants both environments plan and rollback; the table stays explicit because"
+            ],
+            [
+              10,
+              "# a later goal (CHANGE-G2.md) may narrow one environment without touching the rest."
+            ],
+            [
+              29,
+              "# isinstance(str) is checked first: dict/list values from JSON are unhashable"
+            ],
+            [
+              30,
+              "# and would raise TypeError inside the membership test, turning a domain error"
+            ],
+            [
+              31,
+              "# into a crashed process (SPEC: every request exits normally with JSON)."
+            ],
+            [
+              34,
+              "# A known environment with an action this goal does not implement is rejected"
+            ],
+            [
+              35,
+              "# here, before journal/planner work, so no partial actions are ever emitted."
+            ],
+            [
+              36,
+              "# Same unhashable guard as above for non-string actions."
+            ],
+            [
+              41,
+              "# type(...) is int (not isinstance) so booleans are not accepted as integers."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nImport direction: policy.py is a leaf module (imports nothing local). It owns the\nenvironment/action/budget gate only; record identity, graph and ordering stay in\njournal and planner, so a policy rejection happens before any journal or graph\nwork and cannot leave partial actions behind."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "modules/architecture.md",
+          "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "self-cycle-in-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "mode": "building-loop",
+      "stage": "g2",
+      "session": "5832c6e16f0f",
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "carry": "same-workspace-new-session",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_invalid",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 83
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_retained",
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 142
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "check_environment",
+            "limit_for"
+          ],
+          "lineCount": 75
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 16,
+              "end": 17,
+              "name": "_invalid",
+              "docstring": null
+            },
+            {
+              "line": 20,
+              "end": 32,
+              "name": "_id_list",
+              "docstring": "Read an optional array-of-change-id field, defaulting to empty.\n\nSPEC: depends_on/applied must be arrays of nonempty strings. Shape errors are\nrejected here so graph code can trust the values it receives."
+            },
+            {
+              "line": 35,
+              "end": 65,
+              "name": "read_changes",
+              "docstring": "Validate change records and collapse identical duplicates.\n\nReturns dicts {\"id\",\"component\",\"units\",\"depends_on\"} in first-appearance\norder. SPEC: duplicates are identical only when id, component, units and the\n*set* of dependencies match, hence frozenset(deps) in the dedup key; any other\nrepeat of an id is conflicting-change. Deduplication runs before accounting\nand graph construction so repeated records are never counted twice."
+            },
+            {
+              "line": 68,
+              "end": 83,
+              "name": "read_applied",
+              "docstring": "Validate the persisted release journal against the known change set.\n\n`applied` defaults to empty. Unknown ids mean the caller's journal does not\ndescribe this release set, so replay and ordering would be unsound; SPEC maps\nthat to unknown-dependency (not invalid-change). Malformed shape stays\ninvalid-change via _id_list."
+            }
+          ],
+          "comments": [
+            [
+              62,
+              "# Same id but different identity: the caller's intent is ambiguous, so"
+            ],
+            [
+              63,
+              "# neither record may be chosen silently on its behalf."
+            ],
+            [
+              81,
+              "# Sorted unique: replay is a set of states, and a repeated id must not make"
+            ],
+            [
+              82,
+              "# rollback emit the same action twice or plan count it twice."
+            ]
+          ],
+          "moduleNote": "Normalize release records at the input boundary.\n\nImport direction: journal.py is a leaf module (imports nothing local). It owns\nrecord validation, identity/replay semantics and existence checks; it never\norders changes. planner.py calls it and then ranks the graph.\n\nEvery rejection raises JournalError carrying the SPEC error code as its message,\nso planner converts it into the failure object without inspecting types."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 13,
+              "end": 15,
+              "name": "failure",
+              "docstring": "The single failure shape from SPEC: no partial actions, units always 0."
+            },
+            {
+              "line": 18,
+              "end": 61,
+              "name": "_topological_order",
+              "docstring": "Return every change id in deterministic topological order.\n\nRaises unknown-dependency for dependency targets that are not change ids and\ndependency-cycle when any part of the graph is cyclic (including components\nwith cycles unreachable from an acyclic prefix).\n\nTie-breaking: among changes whose dependencies are all already emitted, the\nlexicographically smallest id goes next. heapq gives that deterministically,\nso the same request always yields the same order regardless of input order.\nThe full order is computed even for `plan` because rollback reverses it and\nplan must still reject cycles it would otherwise only reach via unapplied\nrecords."
+            },
+            {
+              "line": 64,
+              "end": 97,
+              "name": "_retained",
+              "docstring": "Return the staging rollback retention closure (G2).\n\n`retain` lists applied ids that must stay. Its transitive dependencies are kept\nonly when they are themselves applied: an unapplied dependency is not part of\nthe live release, so keeping it would make the emitted rollback describe state\nthat was never there. Retained ids (and their closure) are therefore left out\nof the reverse order emitted by the caller.\n\nMalformed shape (non-array, non-string or empty ids) and ids that are not in\nthe applied journal are both invalid-retain: the caller asked to preserve\nsomething this request cannot preserve. This replaces the generic\ninvalid-change that _id_list would raise, because CHANGE-G2 names the code."
+            },
+            {
+              "line": 100,
+              "end": 142,
+              "name": "plan",
+              "docstring": "Validate the request and build the ordered action list.\n\nOrder matters: request shape, then policy (environment/action/budget + the G2\nproduction freeze), then journal identity/applied, then graph, then rollback\nretention. Every check raises before any action is assembled, so a rejected\nrequest can never emit partial actions. budget is already the effective one, so\nthe staging plan cap from G2 lives entirely in policy.py."
+            }
+          ],
+          "comments": [
+            [
+              37,
+              "# A missing target means the caller's graph references a change this"
+            ],
+            [
+              38,
+              "# request cannot describe, so no safe order exists."
+            ],
+            [
+              42,
+              "# A self-dependency can never be satisfied; treat as a cycle"
+            ],
+            [
+              43,
+              "# instead of silently ignoring the record."
+            ],
+            [
+              57,
+              "# Fewer emitted ids than changes means the leftover set holds or feeds a"
+            ],
+            [
+              58,
+              "# cycle; SPEC requires a cycle anywhere to fail, applied or not."
+            ],
+            [
+              83,
+              "# Iterative walk with an explicit stack: a deep chain must not hit the recursion"
+            ],
+            [
+              84,
+              "# limit and crash the transport (SPEC: every request exits with JSON)."
+            ],
+            [
+              120,
+              "# Rollback walks the full deterministic order backwards and emits only"
+            ],
+            [
+              121,
+              "# what the journal says is live. SPEC: budget is validated but never caps"
+            ],
+            [
+              122,
+              "# a rollback, since undoing work is the recovery path. G2 retention is"
+            ],
+            [
+              123,
+              "# computed here, after the graph is known valid, because the closure needs"
+            ],
+            [
+              124,
+              "# the dependencies of already-checked changes."
+            ],
+            [
+              134,
+              "# plan: applied entries already satisfy their dependencies and cost nothing, so"
+            ],
+            [
+              135,
+              "# they are skipped both as output and in the budget sum decided below. `retain`"
+            ],
+            [
+              136,
+              "# is a rollback-only field (CHANGE-G2), so a malformed retain is ignored here."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nImport direction: planner.py is the top of the local stack (journal.py and\npolicy.py import nothing local). It owns graph validation, ordering and the\nresult assembly, and is the only module that builds success/failure objects."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 31,
+              "end": 47,
+              "name": "check_environment",
+              "docstring": "Validate `environment` and enforce the G2 production freeze.\n\nThis gate runs before action/budget/journal/graph checks on purpose: a frozen\nenvironment must answer production-frozen even when changes or applied are\nmalformed, and it must never emit partial actions. Raises PolicyError whose\nmessage is the SPEC/CHANGE-G2 error code."
+            },
+            {
+              "line": 50,
+              "end": 75,
+              "name": "limit_for",
+              "docstring": "Return the validated budget for an already-confirmed object request.\n\nChecks run in a fixed order (environment + freeze, action, budget) so a request\nwith several defects always reports the same first code. Raises PolicyError\nwhose message is the SPEC/CHANGE-G2 error code; planner turns it into the\nfailure object. The returned budget is the effective one: for a staging plan it\nis already capped at STAGING_PLAN_CAP."
+            }
+          ],
+          "comments": [
+            [
+              9,
+              "# G2 is staging-only: production is frozen for every action, so it intentionally"
+            ],
+            [
+              10,
+              "# has no allowed actions here. The table stays explicit per environment so a later"
+            ],
+            [
+              11,
+              "# goal can re-open one environment without touching the other."
+            ],
+            [
+              17,
+              "# G2 refuses production before any graph/change validation, so the planner can"
+            ],
+            [
+              18,
+              "# still return production-frozen for a malformed request instead of the deeper"
+            ],
+            [
+              19,
+              "# graph error. Both plan and rollback are frozen."
+            ],
+            [
+              22,
+              "# G2 caps a staging plan at 3 units regardless of the requested budget; the"
+            ],
+            [
+              23,
+              "# request itself is still validated as a nonnegative integer first."
+            ],
+            [
+              40,
+              "# isinstance(str) is checked first: dict/list values from JSON are unhashable"
+            ],
+            [
+              41,
+              "# and would raise TypeError inside the membership test, turning a domain error"
+            ],
+            [
+              42,
+              "# into a crashed process (SPEC: every request exits normally with JSON)."
+            ],
+            [
+              60,
+              "# A known environment with an action this goal does not implement is rejected"
+            ],
+            [
+              61,
+              "# here, before journal/planner work, so no partial actions are ever emitted."
+            ],
+            [
+              62,
+              "# Same unhashable guard as above for non-string actions."
+            ],
+            [
+              67,
+              "# type(...) is int (not isinstance) so booleans are not accepted as integers."
+            ],
+            [
+              70,
+              "# G2: a staging plan may emit at most min(request budget, 3) units; the request"
+            ],
+            [
+              71,
+              "# value alone never raises the cap. Rollback keeps the raw budget (validated,"
+            ],
+            [
+              72,
+              "# never capping), so the cap is applied to plan only."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nImport direction: policy.py is a leaf module (imports nothing local). It owns the\nenvironment/action/budget gate only; record identity, graph and ordering stay in\njournal and planner, so a policy rejection happens before any journal or graph\nwork and cannot leave partial actions behind."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "modules/architecture.md",
+          "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "plan-ignores-rollback-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 2,
+                "depends_on": []
+              }
+            ],
+            "retain": [
+              "absent"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "staging-denied-after-replay",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 3,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "mode": "standard-checklist",
+      "stage": "g1",
+      "session": "8c93d6422cbf",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "016d08d7e1d60c1d8321200038d1b3355282b36cff9d5f2447837a71db740628"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ac47ae842359d54b3f350380e9629a54eae0b600ae2da27745664ead69538ada"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "f23b3b5b36bbfdd209562ca23698d3cd31482a2bd0c2003e3b0628dd1ab72104"
+        },
+        {
+          "path": "release.py",
+          "sha256": "bca83e8c6ccda56f616bce1f5af088dfbecbda979f8eb286a59edff7a2b262b9"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_int",
+            "_read_ids",
+            "_signature",
+            "dedupe",
+            "known",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 94
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "build_graph",
+            "failure",
+            "plan",
+            "success",
+            "topological_order"
+          ],
+          "lineCount": 97
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 30
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 14,
+              "end": 17,
+              "name": "_is_int",
+              "docstring": null
+            },
+            {
+              "line": 20,
+              "end": 27,
+              "name": "_read_ids",
+              "docstring": "Validate an array of change IDs, used for both depends_on and applied."
+            },
+            {
+              "line": 30,
+              "end": 47,
+              "name": "read_changes",
+              "docstring": "Validate and normalize change records into dictionaries.\n\nDefaults are applied here (`depends_on` -> empty set) so finer layers never\nhave to care whether a field was explicit or omitted."
+            },
+            {
+              "line": 50,
+              "end": 54,
+              "name": "_signature",
+              "docstring": null
+            },
+            {
+              "line": 57,
+              "end": 75,
+              "name": "dedupe",
+              "docstring": "Collapse identical records; fail on conflicting records sharing an ID.\n\nRuns before graph construction and accounting: if the same change appeared\ntwice it would otherwise be counted twice toward the budget and produce two\nnodes / duplicate edges."
+            },
+            {
+              "line": 78,
+              "end": 80,
+              "name": "read_applied",
+              "docstring": "Validate the caller-supplied persisted journal as a set of applied IDs."
+            },
+            {
+              "line": 83,
+              "end": 92,
+              "name": "known",
+              "docstring": "Reject applied IDs that do not name a change in the request.\n\nSPEC treats an unknown ID in the persisted journal as `unknown-dependency`\n(not `invalid-change`): the journal is well-formed but references something\nthat is not part of this graph."
+            }
+          ],
+          "comments": [
+            [
+              15,
+              "# bool is a subclass of int: `True` must be rejected as a integer (SPEC:"
+            ],
+            [
+              16,
+              "# \"Integers exclude booleans\"), hence an exact type check rather than isinstance."
+            ],
+            [
+              51,
+              "# Equality covers id, component, units and the *set* of dependencies, so a"
+            ],
+            [
+              52,
+              "# duplicated dependency or a different ordering is still the same record."
+            ],
+            [
+              53,
+              "# depends_on is stored as a set and sorted here for a stable comparison key."
+            ],
+            [
+              71,
+              "# Identical duplicate: drop it, keeping the first occurrence."
+            ]
+          ],
+          "moduleNote": "Normalize release records at the input boundary.\n\nResponsibility: everything that is about *identity* of changes and the persisted\nreplay journal -- row validation, defaulting, equivalent-record collapsing,\nconflict detection, and `applied` validation. It never sorts a graph and never\ncompares against the budget; those belong to planner/policy respectively."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 13,
+              "end": 14,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 17,
+              "end": 18,
+              "name": "success",
+              "docstring": null
+            },
+            {
+              "line": 21,
+              "end": 31,
+              "name": "build_graph",
+              "docstring": "Map change ID -> set of dependencies, failing on missing targets.\n\nEdge direction is dependency -> dependent. `unknown-dependency` is raised\nfor a dependency naming an ID absent from the (deduplicated) request."
+            },
+            {
+              "line": 34,
+              "end": 64,
+              "name": "topological_order",
+              "docstring": "Full deterministic order with lexicographic tie-breaking.\n\nOnly currently eligible nodes are candidates, and the smallest ID among\nthem is taken -- a min-heap gives exactly that, so the result is fully\nreproducible. Cycles are detected by Kahn's count: if fewer nodes than exist\nare emitted, a cycle exists somewhere. A recursive DFS is avoided because\nlong dependency chains would exceed the recursion limit."
+            },
+            {
+              "line": 67,
+              "end": 97,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              56,
+              "# Eligible pushes are unique per node, so no duplicate-entry guard"
+            ],
+            [
+              57,
+              "# is needed: indegree reaching 0 happens exactly once per node."
+            ],
+            [
+              62,
+              "# Includes self-dependency (X depends on X), which Kahn cannot drain."
+            ],
+            [
+              71,
+              "# Policy first, then records: this is the documented error precedence."
+            ],
+            [
+              85,
+              "# Already-applied entries satisfy dependencies but emit nothing and cost"
+            ],
+            [
+              86,
+              "# no budget; only emitted units are summed, matching the success shape."
+            ],
+            [
+              93,
+              "# rollback: reverse of the *full* deterministic order, then filtered to the"
+            ],
+            [
+              94,
+              "# applied entries. Deriving it from the full order (rather than re-sorting a"
+            ],
+            [
+              95,
+              "# subgraph) is what SPEC requires; the budget is validated but never caps."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nResponsibility: graph construction, deterministic ordering, action selection and\nresult assembly. Every check runs before the single success return so a failure\nnever carries partial actions."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 20,
+              "end": 30,
+              "name": "limit_for",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              10,
+              "# G1: both environments support plan and rollback. A disallowed action must be"
+            ],
+            [
+              11,
+              "# rejected here, before any action list exists, so failures never carry partial"
+            ],
+            [
+              12,
+              "# actions (SPEC: \"A disallowed operation emits no partial actions\")."
+            ],
+            [
+              26,
+              "# type(...) is int, not isinstance: booleans are ints in Python and SPEC"
+            ],
+            [
+              27,
+              "# excludes them from valid integers."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nResponsibility: environment, action support and budget. Deliberately free of any\ngraph or journal knowledge so the error precedence (environment -> action ->\nbudget) stays a single, readable chain that runs *before* record validation."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 9,
+              "end": 25,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              13,
+              "# Deeply nested or non-UTF8 input is still a transport failure: exit 0"
+            ],
+            [
+              14,
+              "# with a JSON result, never a traceback (SPEC: all requests exit normally)."
+            ],
+            [
+              20,
+              "# Last-resort guard: the transport must still emit exactly one JSON"
+            ],
+            [
+              21,
+              "# object. The planner already returns its own domain errors, so this"
+            ],
+            [
+              22,
+              "# is only reachable through a defect; surface it on stderr."
+            ]
+          ],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "ARCHITECTURE.md",
+          "sha256": "b20957fcefb3f68a2259c009ba1121d6a2fcbfccd5375f26940a10545a67a1c3"
+        },
+        {
+          "path": "TEST-RESULTS.md",
+          "sha256": "744a2cddcecd637a0351ee463f130d96b890acda99742f4a1e7ea3c3c897d9f7"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": false
+        },
+        {
+          "case": "self-cycle-in-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "mode": "standard-checklist",
+      "stage": "g2",
+      "session": "679cfd31c2f1",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-workspace-new-session",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "27389a8a21539ec97a9f86dfede9d036d6cd84191a189a79baf4e3eed6afabdb"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "02ce35d39a1c162cadfc52be0c7d7f7969acd47883a407d9649f963c7931b8b8"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "f1a0fe75b92ba0ed244014cd1b1d2704e3073009526df2795217ba03d835e10f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "bca83e8c6ccda56f616bce1f5af088dfbecbda979f8eb286a59edff7a2b262b9"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_int",
+            "_read_ids",
+            "_signature",
+            "dedupe",
+            "known",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 121
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "build_graph",
+            "failure",
+            "plan",
+            "retained_closure",
+            "success",
+            "topological_order"
+          ],
+          "lineCount": 149
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 67
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 14,
+              "end": 17,
+              "name": "_is_int",
+              "docstring": null
+            },
+            {
+              "line": 20,
+              "end": 27,
+              "name": "_read_ids",
+              "docstring": "Validate an array of change IDs, used for both depends_on and applied."
+            },
+            {
+              "line": 30,
+              "end": 47,
+              "name": "read_changes",
+              "docstring": "Validate and normalize change records into dictionaries.\n\nDefaults are applied here (`depends_on` -> empty set) so finer layers never\nhave to care whether a field was explicit or omitted."
+            },
+            {
+              "line": 50,
+              "end": 54,
+              "name": "_signature",
+              "docstring": null
+            },
+            {
+              "line": 57,
+              "end": 75,
+              "name": "dedupe",
+              "docstring": "Collapse identical records; fail on conflicting records sharing an ID.\n\nRuns before graph construction and accounting: if the same change appeared\ntwice it would otherwise be counted twice toward the budget and produce two\nnodes / duplicate edges."
+            },
+            {
+              "line": 78,
+              "end": 80,
+              "name": "read_applied",
+              "docstring": "Validate the caller-supplied persisted journal as a set of applied IDs."
+            },
+            {
+              "line": 83,
+              "end": 107,
+              "name": "read_retain",
+              "docstring": "Validate the staging rollback `retain` list as a set of change IDs (G2-3).\n\nShape validation only: whether each ID is *applied* is a graph/journal\nquestion answered against `applied` in planner. `_read_ids` is not reused\nbecause it always raises `invalid-change`; G2 gives retain its own code.\nA malformed `retain` (non-array, empty/non-string element) is\n`invalid-retain` rather than `invalid-change`, so the caller can tell which\nfield was wrong.\n\n`None` is treated as absent (the empty list) because an explicit JSON null\narrives here as None on an optional field; it must behave like an omitted\nkey rather than inventing an error.\n\n`retain` is accepted only for rollback; planner never calls this for plan,\nmatching the existing rule that unknown extra fields are ignored."
+            },
+            {
+              "line": 110,
+              "end": 119,
+              "name": "known",
+              "docstring": "Reject applied IDs that do not name a change in the request.\n\nSPEC treats an unknown ID in the persisted journal as `unknown-dependency`\n(not `invalid-change`): the journal is well-formed but references something\nthat is not part of this graph."
+            }
+          ],
+          "comments": [
+            [
+              15,
+              "# bool is a subclass of int: `True` must be rejected as a integer (SPEC:"
+            ],
+            [
+              16,
+              "# \"Integers exclude booleans\"), hence an exact type check rather than isinstance."
+            ],
+            [
+              51,
+              "# Equality covers id, component, units and the *set* of dependencies, so a"
+            ],
+            [
+              52,
+              "# duplicated dependency or a different ordering is still the same record."
+            ],
+            [
+              53,
+              "# depends_on is stored as a set and sorted here for a stable comparison key."
+            ],
+            [
+              71,
+              "# Identical duplicate: drop it, keeping the first occurrence."
+            ]
+          ],
+          "moduleNote": "Normalize release records at the input boundary.\n\nResponsibility: everything that is about *identity* of changes and the persisted\nreplay journal -- row validation, defaulting, equivalent-record collapsing,\nconflict detection, and `applied` validation. It never sorts a graph and never\ncompares against the budget; those belong to planner/policy respectively."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 14,
+              "end": 15,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 18,
+              "end": 19,
+              "name": "success",
+              "docstring": null
+            },
+            {
+              "line": 22,
+              "end": 32,
+              "name": "build_graph",
+              "docstring": "Map change ID -> set of dependencies, failing on missing targets.\n\nEdge direction is dependency -> dependent. `unknown-dependency` is raised\nfor a dependency naming an ID absent from the (deduplicated) request."
+            },
+            {
+              "line": 35,
+              "end": 65,
+              "name": "topological_order",
+              "docstring": "Full deterministic order with lexicographic tie-breaking.\n\nOnly currently eligible nodes are candidates, and the smallest ID among\nthem is taken -- a min-heap gives exactly that, so the result is fully\nreproducible. Cycles are detected by Kahn's count: if fewer nodes than exist\nare emitted, a cycle exists somewhere. A recursive DFS is avoided because\nlong dependency chains would exceed the recursion limit."
+            },
+            {
+              "line": 68,
+              "end": 102,
+              "name": "retained_closure",
+              "docstring": "IDs that a staging rollback must keep: `retain` plus its applied deps.\n\nG2-3: the caller names already-applied changes that must stay; their\ntransitive dependencies must stay too, otherwise the release journal would\nend up with a change whose dependency was rolled back.\n\nNon-obvious boundaries:\n- A `retain` ID that is not applied is `invalid-retain`. An applied ID that\n  does not exist at all never reaches here: `known()` already reported it as\n  `unknown-dependency`, keeping G1's precedence for a broken journal. G2\n  adds a check for a *well-formed but wrong* journal, it does not reorder G1.\n- The closure also requires every dependency it walks to be applied. If a\n  retained change depends on a change the journal never recorded, keeping\n  the dependent would leave the journal inconsistent (it would claim an\n  applied change whose dependency is gone), so it is `invalid-retain` rather\n  than a silently partial keep.\n- Iterative BFS, not recursion: dependency chains can be thousands deep\n  (see the deep-chain test) and would exceed the default recursion limit."
+            },
+            {
+              "line": 105,
+              "end": 149,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              57,
+              "# Eligible pushes are unique per node, so no duplicate-entry guard"
+            ],
+            [
+              58,
+              "# is needed: indegree reaching 0 happens exactly once per node."
+            ],
+            [
+              63,
+              "# Includes self-dependency (X depends on X), which Kahn cannot drain."
+            ],
+            [
+              109,
+              "# Policy first, then records: this is the documented error precedence."
+            ],
+            [
+              110,
+              "# It is also what makes G2-1 work: a production request fails with"
+            ],
+            [
+              111,
+              "# `production-frozen` here, before `changes` is touched, so a malformed"
+            ],
+            [
+              112,
+              "# graph or change list cannot turn the freeze into another error."
+            ],
+            [
+              120,
+              "# `retain` is rollback-only (G2-3): it is neither read nor validated for"
+            ],
+            [
+              121,
+              "# a plan request, so a stray field cannot change plan behaviour or turn"
+            ],
+            [
+              122,
+              "# a valid plan into an error."
+            ],
+            [
+              131,
+              "# Already-applied entries satisfy dependencies but emit nothing and cost"
+            ],
+            [
+              132,
+              "# no budget; only emitted units are summed, matching the success shape."
+            ],
+            [
+              133,
+              "# `budget` here is already the *effective* budget from policy: on"
+            ],
+            [
+              134,
+              "# staging it is capped at STAGING_PLAN_LIMIT, so a request that allows"
+            ],
+            [
+              135,
+              "# more still fails once emitted units are past the cap (G2-2)."
+            ],
+            [
+              142,
+              "# rollback: reverse of the *full* deterministic order, then filtered to the"
+            ],
+            [
+              143,
+              "# applied entries that are not retained. Deriving the sequence from the full"
+            ],
+            [
+              144,
+              "# order (rather than re-sorting a subgraph) is what SPEC requires; dropping"
+            ],
+            [
+              145,
+              "# the kept set only removes elements, so the result is still a subsequence"
+            ],
+            [
+              146,
+              "# of the full reverse order. The budget is validated but never caps (G2-2"
+            ],
+            [
+              147,
+              "# caps staging only for plan, so `budget` is ignored here on purpose)."
+            ]
+          ],
+          "moduleNote": "Compose policy and journal data into a plan.\n\nResponsibility: graph construction, deterministic ordering, action selection and\nresult assembly. Every check runs before the single success return so a failure\nnever carries partial actions."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 28,
+              "end": 67,
+              "name": "limit_for",
+              "docstring": "Return the effective budget, or raise the environment/action/budget error.\n\nOrder matters and is locked by tests: environment -> freeze -> action ->\nbudget. Two points are easy to get wrong:\n\n- The freeze runs *before* the action and budget checks. G2-1 asks for\n  `production-frozen` \"before graph or change validation\" and says both plan\n  and rollback are frozen; putting it first in the staging-only contract is\n  the only way a production request can be frozen unconditionally, whatever\n  else is malformed in it. G1's \"invalid-budget wins\" was a consequence of\n  budgets being checked first, and G2 supersedes it for production.\n- It still runs after the environment check: an unknown environment is not\n  production and must keep reporting `invalid-environment` (G1 behaviour)."
+            }
+          ],
+          "comments": [
+            [
+              10,
+              "# G1: both actions are supported. A disallowed action must be rejected here,"
+            ],
+            [
+              11,
+              "# before any action list exists, so failures never carry partial actions (SPEC:"
+            ],
+            [
+              12,
+              "# \"A disallowed operation emits no partial actions\")."
+            ],
+            [
+              13,
+              "# G2: support no longer depends on the environment -- production is rejected by"
+            ],
+            [
+              14,
+              "# the freeze below, not by this set, so `deploy` stays `unsupported-action` even"
+            ],
+            [
+              15,
+              "# in production (the caller must not be told a nonexistent action is frozen)."
+            ],
+            [
+              18,
+              "# G2-2: the effective staging plan budget is the smaller of the request budget"
+            ],
+            [
+              19,
+              "# and this cap, so a request asking for more still fails once emitted units go"
+            ],
+            [
+              20,
+              "# past it. Rollback is never capped by it."
+            ],
+            [
+              47,
+              "# G2-1: staging-only release. Both plan and rollback are frozen, and this"
+            ],
+            [
+              48,
+              "# fires before `changes`/`applied`/`retain` are ever looked at, so no"
+            ],
+            [
+              49,
+              "# partial actions can be produced for a production request."
+            ],
+            [
+              57,
+              "# type(...) is int, not isinstance: booleans are ints in Python and SPEC"
+            ],
+            [
+              58,
+              "# excludes them from valid integers."
+            ],
+            [
+              62,
+              "# Environment here can only be staging. Only the plan budget is capped;"
+            ],
+            [
+              63,
+              "# rollback's budget stays \"validated but never a cap\" (G1), so it is"
+            ],
+            [
+              64,
+              "# returned unchanged and planner simply must not compare against it."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions.\n\nResponsibility: environment, action support and budget. Deliberately free of any\ngraph or journal knowledge so the error precedence stays a single, readable chain\nthat runs *before* record validation."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 9,
+              "end": 25,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [
+            [
+              13,
+              "# Deeply nested or non-UTF8 input is still a transport failure: exit 0"
+            ],
+            [
+              14,
+              "# with a JSON result, never a traceback (SPEC: all requests exit normally)."
+            ],
+            [
+              20,
+              "# Last-resort guard: the transport must still emit exactly one JSON"
+            ],
+            [
+              21,
+              "# object. The planner already returns its own domain errors, so this"
+            ],
+            [
+              22,
+              "# is only reachable through a defect; surface it on stderr."
+            ]
+          ],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [
+        {
+          "path": "ARCHITECTURE.md",
+          "sha256": "df63e653261932fc0d8975d03d8fb7eb9bbd740d07234ae367508dd221483d9d"
+        },
+        {
+          "path": "G2-PLAN.md",
+          "sha256": "86db4de8b612602e8652a32403e6418795adbd29fbca6024c3d0dc39dced4db0"
+        },
+        {
+          "path": "TEST-RESULTS.md",
+          "sha256": "2318e0a4d5254d730000e2b6a8ed3170e8a70a1b1532de690a103772de13e2bc"
+        }
+      ],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": false
+        },
+        {
+          "case": "plan-ignores-rollback-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 2,
+                "depends_on": []
+              }
+            ],
+            "retain": [
+              "absent"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "staging-denied-after-replay",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 3,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "mode": "standard",
+      "stage": "g1",
+      "session": "d83fccb56399",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "e785675618e7263829dcfd463eab91312822ccad89baddfe2d1d45b7c5ccd37a"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "1a6794d2a36032d4f51a89cd7518fca9308bb70ae173535f13c2a0cd8953bc16"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6b9d2464955875bd0cbc4ade2b8aeede0c0b43b4cfd7fced820d02f77dcf5929"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_change",
+            "_is_text",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 64
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 58
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 20
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "_is_text",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 34,
+              "name": "_change",
+              "docstring": "Validate one change record and return its normalized form."
+            },
+            {
+              "line": 37,
+              "end": 50,
+              "name": "read_changes",
+              "docstring": "Return unique changes keyed by ID, collapsing identical duplicates."
+            },
+            {
+              "line": 53,
+              "end": 64,
+              "name": "read_applied",
+              "docstring": "Return the set of applied change IDs from the persisted release journal."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Normalize release records at the input boundary."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 34,
+              "name": "topological_order",
+              "docstring": "Return the full deterministic order: lexicographic among eligible IDs."
+            },
+            {
+              "line": 37,
+              "end": 58,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Compose policy and journal data into a plan."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 11,
+              "end": 20,
+              "name": "limit_for",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Validate release policy before computing actions."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "passed": false
+        },
+        {
+          "case": "self-cycle-in-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "mode": "standard",
+      "stage": "g2",
+      "session": "265026a46d75",
+      "terminal": "completed",
+      "nativePhase": null,
+      "carry": "same-workspace-new-session",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "97c14e5699ac86f13db3fe5cfc68c346e77f2966691b61636263d86e693ec218"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "4c3f939faca621558fe010b0112063ff9e17b3112b87c8936d0498e01ec66a02"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "dde615ade8afd23a80c2975309ee57fd5360acb9b6896e2ee77def9853456cee"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "astBoundary": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_change",
+            "_is_text",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 78
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "plan",
+            "retained_closure",
+            "topological_order"
+          ],
+          "lineCount": 73
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 31
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "sourceInspection": {
+        "journal.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "_is_text",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 34,
+              "name": "_change",
+              "docstring": "Validate one change record and return its normalized form."
+            },
+            {
+              "line": 37,
+              "end": 50,
+              "name": "read_changes",
+              "docstring": "Return unique changes keyed by ID, collapsing identical duplicates."
+            },
+            {
+              "line": 53,
+              "end": 64,
+              "name": "read_applied",
+              "docstring": "Return the set of applied change IDs from the persisted release journal."
+            },
+            {
+              "line": 67,
+              "end": 78,
+              "name": "read_retain",
+              "docstring": "Return the retained IDs, which must already be applied."
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Normalize release records at the input boundary."
+        },
+        "planner.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 9,
+              "name": "failure",
+              "docstring": null
+            },
+            {
+              "line": 12,
+              "end": 34,
+              "name": "topological_order",
+              "docstring": "Return the full deterministic order: lexicographic among eligible IDs."
+            },
+            {
+              "line": 37,
+              "end": 47,
+              "name": "retained_closure",
+              "docstring": "Return the retain set plus its applied transitive dependencies."
+            },
+            {
+              "line": 50,
+              "end": 73,
+              "name": "plan",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "Compose policy and journal data into a plan."
+        },
+        "policy.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 16,
+              "end": 31,
+              "name": "limit_for",
+              "docstring": "Return the effective plan budget after environment and budget checks."
+            }
+          ],
+          "comments": [
+            [
+              6,
+              "# G2: this release is staging-only; both plan and rollback are frozen in production."
+            ],
+            [
+              8,
+              "# G2: staging plans are capped at 3 units no matter what the request allows."
+            ]
+          ],
+          "moduleNote": "Validate release policy before computing actions."
+        },
+        "release.py": {
+          "parse": true,
+          "routines": [
+            {
+              "line": 8,
+              "end": 15,
+              "name": "main",
+              "docstring": null
+            }
+          ],
+          "comments": [],
+          "moduleNote": "JSON transport for the release planner."
+        }
+      },
+      "authoredDocumentPins": [],
+      "supplemental": [
+        {
+          "case": "malformed-environment-list",
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "passed": false
+        },
+        {
+          "case": "plan-ignores-rollback-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 2,
+                "depends_on": []
+              }
+            ],
+            "retain": [
+              "absent"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 2
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        },
+        {
+          "case": "staging-denied-after-replay",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 3,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 5,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "passed": true
+        }
+      ]
+    }
+  ]
+}
