@@ -21,3 +21,20 @@
 第一包 SHA-256 为 `b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5`。Windows DSH 无模型预跑通过，短题基线 8/8，难题基线 21/21。真实沙箱超时等输入控制 4/4、5/5。独立验证又发现，条件条款可被用在条件不成立的输入上。修订包 `5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7` 对可识别的条件句要求登记的相符输入。无条件的明确条款仍可据实核对。 [测试输入版本](observations-0.7.27-native-setup.json) · [候选预跑](observations-0.7.27-native-preflights.json)
 
 逐字核对两个包的摘要后运行同样六个对照。修订包拦住了拿非空输入套用空输入条款的退回，仍允许真实条件例和无条件实测差异进入退回。登记通过例继续通过，两包都拦住原 G4 的误退。修订包 Windows DSH 无模型预跑同样通过。 [条件条款对照](observations-0.7.27-review-condition-grounding.json) · [修订包预跑](observations-0.7.27-revised-preflights.json)
+
+### 第一包两轮短题
+
+| 运行 | 标准 G1 → G2 | 标准＋清单 G1 → G2 | Building-loop G1 → G2 |
+|---|---|---|---|
+| `r-1G8kmp` | 18/18 → 21/21 | 18/18 → 21/21 | 18/18 关单 → 21/21 到上限，停独立复核 |
+| `r-Y6e2M4` | 17/18 → 20/21 | 18/18 → 21/21 | 18/18 → 21/21，均关单 |
+
+两轮 Building-loop 均从同一目录的新会话接 G2。第二轮通过旧短题门槛及新加的生产冻结先后独立补测。第一轮 G2 只过 2/5 项先后补测，三种坏变更输入先返回了 `invalid-change`。独立核对还发现架构把错误判定归给了转发层。机械检测当时对四份架构稿均没有报冲突，审阅也曾用端到端运行结果支持源码职责，这些证据不能说明哪一层实际作出判定。 [短题门槛](observations-0.7.27-original-short-gate.json) · [先后关系补测](observations-0.7.27-original-short-precedence-public.json) · [架构独立核对](observations-0.7.27-original-short-architecture-semantic.json)
+
+| 两轮合计 | 总 Token | 输入缓存命中 | 210 秒对齐窗口 Token |
+|---|---:|---:|---:|
+| 标准 | 1,657,837 | 97.6445% | 1,657,837 |
+| 标准＋清单 | 5,352,463 | 98.4347% | 5,121,591 |
+| Building-loop | 9,584,927 | 94.6181% | 4,563,190 |
+
+90 次审核探针中有 58 次探索、22 次调用被拒、5 次结果不可用、3 次有据确认、2 次语法检查，实际没有产生阻塞发现。关联用量随响应记录，不能把整段上下文都当成单个探针的增量费用。 [完整脱敏事件](observations-0.7.27-original-short-public.json) · [阶段与用量](observations-0.7.27-original-short-compact-summary.json) · [审核探针统计](observations-0.7.27-original-short-review-probe-usage.json)
