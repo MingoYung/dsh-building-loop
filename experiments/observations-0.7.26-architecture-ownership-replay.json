@@ -1,0 +1,350 @@
+{
+  "spec": "building-loop-architecture-ownership-replay/1",
+  "modelCalls": 0,
+  "inputs": [
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g1",
+      "architectureSha256": "16a5f9e84b6e2799d3c85643a238cad232269476a3dc28a4b0a2b11120c57db6",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "ce5175a69255a79ab7433d3939e2243e354d6c440138b4fe15b76c43d5708b17"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e821b0e664cd65db65696d9e61e1fe1a64da94372708e9cc12a60e2bd5ff5d6b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "ac553b6f6ab1c6af9a6c5e87e3e8eb70500a2929282dc1c81ff0369929988fb8"
+        },
+        {
+          "path": "release.py",
+          "sha256": "b1939e1139c5dd57b33752919877d4394f4d9ac29d47c7e8fedbf429968a2736"
+        }
+      ]
+    },
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g2",
+      "architectureSha256": "4349bf3d0d4cb391087d79a5357fb5222bba919f154ef8ea136147130cd74d22",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "50ece2f0c7cdaf9d9596ddae54a98bfa2cc5d9a6bc81a909574af418be9e52c0"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "4b054b16ac97d8406e83dd6807bc2377ec62c9ad65884fffb7387ceba426d655"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "7b7d00934cc55cf39e5cd1a756f049a5d0ecfbb5e19cf14522b2404ffa9370ac"
+        },
+        {
+          "path": "release.py",
+          "sha256": "b1939e1139c5dd57b33752919877d4394f4d9ac29d47c7e8fedbf429968a2736"
+        }
+      ]
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g1",
+      "architectureSha256": "5bb1eb95e82a1372039715bc0684e8de3d68f2cb6d5a41891a796642054121ee",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "d43071a22b807c2cff312c76f7ecdc559403c50d7581400a3e6f265367c791f9"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "36a4958bc776baebfc9887ccb50b2e0f916c49c6f8c4d78fee60456cd9e2e531"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "49a9689472cfd37355c7d920c903a0cd51d4bf8fe592a1c807e47055a9541cf4"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ]
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g2",
+      "architectureSha256": "4aee1aede1221c7664a154bf52ea4d7cb11cb2d02627bb32efab9949b966fddc",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "3806d2cf1fa6a9eff7fa60e3db925b1c333ad2bb3f10e0fa089003098d5120b4"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d24ef43be3d560f21511fa05a2e75624f4093a5cd57e88ce39929a91778bb6ac"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "68d2c37d53517deacc606c380b0ad15c136f99cd9d5393e03afcec5ef016a38f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "candidate": "initial-0.7.26",
+      "detected": 0,
+      "knownStaticErrors": 7,
+      "correctControlClauses": 32,
+      "falseRetreats": 0
+    },
+    {
+      "candidate": "archived-prototype",
+      "detected": 0,
+      "knownStaticErrors": 7,
+      "correctControlClauses": 32,
+      "falseRetreats": 0
+    },
+    {
+      "candidate": "scoped-detached-prototype",
+      "detected": 7,
+      "knownStaticErrors": 7,
+      "correctControlClauses": 32,
+      "falseRetreats": 0
+    }
+  ],
+  "staticFindings": [
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g1",
+      "conflicts": [
+        {
+          "line": 6,
+          "from": "policy.py",
+          "relation": "decision",
+          "code": "budget-exceeded",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "budget-exceeded",
+              "line": 79
+            }
+          ]
+        },
+        {
+          "line": 7,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 56
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g2",
+      "conflicts": [
+        {
+          "line": 7,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 81
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g1",
+      "conflicts": [
+        {
+          "line": 7,
+          "from": "release.py",
+          "relation": "json-decoder-call",
+          "symbol": "json.loads",
+          "actual": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "symbol": "json.load"
+            }
+          ]
+        },
+        {
+          "line": 9,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 66
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g2",
+      "conflicts": [
+        {
+          "line": 9,
+          "from": "release.py",
+          "relation": "json-decoder-call",
+          "symbol": "json.loads",
+          "actual": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "symbol": "json.load"
+            }
+          ]
+        },
+        {
+          "line": 11,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 94
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "prototype": {
+    "patchSha256": "f40e1c5a96670179be3af1549866ef72a1900dc070b54c8b8faea29654ede7e4",
+    "targetedTests": {
+      "passed": 21,
+      "failed": 0
+    }
+  },
+  "architecturePrecedence": {
+    "run": "r-nFfK7c",
+    "stage": "g2",
+    "architectureLine": 14,
+    "claimedOrder": [
+      "malformed-retain",
+      "conflicting-change"
+    ],
+    "status": "architecture-claim-contradicted",
+    "ownerContract": "The published owner rules require both failures independently and do not define their relative precedence.",
+    "observed": [
+      {
+        "id": "malformed-retain-alone",
+        "input": {
+          "environment": "staging",
+          "action": "rollback",
+          "budget": 0,
+          "applied": [
+            "a"
+          ],
+          "changes": [
+            {
+              "id": "a",
+              "component": "db",
+              "units": 1
+            }
+          ],
+          "retain": null
+        },
+        "output": {
+          "status": "error",
+          "error": "invalid-retain",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0
+      },
+      {
+        "id": "conflicting-change-alone",
+        "input": {
+          "environment": "staging",
+          "action": "rollback",
+          "budget": 0,
+          "applied": [
+            "a"
+          ],
+          "changes": [
+            {
+              "id": "a",
+              "component": "db",
+              "units": 1
+            },
+            {
+              "id": "a",
+              "component": "db",
+              "units": 2
+            }
+          ]
+        },
+        "output": {
+          "status": "error",
+          "error": "conflicting-change",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0
+      },
+      {
+        "id": "both",
+        "input": {
+          "environment": "staging",
+          "action": "rollback",
+          "budget": 0,
+          "applied": [
+            "a"
+          ],
+          "changes": [
+            {
+              "id": "a",
+              "component": "db",
+              "units": 1
+            },
+            {
+              "id": "a",
+              "component": "db",
+              "units": 2
+            }
+          ],
+          "retain": null
+        },
+        "output": {
+          "status": "error",
+          "error": "conflicting-change",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0
+      }
+    ]
+  }
+}

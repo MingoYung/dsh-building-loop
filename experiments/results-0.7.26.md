@@ -36,6 +36,10 @@
 
 原始事件加上持久日志中窗口外用量去重统计，各臂均无缺失。缓存命中分母含未缓存输入、缓存读取和缓存写入，输出只计总 Token。 [用量明细](observations-0.7.26-initial-short-measures.json)
 
+按同样的 210 秒窗口截止，三组分别消耗 1,660,399、4,175,921 和 5,473,682 Token，输入缓存命中分别为 97.5164%、97.8604% 和 93.8850%。短题中标准模式两轮都完成全部功能，Building-loop 的阶段验收和诊断增加了调用。此处观测到可追踪的故障恢复，尚未观察到节省 Token。 [比较窗口与延时分段](observations-0.7.26-initial-short-measures.json)
+
 首轮通过短题功能门槛。两轮 Building-loop 冻结源码的独立异常输入补测各为 19/19、24/24。单独对照架构原文和源码，四份架构稿仍发现八处明确差异，包括把 `invalid-request` 的拒绝归给日志层、把 `json.load` 写成 `json.loads`。这属于正式放行前还要处理的架构准确性。 [短题功能判定](observations-0.7.26-initial-short-gate.json) · [异常输入](observations-0.7.26-initial-short-transport.json) · [架构逐条核证](observations-0.7.26-initial-architecture.json)
+
+隔离架构候选在同一冻结稿上抓住了 7/7 个可静态核实的错误，32 条准确对照没有误退，21/21 项定向回归通过。第八处是架构稿声明先校验保留项、后判重复，公开组合探针返回 `conflicting-change`，且用户规格对这两个错误的先后未作规定。它属于架构说明与当前代码不符。此候选尚未进入原生对照包。 [架构隔离候选的正反对照](observations-0.7.26-architecture-ownership-replay.json)
 
 拆分接口的候选已在隔离 Windows DSH 实际激活，种子校验 8/8，四条真实适配器输入控制通过。两轮付费短题仍在收集。G3/G4 三组盲测在该候选通过短回归后启动。正式 DSH 同步与 ClearAI 实测以完整验收为前提。 [原生预跑](observations-0.7.26-native-preflights.json)
