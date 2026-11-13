@@ -1,0 +1,394 @@
+{
+  "scope": "Exact installed diagnosis comparator and authenticated Windows/WSL execution on archived .28 source, no models.",
+  "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+  "nativePreflightRun": "r-1bya8y",
+  "modelCalls": 0,
+  "observations": [
+    {
+      "label": "bad-applied-edge",
+      "priorRun": "r-iAiCGF",
+      "exampleId": "public-rollback-order-diagnostics:example:reverse-preserves-applied-prerequisite-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": [
+              "b-prerequisite"
+            ]
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "a-consumer",
+            "b-prerequisite"
+          ],
+          "units": 3
+        }
+      },
+      "actual": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "b-prerequisite",
+            "a-consumer"
+          ],
+          "units": 3
+        }
+      },
+      "outcome": "mismatch",
+      "clause": {
+        "file": "SPEC.md",
+        "start": 14,
+        "end": 14,
+        "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "quoteSha256": "ceffdefbca5ce002b11713b50af2a1f3cf7b12997c89961caf1e4975d3111d8e"
+      },
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "2a6cff4f1d3403ec9682c69f3cb9827f3afe7e99c243ca8b683e5d15588ec549"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d22ec923c19316dd3a3ae13731833c205ee6c7eadc9b3ce4f953f9dcc59d026e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6b141e244910363c6e9c8bc5409ce73946b05ae45e91b385badc3fddea16a467"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "proof": {
+        "id": "stall-proof-b6b28bf07e943e2a351c0093da258fa56ebaaf52fcfae9fd68d4fb57a32fdb08",
+        "stallId": "deterministic-stall-replay",
+        "artifactSha256": "950dad60f539001a9ebc92f7c117e5ff1d82b525b6cb0930d4982f8c2be6e6d7",
+        "layer": "behavior",
+        "requestId": "acf622a5-78e7-40ad-9694-0e80f61cb997",
+        "operation": "probe",
+        "snapshotSha256": "eee301f0432d6f469b07de7b58d1d6af109a75bca779ef3faeae765b05f06107",
+        "recipe": "engineering-json",
+        "inputSha256": "f65d1806edaa4e311daac0797cdb9531111ab274c936f181601a78da79892265",
+        "kind": "runtime-mismatch",
+        "expectedExitCode": 0,
+        "exitCode": 0,
+        "exampleId": "public-rollback-order-diagnostics:example:reverse-preserves-applied-prerequisite-edge",
+        "expectedSha256": "2894cd91f691b807b82ea8b39bf237572318574012ad91a0992d56bc49b0b93f",
+        "actualSha256": "85f7718309ccfa7febc646fd1f527e8ab85ceab4a7f9f0b3d3a2de4009d2c4c5"
+      }
+    },
+    {
+      "label": "bad-applied-edge",
+      "priorRun": "r-iAiCGF",
+      "exampleId": "public-rollback-order-diagnostics:example:reverse-lexical-control-without-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "b-prerequisite",
+            "a-consumer"
+          ],
+          "units": 3
+        }
+      },
+      "actual": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "b-prerequisite",
+            "a-consumer"
+          ],
+          "units": 3
+        }
+      },
+      "outcome": "match",
+      "clause": {
+        "file": "SPEC.md",
+        "start": 14,
+        "end": 14,
+        "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "quoteSha256": "ceffdefbca5ce002b11713b50af2a1f3cf7b12997c89961caf1e4975d3111d8e"
+      },
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "2a6cff4f1d3403ec9682c69f3cb9827f3afe7e99c243ca8b683e5d15588ec549"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d22ec923c19316dd3a3ae13731833c205ee6c7eadc9b3ce4f953f9dcc59d026e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6b141e244910363c6e9c8bc5409ce73946b05ae45e91b385badc3fddea16a467"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "proof": null
+    },
+    {
+      "label": "good-full-order",
+      "priorRun": "r-J3dUWi",
+      "exampleId": "public-rollback-order-diagnostics:example:reverse-preserves-applied-prerequisite-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": [
+              "b-prerequisite"
+            ]
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "a-consumer",
+            "b-prerequisite"
+          ],
+          "units": 3
+        }
+      },
+      "actual": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "a-consumer",
+            "b-prerequisite"
+          ],
+          "units": 3
+        }
+      },
+      "outcome": "match",
+      "clause": {
+        "file": "SPEC.md",
+        "start": 14,
+        "end": 14,
+        "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "quoteSha256": "ceffdefbca5ce002b11713b50af2a1f3cf7b12997c89961caf1e4975d3111d8e"
+      },
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "proof": null
+    },
+    {
+      "label": "good-full-order",
+      "priorRun": "r-J3dUWi",
+      "exampleId": "public-rollback-order-diagnostics:example:reverse-lexical-control-without-edge",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "component",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "b-prerequisite",
+            "a-consumer"
+          ],
+          "units": 3
+        }
+      },
+      "actual": {
+        "exitCode": 0,
+        "json": {
+          "status": "ok",
+          "actions": [
+            "z-independent",
+            "b-prerequisite",
+            "a-consumer"
+          ],
+          "units": 3
+        }
+      },
+      "outcome": "match",
+      "clause": {
+        "file": "SPEC.md",
+        "start": 14,
+        "end": 14,
+        "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "quoteSha256": "ceffdefbca5ce002b11713b50af2a1f3cf7b12997c89961caf1e4975d3111d8e"
+      },
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "proof": null
+    }
+  ],
+  "transport": [
+    {
+      "phase": "diagnosis",
+      "snapshotSha256": "eee301f0432d6f469b07de7b58d1d6af109a75bca779ef3faeae765b05f06107",
+      "exitCode": 0
+    },
+    {
+      "phase": "diagnosis",
+      "snapshotSha256": "f9c6fe5936258d10bd7da063ed79f5d50dcfb6b44f11517810e12d5f6e5c844e",
+      "exitCode": 0
+    },
+    {
+      "phase": "diagnosis",
+      "snapshotSha256": "2efffaf860568a6e685b2a9fd8dd107f8b5edda9ea846aca89944580e33faab3",
+      "exitCode": 0
+    },
+    {
+      "phase": "diagnosis",
+      "snapshotSha256": "c86f5d6e02500476190fb1d0d97c615e12b522be37fe7ed69c864c49ffa28644",
+      "exitCode": 0
+    }
+  ]
+}

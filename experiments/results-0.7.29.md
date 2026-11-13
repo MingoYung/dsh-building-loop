@@ -37,3 +37,17 @@
 - `r-h4cllo` G2 首次回退提议 3/4，漏保留 staging 配额。宿主交回同一执行会话，只读补正提议后 4/4。回执重验原 Ed25519 签名和工件摘要，只在隔离副本改 `policy.py`。独立复核退回正文中扩大回退范围的陈述，修订后仍残留扩大范围的文字。已把登记恢复和保留条款生成为宿主管理的回退小节，保留其他章节的独立审查。 [真实回退补正](observations-0.7.29-guarded-live-rehearsal.json)
 - `r-iHOuis` G1 首审把非对象和缺字段两类请求标作同一响应，独立复核退回原行。三种非对象符合预期，四种对象缺字段各返回相应字段错误。`r-h4cllo` G1 则两道审核均漏过了可唯一定位的模块字段归属与 JSON 解码器调用。用冻结稿回放这两类现行源码错误，准确定位 4 处，定点正例 0 处。 [缺字段实际响应](observations-0.7.29-guarded-missing-fields.json) · [字段和解码器正反回放](observations-0.7.29-inline-owner-replay.json)
 - 已安装的精确宿主模块走真实签名副本的公开回滚次序复现。坏版本的依赖边用例形成认证行为回执，坏版本无边对照、正版本及过期版本分别检查。 [签名诊断实跑](observations-0.7.29-guarded-host-diagnosis.json)
+
+第二批仍为 **0/2 完整放行**。`r-iHOuis` G1 功能 18/18，终审到达时限，G2 在冻结副本续跑，功能 21/21，独立审核未完成。`r-h4cllo` 同目录交接，G1 18/18、G2 21/21。G2 的宿主最终相位为 `closed`，运行器完成状态仍记 `completion-cap`；独立的源码与正文检查仍发现实质问题。两轮标准和标准加清单各通过 18/18→21/21 功能用例。 [第二批原始记录](observations-0.7.29-guarded-paid-public.json)
+
+| 模式 | 210 秒对齐 Token | 缓存命中 | 完整 Token | 缓存命中 |
+|---|---:|---:|---:|---:|
+| 标准 | 2,553,862 | 98.1954% | 2,553,862 | 98.1954% |
+| 标准＋清单 | 3,168,933 | 97.9299% | 3,975,782 | 98.2412% |
+| Building-loop | 6,192,516 | 92.1898% | 19,683,235 | 95.5887% |
+
+第二批三组用量缺记均为 0。 [用量细项](observations-0.7.29-guarded-paid-measures.json)
+
+### 宿主管理回退范围的候选包
+
+`33d62ae0` 版本通过本地 414 项回归和三套 Windows 零模型安装预跑。签名副本演练仍保留 2/4 的旧负例和 4/4 的正例，公开回滚顺序的当前签名正反复现仍使用受信运行器。 [Windows 预跑](observations-0.7.29-locked-preflight.json) · [签名副本](observations-0.7.29-locked-host-rehearsal.json) · [诊断](observations-0.7.29-locked-host-diagnosis.json)
