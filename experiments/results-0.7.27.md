@@ -19,3 +19,5 @@
 测试环境与正式 Profile 隔离。使用同一 DeepSeek Flash、原短提示和 G3/G4 隐藏评分契约。公开组合样例登记在宿主，线上和冻结后盲评种子单独生成和保管。
 
 第一包 SHA-256 为 `b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5`。Windows DSH 无模型预跑通过，短题基线 8/8，难题基线 21/21。真实沙箱超时等输入控制 4/4、5/5。独立验证又发现，条件条款可被用在条件不成立的输入上。修订包 `5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7` 对可识别的条件句要求登记的相符输入。无条件的明确条款仍可据实核对。 [测试输入版本](observations-0.7.27-native-setup.json) · [候选预跑](observations-0.7.27-native-preflights.json)
+
+逐字核对两个包的摘要后运行同样六个对照。修订包拦住了拿非空输入套用空输入条款的退回，仍允许真实条件例和无条件实测差异进入退回。登记通过例继续通过，两包都拦住原 G4 的误退。修订包 Windows DSH 无模型预跑同样通过。 [条件条款对照](observations-0.7.27-review-condition-grounding.json) · [修订包预跑](observations-0.7.27-revised-preflights.json)

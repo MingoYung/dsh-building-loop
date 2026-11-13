@@ -1,0 +1,210 @@
+{
+  "spec": "building-loop-runtime-review-conditional-replay/1",
+  "modelCalls": 0,
+  "scope": "Extracts and hashes both candidate archives, exercises their actual comparator and finding gate with synthetic public controls, and feeds both real isolated responses from the archived G4 source replay.",
+  "publicCases": [
+    {
+      "id": "wrong-conditional-input",
+      "input": {
+        "entries": [
+          1
+        ]
+      },
+      "actual": {
+        "count": 1
+      },
+      "quote": "When the input contains no entries, output field `count` equals 0.",
+      "expectedPointer": "/count",
+      "expectedJson": "0"
+    },
+    {
+      "id": "registered-conditional-defect",
+      "input": {
+        "entries": []
+      },
+      "actual": {
+        "count": 1
+      },
+      "quote": "When the input contains no entries, output field `count` equals 0.",
+      "exampleId": "entries:example:empty",
+      "approvedResponse": {
+        "count": 0
+      }
+    },
+    {
+      "id": "registered-conditional-control",
+      "input": {
+        "entries": []
+      },
+      "actual": {
+        "count": 0
+      },
+      "quote": "When the input contains no entries, output field `count` equals 0.",
+      "exampleId": "entries:example:empty",
+      "approvedResponse": {
+        "count": 0
+      }
+    },
+    {
+      "id": "unconditional-defect",
+      "input": {
+        "entries": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "actual": {
+        "count": 6
+      },
+      "quote": "Output field `count` is at most 5.",
+      "expectedPointer": "/count",
+      "expectedJson": "5",
+      "expectedOperator": "at-most"
+    }
+  ],
+  "archivedG4": {
+    "run": "r-j5sGRU",
+    "sourcePins": [
+      {
+        "path": "journal.py",
+        "sha256": "b6462ce634ca87ea56120bd80ec3dffde80267cbdad0b88df3123efd99f72a6a"
+      },
+      {
+        "path": "planner.py",
+        "sha256": "b783b81c953add7666e0762e9cb3647553f06f92be5f9e07c18fea3f1d14a394"
+      },
+      {
+        "path": "policy.py",
+        "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+      },
+      {
+        "path": "release.py",
+        "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+      }
+    ],
+    "clauseSha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+    "oldExpectation": {
+      "exitCode": 0,
+      "json": 0,
+      "pointer": "/requestIndex"
+    },
+    "results": {
+      "actualReplay": {
+        "exitCode": 0,
+        "output": {
+          "status": "error",
+          "error": "conflicting-operation",
+          "requestIndex": 1,
+          "results": [],
+          "units": 0
+        }
+      },
+      "correctIdenticalPayloadControl": {
+        "exitCode": 0,
+        "output": {
+          "status": "ok",
+          "results": [
+            {
+              "actions": [
+                "x"
+              ],
+              "units": 1,
+              "operationId": "a"
+            }
+          ],
+          "units": 1
+        }
+      }
+    }
+  },
+  "candidates": [
+    {
+      "archiveSha256": "b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5",
+      "comparatorSha256": "51d1bed15bc1d77ce71214e29819e485fb6a08729ad96df2dfbb075dba119f62",
+      "outcomes": {
+        "wrong-conditional-input": {
+          "outcome": "mismatch",
+          "blocking": true,
+          "admitsFinding": true,
+          "grounding": "clause"
+        },
+        "registered-conditional-defect": {
+          "outcome": "mismatch",
+          "blocking": true,
+          "admitsFinding": true,
+          "grounding": "registered-example"
+        },
+        "registered-conditional-control": {
+          "outcome": "match",
+          "blocking": false,
+          "admitsFinding": false,
+          "grounding": "registered-example"
+        },
+        "unconditional-defect": {
+          "outcome": "mismatch",
+          "blocking": true,
+          "admitsFinding": true,
+          "grounding": "clause"
+        },
+        "archived-g4-conflict": {
+          "outcome": "mismatch",
+          "blocking": false,
+          "admitsFinding": false,
+          "reason": "expectation-not-established-by-clause"
+        },
+        "archived-g4-success": {
+          "outcome": "unavailable",
+          "blocking": false,
+          "admitsFinding": false,
+          "reason": "missing-unstated-field"
+        }
+      }
+    },
+    {
+      "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+      "comparatorSha256": "d399a5f6f373ba57473a4896c61e79f688c12275ad0b04e440da3b01ac02ebc9",
+      "outcomes": {
+        "wrong-conditional-input": {
+          "outcome": "mismatch",
+          "blocking": false,
+          "admitsFinding": false,
+          "reason": "expectation-not-established-by-clause"
+        },
+        "registered-conditional-defect": {
+          "outcome": "mismatch",
+          "blocking": true,
+          "admitsFinding": true,
+          "grounding": "registered-example"
+        },
+        "registered-conditional-control": {
+          "outcome": "match",
+          "blocking": false,
+          "admitsFinding": false,
+          "grounding": "registered-example"
+        },
+        "unconditional-defect": {
+          "outcome": "mismatch",
+          "blocking": true,
+          "admitsFinding": true,
+          "grounding": "clause"
+        },
+        "archived-g4-conflict": {
+          "outcome": "mismatch",
+          "blocking": false,
+          "admitsFinding": false,
+          "reason": "expectation-not-established-by-clause"
+        },
+        "archived-g4-success": {
+          "outcome": "unavailable",
+          "blocking": false,
+          "admitsFinding": false,
+          "reason": "missing-unstated-field"
+        }
+      }
+    }
+  ]
+}
