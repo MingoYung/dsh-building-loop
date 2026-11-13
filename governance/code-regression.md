@@ -101,3 +101,17 @@
 已登记的纯 Python 实现可以选用 `architecture.importsHeading`，指向一个独立的 Markdown 章节。总控登记架构时，宿主从实际授权文件生成可解析的显式本地导入关系，源码通过签名后核对并同步当前图。核验与关单重新读取生成结果。具体职责、控制流、动态导入和适用边界仍须两位审核者对照当前源码判断。
 
 有明确模块边界的项目可另登记 `architecture.allowedLocalImports`，例如 `[{ "file": "cli.py", "imports": ["planner.py"] }]`。规则只约束所列模块对已登记项目源码的静态导入；空数组禁止该模块导入其他登记模块。签名通过后若新源码越界，原执行会话会收到具体导入行并继续修改。生成的依赖图仍记录实际关系。需要变更边界时由维护者更新该工作单元的授权。
+
+### 关键职责实证
+
+维护者可给签名 Python 工作单元登记 `architecture.responsibilitiesHeading`（独立的宿主生成章节）及最多八个 `architecture.responsibilities`。每条包含 `id`、`mode`、`trigger`、`owner: {file, symbol?}` 和 `exampleId`。源码必须已登记，示例必须是当前目标可见完整条款下的公开契约，例如 `entry:example:non-object`。工具会校验该输入能满足登记的类型或字段触发。用于解码失败的例子可以用逐字 `stdin` 代替 JSON `input`；仍须有条款、同样的大小限制和固定运行配方。
+
+| 职责类型 | 可登记的触发 |
+|---|---|
+| `business` 业务判定 | `{kind:"input-type",argument:0,type:"object",test:"not"}`，或 `{kind:"field-presence",argument:0,field:"key",test:"missing"}`。取实际拒绝响应的 `error` 值。 |
+| `fallback` 异常兜底 | `{kind:"exception",name:"ValueError"}`。核实际进入的异常分支、拒绝值及可定位的输出。 |
+| `forwarding` 透传 | `{kind:"delegate",file:"planner.py",symbol:"plan"}`。核实际调用和可证明未修改的返回或输出。 |
+
+签名、读回和完整示例响应通过后，宿主将此次运行的已执行位置与同版源码的明确分支核对。没有足够定位、位置不符、条款已变、轨迹缺失或运行器不可用都不能通过。配置和示例只由维护者授权。诊断运行器的第 2 版协议支持仅宿主请求的 `probe.trace: true`；运行器须在正常响应外提供 `probe.executed` 中已登记源码的路径与行号，最多 256 个位置。运行器不能确定或上限溢出时返回不可用。日志、任意 stdout 或模型填报的行号不能充当轨迹。运行器的 Python 行级跟踪是隔离测试证据，不是对恶意候选代码的证明，也不覆盖动态控制流和参数跨函数的全部来源。
+
+总控在送审前用 `architecture` 更新生成章节，看到的是条款定位、触发、判定位置、实际响应和证据摘要；普通源码白名单不扩大。初审与独立复核分别读回必要条款及判定位置，仍各自判断其他架构段落、必要注释和目标约束。宿主事实与其他章节发生矛盾，仍要按真实证据提出架构退回。

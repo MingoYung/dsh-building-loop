@@ -21,7 +21,8 @@ const plan = "# 架构\n\n## 职责\n\n入口限制请求预算。\n\n## 回退\
 const revised = plan.replace("验证旧预算", "重放已发请求并验证旧预算");
 const ref = (file, start, end = start) => ({ file, start, end });
 
-function project(root, write, { importsHeading, examplesHeading, diagnostics, allowedLocalImports } = {}) {
+function project(root, write, { importsHeading, examplesHeading, diagnostics, allowedLocalImports,
+  responsibilitiesHeading, responsibilities, goalClause = "预算最多五项。" } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = importsHeading ? [candidate, "limits.py"] : [candidate];
   const files = [...sources, architecture];
@@ -30,10 +31,11 @@ function project(root, write, { importsHeading, examplesHeading, diagnostics, al
   const tests = { file: "current-test.json", publicKey: keys.publicKey.export({ type: "spki", format: "der" }).toString("base64"),
     previousSuiteSha256: digest("old"), suiteSha256: digest("new"), requiredCases: ["limit"],
     regression: { baselineFile: "before-test.json", previousCases: ["old"] } };
-  write(goal, "# 本轮目标\n\n预算最多五项。\n\n## 入口\n\n- [索引](INDEX.md)\n");
+  write(goal, "# 本轮目标\n\n" + goalClause + "\n\n## 入口\n\n- [索引](INDEX.md)\n");
   write("INDEX.md", "# 索引\n\n## 模块\n\n- [架构](modules/architecture.md)\n");
   fs.mkdirSync(path.dirname(path.join(root, architecture)));
-  write(architecture, template + (importsHeading ? "\n## " + importsHeading + "\n\n待由宿主生成。\n" : ""));
+  write(architecture, template + [importsHeading, responsibilitiesHeading].filter(Boolean)
+    .map(heading => "\n## " + heading + "\n\n待由宿主生成。\n").join(""));
   write(candidate, "def budget(value):\n    return value\n");
   if (importsHeading) write("limits.py", "MAXIMUM = 5\n");
   write("BUILDING-LOOP.json", JSON.stringify({ spec: "building-loop/1", goalContext: [goal],
@@ -41,7 +43,8 @@ function project(root, write, { importsHeading, examplesHeading, diagnostics, al
       modules: { architecture } },
     coordinator: { read: [goal, "INDEX.md", architecture, "first.json", "final.json"], write: [architecture] },
     units: { K01: { candidate, plainLast: false, architecture: {
-      module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading, examplesHeading, allowedLocalImports,
+      module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading,
+      examplesHeading, allowedLocalImports, responsibilitiesHeading, responsibilities,
     },
       codeTask: { sources, tests, diagnostics }, phases: { intake: execute, supplement: execute,
         "first-review": review("first.json"), "final-review": review("final.json") } } } }));
@@ -63,6 +66,98 @@ const fileJudgment = { file: candidate, basis: "The cap protects downstream capa
   comment: { status: "verified", start: 2, end: 2, basis: "This clamp implements the stated limit." } };
 const constraint = { caseId: "limit", status: "pass", requirement: ref(goal, 3), code: ref(candidate, 3),
   basis: "The signed test checks the cap that is applied before returning." };
+
+test("signed responsibility distinguishes a reached business guard from the same transport fallback code", () => fixture(async (root, write) => {
+  const clause = "A request that is not an object returns the invalid-request error.";
+  const bad = { error: "invalid-request" };
+  const secret = "isolated-responsibility-test-runner-token";
+  const seen = [];
+  let traceMode = "missing";
+  const server = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const request = JSON.parse(Buffer.concat(chunks));
+    assert.equal(req.headers.authorization, "Bearer " + secret);
+    assert.equal(request.probe.trace, true);
+    assert.deepEqual(JSON.parse(request.probe.stdin), []);
+    const sources = Object.fromEntries(request.artifacts.map(row => [row.path, Buffer.from(row.contentBase64, "base64").toString()]));
+    const selected = traceMode === "wrong-owner" ? candidate : "limits.py";
+    const responseLine = sources[selected].split("\n").findIndex(row => row.includes("return {")) + 1;
+    const executed = traceMode === "missing" ? undefined :
+      [{ path: selected, line: responseLine - 1 }, { path: selected, line: responseLine }];
+    seen.push(request.snapshotSha256);
+    res.end(JSON.stringify({ spec: request.spec, requestId: request.requestId, snapshotSha256: request.snapshotSha256,
+      status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(bad), ...(executed ? { executed } : {}) } }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const env = { DSH_BUILDING_LOOP_DIAGNOSTICS_URL: "http://127.0.0.1:" + server.address().port + "/run",
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: secret };
+  const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    const responsibilitiesHeading = "关键职责实证";
+    const trigger = { kind: "input-type", argument: 0, type: "object", test: "not" };
+    const responsibilities = [{ id: "non-object", mode: "business", trigger,
+      owner: { file: "limits.py" }, exampleId: "entry:example:non-object" }];
+    const diagnostics = { checkSet: "receipt", protocol: 2, recipes: ["entry"], reviewRecipes: ["entry"],
+      inputContracts: [{ id: "entry", recipe: "entry", examples: [{ id: "non-object", input: [], expectedJson: bad,
+        requirement: { ...ref(goal, 3), quote: clause } }] }] };
+    const { harness, save } = project(root, write, { importsHeading: "静态导入", responsibilitiesHeading,
+      responsibilities, diagnostics, goalClause: clause });
+    const newPlan = plan + "\n## 静态导入\n\n待由宿主生成。\n\n## " + responsibilitiesHeading + "\n\n待由宿主生成。\n";
+    await harness.file("root", "write", architecture, { content: newPlan, note: "Plan where the condition belongs" });
+    const planned = await harness.flow("root", "architecture");
+    assert.match(fs.readFileSync(path.join(root, architecture), "utf8"), /等待当前签名稿与实际运行/u);
+    const executor = (await harness.flow("root", "advance")).childId;
+    const source = 'def validate(request):\n    if not isinstance(request, dict):\n        return {"error": "invalid-request"}\n    return request\n';
+    write(candidate, source);
+    const signCurrent = async () => {
+      const { codeTask } = await harness.flow(executor, "prepare");
+      const { file, previousCases, requiredCases, protectedCases, ...binding } = codeTask.regressionProof;
+      save(file, { ...binding, runId: "current", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+    };
+    await signCurrent();
+    const absent = await harness.flow(executor, "submit");
+    assert.equal(absent.phase, "intake");
+    assert.equal(absent.submission.inputContracts.failures[0].reason, "invalid-runner-reply");
+    traceMode = "wrong-owner";
+    const wrong = await harness.flow(executor, "submit");
+    assert.equal(wrong.phase, "intake");
+    assert.equal(wrong.submission.rows[0].status, "mismatch");
+    assert.equal(wrong.submission.rows[0].actual.file, candidate);
+    assert.deepEqual(wrong.submission.rows[0].response.json, bad);
+    write(candidate, 'from limits import validate\n\ndef dispatch(request):\n    try:\n        return validate(request)\n    except Exception:\n        return {"error": "invalid-request"}\n');
+    write("limits.py", source);
+    traceMode = "right-owner";
+    await signCurrent();
+    const accepted = await harness.flow(executor, "submit");
+    assert.equal(accepted.phase, "architecture-sync");
+    const synced = await harness.flow("root", "architecture");
+    assert.equal(synced.phase, "review-ready");
+    assert.notEqual(synced.architecture.sha256, planned.architecture.sha256);
+    const text = fs.readFileSync(path.join(root, architecture), "utf8");
+    assert.match(text, /"decision":\{"file":"limits.py"/u);
+    assert.match(text, /"responseSha256"/u);
+    await assert.rejects(harness.file("root", "write", architecture, { content: text.replace('"decision":', '"made-up":'),
+      note: "Try writing generated evidence" }), /由宿主生成/u);
+    await assert.rejects(harness.file("root", "read", "limits.py"), /读白名单/u);
+    const reviewer = (await harness.flow("root", "advance")).childId;
+    const { codeReview } = await harness.invoke(reviewer, "building_loop_code_review", { action: "prepare" });
+    assert.equal(codeReview.architectureResponsibilities[0].id, "non-object");
+    assert.equal(codeReview.architectureResponsibilities[0].actual.file, "limits.py");
+    assert.equal(codeReview.progress.responsibilityEvidenceMissing, undefined);
+    assert.equal((await harness.invoke(reviewer, "building_loop_code_review", { action: "submit" })).status, "needs-review");
+    assert.equal(seen.length, 3);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+}));
 
 test("an owner's explicit static import boundary rejects a signed behavioral pass before review", () => fixture(async (root, write) => {
   const importsHeading = "静态导入";

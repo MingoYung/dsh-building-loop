@@ -191,6 +191,7 @@ function changedRanges(before, current) {
 function proofBinding(regression, goal, architecture) {
   return digest(JSON.stringify([goal.sha256, regression.suiteSha256, regression.artifactsSha256,
     regression.receiptSha256, regression.baselineReceiptSha256,
+    ...(regression.architectureResponsibilities ? [digest(JSON.stringify(regression.architectureResponsibilities))] : []),
     ...(architecture ? [[architecture.file, architecture.sha256, architecture.headings,
       ...(architecture.examples ? [architecture.examples] : [])]] : [])]));
 }
@@ -233,6 +234,7 @@ function plan(frame, active, spec, regression) {
     throw new Error("架构稿中的静态依赖章节与当前签名源码不一致，须由总控同步");
   }
   return { binding: proofBinding(regression, active.goal, architecture), changes, artifacts, architecture,
+    ...(regression.architectureResponsibilities ? { responsibilities: regression.architectureResponsibilities.rows } : {}),
     requiredCases: active.codeIntake.qualification.requiredCases, signedCases: active.codeIntake.qualification.cases };
 }
 
@@ -240,13 +242,22 @@ function plan(frame, active, spec, regression) {
  * actually displays. A large unchanged source stays available by explicit read. */
 export function codeReviewReadPaths(frame, id, active, spec) {
   const signed = requireCodeRegressionCurrent(frame, id, active, spec, active.goal);
-  const { changes, artifacts } = plan(frame, active, spec, signed);
+  const { changes, artifacts, responsibilities } = plan(frame, active, spec, signed);
   const changed = new Set(changes.map(row => keyOf(row.path)));
   const paths = changes.map(row => ({ file: row.path, ...(row.lines > 250 ? { ranges: row.ranges } : {}) }));
   for (const { path, sha256 } of artifacts) {
     if (!sha256 || changed.has(keyOf(path)) || !sourceArtifact(path) || !includes(frame.reads, path)) continue;
     const bytes = readBytes(frame.root, path);
     if (bytes && digest(bytes) === sha256 && bytes.length <= 24 * 1024 && lineList(bytes).length <= 250) paths.push({ file: path });
+  }
+  // A pinned line may be unchanged and lie in a large module. Read only that
+  // location in addition to the ordinary changed ranges; never copy a verdict.
+  for (const { actual } of responsibilities ?? []) {
+    const lines = [...new Set([actual.conditionLine, actual.line, actual.callLine, actual.outputLine].filter(Number.isSafeInteger))];
+    const existing = paths.find(row => row.file === actual.file);
+    const ranges = lines.map(line => ({ start: line, end: line }));
+    if (!existing) paths.push({ file: actual.file, ranges });
+    else if (existing.ranges) existing.ranges = [...existing.ranges, ...ranges];
   }
   return paths;
 }
@@ -336,6 +347,7 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     ...(nextOffset < changes.length ? { nextChangePage: { action: "prepare", codeReviewOffset: nextOffset } } : {}),
     requiredCases, signed, goalFiles: active.goal.files.map(({ file }) => file),
     ...(architecture ? { architecture, imports: pythonImportEvidence(frame, current.artifacts) } : {}),
+    ...(signed.architectureResponsibilities ? { architectureResponsibilities: signed.architectureResponsibilities.rows } : {}),
     progress, pending, refs,
     ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {
@@ -351,6 +363,7 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     next: (architectureProbe ? "先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 一次，宿主运行当前角色未完成的已登记示例。不要把示例逐个复制到 runtime。" : "") +
       "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。" + CODE_REVIEW_REJECTION_RULE + CODE_REVIEW_PROBE_RULE +
       (architecture ? "完整读架构稿，对照实际目标和源码判断各节。静态导入仅能证明静态依赖。" : "") +
+      (signed.architectureResponsibilities ? "按编号逐条对照生成的关键职责与全稿。若实施、回退或验证章节把该触发归给其他模块，用该章节原位置和实际源码登记架构退回。计划、兜底和透传分别判断。" : "") +
       (architecture?.examples ? "登记示例实际有差异时，按原示例位置记录架构退回并链接复现编号。" : "") +
       "每批最多 32 项。发现记齐后填 findingsDone:true，无发现也如此。progress.ready 后空参数 submit。",
     commentRule: CODE_COMMENT_RULE };
@@ -925,12 +938,22 @@ function reviewProgress(frame, active, current, draft) {
     ((architectureVerdict.status === "revise") !== draft.findings.some(row => row.owner === "coordinator"));
   const architecture = current.architecture ? architectureVerdict ? architectureIssue ? "inconsistent" : "recorded" : "missing" : "not-required";
   const examples = architectureProbeProgress(frame, active, current, draft, architectureVerdict);
+  const responsibilityEvidenceMissing = (current.responsibilities ?? []).flatMap(({ id, clause, actual }) => {
+    const locators = [clause, ...[...new Set([actual.conditionLine, actual.line, actual.callLine, actual.outputLine]
+      .filter(Number.isSafeInteger))].map(line => ({ file: actual.file, start: line, end: line, sha256: actual.sha256 }))];
+    const missing = locators.filter(({ file, start, end, sha256 }) => {
+      const seen = active.seen?.[keyOf(file)];
+      return !includes(frame.reads, file) || seen?.hash !== sha256 || !seen.ranges.some(([a, b]) => a <= start && b >= end);
+    });
+    return missing.length ? [{ id, missing }] : [];
+  });
   return { missingFiles, missingCases, findingIds, observationIds, findingsDone: draft.findingsDone, architecture, pendingCorrections,
+    ...(responsibilityEvidenceMissing.length ? { responsibilityEvidenceMissing } : {}),
     ...(unsupportedCaseRevisions.length ? { unsupportedCaseRevisions } : {}),
     ...(current.architecture ? { missingArchitectureSections: unfinishedSections, architectureCodeEvidence,
       ...(sectionFindingsMissing.length ? { sectionFindingsMissing } : {}) } : {}),
     ...(examples ? { architectureExamples: examples } : {}),
-    ready: !missingFiles.length && !missingCases.length && !pendingCorrections.length && draft.findingsDone &&
+    ready: !missingFiles.length && !missingCases.length && !pendingCorrections.length && !responsibilityEvidenceMissing.length && draft.findingsDone &&
       !unfinishedSections.length && architectureCodeEvidence && !["missing", "inconsistent"].includes(architecture) &&
       (!examples || !examples.missing.length && !examples.unaddressed.length && !examples.passWithMismatch) };
 }
@@ -1154,6 +1177,8 @@ export function recordCodeReview(frame, active, spec, input, signed, { resolveRe
 function reviewNext(frame, current, progress, refs) {
   if (progress.ready) return { tool: "building_loop_code_review", action: "submit" };
   if (progress.architectureExamples?.missing.length) return { tool: "building_loop_code_review", action: "probe", assertion: "architecture" };
+  if (progress.responsibilityEvidenceMissing?.length) return { tool: "building_loop_code_review", action: "prepare",
+    responsibilityEvidenceMissing: progress.responsibilityEvidenceMissing };
   const rows = pendingReviewRows(frame, current, progress, current.changes, refs).slice(0, RECORD_LIMIT);
   if (!rows.length && progress.architecture === "missing" && current.architecture) {
     return { tool: "building_loop_code_review", action: "prepare", read: current.architecture.file };
@@ -1191,6 +1216,7 @@ export function verifyCodeReview(frame, active, spec, signed) {
       progress.architecture === "missing" && "缺少架构核验",
       progress.missingArchitectureSections?.length && "待记录架构章节 " + progress.missingArchitectureSections.join("、"),
       progress.architectureCodeEvidence === false && "架构核验缺少实际源码依据",
+      progress.responsibilityEvidenceMissing?.length && "关键职责未读回 " + progress.responsibilityEvidenceMissing.map(row => row.id).join("、"),
       progress.architecture === "inconsistent" && "架构判断与发现不一致",
       progress.architectureExamples?.missing.length && "待复现架构示例 " + progress.architectureExamples.missing.join("、") +
         "，先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 批量核验",

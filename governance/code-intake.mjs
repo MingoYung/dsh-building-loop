@@ -1,6 +1,7 @@
 import { createPublicKey, randomBytes, verify } from "node:crypto";
 import { digest, includes, isImplementationPath, keyOf, readBytes, text } from "./policy.mjs";
 import { pythonStructure } from "./python-structure.mjs";
+import { architectureResponsibilitiesCurrent } from "./architecture-responsibilities.mjs";
 
 const PROOF = "building-loop-code-test/1";
 const BASELINE = "building-loop-code-regression-baseline/1";
@@ -216,10 +217,14 @@ export function requireCodeRegressionCurrent(frame, id, active, spec, goal) {
     inputContracts.policySha256 !== frame.policy.hash || inputContracts.artifactsSha256 !== artifactsSha256)) {
     throw new Error("[building-loop/code-regression] 当前版本缺少已登记输入契约的宿主复现，请由执行方重新提交");
   }
+  if (!architectureResponsibilitiesCurrent(frame, spec, submission, artifactsSha256)) {
+    throw new Error("[building-loop/code-regression] 当前签名稿缺少关键职责的条款、实跑与源码定位证明，请由执行方重新提交");
+  }
   return { receiptSha256: check.receiptSha256, suiteSha256: check.suiteSha256,
     baselineReceiptSha256: active.codeIntake.regression.receiptSha256,
     artifactsSha256, protectedPassed: check.protectedCases.length,
-    requiredPassed: check.requiredCases.length, ...(inputContracts ? { inputContracts } : {}) };
+    requiredPassed: check.requiredCases.length, ...(inputContracts ? { inputContracts } : {}),
+    ...(submission.architectureResponsibilities ? { architectureResponsibilities: submission.architectureResponsibilities } : {}) };
 }
 
 /** Audits and closure also bind unchanged sibling files, which prose checks do not track. */

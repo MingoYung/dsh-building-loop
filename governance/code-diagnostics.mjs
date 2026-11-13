@@ -22,6 +22,7 @@ const MAX_PROBE_FILE_BYTES = 16 * 1024;
 const MAX_PROBE_PATH_BYTES = 160;
 const MAX_PROBE_OUTPUT_BYTES = 2 * 1024;
 const MAX_STACK_FRAMES = 6;
+const MAX_EXECUTED_LINES = 256;
 const SINGLE_LINE_CONTROLS = /[\x00-\x1f\x7f]/u;
 const MULTILINE_CONTROLS = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u;
 const CHECK_STATUSES = new Set(["passed", "failed", "unavailable"]);
@@ -137,6 +138,7 @@ export function prepareCodeReproduction(frame, args, runner) {
 export function prepareInputContractBatch(frame, spec, runner) {
   const cases = inputContractCases(spec.codeTask?.diagnostics?.inputContracts);
   if (!cases.length) return;
+  const traceExamples = new Set(spec.architecture?.responsibilities?.map(row => row.exampleId) ?? []);
   return cases.map(check => {
     const { requirement } = check;
     if (requirement) {
@@ -147,7 +149,8 @@ export function prepareInputContractBatch(frame, spec, runner) {
         return { check, job: { result: { status: "unavailable", reason: "public-example-clause-stale" } } };
       }
     }
-    return { check, job: prepareCodeReproduction(frame, { action: "probe", ...check.input }, runner) };
+    // Only owner-pinned responsibility cases can request executed-line evidence.
+    return { check, job: prepare(frame, runner, { manual: { action: "probe", ...check.input }, trace: traceExamples.has(check.id) }) };
   });
 }
 
@@ -169,9 +172,15 @@ export async function runInputContractBatch(batch, runner, signal) {
       Promise.resolve(job.result ?? runCodeDiagnostics(job, runner, signal)).then(result => ({ check, result })))));
   }
   const failures = [];
+  const traced = [];
   for (const { check, result } of results) {
     const compared = compareInputContract(check, result);
-    if (compared.outcome === "match") continue;
+    if (compared.outcome === "match") {
+      if (result.probe?.executed) traced.push({ id: check.id, snapshotSha256: result.snapshotSha256,
+        exitCode: result.probe.exitCode, responseSha256: digest(result.probe.stdout),
+        json: JSON.parse(result.probe.stdout), executed: result.probe.executed });
+      continue;
+    }
     const { id, shape, input, expected } = check;
     failures.push({ id, ...(shape ? { shape } : {}), ...compared,
       ...(compared.outcome === "mismatch" ? { ...(failures.length < 4 ? { stdin: input.stdin, expected } : {}),
@@ -180,6 +189,7 @@ export async function runInputContractBatch(batch, runner, signal) {
   }
   return { status: failures.some(row => row.outcome === "mismatch") ? "failed" : failures.length ? "unavailable" : "passed",
     total: results.length, passed: results.length - failures.length, failures,
+    ...(traced.length ? { traced } : {}),
     receipts: results.flatMap(({ check, result }) => result.snapshotSha256 ? [{ id: check.id, snapshotSha256: result.snapshotSha256 }] : []) };
 }
 
@@ -198,7 +208,7 @@ export function prepareReviewReproduction(frame, args, runner) {
   return prepare(frame, runner, { manual: { action: "probe", ...args }, review: true });
 }
 
-function prepare(frame, runner, { file, fileSha256, manual, review = false }) {
+function prepare(frame, runner, { file, fileSha256, manual, review = false, trace = false }) {
   const [unit, active] = frame.assignment ?? [];
   const spec = frame.policy.units[unit];
   if ((!review && !["executor", "diagnostician"].includes(frame.role)) || !active?.codeIntake?.regression || !spec?.codeTask?.tests?.regression) {
@@ -250,13 +260,13 @@ function prepare(frame, runner, { file, fileSha256, manual, review = false }) {
         sourceLineCounts.set(version.path, sourceLines(bytes));
       }
     }
-    const operation = protocol === 2 ? scopedOperation(spec, active, probe) : undefined;
+    const operation = protocol === 2 ? scopedOperation(spec, active, trace ? { ...probe, trace: true } : probe) : undefined;
     const request = {
       spec: protocol === 2 ? SCOPED_SPEC : LEGACY_SPEC, requestId: randomUUID(), ...binding,
       snapshotSha256: snapshotId(binding, versions, operation), ...(changed ? { changed } : {}), artifacts, ...operation,
     };
     return { request, binding, role: frame.role, root: frame.root, actor: active.actor, serial: active.serial, nonce: active.codeIntake.nonce,
-      readablePaths, sourceLineCounts };
+      readablePaths, sourceLineCounts, ...(trace ? { tracePaths: spec.codeTask.sources } : {}) };
   } catch {
     // A diagnostic capture error must never report an already-landed edit as lost.
     return { result: { status: "unavailable", reason: "snapshot-error" } };
@@ -347,6 +357,22 @@ function sourceStack(stack, job) {
       (frame.function === undefined || cleanText(frame.function, 120, SINGLE_LINE_CONTROLS) && frame.function.isWellFormed()));
 }
 
+/** Keep trace metadata in a separate envelope from candidate stdout/stderr.
+ * A trace belongs only to the exact requested Python artifact inventory. */
+function executionTrace(rows, job) {
+  if (!job.request.probe.trace) return rows === undefined;
+  if (!Array.isArray(rows) || !rows.length || rows.length > MAX_EXECUTED_LINES) return false;
+  const positions = new Set();
+  return rows.every(row => {
+    if (!hasOnly(row, ["path", "line"]) || !job.tracePaths?.includes(row.path) || !Number.isSafeInteger(row.line) ||
+      !sourceLocation(row.path, row.line, job)) return false;
+    const position = row.path + ":" + row.line;
+    if (positions.has(position)) return false;
+    positions.add(position);
+    return true;
+  });
+}
+
 function caseError(error, job) {
   return hasOnly(error, ["caseId", "message", "path", "line", "stack"]) &&
     cleanText(error.message, 1200, MULTILINE_CONTROLS) && error.message.isWellFormed() &&
@@ -393,11 +419,12 @@ function probeFeedback(reply, job) {
   if (!hasOnly(reply, [...replyEnvelope, "probe"])) return invalidReply();
   const { status, snapshotSha256, probe } = reply;
   if (status === "unavailable" && probe === undefined) return runnerUnavailable();
-  if (!["passed", "failed"].includes(status) || !hasOnly(probe, ["exitCode", "stdout", "stderr", "stack", "truncated"]) ||
+  if (!["passed", "failed"].includes(status) || !hasOnly(probe, ["exitCode", "stdout", "stderr", "stack", "truncated", "executed"]) ||
     !Number.isSafeInteger(probe.exitCode) || probe.exitCode < 0 || probe.exitCode > 0xffffffff ||
     (status === "passed") !== (probe.exitCode === 0) ||
     ["stdout", "stderr"].some(field => probe[field] !== undefined && !boundedData(probe[field], MAX_PROBE_OUTPUT_BYTES, MULTILINE_CONTROLS)) ||
-    (probe.truncated !== undefined && typeof probe.truncated !== "boolean") || !sourceStack(probe.stack, job)) return invalidReply();
+    (probe.truncated !== undefined && typeof probe.truncated !== "boolean") || !sourceStack(probe.stack, job) ||
+    !executionTrace(probe.executed, job)) return invalidReply();
   return { status, snapshotSha256, probe };
 }
 
@@ -416,7 +443,7 @@ export async function runCodeDiagnostics(job, runner, signal) {
   const timeout = AbortSignal.timeout(runner.timeoutMs);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const maxBytes = job.request.operation === "check" ? MAX_CHECK_RESPONSE_BYTES
-    : job.request.operation === "probe" ? MAX_PROBE_RESPONSE_BYTES : MAX_LEGACY_RESPONSE_BYTES;
+    : job.request.probe?.trace ? MAX_CHECK_RESPONSE_BYTES : job.request.operation === "probe" ? MAX_PROBE_RESPONSE_BYTES : MAX_LEGACY_RESPONSE_BYTES;
   try {
     const result = feedback(await post(runner, job.request, maxBytes, requestSignal), job);
     // The transport credential is never a diagnostic, even if a broken

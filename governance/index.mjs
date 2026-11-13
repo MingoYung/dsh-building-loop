@@ -30,6 +30,7 @@ import { codeDiagnosticsCurrent, compareInputContract, diagnosticRunnerConfig, i
   prepareInputContractBatch, prepareReviewReproduction, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
 import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
 import { inputContractCases, publicInputExamples } from "./input-contracts.mjs";
+import { architectureResponsibilityResult } from "./architecture-responsibilities.mjs";
 import { compareReviewProbe, requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, runtimeExpectation, saveReviewProbe } from "./code-review-probes.mjs";
 import { createStallReproductionProof, DIAGNOSIS_WAIT, observeExecutionDiagnostic, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
@@ -989,6 +990,8 @@ export function apply(ctx, config = {}) {
         if (recipeInputs || publicExamples.length) codeTask.reproduction = { tool: REPRODUCE,
           ...(recipeInputs ? { recipeInputs } : {}), ...(publicExamples.length ? { publicExamples } : {}) };
         if (spec.architecture?.allowedLocalImports) codeTask.allowedLocalImports = spec.architecture.allowedLocalImports;
+        if (spec.architecture?.responsibilities) codeTask.architectureResponsibilities = spec.architecture.responsibilities
+          .map(({ id, mode, trigger, owner, exampleId }) => ({ id, mode, trigger, owner, exampleId }));
       }
       let submission;
       if (frame.role === "executor" && isCodeReviewUnit(frame, current, spec)) {
@@ -2186,7 +2189,7 @@ export function apply(ctx, config = {}) {
           if (boundary) return { unit: id, phase: active.phase, submission: boundary };
           signed = { goal, qualification };
         }
-        let inputProof;
+        let inputProof, responsibilityProof;
         if (spec.codeTask?.diagnostics?.inputContracts && active.codeIntake?.regression) {
           const observed = inputCheck?.result;
           const current = inputCheck?.batch && inputContractBatchCurrent(frame, inputCheck.batch);
@@ -2201,6 +2204,14 @@ export function apply(ctx, config = {}) {
           const artifacts = inputCheck.batch[0].job.request.artifacts.map(({ path, sha256 }) => ({ path, sha256 }));
           inputProof = { status: observed.status, passed: observed.passed, receipts: observed.receipts,
             policySha256: frame.policy.hash, artifactsSha256: digest(JSON.stringify(artifacts)) };
+          if (signed && spec.architecture?.responsibilities) {
+            const rows = architectureResponsibilityResult(frame, spec, signed.qualification, observed.traced);
+            if (rows.some(row => row.status !== "passed")) {
+              return { unit: id, phase: active.phase, submission: { status: "architecture-responsibility",
+                rows: rows.filter(row => row.status !== "passed"), next: { tool: WORKFLOW, action: "submit" } } };
+            }
+            responsibilityProof = { version: 1, policySha256: frame.policy.hash, artifactsSha256: inputProof.artifactsSha256, rows };
+          }
         }
         if (signed) {
           const { goal, qualification } = signed;
@@ -2234,6 +2245,7 @@ export function apply(ctx, config = {}) {
           }
           active.codeIntake.qualification.inputContracts = inputProof;
         }
+        if (responsibilityProof) active.codeIntake.qualification.architectureResponsibilities = responsibilityProof;
         if (active.phase === "intake" && /\.(?:md|markdown)$/iu.test(spec.candidate)) {
           const table = deliverableTableContract(frame.started?.proposal.instruction);
           const issues = deliverableTableIssues(bytes, table);
@@ -2260,8 +2272,8 @@ export function apply(ctx, config = {}) {
           }
           active.phase = "review-ready";
         }
-        if (spec.architecture?.importsHeading && (!inspectArchitectureImports(frame, spec, active).match ||
-          inspectEngineeringArchitectureClaims(frame, spec, active).conflicts.length)) {
+        if (spec.architecture?.responsibilities || spec.architecture?.importsHeading &&
+          (!inspectArchitectureImports(frame, spec, active).match || inspectEngineeringArchitectureClaims(frame, spec, active).conflicts.length)) {
           active.architectureSyncResume = active.phase;
           active.phase = "architecture-sync";
         }

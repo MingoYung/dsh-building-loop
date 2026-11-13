@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash, createPublicKey, randomUUID } from "node:crypto";
 import { parseInputContracts } from "./input-contracts.mjs";
 import { parseRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
+import { parseArchitectureResponsibilities } from "./architecture-responsibilities.mjs";
 
 export const AUTHORITY = "BUILDING-LOOP.json";
 export const MANAGED = ".building-loop";
@@ -457,8 +458,10 @@ export function parseAuthority(bytes) {
   }
   const hierarchy = source.hierarchy === undefined ? undefined : hierarchyPolicy(source.hierarchy, coordinator, goalContext, protectedFiles, ledgerDocument);
   const managedImportSections = new Map();
+  const managedResponsibilitySections = new Map();
   for (const [id, entry] of architectureEntries) {
-    object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading", "allowedLocalImports"]);
+    object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading", "allowedLocalImports",
+      "responsibilitiesHeading", "responsibilities"]);
     const file = hierarchyBodyPath(hierarchy, entry.module, false);
     const unit = units[id];
     const review = [unit.phases["first-review"], unit.phases["final-review"]];
@@ -482,6 +485,17 @@ export function parseAuthority(bytes) {
     }
     const examplesHeading = entry.examplesHeading;
     const diagnostics = unit.codeTask.diagnostics;
+    const responsibilitiesHeading = entry.responsibilitiesHeading;
+    let responsibilities;
+    if (entry.responsibilities !== undefined || responsibilitiesHeading !== undefined) {
+      if (typeof responsibilitiesHeading !== "string" || !responsibilitiesHeading.trim() ||
+        responsibilitiesHeading !== responsibilitiesHeading.trim() || responsibilitiesHeading.length > 80 ||
+        /[\x00-\x1f]/u.test(responsibilitiesHeading) || headings.includes(responsibilitiesHeading) ||
+        responsibilitiesHeading === importsHeading || unit.codeTask.sources.some(source => !/\.py$/iu.test(source))) {
+        throw new Error("关键职责实证须使用独立的宿主生成章节和已登记 Python 源码");
+      }
+      responsibilities = parseArchitectureResponsibilities(entry.responsibilities, unit.codeTask.sources, diagnostics);
+    }
     // Executable examples use the maintainer's data-only recipe grants; a
     // compiler recipe accepts a source location and is never an example entry.
     if (examplesHeading !== undefined && (!headings.includes(examplesHeading) || examplesHeading === importsHeading ||
@@ -490,6 +504,9 @@ export function parseAuthority(bytes) {
     }
     if (managedImportSections.has(keyOf(file)) && managedImportSections.get(keyOf(file)) !== importsHeading) {
       throw new Error("共用架构稿的工程单元须使用相同的宿主静态导入章节");
+    }
+    if (managedResponsibilitySections.has(keyOf(file)) && managedResponsibilitySections.get(keyOf(file)) !== responsibilitiesHeading) {
+      throw new Error("共用架构稿的工程单元须使用相同的关键职责实证章节");
     }
     let allowedLocalImports;
     if (entry.allowedLocalImports !== undefined) {
@@ -507,8 +524,9 @@ export function parseAuthority(bytes) {
       allowedLocalImports = rules.map(({ file, imports }) => ({ file, imports: imports.slice() }));
     }
     managedImportSections.set(keyOf(file), importsHeading);
+    managedResponsibilitySections.set(keyOf(file), responsibilitiesHeading);
     unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}), ...(examplesHeading ? { examplesHeading } : {}),
-      ...(allowedLocalImports ? { allowedLocalImports } : {}) };
+      ...(allowedLocalImports ? { allowedLocalImports } : {}), ...(responsibilities ? { responsibilitiesHeading, responsibilities } : {}) };
   }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }

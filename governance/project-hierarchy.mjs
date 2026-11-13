@@ -174,6 +174,7 @@ export function architectureDocument(frame, spec, diagnostics) {
   if (!bytes) throw new Error("缺少架构正文 " + file);
   const source = decoder.decode(bytes);
   const doc = document(file, source);
+  if (spec.responsibilitiesHeading) generatedArchitectureSection(frame, { architecture: spec }, source, "responsibilitiesHeading");
   const sections = [];
   let examples;
   const bodies = headings.map(title => {
@@ -202,14 +203,20 @@ export function architectureDocument(frame, spec, diagnostics) {
 
 /** Locate the designated generated section through the same visible-heading parser. */
 export function architectureImportsSection(frame, spec, proposed) {
-  const { file, importsHeading } = spec.architecture;
+  return generatedArchitectureSection(frame, spec, proposed, "importsHeading");
+}
+
+/** Return a unique generated heading's replacement range, without writing. */
+export function generatedArchitectureSection(frame, spec, proposed, field) {
+  const { file } = spec.architecture;
+  const heading = spec.architecture[field];
   const bytes = readBytes(frame.root, file);
   if (!bytes) throw new Error("缺少架构正文 " + file);
   const source = proposed ?? decoder.decode(bytes);
   const doc = document(file, source);
-  const anchor = section(doc, importsHeading);
+  const anchor = section(doc, heading);
   if (doc.headings.some(heading => heading.start > anchor.start && heading.start < anchor.stop)) {
-    throw new Error("宿主静态导入章节不能包含其他标题，移到同级章节保留正文");
+    throw new Error("宿主生成章节不能包含其他标题，移到同级章节保留正文");
   }
   return { source, sha256: digest(bytes), bodyStart: anchor.end, bodyEnd: anchor.stop };
 }

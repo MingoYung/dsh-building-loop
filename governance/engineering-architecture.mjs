@@ -1,7 +1,8 @@
 import { goalSnapshot } from "./goals.mjs";
 import { inspectArchitectureImports } from "./code-review.mjs";
+import { architectureResponsibilitiesCurrent, responsibilityClause } from "./architecture-responsibilities.mjs";
 import { digest, includes, keyOf, readBytes, replaceWithHistory, text } from "./policy.mjs";
-import { architectureDocument, architectureImportsSection, architectureProseLines } from "./project-hierarchy.mjs";
+import { architectureDocument, architectureProseLines, generatedArchitectureSection } from "./project-hierarchy.mjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
 
 const declaration = /^(?:[-+*]\s+|\d+[.)]\s+)?(?:\*\*)?\x60?([^\s`:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(][^）)]{1,80}[）)])?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?/iu;
@@ -323,6 +324,39 @@ function architectureSourceInventory(frame, spec) {
   return { rows, truncated: spec.codeTask.sources.length > rows.length };
 }
 
+/** Generate a separate factual section; plans and historical claims stay in
+ * normal review sections. Do not transfer raw source or trace events. */
+export function inspectArchitectureResponsibilitiesSection(frame, spec, active, proposed) {
+  if (!spec.architecture?.responsibilities) return;
+  const section = generatedArchitectureSection(frame, spec, proposed, "responsibilitiesHeading");
+  const qualification = active?.codeIntake?.qualification;
+  const artifactsSha256 = qualification && digest(JSON.stringify(qualification.artifacts));
+  const claims = spec.architecture.responsibilities;
+  const eol = /\r\n|\n|\r/u.exec(section.source)?.[0] ?? "\n";
+  const fmt = value => JSON.stringify(value).replace(/[\x60<>]/gu, char => "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0"));
+  const verified = qualification && architectureResponsibilitiesCurrent(frame, spec, qualification, artifactsSha256);
+  const contract = claims.map(row => {
+    const clause = responsibilityClause(frame, row);
+    if (!clause) throw new Error("关键职责 " + row.id + " 的原条款已变或不是完整可见句，请维护者核对");
+    const proof = verified && qualification.architectureResponsibilities.rows.find(item => item.id === row.id);
+    return proof ? { id: row.id, clause, mode: proof.mode, trigger: proof.trigger, decision: proof.actual,
+      response: proof.response, traceSha256: proof.traceSha256 } :
+      { id: row.id, clause, mode: row.mode, trigger: row.trigger, planned: row.owner, status: "等待当前签名稿与实际运行" };
+  });
+  const modes = { business: "业务判定", fallback: "入口兜底", forwarding: "原结果透传" };
+  const expected = ["由宿主按当前签名源码和实际运行生成。其他章节如引用这些职责，请使用编号并保留实际归属。", "",
+    ...contract.map(({ id, mode, clause, decision, planned }) =>
+      "- `" + id + "` · " + modes[mode] + " · 条款 " + clause.file + ":" + clause.start + "–" + clause.end +
+      (decision ? " · 已验证：" + decision.file + ":" + decision.line + "（" + decision.symbol + "）" :
+        " · 计划：" + planned.file + "；等待当前签名稿与实际运行")),
+    "", "\x60\x60\x60text", ...contract.map(fmt), "\x60\x60\x60"].join("\n");
+  const { source, bodyStart, bodyEnd } = section;
+  const current = source.slice(bodyStart, bodyEnd).trim().replace(/\r\n?/gu, "\n");
+  const match = current === expected;
+  return { ...section, match, proposed: match ? source : source.slice(0, bodyStart) + eol + eol + expected.replaceAll("\n", eol) +
+    (bodyEnd < source.length ? eol + eol : eol) + source.slice(bodyEnd), contract };
+}
+
 /** Supply only names, presence and proven direct local edges. In particular,
  * this projection must not stamp source reads or change any role's grants. */
 export function engineeringArchitectureSourceFacts(frame, unit) {
@@ -421,11 +455,14 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag) {
     const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports);
     if (claims.conflicts.length) throw new Error(architectureClaimIssues(claims.conflicts).join("\n"));
   }
-  if (imports && !imports.match) {
+  const original = imports?.proposed ?? text(readBytes(frame.root, plan.file));
+  const responsibilities = inspectArchitectureResponsibilitiesSection(frame, spec, pendingCodeRepair ? undefined : active, original);
+  const updated = responsibilities?.proposed ?? original;
+  if (updated !== text(readBytes(frame.root, plan.file))) {
     replaceWithHistory(frame.root, plan.file, before => {
-      if (!before || digest(before) !== imports.sha256) throw new Error("静态导入生成时架构正文已变化，请重新登记");
-      return imports.proposed;
-    }, "宿主根据当前代码更新实际本地静态导入", tag, frame.state.markers);
+      if (!before || digest(before) !== plan.sha256) throw new Error("宿主生成架构章节时正文已变化，请重新登记");
+      return updated;
+    }, "宿主按当前证据生成静态导入或关键职责", tag, frame.state.markers);
     plan = architectureDocument(frame, spec.architecture, diagnostics);
   }
   const snapshot = { ...plan, goalSha256: goal.sha256, unit, owner: frame.agent.id };
@@ -461,7 +498,9 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
     // Rebuild the typed data from the exact document before any runner uses the
     // stored examples. The validated data must still be that revision's data.
     if (plan.sha256 !== snapshot.sha256 || JSON.stringify(plan.examples) !== JSON.stringify(snapshot.examples)) return false;
-    if (!checkImports || !spec.architecture.importsHeading) return true;
+    if (!checkImports) return true;
+    if (spec.architecture.responsibilities && !inspectArchitectureResponsibilitiesSection(frame, spec, active).match) return false;
+    if (!spec.architecture.importsHeading) return true;
     const imports = inspectArchitectureImports(frame, spec, active);
     return imports.match && !inspectEngineeringArchitectureClaims(frame, spec, active, imports).conflicts.length;
   }
@@ -483,8 +522,9 @@ export function engineeringArchitectureStatus(frame, unit) {
   const spec = frame.policy.units[unit];
   if (!spec?.architecture || frame.role !== "coordinator") return;
   const active = frame.state.units[unit];
-  const { file, headings, examplesHeading } = spec.architecture;
-  const contract = { file, headings, ...(examplesHeading ? { examplesHeading } : {}) };
+  const { file, headings, examplesHeading, responsibilitiesHeading } = spec.architecture;
+  const contract = { file, headings, ...(examplesHeading ? { examplesHeading } : {}),
+    ...(responsibilitiesHeading ? { responsibilitiesHeading, generated: "关键职责由宿主生成，请保留该章节及原文。其他章节用职责编号引用，说明计划和验证方式；不要另写一份当前判定位置。", responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id) } : {}) };
   if (active?.phase === "architecture-repair") {
     return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };
   }
@@ -492,7 +532,9 @@ export function engineeringArchitectureStatus(frame, unit) {
     const sync = { ...contract, status: "sync", next: { action: "architecture", unit } };
     try {
       const { conflicts } = inspectEngineeringArchitectureClaims(frame, spec, active);
-      return conflicts.length ? { ...sync, conflicts: architectureClaimIssues(conflicts) } : sync;
+      const responsibilities = inspectArchitectureResponsibilitiesSection(frame, spec, active);
+      return { ...sync, ...(conflicts.length ? { conflicts: architectureClaimIssues(conflicts) } : {}),
+        ...(responsibilities ? { responsibilities: responsibilities.contract } : {}) };
     } catch (error) { return { ...sync, reason: error.message }; }
   }
   const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
@@ -507,12 +549,14 @@ export function engineeringArchitectureStatus(frame, unit) {
 
 /** Preserve the designated generated body when the coordinator edits prose. */
 export function requireHostImportSectionUnchanged(frame, file, proposed) {
-  const spec = Object.values(frame.policy.units).find(unit => unit.architecture?.importsHeading && includes([unit.architecture.file], file));
-  if (!spec) return;
-  const current = architectureImportsSection(frame, spec);
-  const next = architectureImportsSection(frame, spec, proposed);
-  if (current.source.slice(current.bodyStart, current.bodyEnd).trim() !== next.source.slice(next.bodyStart, next.bodyEnd).trim()) {
-    throw new Error("静态导入章节由宿主生成。保留该章节原文，用 building_loop architecture 更新");
+  const spec = Object.values(frame.policy.units).find(unit => unit.architecture && includes([unit.architecture.file], file));
+  for (const field of ["importsHeading", "responsibilitiesHeading"]) {
+    if (!spec?.architecture[field]) continue;
+    const current = generatedArchitectureSection(frame, spec, undefined, field);
+    const next = generatedArchitectureSection(frame, spec, proposed, field);
+    if (current.source.slice(current.bodyStart, current.bodyEnd).trim() !== next.source.slice(next.bodyStart, next.bodyEnd).trim()) {
+      throw new Error(spec.architecture[field] + " 章节由宿主生成。保留该章节原文，用 building_loop architecture 更新");
+    }
   }
 }
 

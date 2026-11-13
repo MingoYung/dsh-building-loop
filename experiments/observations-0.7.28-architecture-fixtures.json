@@ -1,0 +1,868 @@
+{
+  "scope": "Selected facts in actual frozen architecture, plus same-source corrected controls. Corrected files are test controls only. They do not replace the archived model-authored drafts or certify other claims.",
+  "fixtures": [
+    {
+      "fixture": "journal-nonobject-and-missing-fields",
+      "run": "r-9CyRwq",
+      "stage": "g1",
+      "archiveSha256": "9ad054c0c8fbe0538c60f5a1f188555bbc969f6d2e1970c06dac0913e04d532a",
+      "frozenFiles": {
+        "journal.py": "1cd8367bca1ac32d69718f4ff5623dcbf45fdc44f5de5c21d73c15f1c621a58b",
+        "planner.py": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+        "policy.py": "c1a0135800277a2da3138e83c4b04f1f3def757cba5bd7dd0da103220592493d",
+        "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+        "modules/architecture.md": "69db457bf322343f169bfaae5a3d05a4a85dd13f37848e51ebc78592f91bf255",
+        "SPEC.md": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "CHANGE-G2.md": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+      },
+      "selectedAssertions": [
+        {
+          "id": "journal-nonobject",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "69db457bf322343f169bfaae5a3d05a4a85dd13f37848e51ebc78592f91bf255",
+            "lines": [
+              {
+                "line": 9,
+                "text": "- journal.py：输入校验、身份与回放。校验请求对象与字段（非对象/缺字段/类型错 -> invalid-request 或 invalid-change），校验 change 的 id/component 为非空字符串、units 为正整数且排除 bool、depends_on 与 applied 必须是字符串数组（否则 invalid-change）；对 change 记录做去重：id、component、units、depends_on 集合完全相同的重复记录合并为一条，同一 id 但内容冲突返回 conflicting-change；返回规范化的变化集合与已应用 id 集合。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+              "lines": [
+                {
+                  "line": 58,
+                  "text": "def plan(request):"
+                },
+                {
+                  "line": 59,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 60,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 62,
+                  "text": "        action, budget = limit_for(request)"
+                },
+                {
+                  "line": 63,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 64,
+                  "text": "        applied = read_applied(request)"
+                }
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "lines": [
+                {
+                  "line": 14,
+                  "text": "        result = plan(request)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "missing-fields-combined",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "69db457bf322343f169bfaae5a3d05a4a85dd13f37848e51ebc78592f91bf255",
+            "lines": [
+              {
+                "line": 37,
+                "text": "- 输入错误：非法 JSON -> invalid-json；请求不是对象/缺 environment/action/budget/changes -> invalid-request；环境、预算、change 字段、depends_on/applied 非数组等 -> 对应 invalid-environment / invalid-budget / invalid-change / unsupported-action。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+              "lines": [
+                {
+                  "line": 58,
+                  "text": "def plan(request):"
+                },
+                {
+                  "line": 59,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 60,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 62,
+                  "text": "        action, budget = limit_for(request)"
+                },
+                {
+                  "line": 63,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                }
+              ]
+            },
+            {
+              "file": "policy.py",
+              "sha256": "c1a0135800277a2da3138e83c4b04f1f3def757cba5bd7dd0da103220592493d",
+              "lines": [
+                {
+                  "line": 24,
+                  "text": "    action = request.get(\"action\")"
+                },
+                {
+                  "line": 25,
+                  "text": "    if not isinstance(action, str) or action not in (\"plan\", \"rollback\"):"
+                },
+                {
+                  "line": 26,
+                  "text": "        raise PolicyError(\"unsupported-action\")"
+                },
+                {
+                  "line": 27,
+                  "text": "    budget = request.get(\"budget\")"
+                },
+                {
+                  "line": 28,
+                  "text": "    # type() rather than isinstance: bool is an int subclass and must be rejected."
+                },
+                {
+                  "line": 29,
+                  "text": "    if type(budget) is not int or budget < 0:"
+                },
+                {
+                  "line": 30,
+                  "text": "        raise PolicyError(\"invalid-budget\")"
+                },
+                {
+                  "line": 31,
+                  "text": "    return action, budget"
+                },
+                {
+                  "line": 32,
+                  "text": ""
+                },
+                {
+                  "line": 33,
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sameSourcePositiveControl": {
+        "file": "architecture-positive-control.md",
+        "sha256": "6dba7ebf01eb95a0846f4967d6dea871dd9d2799738816fb7cca4e1561e5f1e0",
+        "replacedLines": [
+          9,
+          37
+        ],
+        "expected": "selected claims supported by identical source"
+      }
+    },
+    {
+      "fixture": "transport-fallback-and-shared-code",
+      "run": "r-v7UYLt",
+      "stage": "g1",
+      "archiveSha256": "9ad054c0c8fbe0538c60f5a1f188555bbc969f6d2e1970c06dac0913e04d532a",
+      "frozenFiles": {
+        "journal.py": "8802bc1dc03168e4fb5a22b6d70ac8d9832bafe36f3fd6500afd8a9a1318367b",
+        "planner.py": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+        "policy.py": "9acdb1326f1a23924e2b0171ac0485f9b863b9ae8f8b3e0ba5d85123ca17593e",
+        "release.py": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+        "modules/architecture.md": "48fdf7c72c92e07d0e90ec38b5acbcf0d5338a7e73a77d1de33b2bc876cb5ca9",
+        "SPEC.md": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "CHANGE-G2.md": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+      },
+      "selectedAssertions": [
+        {
+          "id": "transport-fallback-ownership",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "48fdf7c72c92e07d0e90ec38b5acbcf0d5338a7e73a77d1de33b2bc876cb5ca9",
+            "lines": [
+              {
+                "line": 9,
+                "text": "- `release.py`：JSON 解析失败 → `invalid-json`；请求不是对象或缺少/多余顶层字段结构 → `invalid-request`；保证输出恰好为 `{\"status\":\"ok\",\"actions\":[...],\"units\":n}` 或 `{\"status\":\"error\",\"error\":code,\"actions\":[],\"units\":0}`，退出码 0。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "release.py",
+              "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+              "lines": [
+                {
+                  "line": 18,
+                  "text": "INVALID_REQUEST = {\"status\": \"error\", \"error\": \"invalid-request\", \"actions\": [], \"units\": 0}"
+                },
+                {
+                  "line": 23,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 27,
+                  "text": "    else:"
+                },
+                {
+                  "line": 28,
+                  "text": "        try:"
+                },
+                {
+                  "line": 29,
+                  "text": "            result = plan(request)"
+                },
+                {
+                  "line": 36,
+                  "text": "            sys.stderr.write(\"unexpected planner failure\\n\")"
+                },
+                {
+                  "line": 37,
+                  "text": "            result = dict(INVALID_REQUEST)"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+              "lines": [
+                {
+                  "line": 66,
+                  "text": "    \"\"\""
+                },
+                {
+                  "line": 67,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 68,
+                  "text": "        return failure(\"invalid-request\")"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "shared-code-dangling-owner",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "48fdf7c72c92e07d0e90ec38b5acbcf0d5338a7e73a77d1de33b2bc876cb5ca9",
+            "lines": [
+              {
+                "line": 11,
+                "text": "- `journal.py`：`changes` 非数组、记录非对象、`id`/`component` 非空字符串、`units` 非正整数、`depends_on`/`applied` 非数组或含非字符串 → `invalid-change`；相同记录（id、component、units、依赖集合相等）折叠为一条，同 id 但内容不同 → `conflicting-change`；依赖指向不存在的变更或 `applied` 中出现未声明的 id → `unknown-dependency`。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "journal.py",
+              "sha256": "8802bc1dc03168e4fb5a22b6d70ac8d9832bafe36f3fd6500afd8a9a1318367b",
+              "lines": [
+                {
+                  "line": 78,
+                  "text": "    known = {change[\"id\"] for change in changes}"
+                },
+                {
+                  "line": 79,
+                  "text": "    for change_id in applied:"
+                },
+                {
+                  "line": 80,
+                  "text": "        if change_id not in known:"
+                },
+                {
+                  "line": 81,
+                  "text": "            raise JournalError(\"unknown-dependency\")"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+              "lines": [
+                {
+                  "line": 25,
+                  "text": "    for change in changes:"
+                },
+                {
+                  "line": 26,
+                  "text": "        for target in change[\"depends_on\"]:"
+                },
+                {
+                  "line": 27,
+                  "text": "            if target not in known:"
+                },
+                {
+                  "line": 28,
+                  "text": "                raise JournalError(\"unknown-dependency\")"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sameSourcePositiveControl": {
+        "file": "architecture-positive-control.md",
+        "sha256": "d36c110766975879f37323adbef62e0f76e1851e1642259c07fa575ac06a408c",
+        "replacedLines": [
+          9,
+          11
+        ],
+        "expected": "selected claims supported by identical source"
+      }
+    },
+    {
+      "fixture": "retain-before-changes",
+      "run": "r-v7UYLt",
+      "stage": "g2",
+      "archiveSha256": "9ad054c0c8fbe0538c60f5a1f188555bbc969f6d2e1970c06dac0913e04d532a",
+      "frozenFiles": {
+        "journal.py": "8802bc1dc03168e4fb5a22b6d70ac8d9832bafe36f3fd6500afd8a9a1318367b",
+        "planner.py": "7cb87617499f21a9a768900cbba4ef96d6b2af94b074345f631e9b264693823a",
+        "policy.py": "af00469d77427336bf254f255e89e4128cdd6806920bb04d9f050b0438403b60",
+        "release.py": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+        "modules/architecture.md": "a5f96fe445e7e18df60a56616a3ae5f72d2495616e83f2b636ece5c905469ffa",
+        "SPEC.md": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "CHANGE-G2.md": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a"
+      },
+      "selectedAssertions": [
+        {
+          "id": "retain-vs-change-guard-order",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "a5f96fe445e7e18df60a56616a3ae5f72d2495616e83f2b636ece5c905469ffa",
+            "lines": [
+              {
+                "line": 13,
+                "text": "- 校验次序（G2 第 1 条要求 `production-frozen` 先于图与变更校验）：`release.py` 顶层字段形状 → `policy.py` 的 `environment` 形状 → `production-frozen` → `action` → `budget` 类型 → rollback 的 `retain` 形状 → `journal.py` 的变更/回放校验 → `planner.py` 建图。于是 production 下即使 `changes` 畸形或含环，也只会得到 `production-frozen`，且 `actions` 为空、`units` 为 0，绝不输出部分动作。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "7cb87617499f21a9a768900cbba4ef96d6b2af94b074345f631e9b264693823a",
+              "lines": [
+                {
+                  "line": 93,
+                  "text": "        limit = limit_for(request)"
+                },
+                {
+                  "line": 94,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 95,
+                  "text": "        applied = read_applied(request, changes)"
+                },
+                {
+                  "line": 96,
+                  "text": "        if request.get(\"action\") == \"rollback\":"
+                },
+                {
+                  "line": 97,
+                  "text": "            # Retain is a rollback-only concept; validated after replay so that"
+                },
+                {
+                  "line": 98,
+                  "text": "            # malformed changes keep ``invalid-change``."
+                },
+                {
+                  "line": 99,
+                  "text": "            retain = read_retain(request, {change[\"id\"] for change in changes})"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sameSourcePositiveControl": {
+        "file": "architecture-positive-control.md",
+        "sha256": "7131e63261a31dbe5d544b35aa26f5141cc01e004d517e90a1554cadf124ac9c",
+        "replacedLines": [
+          11,
+          13
+        ],
+        "expected": "selected claims supported by identical source"
+      }
+    },
+    {
+      "fixture": "valid-transport-direct-guard",
+      "run": "r-b9dxay",
+      "stage": "g1",
+      "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+      "frozenFiles": {
+        "journal.py": "4038a073eaddc32eec4df3d764b768151d14b99aed1d1ac0ac3c3c6c5e457b63",
+        "planner.py": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+        "policy.py": "646bca5b71e393b5f44064d4bd083300e6e946b061631a4743899b7d988dd71f",
+        "release.py": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+        "modules/architecture.md": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82",
+        "SPEC.md": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "CHANGE-G2.md": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+      },
+      "selectedAssertions": [
+        {
+          "id": "actual-direct-cli-guard",
+          "expected": "supported",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82",
+            "lines": [
+              {
+                "line": 8,
+                "text": "  - 从 stdin 读取一段文本，解析 JSON，解析失败返回 `invalid-json`；顶层必须是对象，否则 `invalid-request`。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "release.py",
+              "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+              "lines": [
+                {
+                  "line": 15,
+                  "text": "INVALID_REQUEST = {\"status\": \"error\", \"error\": \"invalid-request\", \"actions\": [], \"units\": 0}"
+                },
+                {
+                  "line": 20,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 24,
+                  "text": "        result = plan(request) if isinstance(request, dict) else INVALID_REQUEST"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+              "lines": [
+                {
+                  "line": 81,
+                  "text": "    # the rule that a disallowed operation never produces partial output."
+                },
+                {
+                  "line": 82,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 83,
+                  "text": "        return failure(\"invalid-request\")"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fixture": "valid-shared-code-branches",
+      "run": "r-eXVclv",
+      "stage": "g1",
+      "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+      "frozenFiles": {
+        "journal.py": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac",
+        "planner.py": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+        "policy.py": "84eac530db795d0f7f28b46a79fa0e4a504d9c70f7133384d6a48a34c79885a5",
+        "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+        "modules/architecture.md": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6",
+        "SPEC.md": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "CHANGE-G2.md": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+      },
+      "selectedAssertions": [
+        {
+          "id": "actual-applied-owner",
+          "expected": "supported",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6",
+            "lines": [
+              {
+                "line": 7,
+                "text": "- `journal.py`：请求与变更记录校验、重复记录折叠与冲突判定、`applied` 回放集解析。负责 `invalid-change`、`conflicting-change`、未知回放 ID 对应的 `unknown-dependency`。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "journal.py",
+              "sha256": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac",
+              "lines": [
+                {
+                  "line": 65,
+                  "text": "    applied = set()"
+                },
+                {
+                  "line": 66,
+                  "text": "    for value in values:"
+                },
+                {
+                  "line": 67,
+                  "text": "        if not isinstance(value, str) or not value:"
+                },
+                {
+                  "line": 68,
+                  "text": "            raise JournalError(\"invalid-change\")"
+                },
+                {
+                  "line": 69,
+                  "text": "        if value not in known_ids:"
+                },
+                {
+                  "line": 70,
+                  "text": "            raise JournalError(\"unknown-dependency\")"
+                },
+                {
+                  "line": 71,
+                  "text": "        applied.add(value)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "actual-dangling-owner",
+          "expected": "supported",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6",
+            "lines": [
+              {
+                "line": 8,
+                "text": "- `planner.py`：构造依赖图、检测环（`dependency-cycle`）与缺失依赖（`unknown-dependency`）、给出字典序稳定拓扑序，按 action 产出动作与单位数，并组装最终结果。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+              "lines": [
+                {
+                  "line": 25,
+                  "text": "        for target in depends[change_id]:"
+                },
+                {
+                  "line": 26,
+                  "text": "            if target not in units:"
+                },
+                {
+                  "line": 27,
+                  "text": "                raise JournalError(\"unknown-dependency\")"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fixture": "valid-g2-freeze-order",
+      "run": "r-eXVclv",
+      "stage": "g2",
+      "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+      "frozenFiles": {
+        "journal.py": "c843f340ae5517c34322fa441c6aa6a63320998667738f2eb50a2bd90278c16f",
+        "planner.py": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+        "policy.py": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+        "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+        "modules/architecture.md": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f",
+        "SPEC.md": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "CHANGE-G2.md": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a"
+      },
+      "selectedAssertions": [
+        {
+          "id": "actual-production-freeze-order",
+          "expected": "supported",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f",
+            "lines": [
+              {
+                "line": 6,
+                "text": "- `policy.py`：环境（`staging`/`production`）与预算校验，以及本轮允许的 action 集合。G2 起 production 被冻结：环境校验通过后立即返回 `production-frozen`，且该判定先于 action 分发与图/变更校验；预算校验仍保持类型优先（先测类型再比值，避免不可哈希输入崩溃），`effective_budget` 取请求预算与 3 的较小值，仅用于 staging `plan`。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "policy.py",
+              "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+              "lines": [
+                {
+                  "line": 36,
+                  "text": "    environment = request.get(\"environment\")"
+                },
+                {
+                  "line": 37,
+                  "text": "    if not isinstance(environment, str) or environment not in (\"staging\", \"production\"):"
+                },
+                {
+                  "line": 38,
+                  "text": "        raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 39,
+                  "text": "    if environment == \"production\":"
+                },
+                {
+                  "line": 40,
+                  "text": "        raise PolicyError(\"production-frozen\")"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+              "lines": [
+                {
+                  "line": 91,
+                  "text": "        check_environment(request)"
+                },
+                {
+                  "line": 92,
+                  "text": "        action = read_action(request)"
+                },
+                {
+                  "line": 93,
+                  "text": "        budget = effective_budget(read_budget(request), action)"
+                },
+                {
+                  "line": 94,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 95,
+                  "text": "        applied = read_applied(request.get(\"applied\", []), {row[\"id\"] for row in changes})"
+                },
+                {
+                  "line": 96,
+                  "text": "        order, units = _graph(changes)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fixture": "g3-transport-branch-and-decoder",
+      "run": "r-QRyWYi",
+      "stage": "g1",
+      "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+      "frozenFiles": {
+        "journal.py": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041",
+        "planner.py": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+        "policy.py": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+        "release.py": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+        "modules/architecture.md": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644",
+        "SPEC.md": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+        "CHANGE-G2.md": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+      },
+      "selectedAssertions": [
+        {
+          "id": "decoder-and-dispatch-owner",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644",
+            "lines": [
+              {
+                "line": 7,
+                "text": "- `release.py`（传输层，只做传输）：读取 stdin 全部文本，`json.loads` 失败返回 `invalid-json`；解析后若是 dict 且 `action == \"rollback-many\"`，整批交给批量入口（`planner` 提供的批量组装函数）处理；否则维持现有单项分发。批量入口的错误对象已含 `requestIndex`，传输层不得再次改写或补字段。所有路径输出恰好一个 JSON 对象并以 0 退出。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "release.py",
+              "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+              "lines": [
+                {
+                  "line": 10,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 13,
+                  "text": "    else:"
+                },
+                {
+                  "line": 14,
+                  "text": "        # A `rollback-many` batch is dispatched by planner.plan, which answers with"
+                },
+                {
+                  "line": 15,
+                  "text": "        # the batch shape (`results`/`requestIndex`). Transport stays shape-blind:"
+                },
+                {
+                  "line": 16,
+                  "text": "        # it must not add or strip keys, because that would rewrite a"
+                },
+                {
+                  "line": 17,
+                  "text": "        # requestIndex the planner already decided."
+                },
+                {
+                  "line": 18,
+                  "text": "        result = plan(request)"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+              "lines": [
+                {
+                  "line": 173,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 175,
+                  "text": "    if request.get(\"action\") == BATCH_ACTION:"
+                },
+                {
+                  "line": 179,
+                  "text": "        return plan_batch(request)"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sameSourcePositiveControl": {
+        "file": "architecture-positive-control.md",
+        "sha256": "2dff670c1364a155237e99b668f1cb8dbe1106b2280b9bf925247cf509226f4b",
+        "replacedLines": [
+          7,
+          19,
+          24
+        ],
+        "expected": "selected claims supported by identical source"
+      }
+    },
+    {
+      "fixture": "g3-import-self-declaration",
+      "run": "r-P5jGT4",
+      "stage": "g1",
+      "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+      "frozenFiles": {
+        "journal.py": "86f4032c73c1ecb9465f88b24596a290cf880db6039d6f0316d91b80f1b4b7e1",
+        "planner.py": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+        "policy.py": "99ef6be432dc7e93c8ac04f7a8cff34d5d047050c3bf81045eedd6d0cd759349",
+        "release.py": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+        "modules/architecture.md": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+        "SPEC.md": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+        "CHANGE-G2.md": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+      },
+      "selectedAssertions": [
+        {
+          "id": "actual-edges-vs-owner-boundary",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+            "lines": [
+              {
+                "line": 5,
+                "text": "保持现有四模块与既有 import 方向（release.py → planner.py → journal.py/policy.py），只用标准库，无文件与网络操作；既有 plan / rollback 的输出形状、错误码与 G2 行为一律不变，G3 只新增 rollback-many 路径。release.py 除 planner 外还直接导入 journal 与 policy，仅为在 main() 兜底捕获 PolicyError/JournalError 并转成 error JSON，不承担业务规则。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "release.py",
+              "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+              "lines": [
+                {
+                  "line": 5,
+                  "text": "from planner import MAX_BATCH, batch_failure, plan, rollback_many"
+                },
+                {
+                  "line": 6,
+                  "text": "from journal import JournalError"
+                },
+                {
+                  "line": 7,
+                  "text": "from policy import PolicyError"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "duplicated-policy-validation",
+          "expected": "contradicted",
+          "document": {
+            "file": "modules/architecture.md",
+            "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+            "lines": [
+              {
+                "line": 9,
+                "text": "- policy.py（环境与预算）：逐项判定 production-frozen 先于图与变更校验，以及预算须为非负整数；G2 的 staging 计划配额不作用于回退，也不作用于批内各项回退。"
+              }
+            ]
+          },
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+              "lines": [
+                {
+                  "line": 151,
+                  "text": "            # be a rollback; environment/budget keep their usual owners and the"
+                },
+                {
+                  "line": 152,
+                  "text": "            # production freeze still fires before any graph validation."
+                },
+                {
+                  "line": 153,
+                  "text": "            environment = item.get(\"environment\")"
+                },
+                {
+                  "line": 154,
+                  "text": "            if not isinstance(environment, str) or environment not in ENVIRONMENTS:"
+                },
+                {
+                  "line": 155,
+                  "text": "                raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 156,
+                  "text": "            if environment in FROZEN_ENVIRONMENTS:"
+                },
+                {
+                  "line": 157,
+                  "text": "                raise PolicyError(\"production-frozen\")"
+                },
+                {
+                  "line": 158,
+                  "text": "            check_budget(item.get(\"budget\"))"
+                },
+                {
+                  "line": 159,
+                  "text": "            decision = limit_for(dict(item, action=BATCH_ACTION))"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ const CONTRACT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
 const BOUNDARY_VALUES = Object.freeze({ array: [], object: {}, null: null, boolean: true, number: 0, string: "", missing: undefined });
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/u;
+const INVALID_STDIN_CHARS = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u;
 
 const own = (value, key) => value != null && Object.hasOwn(value, key);
 const object = (value, fields) => value && typeof value === "object" && !Array.isArray(value) &&
@@ -64,9 +65,13 @@ export function parseInputContracts(value, reviewRecipes, syntaxRecipe) {
       if (!Array.isArray(examples) || !examples.length || examples.length > MAX_EXAMPLES) throw invalid();
       const exampleIds = new Set();
       for (const example of examples) {
-        if (!object(example, ["id", "input", "expectedJson", "expectedExitCode", "requirement"]) ||
+        if (!object(example, ["id", "input", "stdin", "expectedJson", "expectedExitCode", "requirement"]) ||
           !CONTRACT_ID.test(typeof example.id === "string" ? example.id : "") || exampleIds.has(example.id) ||
-          !own(example, "input") || !boundedJson(example.input, MAX_STDIN - 1) || !own(example, "expectedJson") ||
+          own(example, "input") === own(example, "stdin") ||
+          (own(example, "input") ? !boundedJson(example.input, MAX_STDIN - 1) :
+            typeof example.stdin !== "string" || !example.stdin.isWellFormed() ||
+            INVALID_STDIN_CHARS.test(example.stdin) || Buffer.byteLength(example.stdin) > MAX_STDIN || !example.requirement) ||
+          !own(example, "expectedJson") ||
           !boundedJson(example.expectedJson, MAX_JSON) || !validCode(example.expectedExitCode) ||
           example.requirement !== undefined && !validRequirement(example.requirement)) throw invalid();
         exampleIds.add(example.id);
@@ -121,8 +126,8 @@ function mutate(seed, path, type) {
 export function inputContractCases(contracts) {
   const result = [];
   for (const { id, recipe, seed, expectedExitCode, expectedJson, checks, examples = [] } of contracts ?? []) {
-    const add = (caseId, stdin, exitCode, json, details) => {
-      const input = { recipe, stdin: JSON.stringify(stdin) + "\n" };
+    const add = (caseId, stdin, exitCode, json, details, raw = false) => {
+      const input = { recipe, stdin: raw ? stdin : JSON.stringify(stdin) + "\n" };
       if (Buffer.byteLength(input.stdin) > MAX_STDIN) throw new Error("异常输入契约样例超过复现输入限制");
       result.push({ id: caseId, input, expected: { exitCode: exitCode ?? 0, json }, ...details });
     };
@@ -134,8 +139,9 @@ export function inputContractCases(contracts) {
       }
     }
     for (const example of examples) {
-      add(id + ":example:" + example.id, example.input, example.expectedExitCode, example.expectedJson,
-        { publicExample: true, ...(example.requirement ? { requirement: example.requirement } : {}) });
+      const raw = own(example, "stdin");
+      add(id + ":example:" + example.id, raw ? example.stdin : example.input, example.expectedExitCode, example.expectedJson,
+        { publicExample: true, ...(raw ? { raw: true } : {}), ...(example.requirement ? { requirement: example.requirement } : {}) }, raw);
     }
   }
   return result;
