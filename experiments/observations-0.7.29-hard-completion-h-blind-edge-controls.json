@@ -1,0 +1,1403 @@
+{
+  "intakeSha256": "2029beade27cf54a608dc3da3641d96a4cdf929f66fece36f141fee2a7763640",
+  "caseKind": "Public owner-clause contrasts, no private seeds or model",
+  "cells": [
+    {
+      "cell": "cell-9a2ccee2a8d9",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 32.6,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 33.6,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 32.7,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 37.4,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "new",
+                "kind": "reserve",
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "ok",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "results": [
+              {
+                "event_id": "new",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "runnerError": null
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 35.4,
+          "ownerReference": "SPEC.md:7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "release",
+                "kind": "release",
+                "id": "old"
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "active": [],
+            "results": [
+              {
+                "event_id": "release",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "actual": {
+            "status": "ok",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "results": [
+              {
+                "event_id": "release",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "runnerError": null
+        },
+        {
+          "id": "identical-closed-windows-remain-legal",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 35.9,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "transfer-of-missing-id-is-unknown",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 38.7,
+          "ownerReference": "CHANGE-G2.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [],
+            "events": [
+              {
+                "event_id": "move",
+                "kind": "transfer",
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 5,
+                "end": 7,
+                "if_revision": 1
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 5,
+                "end": 6
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "unknown-reservation",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "revision-conflict",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "two-touching-closures-no-gap-no-live-dependency",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 34.7,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-aeebf153dbb4",
+      "stage": "H1",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 33.6,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.9,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 31.5,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 31.2,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.7,
+          "ownerReference": "SPEC.md:7"
+        }
+      ]
+    },
+    {
+      "cell": "cell-d0672d169f26",
+      "stage": "H1",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.3,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.0,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 28.9,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 28.5,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "new",
+                "kind": "reserve",
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 29.6,
+          "ownerReference": "SPEC.md:7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "release",
+                "kind": "release",
+                "id": "old"
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "active": [],
+            "results": [
+              {
+                "event_id": "release",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        }
+      ]
+    },
+    {
+      "cell": "cell-0a4b0196ff0a",
+      "stage": "H1",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "failed",
+          "exitCode": 1,
+          "elapsedMs": 45.2,
+          "ownerReference": "SPEC.md:3,5",
+          "input": {
+            "operation": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": null,
+          "runnerError": "TypeError: cannot use 'list' as a dict key (unhashable type: 'list')"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.8,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 30.1,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.6,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.2,
+          "ownerReference": "SPEC.md:7"
+        }
+      ]
+    },
+    {
+      "cell": "cell-34c85fd88f9f",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 35.3,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 35.0,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 32.8,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.6,
+          "ownerReference": "SPEC.md:7"
+        },
+        {
+          "id": "identical-closed-windows-remain-legal",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.7,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "transfer-of-missing-id-is-unknown",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.9,
+          "ownerReference": "CHANGE-G2.md:5,7"
+        },
+        {
+          "id": "two-touching-closures-no-gap-no-live-dependency",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.3,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-eb6c46bc6fa6",
+      "stage": "H1",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.8,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.5,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.7,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 31.8,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "new",
+                "kind": "reserve",
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "conflict",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 31.1,
+          "ownerReference": "SPEC.md:7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "release",
+                "kind": "release",
+                "id": "old"
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "active": [],
+            "results": [
+              {
+                "event_id": "release",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "unknown-reservation",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        }
+      ]
+    },
+    {
+      "cell": "cell-fa0413214c18",
+      "stage": "H1",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.6,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.8,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 27.6,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.1,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.0,
+          "ownerReference": "SPEC.md:7"
+        }
+      ]
+    },
+    {
+      "cell": "cell-cbfeb9348a83",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.7,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.8,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.6,
+          "ownerReference": "SPEC.md:7"
+        },
+        {
+          "id": "identical-closed-windows-remain-legal",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.6,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "transfer-of-missing-id-is-unknown",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.2,
+          "ownerReference": "CHANGE-G2.md:5,7"
+        },
+        {
+          "id": "two-touching-closures-no-gap-no-live-dependency",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.1,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-9be9e527d4d5",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.3,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 28.9,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.5,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.6,
+          "ownerReference": "SPEC.md:7"
+        },
+        {
+          "id": "identical-closed-windows-remain-legal",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.1,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "transfer-of-missing-id-is-unknown",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 29.2,
+          "ownerReference": "CHANGE-G2.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [],
+            "events": [
+              {
+                "event_id": "move",
+                "kind": "transfer",
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 5,
+                "end": 7,
+                "if_revision": 1
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 5,
+                "end": 6
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "unknown-reservation",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "revision-conflict",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "two-touching-closures-no-gap-no-live-dependency",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.7,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-e875eac7106b",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.6,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.9,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 28.9,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.4,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.1,
+          "ownerReference": "SPEC.md:7"
+        },
+        {
+          "id": "identical-closed-windows-remain-legal",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.2,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "transfer-of-missing-id-is-unknown",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 30.0,
+          "ownerReference": "CHANGE-G2.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [],
+            "events": [
+              {
+                "event_id": "move",
+                "kind": "transfer",
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 5,
+                "end": 7,
+                "if_revision": 1
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 5,
+                "end": 6
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "unknown-reservation",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "revision-conflict",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "two-touching-closures-no-gap-no-live-dependency",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.3,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-904270bcb94d",
+      "stage": "H1",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.2,
+          "ownerReference": "SPEC.md:3,5"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 28.8,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 29.3,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.7,
+          "ownerReference": "SPEC.md:7"
+        }
+      ]
+    },
+    {
+      "cell": "cell-a91f20248e1a",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "operation-json-array",
+          "status": "failed",
+          "exitCode": 1,
+          "elapsedMs": 44.9,
+          "ownerReference": "SPEC.md:3,5",
+          "input": {
+            "operation": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": null,
+          "runnerError": "TypeError: cannot use 'list' as a dict key (unhashable type: 'list')"
+        },
+        {
+          "id": "decoded-json-array",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.0,
+          "ownerReference": "SPEC.md:3"
+        },
+        {
+          "id": "initial-overlap-before-any-event",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:5,7",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              },
+              {
+                "id": "other",
+                "resource": "dock",
+                "owner": "test",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "overlap",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-event",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "reserve-interval-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "SPEC.md:5,7"
+        },
+        {
+          "id": "successful-release-of-seed-booking",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 30.9,
+          "ownerReference": "SPEC.md:7"
+        },
+        {
+          "id": "identical-closed-windows-remain-legal",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 30.2,
+          "ownerReference": "CHANGE-G2.md:3,5",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 1,
+                "end": 2,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "move",
+                "kind": "transfer",
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 5,
+                "end": 7,
+                "if_revision": 1
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 3,
+                "end": 4
+              },
+              {
+                "resource": "dock",
+                "start": 3,
+                "end": 4
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "active": [
+              {
+                "id": "old",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 5,
+                "end": 7,
+                "revision": 2
+              }
+            ],
+            "results": [
+              {
+                "event_id": "move",
+                "outcome": "applied",
+                "fromRevision": 1,
+                "toRevision": 2
+              }
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-window",
+            "eventIndex": null,
+            "active": [],
+            "results": []
+          },
+          "runnerError": null
+        },
+        {
+          "id": "transfer-of-missing-id-is-unknown",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.7,
+          "ownerReference": "CHANGE-G2.md:5,7"
+        },
+        {
+          "id": "two-touching-closures-no-gap-no-live-dependency",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 29.5,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        }
+      ]
+    }
+  ]
+}

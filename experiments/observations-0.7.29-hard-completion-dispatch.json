@@ -1,0 +1,273 @@
+{
+  "spec": "building-loop-dispatch-comparison/1",
+  "scope": "Read-only comparison of two real G3 starts. Session identifiers, private seeds, model request contents and raw journals omitted.",
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "installedGovernanceIndexSha256": "20d885dccc984e6494c3913edc09617a5b22d9be248abfb3b8001febd75b7577",
+  "provenance": "Native events.jsonl and progress.jsonl, persisted session journal tool results, isolated BUILDING-LOOP.json, installed source matched to frozen package.",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "off",
+    "maxTokens": 12288
+  },
+  "common": {
+    "unit": "K01",
+    "originalWorkspaceBound": true,
+    "goalSha256": "8045e0083c6d9b7d3b181625fd6616663fd8e6e62c2abedcf99c2d7041dd1424",
+    "firstRequestTools": [
+      "building_loop_propose"
+    ],
+    "firstBoundRequestTools": [
+      "building_loop",
+      "building_loop_file",
+      "building_loop_ledger"
+    ],
+    "prepare": {
+      "role": "coordinator",
+      "phase": "dispatch",
+      "complete": true,
+      "pending": [],
+      "files": [
+        "PROJECT-GOAL.md",
+        "SPEC.md",
+        "CHANGE-G2.md",
+        "INDEX.md",
+        "modules/architecture.md"
+      ],
+      "interpretationOfComplete": "Returned coordinator read packet was complete. Code files belong to the executor's separate grant.",
+      "architecture": {
+        "status": "required",
+        "headings": [
+          "实施顺序",
+          "回退顺序",
+          "关键验证"
+        ],
+        "responsibilitiesHeading": "模块职责",
+        "requiredStaticImportsHeading": "静态导入",
+        "staticImportsHeadingPresentInReturnedTemplate": true,
+        "staticImportsHeadingDeclaredInArchitectureContract": false,
+        "sourceFacts": {
+          "presentModules": [
+            "journal.py",
+            "planner.py",
+            "policy.py",
+            "release.py"
+          ],
+          "localImports": {
+            "journal.py": [],
+            "planner.py": [
+              "journal.py",
+              "policy.py"
+            ],
+            "policy.py": [],
+            "release.py": [
+              "planner.py"
+            ]
+          }
+        }
+      },
+      "next": {
+        "tool": "building_loop_file",
+        "action": "write",
+        "path": "modules/architecture.md",
+        "required": [
+          "content",
+          "note"
+        ],
+        "then": {
+          "tool": "building_loop",
+          "action": "architecture",
+          "unit": "K01"
+        }
+      },
+      "checkpointAdvance": {
+        "action": "advance",
+        "unit": "K01"
+      }
+    },
+    "scope": {
+      "coordinatorSourceReadWrite": false,
+      "executorIntakeSourceReadWrite": [
+        "journal.py",
+        "planner.py",
+        "policy.py",
+        "release.py"
+      ]
+    },
+    "policyDigestsExplanation": "Isolated hosts use separate generated signer keys; effective grants, prepared goals and installed product code matched."
+  },
+  "observations": [
+    {
+      "repetition": 1,
+      "run": "r-kcBQoe",
+      "policySha256": "2955d1d8b79b566fc02b7f6d8d110e4fbf5fb472b28b22fdaace8caa5adb982b",
+      "events": [
+        {
+          "seq": 17,
+          "elapsedMs": 2724,
+          "result": "proposal started",
+          "unit": "K01"
+        },
+        {
+          "seq": 19,
+          "elapsedMs": 2768,
+          "result": "unknown tool building_loop_file",
+          "explanation": "Model grouped list with proposal before tool visibility changed."
+        },
+        {
+          "seq": 28,
+          "elapsedMs": 4986,
+          "result": "bound prepare completed",
+          "phase": "dispatch"
+        },
+        {
+          "seq": 35,
+          "elapsedMs": 7120,
+          "result": "read denied",
+          "path": "release.py"
+        },
+        {
+          "seq": 37,
+          "elapsedMs": 7161,
+          "result": "read denied",
+          "path": "planner.py"
+        },
+        {
+          "seq": 41,
+          "elapsedMs": 11274,
+          "result": "asked owner to expand source/test access, defer code, or specify who does it",
+          "reasonExcerpt": "我需要先查看实际源代码，才能编写架构文档。"
+        },
+        {
+          "seq": 43,
+          "elapsedMs": 11275,
+          "result": "natural root response completed"
+        },
+        {
+          "elapsedMs": 41400,
+          "result": "stalled-idle",
+          "nativePhase": null,
+          "elapsedQuietMs": 30125
+        }
+      ],
+      "codeSnapshotChanged": false,
+      "executorSpawned": false,
+      "officialCases": {
+        "passed": 21,
+        "total": 48
+      }
+    },
+    {
+      "repetition": 2,
+      "run": "r-2duQUj",
+      "policySha256": "47df2e7288aa77c287dae7646bb00036fb1821fd479b68fb6c779d421ded817c",
+      "events": [
+        {
+          "seq": 17,
+          "elapsedMs": 2387,
+          "result": "proposal started",
+          "unit": "K01"
+        },
+        {
+          "seq": 26,
+          "elapsedMs": 5680,
+          "result": "bound prepare completed",
+          "phase": "dispatch"
+        },
+        {
+          "seq": 33,
+          "elapsedMs": 6806,
+          "result": "list returned coordinator whitelist without source"
+        },
+        {
+          "seq": 55,
+          "elapsedMs": 17605,
+          "result": "first architecture write rejected",
+          "reasonExcerpt": "须有唯一可见章节「静态导入」"
+        },
+        {
+          "seq": 61,
+          "elapsedMs": 22772,
+          "result": "corrected architecture write landed"
+        },
+        {
+          "seq": 68,
+          "elapsedMs": 24744,
+          "result": "architecture registered",
+          "phase": "dispatch"
+        },
+        {
+          "seq": 76,
+          "elapsedMs": 27731,
+          "result": "advance spawned executor",
+          "phase": "intake"
+        },
+        {
+          "elapsedMs": 132226,
+          "result": "signed current version passed official functional suite",
+          "officialCases": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "executorSpawned": true
+    }
+  ],
+  "source": [
+    {
+      "path": "governance/index.mjs",
+      "line": 436,
+      "evidence": "Proposal returns the started checkpoint unit."
+    },
+    {
+      "path": "governance/engineering-handoff.mjs",
+      "line": 163,
+      "evidence": "Coordinator checkpoint emits the bound unit and advance action."
+    },
+    {
+      "path": "governance/index.mjs",
+      "line": 256,
+      "evidence": "Architecture write next points to registration. The checkpoint advance is a separate alternative."
+    },
+    {
+      "path": "governance/index.mjs",
+      "line": 921,
+      "evidence": "Prepare adds bounded sourceFacts when architecture is required."
+    },
+    {
+      "path": "governance/engineering-architecture.mjs",
+      "line": 397,
+      "evidence": "Source projection carries names, presence, and proven direct imports. It does not grant source reads."
+    },
+    {
+      "path": "governance/engineering-architecture.mjs",
+      "line": 602,
+      "evidence": "Architecture contract omits importsHeading, although the returned template contains the required heading."
+    },
+    {
+      "path": "governance/index.mjs",
+      "line": 1196,
+      "evidence": "File action enforces current role read whitelist."
+    },
+    {
+      "path": "governance/index.mjs",
+      "line": 2965,
+      "evidence": "Phase guidance tells coordinator to author architecture, register it, then dispatch. Source editing belongs to executor. It conditionally says to preserve importsHeading and permits describing dependencies as plans."
+    },
+    {
+      "path": "governance/index.mjs",
+      "line": 2981,
+      "evidence": "General guidance asks user to resolve real goal/authority conflicts."
+    }
+  ],
+  "assessment": {
+    "observedFailure": "The first model treated its intended role split as a permission blocker, asked for wider source authority and ended before writing, registering or dispatching. Both source denials were correct. The second start executed the native workflow and reached an actual full signed draft.",
+    "observedContractGaps": [
+      "The exact static-import heading is omitted from architecture contract metadata.",
+      "Prepare's ordered next stops at registration; checkpoint advance is separate."
+    ],
+    "unverifiedCause": "The omissions may increase wrong action selection, but this two-run contrast does not isolate their effect on model sampling.",
+    "possibleFollowup": "Expose one phase-accurate write, register and advance continuation with the exact preserve heading. Explain current sourceFacts versus planned changes, point implementation to the existing executor grant, and preserve the coordinator whitelist. Validate with frozen good/bad launch scenarios before claiming improvement."
+  }
+}

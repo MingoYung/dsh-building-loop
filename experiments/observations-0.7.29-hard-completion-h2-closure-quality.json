@@ -1,0 +1,503 @@
+{
+  "schema": "building-loop-reservation-h2-closure-scope/1",
+  "run": "r-dzDW0T",
+  "mode": "building-loop",
+  "stage": "H2",
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "nativeClosed": true,
+  "online": [
+    104,
+    104
+  ],
+  "postfreeze": [
+    24,
+    24
+  ],
+  "staticModuleBoundaries": {
+    "entry": {
+      "parse": true,
+      "moduleImports": [
+        "ledger"
+      ],
+      "boundaryOk": true,
+      "transportOnlyIO": true,
+      "functions": [
+        "main"
+      ],
+      "lineCount": 23
+    },
+    "events": {
+      "parse": true,
+      "moduleImports": [],
+      "boundaryOk": true,
+      "transportOnlyIO": true,
+      "functions": [
+        "fingerprint",
+        "integer",
+        "name",
+        "read_active",
+        "read_event"
+      ],
+      "lineCount": 82
+    },
+    "ledger": {
+      "parse": true,
+      "moduleImports": [
+        "events",
+        "windows"
+      ],
+      "boundaryOk": true,
+      "transportOnlyIO": true,
+      "functions": [
+        "__init__",
+        "add",
+        "failure",
+        "overlaps",
+        "process",
+        "remove",
+        "run_apply",
+        "sort_key"
+      ],
+      "lineCount": 180
+    },
+    "windows": {
+      "parse": true,
+      "moduleImports": [],
+      "boundaryOk": true,
+      "transportOnlyIO": true,
+      "functions": [
+        "__init__",
+        "_integer",
+        "_name",
+        "first_overlap",
+        "intersects",
+        "window_problem"
+      ],
+      "lineCount": 87
+    }
+  },
+  "independentResponsibilityAcrossModes": [
+    {
+      "run": "r-QgvDgS",
+      "mode": "standard",
+      "stage": "H1",
+      "confirmed": 3,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [],
+      "behaviorFailed": 1
+    },
+    {
+      "run": "r-QgvDgS",
+      "mode": "standard",
+      "stage": "H2",
+      "confirmed": 4,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "window-closed",
+          "expectedOwner": "windows.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 76,
+              "symbol": "apply"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 1
+    },
+    {
+      "run": "r-QgvDgS",
+      "mode": "standard-checklist",
+      "stage": "H1",
+      "confirmed": 3,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "conflicting-event",
+          "expectedOwner": "events.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 82,
+              "symbol": "apply"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-QgvDgS",
+      "mode": "standard-checklist",
+      "stage": "H2",
+      "confirmed": 4,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "conflicting-event",
+          "expectedOwner": "events.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 143,
+              "symbol": "apply"
+            }
+          ]
+        },
+        {
+          "code": "window-closed",
+          "expectedOwner": "windows.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 67,
+              "symbol": "reserve"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-QgvDgS",
+      "mode": "building-loop",
+      "stage": "H1",
+      "confirmed": 2,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [],
+      "behaviorFailed": 2
+    },
+    {
+      "run": "r-QgvDgS",
+      "mode": "building-loop",
+      "stage": "H2",
+      "confirmed": 5,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "window-closed",
+          "expectedOwner": "windows.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 136,
+              "symbol": "apply_events"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-dzDW0T",
+      "mode": "standard",
+      "stage": "H1",
+      "confirmed": 3,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [],
+      "behaviorFailed": 1
+    },
+    {
+      "run": "r-dzDW0T",
+      "mode": "standard",
+      "stage": "H2",
+      "confirmed": 5,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "window-closed",
+          "expectedOwner": "windows.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 129,
+              "symbol": "placement"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-dzDW0T",
+      "mode": "standard-checklist",
+      "stage": "H1",
+      "confirmed": 4,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-dzDW0T",
+      "mode": "standard-checklist",
+      "stage": "H2",
+      "confirmed": 5,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "window-closed",
+          "expectedOwner": "windows.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 137,
+              "symbol": "reserve"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-dzDW0T",
+      "mode": "building-loop",
+      "stage": "H1",
+      "confirmed": 3,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "conflicting-event",
+          "expectedOwner": "events.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 94,
+              "symbol": "run_apply"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    },
+    {
+      "run": "r-dzDW0T",
+      "mode": "building-loop",
+      "stage": "H2",
+      "confirmed": 4,
+      "pathAndResultObserved": 1,
+      "wrongOwner": [
+        {
+          "code": "conflicting-event",
+          "expectedOwner": "events.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 102,
+              "symbol": "run_apply"
+            }
+          ]
+        },
+        {
+          "code": "window-closed",
+          "expectedOwner": "windows.py",
+          "actualLocations": [
+            {
+              "file": "ledger.py",
+              "line": 113,
+              "symbol": "run_apply"
+            }
+          ]
+        }
+      ],
+      "behaviorFailed": 0
+    }
+  ],
+  "observations": [
+    {
+      "kind": "wrong-event-identity-owner",
+      "finding": "events.py normalizes the fingerprint; ledger.py compares the prior fingerprint and decides conflicting-event. The output is correct for the traced public example.",
+      "evidence": [
+        {
+          "path": "SPEC.md",
+          "start": 9,
+          "end": 9,
+          "sha256": "27dfeb30f0e6f32717cecfb2622337687c29160ae5c939c68e52c4823973da1e",
+          "lines": [
+            "events 对当前批次的 event_id 作身份判定。完全相同的后续事件是重试，响应 outcome 为 replay，且不再检查当前预约状态。对象字段顺序不影响身份。相同 event_id 内容不同，由 events 返回 `conflicting-event`。每项先检查事件形状，再检查身份，随后才应用业务。一个较早的业务错误优先于后续任何错误。成功返回 `{\"status\":\"ok\",\"active\":[...],\"results\":[{\"event_id\":\"...\",\"outcome\":\"applied|replay\"},...]}`，results 一项输入一条，active 按 inspect 的规则排序。"
+          ]
+        },
+        {
+          "path": "events.py",
+          "start": 74,
+          "end": 82,
+          "sha256": "bbc018ac95df28867d5c61b67d14b16d1f71712c88cb44dc021d8f8c950559a2",
+          "lines": [
+            "def fingerprint(event):",
+            "    \"\"\"Content identity of a shape-valid event, independent of the object's field order.",
+            "",
+            "    Sorting keys before serializing makes {kind.., id..} and {id.., kind..} compare equal, which",
+            "    SPEC.md:9 requires for replay detection. read_event has already restricted every value to a",
+            "    string or an int, so the sorted-key dump identifies content unambiguously. A transfer and a",
+            "    reserve can never collide because each kind has a distinct key set and a distinct kind value.",
+            "    \"\"\"",
+            "    return json.dumps(event, sort_keys=True, separators=(\",\", \":\"))"
+          ]
+        },
+        {
+          "path": "ledger.py",
+          "start": 96,
+          "end": 104,
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870",
+          "lines": [
+            "        # Identity is checked before business so a replay never re-tests reservation state",
+            "        # (SPEC.md:9); shape above already ran first, so ordering is shape, identity, business.",
+            "        mark = fingerprint(event)",
+            "        known = seen.get(event[\"event_id\"])",
+            "        if known is not None:",
+            "            if known != mark:",
+            "                return failure(\"conflicting-event\", index)",
+            "            results.append({\"event_id\": event[\"event_id\"], \"outcome\": \"replay\"})",
+            "            continue"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "split-window-guard-owner",
+      "finding": "windows.py decides interval overlap as a boolean. ledger.py uses that boolean to choose window-closed for reserve and transfer, instead of forwarding a windows-owned business decision. The output is correct for the traced public example.",
+      "evidence": [
+        {
+          "path": "CHANGE-G2.md",
+          "start": 3,
+          "end": 3,
+          "sha256": "effff4217039ca18a6c26993c7830c712f545ab0f1a24b27e254a8d611b39666",
+          "lines": [
+            "保留 SPEC.md 已有接口及现有行为。apply 新增可选 `closed` 字段，默认空列表。每个停用区间有且只有 `resource,start,end`，按原字段规则校验。区间可重叠或无序，停用区间最多 24,000 条。字段形状错误由 windows 返回 `invalid-window`，在事件开始前检查。初始预约继续有效。新 reserve 或 transfer 在目标资源与停用区间相交时，由 windows 判定 `window-closed`，它优先于目标预约重叠。release 不受停用影响。inspect 维持原请求形状。"
+          ]
+        },
+        {
+          "path": "windows.py",
+          "start": 76,
+          "end": 87,
+          "sha256": "e86e6c8bb42baab7b8c4b1b33f092dc8643a6dd27e028054a8510c8a7edf3e79",
+          "lines": [
+            "    def intersects(self, resource, start, end):",
+            "        entries = self.by_resource.get(resource)",
+            "        if not entries:",
+            "            return False",
+            "        # `entries` is sorted and disjoint, so [start, end) hits it exactly when the window just",
+            "        # before `start` reaches past `start`, or a window starts inside the probe. The second",
+            "        # test is `entries[position][0] < end`, so a window starting exactly at `end` (or a probe",
+            "        # of zero length) does not count.",
+            "        position = bisect_left(entries, (start,))",
+            "        if position and entries[position - 1][1] > start:",
+            "            return True",
+            "        return position < len(entries) and entries[position][0] < end"
+          ]
+        },
+        {
+          "path": "ledger.py",
+          "start": 109,
+          "end": 115,
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870",
+          "lines": [
+            "        if kind == \"reserve\":",
+            "            if current is not None:",
+            "                return failure(\"duplicate-reservation\", index)",
+            "            if closed.intersects(event[\"resource\"], event[\"start\"], event[\"end\"]):",
+            "                return failure(\"window-closed\", index)",
+            "            if stage.overlaps(event[\"resource\"], event[\"start\"], event[\"end\"]):",
+            "                return failure(\"overlap\", index)"
+          ]
+        },
+        {
+          "path": "ledger.py",
+          "start": 138,
+          "end": 144,
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870",
+          "lines": [
+            "            # Removing the reservation before the probes is what excludes it from its own target",
+            "            # conflict check, so an in-place move that still overlaps only other records fails.",
+            "            stage.remove(current[\"resource\"], current[\"start\"], current[\"end\"], ident)",
+            "            if closed.intersects(event[\"resource\"], event[\"start\"], event[\"end\"]):",
+            "                return failure(\"window-closed\", index)",
+            "            if stage.overlaps(event[\"resource\"], event[\"start\"], event[\"end\"]):",
+            "                return failure(\"overlap\", index)"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "false-complexity-claim",
+      "finding": "Binary search locates an index, but Python list insertion and non-tail removal move O(n) elements. A list suffix slice copies O(n) elements. Fixed scale fixtures passed, which does not establish a logarithmic bound.",
+      "evidence": [
+        {
+          "path": "modules/architecture.md",
+          "start": 35,
+          "end": 35,
+          "sha256": "c126bef038938dc0994914f111d75706fab09d8991d9de7607c703fe456ddec3",
+          "lines": [
+            "5. 索引：预约用 `id -> 记录` 映射加按资源分组的有序区间数组（bisect 插入/删除），单事件为对数级，不按全量预约逐项扫描；停用窗口同样按资源分组预排序（并可选合并），仅在目标资源上判断相交。24,000 条 active 加 24,000 条 closed 加 4,096 项事件应在秒级完成。"
+          ]
+        },
+        {
+          "path": "ledger.py",
+          "start": 20,
+          "end": 25,
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870",
+          "lines": [
+            "class IntervalIndex:",
+            "    \"\"\"Per-resource ordered index of occupied [start, end) intervals.",
+            "",
+            "    Without it, every reserve would rescan the whole active set, which SPEC.md:11 forbids",
+            "    (\"不得按全量预约反复扫描每项冲突\"). Keeping one sorted list per resource makes each insert,",
+            "    removal and overlap probe O(log n + equal-start group) instead of O(total reservations)."
+          ]
+        },
+        {
+          "path": "ledger.py",
+          "start": 40,
+          "end": 45,
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870",
+          "lines": [
+            "    def add(self, resource, start, end, ident):",
+            "        insort(self.by_resource.setdefault(resource, []), (start, end, ident))",
+            "",
+            "    def remove(self, resource, start, end, ident):",
+            "        entries = self.by_resource[resource]",
+            "        entries.pop(bisect_left(entries, (start, end, ident)))"
+          ]
+        },
+        {
+          "path": "ledger.py",
+          "start": 55,
+          "end": 64,
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870",
+          "lines": [
+            "        # The first entry whose start is >= start; every earlier entry starts below it, so only",
+            "        # that predecessor and the equal-start/successor group can possibly overlap [start, end).",
+            "        position = bisect_left(entries, (start,))",
+            "        if position and entries[position - 1][1] > start:",
+            "            return True",
+            "        for entry in entries[position:]:",
+            "            if entry[0] >= end:",
+            "                return False",
+            "            if entry[0] < end:",
+            "                return True"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "false-interval-comment",
+      "finding": "[0,48) union [48,52) is exactly [0,52), with no introduced point. Treating touching rows separately still preserves coverage. The comment’s explanation is inaccurate even though this code path passes tests.",
+      "evidence": [
+        {
+          "path": "windows.py",
+          "start": 65,
+          "end": 69,
+          "sha256": "e86e6c8bb42baab7b8c4b1b33f092dc8643a6dd27e028054a8510c8a7edf3e79",
+          "lines": [
+            "                # Touching windows (next start == current end) stay separate: half-open intervals",
+            "                # [0, 48) and [48, 52) do not intersect, and merging them would invent a closed",
+            "                # slot the caller never declared. Only a strict overlap (next start < current",
+            "                # end) extends the current window.",
+            "                if merged and start < merged[-1][1]:"
+          ]
+        }
+      ]
+    }
+  ]
+}

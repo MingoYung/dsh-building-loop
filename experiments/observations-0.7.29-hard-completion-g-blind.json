@@ -1,0 +1,3577 @@
+{
+  "spec": "dsh-engineering-blind-comparison/1",
+  "suite": "hard-ab",
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "intakeSha256": "a6748999c7986d06c6a7d88de4864724fb6fa192625781fc173ba6b2e19c2964",
+  "sourceJudgmentsSha256": "43b113854abee2c9c51487629640f3c12775a252bbfaef1d9276262b49cd2357",
+  "docJudgmentsSha256": "45ede0341c7312b9e644265ee1b55791e30ab3f970431652b505da38867b2f62",
+  "publicControlsSha256": "4c5ba58b74e775882bb7a3bad341b572aafdc505463a58a81a6f39d8e92e5ab3",
+  "postfreezeSeedSha256": "5e97968f6b3d1c8f3c190c47686345f5c1ee9c236d57ec7061d3a4d6d12fe8da",
+  "groups": [
+    {
+      "mode": "standard",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    },
+    {
+      "mode": "standard-checklist",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    },
+    {
+      "mode": "building-loop",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": false
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": true,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "cell": "cell-ad9dd2672f3f",
+      "rep": 1,
+      "run": "r-kcBQoe",
+      "mode": "standard",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness."
+        },
+        "closure": {
+          "status": "supported",
+          "location": "planner.py:48–69",
+          "reason": "Seen-set traversal and applied keep are distinct.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "defect",
+          "location": "journal.py:95–97; planner.py:137–147",
+          "reason": "Whole-list shape pre-scan beats item 0 business error.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "not-applicable",
+          "location": "SPEC.md",
+          "reason": "G3 lacks G4 operation identity."
+        },
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Local ownership and selected duplicated paths checked. A total simplicity or future maintainability judgment is not inferred from these files."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:130–147; journal.py:95–97",
+            "reason": "Comment asserts first failing item always wins, but whole batch shape pre-scan can return later error."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:48–56,78–83",
+            "reason": "Useful visited/keep and error framing rationale."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:error-order-early-domain-vs-later-invalid-item",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "98d6fe837c2601e3f5ce0cc93898e901129e2f49166a24572c774fcc3bf46da7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "0bed2fd3335d66a232d617249dc37e40a2cc0ad6e2e24e52f1d937b69d6a6551"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "848751d0803f18937caafcada33242043ee1c3ccc64767f57c555626ef0f221f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 207200,
+        "quietMs": 2029,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 205171
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 207200,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 14,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 98
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_index",
+            "batch_item",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolve",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 160
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 68
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 1641762,
+        "cacheComparison": 96.6349,
+        "tokenAll": 1641762,
+        "cacheAll": 96.6349,
+        "usage": {
+          "comparison": {
+            "inputTokens": 54615,
+            "cacheReadTokens": 1568384,
+            "cacheWriteTokens": 0,
+            "outputTokens": 18763,
+            "totalTokens": 1641762,
+            "known": 44,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-ae531633ed12",
+      "rep": 1,
+      "run": "r-kcBQoe",
+      "mode": "standard",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "entry": {
+          "status": "missing",
+          "location": "journal.py:75,90; planner.py:130–150",
+          "reason": "G3 envelope still allows only action and requests; valid G4 limit/operation_id rejected.",
+          "publicCase": "operation-id-required"
+        },
+        "closure": {
+          "status": "missing",
+          "location": "planner.py:48–69; journal.py:90",
+          "reason": "Graph helper supports traversal, but valid G4 envelope cannot reach it.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "missing",
+          "location": "planner.py",
+          "reason": "Applicable batch entry absent."
+        },
+        "atomicOrder": {
+          "status": "missing",
+          "location": "journal.py:90; planner.py:130–150",
+          "reason": "Valid G4 request rejected before per-item work.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "missing",
+          "location": "journal.py:75,90",
+          "reason": "No G4 operation identity.",
+          "publicCase": "operation-id-required"
+        },
+        "maintainability": {
+          "status": "missing",
+          "location": "planner.py",
+          "reason": "Expected stage implementation absent, so no engineering benefit established for this change."
+        },
+        "comments": [
+          {
+            "status": "missing",
+            "location": "planner.py:130–150",
+            "reason": "No G4 identity/quota implementation to document. Existing G3 first-error explanation still contradicts shape pre-scan."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "item-forbids-action",
+            "status": "failed"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "failed"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "failed"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "failed"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "failed"
+          },
+          {
+            "id": "operation-id-required",
+            "status": "failed"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "failed"
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "failed"
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "failed"
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "failed"
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-small",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-shared-unapplied-dag",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:error-order-early-domain-vs-later-invalid-item",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:object-key-order-does-not-charge-twice",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "98d6fe837c2601e3f5ce0cc93898e901129e2f49166a24572c774fcc3bf46da7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "0bed2fd3335d66a232d617249dc37e40a2cc0ad6e2e24e52f1d937b69d6a6551"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "848751d0803f18937caafcada33242043ee1c3ccc64767f57c555626ef0f221f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 25,
+          "total": 72
+        },
+        "protected": {
+          "passed": 24,
+          "total": 48
+        },
+        "required": {
+          "passed": 1,
+          "total": 24
+        },
+        "lostOldCount": 24
+      },
+      "terminal": "operator-censored",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "operator-censored",
+        "classification": "administrative",
+        "elapsedMs": 1775555,
+        "quietMs": 1762616
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 1775555,
+      "postfreeze": {
+        "passed": 0,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 25,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 25,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 7,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 98
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_index",
+            "batch_item",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolve",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 160
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 68
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 64408,
+        "cacheComparison": 88.7292,
+        "tokenAll": 64408,
+        "cacheAll": 88.7292,
+        "usage": {
+          "comparison": {
+            "inputTokens": 7154,
+            "cacheReadTokens": 56320,
+            "cacheWriteTokens": 0,
+            "outputTokens": 934,
+            "totalTokens": 64408,
+            "known": 5,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-d605ed9c8a5e",
+      "rep": 1,
+      "run": "r-kcBQoe",
+      "mode": "standard-checklist",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "finalOwnerDocDrift": [
+        {
+          "path": "CHANGE-G2.md",
+          "suppliedSha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc",
+          "frozenSha256": "432f0d0b96258981c38dcbeaf88412151ccb569872ba9bda8542624c1c917d41"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness."
+        },
+        "closure": {
+          "status": "defect",
+          "location": "planner.py:79–104",
+          "reason": "Traversal stops at an unapplied node and emits the protected anchor.",
+          "publicCase": "targeted:retention-small"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:216–233",
+          "reason": "Each item shape before its own business and first failure discards local results.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "not-applicable",
+          "location": "SPEC.md",
+          "reason": "G3 lacks G4 operation identity."
+        },
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Local ownership and selected duplicated paths checked. A total simplicity or future maintainability judgment is not inferred from these files."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:79–103",
+            "reason": "Full-graph explanation conflicts with code and its own last paragraph. The last paragraph correctly identifies no expansion."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-small",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-shared-unapplied-dag",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "78c4c5c06716d0d44a61c6c891a7df1a96cdfcc39a5d33171600c8d009bf83df"
+          },
+          {
+            "path": "CHANGE-G3.md",
+            "sha256": "26384257d88163adc59510a4d599df1460c43904d11bf16c9ab9897842bd1504"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "bc533096466c1abde4b617d17a3c8e55dee4f4ee0cbcbd21f68f5a2c4202d3b0"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 125,
+            "reason": "Describes current anchor leak but treats it as out of scope; G3 explicitly requires traversal through unapplied intermediates.",
+            "source": "planner.py:79–104"
+          },
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 118,
+            "reason": "Says release only has print I/O; it also decodes from sys.stdin. It remains the correct transport module.",
+            "source": "release.py:10–15"
+          },
+          {
+            "status": "supported",
+            "path": "TEST-REPORT.md",
+            "line": 78,
+            "reason": "Acknowledges the concrete unresolved retain defect. Public target verifies the incorrect ancestor output."
+          },
+          {
+            "status": "unresolved",
+            "path": "TEST-REPORT.md",
+            "line": 35,
+            "reason": "Author-reported baseline coverage is not the same as independent frozen public results."
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "db96e8aa67030fe7f83575e0f011d069e0635821837c67eae1340b9c9dfbfdb4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 41,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 20,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 1675387,
+        "quietMs": 2157,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 1673230
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 1675387,
+      "postfreeze": {
+        "passed": 7,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 41,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 41,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 13,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "emit",
+            "failure",
+            "plan",
+            "prepare",
+            "read_batch",
+            "read_batch_item",
+            "retained_closure",
+            "rollback_actions",
+            "run_batch",
+            "topological_order"
+          ],
+          "lineCount": 233
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 1853327,
+        "cacheComparison": 97.0492,
+        "tokenAll": 5598306,
+        "cacheAll": 98.7424,
+        "usage": {
+          "comparison": {
+            "inputTokens": 54042,
+            "cacheReadTokens": 1777408,
+            "cacheWriteTokens": 0,
+            "outputTokens": 21877,
+            "totalTokens": 1853327,
+            "known": 46,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 15835,
+            "cacheReadTokens": 3709184,
+            "cacheWriteTokens": 0,
+            "outputTokens": 19960,
+            "totalTokens": 3744979,
+            "known": 39,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-9c9e31d52ba9",
+      "rep": 1,
+      "run": "r-kcBQoe",
+      "mode": "standard-checklist",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "finalOwnerDocDrift": [
+        {
+          "path": "SPEC.md",
+          "suppliedSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+          "frozenSha256": "d5fc3d925ac1fb50daba9b35072e443eedf86662173b1a299aa3fd6d629e5645"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness."
+        },
+        "closure": {
+          "status": "defect",
+          "location": "planner.py:87–112",
+          "reason": "Traversal stops at an unapplied node and emits the protected anchor.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:289–327",
+          "reason": "Incremental shape, identity and business before final quota.",
+          "publicCase": "later-domain-priority-over-batch-budget"
+        },
+        "identity": {
+          "status": "supported",
+          "location": "planner.py:184–202,293–327",
+          "reason": "Sorted JSON handles tested key order and boolean difference; retries skip output and charges.",
+          "publicCase": "same-id-boolean-different-from-integer"
+        },
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Local ownership and selected duplicated paths checked. A total simplicity or future maintainability judgment is not inferred from these files."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:87–111",
+            "reason": "Same comment says traverse all nodes, then explicitly describes not expanding intermediates; actual branch only expands applied nodes."
+          },
+          {
+            "status": "defect",
+            "location": "planner.py:193–199",
+            "reason": "Byte-equal language overstates canonical JSON equality; key order is ignored."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:257–269",
+            "reason": "Clear explanation of why quota verdict waits until every item is resolved."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-small",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-shared-unapplied-dag",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "f8a5df9f2710a01cbdf1f9f13b410ec99a175684e2686101bdea47bc08abe1b1"
+          },
+          {
+            "path": "CHANGE-G3.md",
+            "sha256": "df4516d4bf9df433f97f37d71fba9c790ab1a5a21208d2c38c3ddb2806b8ec6a"
+          },
+          {
+            "path": "CHANGE-G4.md",
+            "sha256": "6dc732f9e9c9960141d4390347503a1577b945c3dd2f1c1473031d36499a7ac3"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "0f3fd471a7f6f56d41e70523abdbdd9641152904abd9e7f0485844fea1606499"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 197,
+            "reason": "Accurately describes current defect but accepts it as legacy despite G3’s explicit full-graph traversal clause retained in G4. Public case incorrectly emits anchor.",
+            "source": "planner.py:87–112"
+          },
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 193,
+            "reason": "Says a retry returns its old result again. The current implementation skips the retry slot; the latter matches G4.",
+            "source": "planner.py:293–301"
+          },
+          {
+            "status": "supported",
+            "path": "TEST-REPORT.md",
+            "line": 116,
+            "reason": "Reports a real unresolved retain symptom. Public replay independently confirms it."
+          },
+          {
+            "status": "unresolved",
+            "path": "ARCHITECTURE.md",
+            "line": 196,
+            "reason": "Performance timing is author-reported, with different stated input from controlled WSL public case. Not independent evidence."
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "47da23f0bbfbef1950a5304de2b613b7b7b8acc5905a4533969cb6197033ac48"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 64,
+          "total": 72
+        },
+        "protected": {
+          "passed": 41,
+          "total": 41
+        },
+        "required": {
+          "passed": 23,
+          "total": 24
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 293262,
+        "quietMs": 2011,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 291251
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 293262,
+      "postfreeze": {
+        "passed": 23,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 64,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 64,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 21,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "canonical_item",
+            "emit",
+            "failure",
+            "plan",
+            "prepare",
+            "read_batch",
+            "read_item_operation",
+            "retained_closure",
+            "rollback_actions",
+            "run_batch",
+            "topological_order"
+          ],
+          "lineCount": 327
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 2204887,
+        "cacheComparison": 98.3879,
+        "tokenAll": 2204887,
+        "cacheAll": 98.3879,
+        "usage": {
+          "comparison": {
+            "inputTokens": 35000,
+            "cacheReadTokens": 2136064,
+            "cacheWriteTokens": 0,
+            "outputTokens": 33823,
+            "totalTokens": 2204887,
+            "known": 44,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-31c902274dea",
+      "rep": 1,
+      "run": "r-kcBQoe",
+      "mode": "building-loop",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "entry": {
+          "status": "missing",
+          "location": "planner.py:72–95",
+          "reason": "Only the original single-request path exists; no rollback-many branch.",
+          "publicCase": "item-must-be-object"
+        },
+        "closure": {
+          "status": "missing",
+          "location": "planner.py:48–63",
+          "reason": "G3 batch absent; inherited closure also pushes only applied nodes.",
+          "publicCase": "targeted:retention-small"
+        },
+        "isolation": {
+          "status": "missing",
+          "location": "planner.py",
+          "reason": "Applicable batch entry absent."
+        },
+        "atomicOrder": {
+          "status": "missing",
+          "location": "planner.py:72–95",
+          "reason": "No batch function.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "not-applicable",
+          "location": "SPEC.md",
+          "reason": "G3 lacks G4 operation identity."
+        },
+        "maintainability": {
+          "status": "missing",
+          "location": "planner.py",
+          "reason": "Expected stage implementation absent, so no engineering benefit established for this change."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:48–62",
+            "reason": "Inherited comment says walk continues through unapplied nodes but code skips expansion."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "failed"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "failed"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "failed"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "failed"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "failed"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-small",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-shared-unapplied-dag",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:error-order-early-domain-vs-later-invalid-item",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "f51ec2879bd9eae7ad97fe83e4943da23617e6ac5143be4800751b64d02ec220"
+          }
+        ],
+        "findings": [
+          {
+            "status": "missing",
+            "path": "modules/architecture.md",
+            "line": 9,
+            "reason": "Only host starter placeholders for implementation, rollback and verification, no authored plan."
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "bb311558962924306b9dfe18e0bf8393520e72c1753888487541559f6923dd7e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 21,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 0,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "stalled-idle",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "stalled-idle",
+        "classification": "nonterminal-without-runnable-work",
+        "elapsedMs": 41400,
+        "quietMs": 30125,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 11275
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 41400,
+      "postfreeze": {
+        "passed": 0,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 21,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 21,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 5,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "build_graph",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 95
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 32233,
+        "cacheComparison": 72.1023,
+        "tokenAll": 32233,
+        "cacheAll": 72.1023,
+        "usage": {
+          "comparison": {
+            "inputTokens": 8766,
+            "cacheReadTokens": 22656,
+            "cacheWriteTokens": 0,
+            "outputTokens": 811,
+            "totalTokens": 32233,
+            "known": 4,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-99e4d1f80220",
+      "rep": 1,
+      "run": "r-kcBQoe",
+      "mode": "building-loop",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness."
+        },
+        "closure": {
+          "status": "defect",
+          "location": "planner.py:48–63",
+          "reason": "An unapplied node is never pushed; applied anchor beyond it is wrongly returned for rollback.",
+          "publicCase": "targeted:retention-small"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:214–244",
+          "reason": "Incremental shape, identity and business before final quota.",
+          "publicCase": "later-domain-priority-over-batch-budget"
+        },
+        "identity": {
+          "status": "supported",
+          "location": "planner.py:170–192,224–244",
+          "reason": "Typed identity and immediate no-output retry; only new IDs charged.",
+          "publicCase": "object-key-order-does-not-charge-twice"
+        },
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Local ownership and selected duplicated paths checked. A total simplicity or future maintainability judgment is not inferred from these files."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:48–62",
+            "reason": "Comment describes an unapplied bridge the code never traverses."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:170–176,215–231",
+            "reason": "Documents type tags and ordering/why dedup skips work."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-small",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-shared-unapplied-dag",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "812e05a2fd59fbf825a046dee5be6a444d63f086e08bb8344bf7fb1056fa48d2"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 17,
+            "reason": "Labels envelope shape/limit as release layer. Entry only invokes planner.dispatch; planner owns checks.",
+            "source": "release.py:14–21; planner.py:129–150,205–208"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 21,
+            "reason": "Labels final quota as policy.py. The actual quota check is in planner.",
+            "source": "planner.py:241–244"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 29,
+            "reason": "Rollback prose says G3 admits 2–128 requests. Public G3 spec admits 1–128.",
+            "source": "SPEC.md:28"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 19,
+            "reason": "Type-sensitive canonicalization and retry result omission align with observed code.",
+            "source": "planner.py:170–192,224–240"
+          },
+          {
+            "status": "unresolved",
+            "path": "modules/architecture.md",
+            "line": 33,
+            "reason": "This is a verification plan. On the frozen version public dependency cases still fail, so it does not prove implementation or completed validation.",
+            "source": "planner.py:48–63"
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "5d56e24f08407d23e6dfa347003d2668b742027eb8310f3e221305c98966777d"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f68e2350a87fc482ab56c56c5b7137d36b80aa61df776ae3f0bd1d65ca5528ff"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "cb7c4b3e13c52a4f37b446a30564a89af6f05f6771a7adddd9a0bb8a1d71b3a5"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 64,
+          "total": 72
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 23,
+          "total": 24
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "blocked",
+      "nativePhase": "blocked",
+      "completion": {
+        "terminal": "blocked",
+        "classification": "native-blocked-and-idle",
+        "elapsedMs": 319248,
+        "quietMs": 30111,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 289137
+        }
+      },
+      "carry": "frozen-workspace-continuation-after-idle-stall",
+      "elapsedMs": 319248,
+      "postfreeze": {
+        "passed": 23,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 64,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 64,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 21,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 80
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_canonical",
+            "_item_request",
+            "_read_items",
+            "_read_limit",
+            "batch_failure",
+            "build_graph",
+            "dispatch",
+            "execute",
+            "failure",
+            "is_batch",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 251
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 25
+        }
+      },
+      "usage": {
+        "tokenComparison": 4103116,
+        "cacheComparison": 95.292,
+        "tokenAll": 4103116,
+        "cacheAll": 95.292,
+        "usage": {
+          "comparison": {
+            "inputTokens": 191413,
+            "cacheReadTokens": 3874304,
+            "cacheWriteTokens": 0,
+            "outputTokens": 37399,
+            "totalTokens": 4103116,
+            "known": 87,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-94cae0d8e25c",
+      "rep": 2,
+      "run": "r-2duQUj",
+      "mode": "standard",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness."
+        },
+        "closure": {
+          "status": "defect",
+          "location": "planner.py:70–85",
+          "reason": "Stack expansion gated on applied membership, so protected ancestors beyond a bridge are emitted.",
+          "publicCase": "targeted:retention-small"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "defect",
+          "location": "journal.py:92–96; planner.py:130–155",
+          "reason": "Whole-list shape pre-scan beats item 0 business error.",
+          "publicCase": "targeted:error-order-early-domain-vs-later-invalid-item"
+        },
+        "identity": {
+          "status": "not-applicable",
+          "location": "SPEC.md",
+          "reason": "G3 lacks G4 operation identity."
+        },
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Local ownership and selected duplicated paths checked. A total simplicity or future maintainability judgment is not inferred from these files."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:70–84,121–145",
+            "reason": "Two docstrings overstate behavior: no intermediate-node expansion, later malformed item can preempt earlier domain fault."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-small",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:retention-shared-unapplied-dag",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:error-order-early-domain-vs-later-invalid-item",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "9b08c3d279e6a3887ad89353d315f66359f4f9155f5d1029469232383da6bec5"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "1b14adc89a10dca4608148f90f9e89c8604bda206782263a3c59ddf2831be24a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 41,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 20,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 98321,
+        "quietMs": 2102,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 96219
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 98321,
+      "postfreeze": {
+        "passed": 7,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 41,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 41,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 11,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_items",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 97
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 170
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 450762,
+        "cacheComparison": 97.5733,
+        "tokenAll": 450762,
+        "cacheAll": 97.5733,
+        "usage": {
+          "comparison": {
+            "inputTokens": 10674,
+            "cacheReadTokens": 429184,
+            "cacheWriteTokens": 0,
+            "outputTokens": 10904,
+            "totalTokens": 450762,
+            "known": 22,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-3b5a26f1dbc6",
+      "rep": 2,
+      "run": "r-2duQUj",
+      "mode": "standard",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "finalOwnerDocDrift": [
+        {
+          "path": "SPEC.md",
+          "suppliedSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+          "frozenSha256": "a11e9767f6a6eb93e070b04dbd643ac26ce822762bf366e649ba984e1557c610"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness."
+        },
+        "closure": {
+          "status": "supported",
+          "location": "planner.py:73–94",
+          "reason": "Separate visited and keep sets separate graph traversal from applied subset.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:195–216,224–229",
+          "reason": "Pre-computes classifications, but reports them and computes earlier items in input order. Local results do not escape upon error.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "defect",
+          "location": "journal.py:113–142; planner.py:206–221",
+          "reason": "Canonical key ordering succeeds and units charge once, but retry is appended as a second output result.",
+          "publicCase": "object-key-order-does-not-charge-twice"
+        },
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Local ownership and selected duplicated paths checked. A total simplicity or future maintainability judgment is not inferred from these files."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:130–145,195–216",
+            "reason": "Comment says faults precede all environment/graph work, but branch replays prepared classifications in per-item order and earlier domain error wins. Another comment describes copying a retry result without explaining G4 forbids duplicate output."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:81–93; journal.py:99–120",
+            "reason": "Good rationale for full traversal and exact identity."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:object-key-order-does-not-charge-twice",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "b3a06a4c53daac9cc94ab05a81809e4dc9776ad4314b1a28c7484ca1aa1b79c5"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "bdd7365f0df7c5807bcbaff06e822822e061cebc7b8d09fe23a894c28168419c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 59,
+          "total": 72
+        },
+        "protected": {
+          "passed": 34,
+          "total": 41
+        },
+        "required": {
+          "passed": 23,
+          "total": 24
+        },
+        "lostOldCount": 7
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 217490,
+        "quietMs": 2046,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 215444
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 217490,
+      "postfreeze": {
+        "passed": 16,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 59,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 59,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 22,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_canonical",
+            "_id_list",
+            "_read_dependencies",
+            "batch_item_fault",
+            "read_applied",
+            "read_batch_items",
+            "read_batch_limit",
+            "read_changes",
+            "read_operation_id",
+            "read_retain",
+            "request_identity"
+          ],
+          "lineCount": 178
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "classify_batch",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 241
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 2032916,
+        "cacheComparison": 98.8125,
+        "tokenAll": 2032916,
+        "cacheAll": 98.8125,
+        "usage": {
+          "comparison": {
+            "inputTokens": 23795,
+            "cacheReadTokens": 1980032,
+            "cacheWriteTokens": 0,
+            "outputTokens": 29089,
+            "totalTokens": 2032916,
+            "known": 53,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-b44776d23e44",
+      "rep": 2,
+      "run": "r-2duQUj",
+      "mode": "standard-checklist",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "finalOwnerDocDrift": [
+        {
+          "path": "CHANGE-G2.md",
+          "suppliedSha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc",
+          "frozenSha256": "255040d9d836409fde244afbac68b657465a6bc08871fbb199c77557ff839802"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "entry": {
+          "status": "defect",
+          "location": "planner.py:171–178; journal.py:7",
+          "reason": "New dispatch checks hash-set membership before the old validator. A JSON array action raises unhandled TypeError.",
+          "publicCase": "single-array-action-invalid"
+        },
+        "closure": {
+          "status": "supported",
+          "location": "planner.py:56–87",
+          "reason": "Stack expands unapplied nodes and visits each node once.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:145–168",
+          "reason": "Order of item shape/business is correct and local totals not returned on failure.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "not-applicable",
+          "location": "SPEC.md",
+          "reason": "G3 lacks G4 operation identity."
+        },
+        "maintainability": {
+          "status": "defect",
+          "location": "planner.py single and batch execution functions",
+          "reason": "Single and batch paths mirror change/applied/graph/order/retain evaluation, increasing divergence risk."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:66–86",
+            "reason": "The expansion guard is `expanded`, while `keep` tracks applied retained subset; comment misidentifies state."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:128–164",
+            "reason": "Useful public envelope and no-partial result rationale."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "single-array-action-invalid",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "7dd5fd1c78e753f2e05e6189e0a179a7bfe0164bf67e3b5ccd804ae97f1bc124"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "d78934132c36e77606946b589f13dcf3bb5920ec7f5b3cde560b5d493d874c6f"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 90,
+            "reason": "Claims old logic remains unchanged after using action in BATCH_ACTIONS. A list action crashes before the old validation path.",
+            "source": "planner.py:171–178"
+          },
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 79,
+            "reason": "Separates expanded set and applied keep correctly and gives a concrete 3-node example that passes.",
+            "source": "planner.py:56–87"
+          },
+          {
+            "status": "unresolved",
+            "path": "TEST-REPORT.md",
+            "line": 14,
+            "reason": "Describes real CLI test process in self-report; asserted test bytes and independent receipt are not in frozen document packet."
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "a07d455b698ae2803aae549e4d632ffb0097b682be13d418b893bd6af0aefa6c"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e2f98b1e8e5d75522ff93602faaaabf71eb38410bab0eedbcc31a31f35956460"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "287e0c43c99fe713e607f78335f106e83086e58d284bf269b049e300fac60c69"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 309282,
+        "quietMs": 2016,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 307266
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 309282,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 15,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_reject_extra_keys",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 128
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_order",
+            "topological_order"
+          ],
+          "lineCount": 199
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_environment",
+            "limit_for",
+            "rollback_decision",
+            "validate_budget"
+          ],
+          "lineCount": 93
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 2043692,
+        "cacheComparison": 98.6455,
+        "tokenAll": 2163891,
+        "cacheAll": 98.7004,
+        "usage": {
+          "comparison": {
+            "inputTokens": 27264,
+            "cacheReadTokens": 1985536,
+            "cacheWriteTokens": 0,
+            "outputTokens": 30892,
+            "totalTokens": 2043692,
+            "known": 58,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 445,
+            "cacheReadTokens": 118912,
+            "cacheWriteTokens": 0,
+            "outputTokens": 842,
+            "totalTokens": 120199,
+            "known": 2,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-90a389a80d05",
+      "rep": 2,
+      "run": "r-2duQUj",
+      "mode": "standard-checklist",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "finalOwnerDocDrift": [
+        {
+          "path": "SPEC.md",
+          "suppliedSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+          "frozenSha256": "42226ac71202c8870c64b756cd1f111a733279214d57e1f25ad851e72cb22a12"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "entry": {
+          "status": "defect",
+          "location": "planner.py:250–257; journal.py:10",
+          "reason": "The new action dispatch still hashes arrays before the old validator, breaking legacy malformed input.",
+          "publicCase": "single-array-action-invalid"
+        },
+        "closure": {
+          "status": "supported",
+          "location": "planner.py:57–88",
+          "reason": "Unapplied nodes are walked; keep and expanded sets have distinct roles.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:221–247",
+          "reason": "Interleaved per-item decisions and limit last. Replay result shape separately defective.",
+          "publicCase": "later-domain-priority-over-batch-budget"
+        },
+        "identity": {
+          "status": "defect",
+          "location": "planner.py:114–147,226–239",
+          "reason": "Typed identity correctly detects conflict, but an equivalent retry appends the original result again.",
+          "publicCase": "object-key-order-does-not-charge-twice"
+        },
+        "maintainability": {
+          "status": "defect",
+          "location": "planner.py single and batch execution functions",
+          "reason": "Single and batch paths mirror change/applied/graph/order/retain evaluation, increasing divergence risk."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:67–87,119–125",
+            "reason": "`expanded`, not `keep`, prevents repeated expansion. The comment incorrectly says json.dumps encodes integer 1 and float 1.0 identically."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:188–206",
+            "reason": "Explains in-place sequencing and late quota."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "single-array-action-invalid",
+            "status": "failed"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "failed"
+          },
+          {
+            "id": "targeted:object-key-order-does-not-charge-twice",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "7b3d581449ebfac6a32f3237230adb18d723c86d84c77d29533854c48b49512d"
+          },
+          {
+            "path": "PLAN-G4.md",
+            "sha256": "9071c58f420a87a53bcd855aa5a0f5e987f99f460aa243368ed7d54da78ac4a1"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "8a569a6d2a0d706a34aa10f7b25b20f6747ae38f06c7aa972f1e50a738fc0f57"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "PLAN-G4.md",
+            "line": 42,
+            "reason": "Treats only return the first result as allowing an extra result slot. G4 requires one result per accepted operation. Public case reproduces two identical rows with one charge.",
+            "source": "planner.py:226–240"
+          },
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 91,
+            "reason": "Factual duplicate-slot description matches source but misstates G4 conformance.",
+            "source": "planner.py:226–240"
+          },
+          {
+            "status": "defect",
+            "path": "TEST-REPORT.md",
+            "line": 65,
+            "reason": "Claims boolean budget cannot reach identity check. On same ID, fingerprint compare precedes replay_item so it correctly reaches conflict. The documented basis for moving test to pure function is incorrect.",
+            "source": "planner.py:224–232"
+          },
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 96,
+            "reason": "Describes full-graph closure; public graph controls pass.",
+            "source": "planner.py:57–88"
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "c533f1490a06732c638bb21ed7aefb28cf1eaa7f4b89e63c0547e229af1204b0"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "cf6f09a7cfeb996e0810f12aa2c6215633bcd2d2135afdadd24eb0a1dab4607d"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "287e0c43c99fe713e607f78335f106e83086e58d284bf269b049e300fac60c69"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 59,
+          "total": 72
+        },
+        "protected": {
+          "passed": 36,
+          "total": 48
+        },
+        "required": {
+          "passed": 23,
+          "total": 24
+        },
+        "lostOldCount": 12
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 343008,
+        "quietMs": 2050,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 340958
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 343008,
+      "postfreeze": {
+        "passed": 16,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 59,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 59,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 21,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_reject_extra_keys",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 163
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_with_operation_id",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "replay_item",
+            "request_fingerprint",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 278
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_environment",
+            "limit_for",
+            "rollback_decision",
+            "validate_budget"
+          ],
+          "lineCount": 93
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 1232722,
+        "cacheComparison": 97.5062,
+        "tokenAll": 1559515,
+        "cacheAll": 97.8539,
+        "usage": {
+          "comparison": {
+            "inputTokens": 30063,
+            "cacheReadTokens": 1175424,
+            "cacheWriteTokens": 0,
+            "outputTokens": 27235,
+            "totalTokens": 1232722,
+            "known": 30,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 2737,
+            "cacheReadTokens": 320128,
+            "cacheWriteTokens": 0,
+            "outputTokens": 3928,
+            "totalTokens": 326793,
+            "known": 5,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-3b01653563d0",
+      "rep": 2,
+      "run": "r-2duQUj",
+      "mode": "building-loop",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness. Entry reads action solely to route to planner; no direct policy/journal imports observed."
+        },
+        "closure": {
+          "status": "supported",
+          "location": "planner.py:48–72",
+          "reason": "Seen-set closure walks all nodes and keeps only applied ones.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:186–202",
+          "reason": "Each item checked then evaluated before the next, local results discarded on fault.",
+          "publicCase": "earlier-domain-before-later-shape"
+        },
+        "identity": {
+          "status": "not-applicable",
+          "location": "SPEC.md",
+          "reason": "G3 lacks G4 operation identity."
+        },
+        "maintainability": {
+          "status": "defect",
+          "location": "planner.py single and batch execution functions",
+          "reason": "Single and batch paths mirror change/applied/graph/order/retain evaluation, increasing divergence risk."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:81–132",
+            "reason": "Comment says `plan` wraps compute_actions, but implementation duplicates its graph path."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:48–60,160–175",
+            "reason": "Clear rationale for full-graph traversal and first failure ordering."
+          }
+        ],
+        "publicFailures": []
+      },
+      "documents": {
+        "stage": "G3",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "b4f521b523088be3224f26d4cbae8fad7dd95a97a2d27d368f33d56bc471af53"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "39a16a361649d866859830be4f1208a2d450c256ac57dfffd48d2490c7ae0fcb"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 17,
+            "reason": "Says current retain logic unchanged and single rollback reused directly. Shared closure did change, and batch compute_actions duplicates the single request graph path.",
+            "source": "planner.py:48–72,81–132"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 25,
+            "reason": "Retains wrong historical claim that single retain logic was never changed, so rollback documentation omits a deliberate change in shared closure.",
+            "source": "planner.py:48–72"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 18,
+            "reason": "Correctly distinguishes transport action routing from planner business; actual nonobject decision remains planner.",
+            "source": "release.py:8–33; planner.py:81–83"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 32,
+            "reason": "States the correct first-item-error and no-partial contract, observed in public replay.",
+            "source": "planner.py:186–202"
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "eadc1d5db9bdd2241d8d0c1b42939a005beb51e581f99644bc4378865f93aad3"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "a2ed8e6ce2c4e20062e5df8b8a961d2442a229bb1c683cea4438edb1683244d4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "66311be769cbf650b03955c345b81037f6f11734e2b08ddfd477a11fc3813fab"
+        },
+        {
+          "path": "release.py",
+          "sha256": "605464d05f40be24e128de810edf97c73ed317298d2f100e23c6d6fe989410e1"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "completion": {
+        "terminal": "closed",
+        "classification": "native-workflow-end",
+        "elapsedMs": 591102,
+        "quietMs": 2039,
+        "hostWorkflowEnd": {
+          "phase": "closed",
+          "elapsedMs": 583618
+        },
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 589063
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 591102,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 16,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 96
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_invalid_batch",
+            "_invalid_batch_item",
+            "build_graph",
+            "compute_actions",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 202
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for",
+            "rollback_decision"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "dispatch",
+            "main"
+          ],
+          "lineCount": 37
+        }
+      },
+      "usage": {
+        "tokenComparison": 3231133,
+        "cacheComparison": 94.5553,
+        "tokenAll": 8831238,
+        "cacheAll": 96.1975,
+        "usage": {
+          "comparison": {
+            "inputTokens": 173929,
+            "cacheReadTokens": 3020544,
+            "cacheWriteTokens": 0,
+            "outputTokens": 36660,
+            "totalTokens": 3231133,
+            "known": 89,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 159211,
+            "cacheReadTokens": 5407360,
+            "cacheWriteTokens": 0,
+            "outputTokens": 33534,
+            "totalTokens": 5600105,
+            "known": 79,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-803eca173e5e",
+      "rep": 2,
+      "run": "r-2duQUj",
+      "mode": "building-loop",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "entry": {
+          "status": "supported",
+          "location": "release.py; public controls",
+          "reason": "Fixed local import/transport I/O edges passed; each observed JSON path returns through the entry. This structural check does not by itself establish full business correctness. Entry reads action solely to route to planner; no direct policy/journal imports observed."
+        },
+        "closure": {
+          "status": "supported",
+          "location": "planner.py:49–73",
+          "reason": "Iterative visited set traverses full graph; applied membership only affects keep.",
+          "publicCase": "targeted:retention-shared-unapplied-dag"
+        },
+        "isolation": {
+          "status": "supported",
+          "location": "planner.py batch loop",
+          "reason": "Each item reuses local graph/change state. A shared repeated change ID passed the public test.",
+          "publicCase": "same-change-id-two-items"
+        },
+        "atomicOrder": {
+          "status": "supported",
+          "location": "planner.py:265–310",
+          "reason": "Shape, identity and business interleaved, output only after quota. Identity semantics separately defective.",
+          "publicCase": "later-domain-priority-over-batch-budget"
+        },
+        "identity": {
+          "status": "defect",
+          "location": "planner.py:175–188,271–288",
+          "reason": "Fingerprint uses normalized fields and Python equality. Budget 0 and false collapse into replay, so batch quota wins over the required conflict.",
+          "publicCase": "same-id-boolean-different-from-integer"
+        },
+        "maintainability": {
+          "status": "defect",
+          "location": "planner.py single and batch execution functions",
+          "reason": "Single and batch paths mirror change/applied/graph/order/retain evaluation, increasing divergence risk."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "planner.py:82–133,175–188",
+            "reason": "Comment says single `plan` wraps compute_actions, but both implement the graph path. Normalized identity notes explain behavior but conflict with exact-identity contract."
+          },
+          {
+            "status": "supported",
+            "location": "planner.py:206–230",
+            "reason": "Useful detailed per-item ordering and atomic quota rationale."
+          }
+        ],
+        "publicFailures": [
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "failed"
+          }
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "b4f521b523088be3224f26d4cbae8fad7dd95a97a2d27d368f33d56bc471af53"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "3a01f390abcc12c22552e5962d698c598d6da03f07000c6064109bc0025c1ccd"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 32,
+            "reason": "Says first production item uses requestIndex=1; the documented zero-based contract and public result require 0.",
+            "source": "planner.py:265,298"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 40,
+            "reason": "Correctly demands type-exact values in prose; implementation uses normalized Python tuple equality and fails false vs integer 0.",
+            "source": "planner.py:175–188,281–288"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 41,
+            "reason": "Treats omitted retain and explicit empty list as identical although complete input data differ; implementation repeats that choice.",
+            "source": "planner.py:175–188"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 60,
+            "reason": "The full graph traverses unapplied intermediates; applied membership only controls keep.",
+            "source": "planner.py:49–73"
+          },
+          {
+            "status": "unresolved",
+            "path": "LEDGER.md",
+            "line": 13,
+            "reason": "Ledger shows K01 closure only; this record provides no K02 final acceptance."
+          }
+        ],
+        "planningProcess": "unobserved before reveal. Frozen documents can establish plan content, not chronology."
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "7fea8803e31d5c53df7246265f1c44458292e1ea5694e73376737b125b45bdde"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "6c7cbfdb61b5a1b3c71d43f3b979377375aed1f57c06cee3b6387c96d28c7a98"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "66311be769cbf650b03955c345b81037f6f11734e2b08ddfd477a11fc3813fab"
+        },
+        {
+          "path": "release.py",
+          "sha256": "605464d05f40be24e128de810edf97c73ed317298d2f100e23c6d6fe989410e1"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 70,
+          "total": 72
+        },
+        "protected": {
+          "passed": 48,
+          "total": 48
+        },
+        "required": {
+          "passed": 22,
+          "total": 24
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "blocked",
+      "nativePhase": "blocked",
+      "completion": {
+        "terminal": "blocked",
+        "classification": "native-blocked-and-idle",
+        "elapsedMs": 531574,
+        "quietMs": 30546,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 501029
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 531574,
+      "postfreeze": {
+        "passed": 32,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 70,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 70,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 23,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 126
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_body",
+            "_batch_failure",
+            "_batch_fingerprint",
+            "_invalid_batch",
+            "_read_batch_limit",
+            "build_graph",
+            "compute_actions",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 310
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for",
+            "rollback_decision"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "dispatch",
+            "main"
+          ],
+          "lineCount": 37
+        }
+      },
+      "usage": {
+        "tokenComparison": 2819842,
+        "cacheComparison": 95.9161,
+        "tokenAll": 7328354,
+        "cacheAll": 96.16,
+        "usage": {
+          "comparison": {
+            "inputTokens": 112837,
+            "cacheReadTokens": 2650112,
+            "cacheWriteTokens": 0,
+            "outputTokens": 56893,
+            "totalTokens": 2819842,
+            "known": 60,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 165459,
+            "cacheReadTokens": 4318976,
+            "cacheWriteTokens": 0,
+            "outputTokens": 24077,
+            "totalTokens": 4508512,
+            "known": 57,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,3388 @@
+{
+  "spec": "dsh-engineering-blind-comparison/1",
+  "suite": "reservation-ab",
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "intakeSha256": "2029beade27cf54a608dc3da3641d96a4cdf929f66fece36f141fee2a7763640",
+  "sourceJudgmentsSha256": "6b6d982fb477c14c2b3ee6e5cc36bfb55cc5e091156c544b632de57e36ff0dbf",
+  "docJudgmentsSha256": "18a5c883c127e30d25fc5f3313c6bbdd06e37cc47784d3d0772091d4ba507e70",
+  "publicControlsSha256": "8a09976ee3ac5eb1a7d5b7b204c981cca5085c6d5fa85951077dce04015fef85",
+  "postfreezeSeedSha256": "8724d5776d97dfbb18fa71a030e9df90bf051a6c7fe0187748a31b7c7cf138ac",
+  "groups": [
+    {
+      "mode": "standard",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    },
+    {
+      "mode": "standard-checklist",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": true,
+          "sameDirectoryNewSession": true
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    },
+    {
+      "mode": "building-loop",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": false
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": true,
+          "twoFullPostfreezeScores": true,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "cell": "cell-aeebf153dbb4",
+      "rep": 1,
+      "run": "r-QgvDgS",
+      "mode": "standard",
+      "nativeStage": "g1",
+      "stage": "H1",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "not-applicable",
+          "location": "H1 contract",
+          "reason": "The requested stage does not add transfer and closed windows."
+        },
+        "stage": "H1",
+        "owner": {
+          "status": "supported",
+          "location": "events.py:36–75; ledger.py:31–71; windows.py:62–98",
+          "reason": "Events supplies shape and identity; windows supplies overlap algorithm. Decisions are delegated, with control order and missing event index assessed separately."
+        },
+        "order": {
+          "status": "defect",
+          "location": "ledger.py:35–41,48–71; events.py:57–75",
+          "reason": "Batch-wide shape/identity check hides earlier business errors and loses the malformed row index. No staged data leaks in either public failure."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:48–51; events.py:36–39,65–75",
+          "reason": "Sorted-key fingerprint and early replay skip passed retry and retry-after-release."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "windows.py:62–98",
+          "reason": "156.4 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Prefix maximum lookup is logarithmic; arrays may shift and prefix maxima may be recomputed on update."
+        },
+        "comments": [
+          {
+            "status": "supported",
+            "location": "ledger.py:46–47; windows.py:62–69",
+            "reason": "States the response commit boundary and explains prefix maximum lookup."
+          },
+          {
+            "status": "defect",
+            "location": "ledger.py:35–41,46–47",
+            "reason": "The comments cover atomicity but omit the contract-critical order across error classes, which the pre-scan violates."
+          }
+        ],
+        "maintainability": {
+          "status": "supported",
+          "location": "ledger.py:43–66; windows.py:16–98",
+          "reason": "Separate record map and interval index with explicit insert/remove updates. Return interface for event error lacks an index."
+        }
+      },
+      "documents": {
+        "stage": "H1",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "44fdab1cc93a0aee03259fc70db8f87f9b214407416fb9f61e39a0147d6ea2ad"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "701e31a382ff484a928e4d998018fc77ebf405bf72c766170f983e31a405aa63"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "c97059ac6018e41ab73c71e5bc04ed5b1b293ad86528686f3c2eded466025c83"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 37,
+          "total": 60
+        },
+        "protected": {
+          "passed": 18,
+          "total": 18
+        },
+        "required": {
+          "passed": 19,
+          "total": 42
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 364123,
+        "quietMs": 2109,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 362014
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 364123,
+      "postfreeze": {
+        "passed": 6,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 37,
+            "total": 60
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 37,
+            "total": 60
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 4,
+        "total": 6
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "integer",
+            "name",
+            "read_active",
+            "read_events",
+            "signature",
+            "valid_event"
+          ],
+          "lineCount": 75
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "apply",
+            "failure",
+            "inspect",
+            "process",
+            "reserve",
+            "sort_key"
+          ],
+          "lineCount": 86
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_resource",
+            "add",
+            "conflicts",
+            "first_overlap",
+            "from_rows",
+            "insert",
+            "remove"
+          ],
+          "lineCount": 98
+        }
+      },
+      "usage": {
+        "tokenComparison": 2650227,
+        "cacheComparison": 99.076,
+        "tokenAll": 3422968,
+        "cacheAll": 99.1577,
+        "usage": {
+          "comparison": {
+            "inputTokens": 24285,
+            "cacheReadTokens": 2603904,
+            "cacheWriteTokens": 0,
+            "outputTokens": 22038,
+            "totalTokens": 2650227,
+            "known": 83,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 4310,
+            "cacheReadTokens": 762496,
+            "cacheWriteTokens": 0,
+            "outputTokens": 5935,
+            "totalTokens": 772741,
+            "known": 15,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-9be9e527d4d5",
+      "rep": 1,
+      "run": "r-QgvDgS",
+      "mode": "standard",
+      "nativeStage": "g2",
+      "stage": "H2",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "defect",
+          "location": "ledger.py:84–95",
+          "reason": "Revision, closure and overlap ordering positive probes passed. Missing reservation incorrectly folded into revision-conflict rather than unknown-reservation."
+        },
+        "stage": "H2",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:37–50; events.py:67–85; windows.py:19–43",
+          "reason": "Owners are separated, but active overlap check happens after events prevalidation, so later event validation wins incorrectly."
+        },
+        "order": {
+          "status": "defect",
+          "location": "ledger.py:37–50,56–102; events.py:67–85",
+          "reason": "Shape/identity pre-pass hides earlier business and removes event index. Batch remains atomic."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:56–60; events.py:37–40,67–85",
+          "reason": "Canonical-key and release/retry controls pass."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "windows.py:46–172",
+          "reason": "147.8 and 165.6 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Maintains prefix arrays and static merged runs. Updates can recompute suffixes."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:84–88",
+            "reason": "Says presence and revision first but does not explain why distinct failures are conflated contrary to required behavior."
+          },
+          {
+            "status": "supported",
+            "location": "windows.py:102–109,136–143",
+            "reason": "Explains closed run lookup and prefix maximum behavior."
+          }
+        ],
+        "maintainability": {
+          "status": "supported",
+          "location": "ledger.py:37–102; windows.py:46–172",
+          "reason": "Explicit window and live interval module ownership, though active/shape processing order is incorrect."
+        }
+      },
+      "documents": {
+        "stage": "H2",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "6cde885eb27b96b13c233358e418383c63b56637f2c09f6d488f06b9bcfcb816"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "ad6abe2431087d0c6fbb27495284c18fe8d2284e7f9f426ba3fb0ea1cd6ce3f2"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "594a3af4c284f981e6b7594a600836f1fa1e8ee2a81cf368c73bedd61a8fd0e2"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 67,
+          "total": 104
+        },
+        "protected": {
+          "passed": 37,
+          "total": 37
+        },
+        "required": {
+          "passed": 30,
+          "total": 44
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 476180,
+        "quietMs": 2095,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 474085
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 476180,
+      "postfreeze": {
+        "passed": 12,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 67,
+            "total": 104
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 67,
+            "total": 104
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 11,
+        "total": 13
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "integer",
+            "name",
+            "read_active",
+            "read_events",
+            "signature",
+            "valid_event"
+          ],
+          "lineCount": 85
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "apply",
+            "failure",
+            "inspect",
+            "process",
+            "reserve",
+            "sort_key",
+            "transferred"
+          ],
+          "lineCount": 117
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_build",
+            "_merge",
+            "_resource",
+            "add",
+            "closed",
+            "conflicts",
+            "first_overlap",
+            "from_rows",
+            "insert",
+            "integer",
+            "name",
+            "read_closed",
+            "remove"
+          ],
+          "lineCount": 172
+        }
+      },
+      "usage": {
+        "tokenComparison": 1643973,
+        "cacheComparison": 98.4972,
+        "tokenAll": 2314212,
+        "cacheAll": 98.6498,
+        "usage": {
+          "comparison": {
+            "inputTokens": 24461,
+            "cacheReadTokens": 1603200,
+            "cacheWriteTokens": 0,
+            "outputTokens": 16312,
+            "totalTokens": 1643973,
+            "known": 51,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 6511,
+            "cacheReadTokens": 659712,
+            "cacheWriteTokens": 0,
+            "outputTokens": 4016,
+            "totalTokens": 670239,
+            "known": 14,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-904270bcb94d",
+      "rep": 1,
+      "run": "r-QgvDgS",
+      "mode": "standard-checklist",
+      "nativeStage": "g1",
+      "stage": "H1",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "not-applicable",
+          "location": "H1 contract",
+          "reason": "The requested stage does not add transfer and closed windows."
+        },
+        "stage": "H1",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:99–107,110–119; windows.py:10–20,48–74",
+          "reason": "Dedicated interval owner is used for inspect and reserve. Apply validates active record shape but skips initial active overlap; public probe returns later invalid-event."
+        },
+        "order": {
+          "status": "supported",
+          "location": "ledger.py:69–90; events.py:46–76,93–105",
+          "reason": "Correct per-event validation/business ordering and all-or-nothing response for valid initial state. Initial-active omission is tracked separately."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:80–87; events.py:93–105",
+          "reason": "Exact identity and replay without current-state execution both pass."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "windows.py:23–74; ledger.py:20–32",
+          "reason": "138.7 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Maintained per-resource sorted start list avoids scanning in overlap lookup; insert/remove may still shift elements."
+        },
+        "comments": [
+          {
+            "status": "supported",
+            "location": "ledger.py:10–16,40–45,73–86; windows.py:23–36",
+            "reason": "Explains private records, duplicate-ID ordering, retry skipping state, and the list movement tradeoff."
+          },
+          {
+            "status": "defect",
+            "location": "ledger.py:23–24,110–119",
+            "reason": "Says each event costs O(log n), overlooking mutation shifts, and leaves initial active overlap invariant unstated in apply."
+          }
+        ],
+        "maintainability": {
+          "status": "supported",
+          "location": "ledger.py:10–66; windows.py:23–74",
+          "reason": "Ledger orchestrates events, windows owns indexed overlap, and both structures are updated together."
+        }
+      },
+      "documents": {
+        "stage": "H1",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "2d02a595724e30c3255b90586b985098505e286543782eeabf28f2aaf26e5422"
+          },
+          {
+            "path": "PROJECT-NOTES.md",
+            "sha256": "1850df21b83278d8bada28db60c4fcc7c2ab2e35e140f87fe890013a05d8afa6"
+          }
+        ],
+        "findings": [
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 28,
+            "reason": "Replay ignores current reservation state and per-event validation is interleaved correctly.",
+            "source": "ledger.py:69–90"
+          },
+          {
+            "status": "defect",
+            "path": "PROJECT-NOTES.md",
+            "line": 66,
+            "reason": "Claims active validates before events without noting apply skips initial overlap check, so malformed later event can hide invalid active intervals.",
+            "source": "ledger.py:104–119; initial-overlap-before-any-event"
+          },
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 65,
+            "reason": "Correctly distinguishes binary conflict probes from underlying pointer moves.",
+            "source": "windows.py:23–36,48–74"
+          },
+          {
+            "status": "unresolved",
+            "path": "PROJECT-NOTES.md",
+            "line": 59,
+            "reason": "Independent exact public case ran in 138.7 ms, but test history and authored totals themselves are self-reported.",
+            "source": "performance-hot-resource"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "1c49fca9814d33d00aa23d0ae1872d69e81bd9bd183b0a4db6d0b0780cc4c87c"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "a5e395f7924091169c4604a320bb5404c0e84100631011f7b3bfc9f066a3d0d7"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "cf5565760b678c2d5ae2d4c7ad0ea6e62565754802da2ecb73545adc01744639"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 60,
+          "total": 60
+        },
+        "protected": {
+          "passed": 18,
+          "total": 18
+        },
+        "required": {
+          "passed": 42,
+          "total": 42
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 189626,
+        "quietMs": 2010,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 187616
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 189626,
+      "postfreeze": {
+        "passed": 24,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 60,
+            "total": 60
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 60,
+            "total": 60
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 6,
+        "total": 6
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "claim",
+            "integer",
+            "name",
+            "read_active",
+            "read_event",
+            "read_events"
+          ],
+          "lineCount": 105
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_index",
+            "apply",
+            "failure",
+            "ordered",
+            "process",
+            "release",
+            "reserve"
+          ],
+          "lineCount": 120
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "__len__",
+            "add",
+            "first_overlap",
+            "overlaps",
+            "remove",
+            "sort_key"
+          ],
+          "lineCount": 74
+        }
+      },
+      "usage": {
+        "tokenComparison": 1312237,
+        "cacheComparison": 98.5755,
+        "tokenAll": 1312237,
+        "cacheAll": 98.5755,
+        "usage": {
+          "comparison": {
+            "inputTokens": 18320,
+            "cacheReadTokens": 1267712,
+            "cacheWriteTokens": 0,
+            "outputTokens": 26205,
+            "totalTokens": 1312237,
+            "known": 44,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-e875eac7106b",
+      "rep": 1,
+      "run": "r-QgvDgS",
+      "mode": "standard-checklist",
+      "nativeStage": "g2",
+      "stage": "H2",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "defect",
+          "location": "ledger.py:92–111",
+          "reason": "Window/overlap and self-replacement positives pass, but a nonexistent booking returns revision-conflict instead of unknown-reservation."
+        },
+        "stage": "H2",
+        "owner": {
+          "status": "defect",
+          "location": "events.py:55–71; ledger.py:53–56,182–198; windows.py:90–151",
+          "reason": "Window shape is decided by events, contrary to its owner, and ledger creates window-closed while windows returns a predicate. Apply also skips initial active overlap. Same owner shape defect is invisible to import-only check."
+        },
+        "order": {
+          "status": "supported",
+          "location": "ledger.py:130–164",
+          "reason": "Per-item shape, identity, state and commit are correctly ordered on valid initial inventory; all public stage-ordered and atomic probes pass."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:134–164; events.py:121–147",
+          "reason": "Replay exits business path before applying or checking current state and omits revision extras."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "windows.py:23–87,90–151",
+          "reason": "144.0 and 175.4 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Distinct mutable and immutable indexes avoid repeated full scans in registered load cases."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "windows.py:93–104; ledger.py:43–45,112–116",
+            "reason": "Comments claim merging touching half-open windows would fill an unoccupied gap and that list mutations are merely bisect operations. Adjacent half-open intervals have no gap; current control passes both cases, but the conditional API couples immutable windows to live reservations without justification."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:137–139,155–163",
+            "reason": "Explains replay-before-state, revision shape and atomic output."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "events.py:55–71; windows.py:90–151; ledger.py:22–45",
+          "reason": "Window validation crosses owner and adds a live-inventory dependency to static merging without a necessary invariant."
+        }
+      },
+      "documents": {
+        "stage": "H2",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "6f7fa736a564f2765e177ac5a4c78f00a75c8e4a0b1b964733891ca1f063b7b8"
+          },
+          {
+            "path": "PROJECT-NOTES.md",
+            "sha256": "e12c46dc95ec3c43de8c1128a5aac022eb83e6a3d9ead14b45cd3f768e8db1f9"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 107,
+            "reason": "Accurately discloses implementation in events, but treats CHANGE-G2 and earlier broad role as a forced conflict. Specific window clause explicitly assigns invalid-window to windows, so the doc knowingly uses a different owner.",
+            "source": "events.py:55–71; CHANGE-G2.md:3"
+          },
+          {
+            "status": "defect",
+            "path": "PROJECT-NOTES.md",
+            "line": 109,
+            "reason": "Says static closure merging depends on live reservations at batch start. Adjacent half-open windows have no gap to fill. Independent touching control passes while exposing unnecessary dependency, not a measured runtime error.",
+            "source": "windows.py:90–151"
+          },
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 6,
+            "reason": "Reports no known functional gaps; public missing transfer ID returns revision-conflict and invalid initial overlap loses to event shape.",
+            "source": "ledger.py:92–103,182–198"
+          },
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 43,
+            "reason": "Replay-before-state and no revision extras are accurate and reproduce on independent public probes.",
+            "source": "ledger.py:130–164"
+          },
+          {
+            "status": "unresolved",
+            "path": "PROJECT-NOTES.md",
+            "line": 120,
+            "reason": "Model-authored test totals and ad hoc crosscheck are handoff leads, not independently verified by frozen captured modules.",
+            "source": "Authored notes vs separately executed controls"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "0d7a1bd4bf4f3d135d57328fc1f10105c042946dfd5f4edb17226de82f712522"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "a85c34aea6584c6a5d1d28501e216727ab1723348079f788ad6429a0e72faaca"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "9917031aab277c0ad083d61965f4258057abb1d8883841600aea9fe6ba20e439"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 103,
+          "total": 104
+        },
+        "protected": {
+          "passed": 60,
+          "total": 60
+        },
+        "required": {
+          "passed": 43,
+          "total": 44
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 585934,
+        "quietMs": 2158,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 583776
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 585934,
+      "postfreeze": {
+        "passed": 24,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 103,
+            "total": 104
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 103,
+            "total": 104
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 13,
+        "total": 13
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "claim",
+            "integer",
+            "interval_ok",
+            "name",
+            "read_active",
+            "read_closed",
+            "read_event",
+            "read_events",
+            "target_ok"
+          ],
+          "lineCount": 147
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_blocked",
+            "_index",
+            "apply",
+            "failure",
+            "ordered",
+            "process",
+            "release",
+            "reserve",
+            "transfer"
+          ],
+          "lineCount": 199
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "__len__",
+            "add",
+            "build_windows",
+            "covers",
+            "first_overlap",
+            "overlaps",
+            "remove",
+            "sort_key"
+          ],
+          "lineCount": 151
+        }
+      },
+      "usage": {
+        "tokenComparison": 4182855,
+        "cacheComparison": 99.0431,
+        "tokenAll": 11640946,
+        "cacheAll": 99.2953,
+        "usage": {
+          "comparison": {
+            "inputTokens": 39649,
+            "cacheReadTokens": 4103808,
+            "cacheWriteTokens": 0,
+            "outputTokens": 39398,
+            "totalTokens": 4182855,
+            "known": 81,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 41926,
+            "cacheReadTokens": 7390592,
+            "cacheWriteTokens": 0,
+            "outputTokens": 25573,
+            "totalTokens": 7458091,
+            "known": 68,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-d0672d169f26",
+      "rep": 1,
+      "run": "r-QgvDgS",
+      "mode": "building-loop",
+      "nativeStage": "g1",
+      "stage": "H1",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "not-applicable",
+          "location": "H1 contract",
+          "reason": "The requested stage does not add transfer and closed windows."
+        },
+        "stage": "H1",
+        "owner": {
+          "status": "missing",
+          "location": "ledger.py:14–26",
+          "reason": "Frozen code only handles inspect; all six public apply controls reject."
+        },
+        "order": {
+          "status": "missing",
+          "location": "ledger.py:14–26",
+          "reason": "Frozen code only handles inspect; all six public apply controls reject."
+        },
+        "replay": {
+          "status": "missing",
+          "location": "ledger.py:14–26",
+          "reason": "Frozen code only handles inspect; all six public apply controls reject."
+        },
+        "scale": {
+          "status": "missing",
+          "location": "ledger.py:14–26",
+          "reason": "Frozen code only handles inspect; all six public apply controls reject."
+        },
+        "comments": [
+          {
+            "status": "missing",
+            "location": "ledger.py:14–26",
+            "reason": "No apply, identity, staging or interval-scale mechanism exists to annotate."
+          }
+        ],
+        "maintainability": {
+          "status": "unresolved",
+          "location": "source scope",
+          "reason": "Seed inspect boundaries remain intact; no new implementation to compare."
+        }
+      },
+      "documents": {
+        "stage": "H1",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "c645088222321d675c20d08d359b3b42c259be8c704d1908f51c2b4224c1b568"
+          }
+        ],
+        "findings": [
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 22,
+            "reason": "Plan states proper per-item validation and earlier business-error precedence. Plan can guide handoff but implementation did not land.",
+            "source": "ledger.py:14–26; public controls 0/6"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 26,
+            "reason": "Anchors in prose use translated labels as fragment identifiers, while generated anchors use stable English IDs. The visible links at lines 26 and 30 do not resolve.",
+            "source": "modules/architecture.md:7–9"
+          },
+          {
+            "status": "unresolved",
+            "path": "modules/architecture.md",
+            "line": 7,
+            "reason": "Registry explicitly says it is awaiting signed source and runtime. Neither documentation nor plan is an acceptance receipt.",
+            "source": "modules/architecture.md:7–14"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "290d4324ff6a1e8b3bdfdadfa78a61d43ce33b55000412f167ab5781e8f1112f"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "3c49c57e078a727ce8e8211123a7978b7becfbc29fec5e4d7651525a06fa41b0"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "328713da3b98b3097db0a2fe17901e88ddd1085763be26ee44ce182d8423ea12"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 22,
+          "total": 60
+        },
+        "protected": {
+          "passed": 18,
+          "total": 18
+        },
+        "required": {
+          "passed": 4,
+          "total": 42
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "stalled-idle",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "stalled-idle",
+        "classification": "nonterminal-without-runnable-work",
+        "elapsedMs": 55271,
+        "quietMs": 30114,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 25158
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 55271,
+      "postfreeze": {
+        "passed": 0,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 22,
+            "total": 60
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 22,
+            "total": 60
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 0,
+        "total": 6
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "integer",
+            "name",
+            "read_active"
+          ],
+          "lineCount": 28
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "process",
+            "sort_key"
+          ],
+          "lineCount": 26
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "first_overlap"
+          ],
+          "lineCount": 11
+        }
+      },
+      "usage": {
+        "tokenComparison": 87431,
+        "cacheComparison": 84.4669,
+        "tokenAll": 87431,
+        "cacheAll": 84.4669,
+        "usage": {
+          "comparison": {
+            "inputTokens": 13111,
+            "cacheReadTokens": 71296,
+            "cacheWriteTokens": 0,
+            "outputTokens": 3024,
+            "totalTokens": 87431,
+            "known": 8,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-34c85fd88f9f",
+      "rep": 1,
+      "run": "r-QgvDgS",
+      "mode": "building-loop",
+      "nativeStage": "g2",
+      "stage": "H2",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "supported",
+          "location": "ledger.py:117–147; windows.py:16–57",
+          "reason": "Revision, then closed then overlaps; ignores replacement ID without removing early, replay omits revision extras. All H2 public revision contrasts pass."
+        },
+        "stage": "H2",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:50–69,72–85; windows.py:16–57",
+          "reason": "Closed windows are correctly delegated. Dynamic live interval decisions are in ledger and apply skips initial live overlap validation."
+        },
+        "order": {
+          "status": "supported",
+          "location": "ledger.py:87–153; events.py:54–89",
+          "reason": "Per-item shape and identity then business; only final publication. Initial invalid active interval ordering is separately defective."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:87–107; events.py:35–38,54–89",
+          "reason": "Both structural identity and replay after release pass."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "ledger.py:19–69; windows.py:16–57",
+          "reason": "172.2 and 193.9 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Indexes avoid per-event full traversal for the tested nonoverlapping inventory."
+        },
+        "comments": [
+          {
+            "status": "supported",
+            "location": "ledger.py:22–26,53–61,87–101,124–136",
+            "reason": "Useful boundaries for index mutation, replay and business ordering."
+          },
+          {
+            "status": "defect",
+            "location": "ledger.py:59–66,72–85",
+            "reason": "Neighbor stopping rationale relies on initial nonoverlap, yet apply never checks that invariant."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "ledger.py:19–69; windows.py:16–67",
+          "reason": "Two domain interval policies across ledger and windows, with duplicated active validation paths."
+        }
+      },
+      "documents": {
+        "stage": "H2",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "c68f9a27ba11d63a0eb9b40fdb4b5d3f59f4523e2906b2ee5e09ed52890dc3a0"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 24,
+            "reason": "H2 document retains H1 apply design without implementation details for transfer, window indexing, or the revised owner split. The appended rollback section has owner excerpts, but current change plan and checks remain stale.",
+            "source": "ledger.py:72–153; windows.py:16–57; CHANGE-G2.md:3–7"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 26,
+            "reason": "Translated fragment references still do not match generated fact anchors.",
+            "source": "modules/architecture.md:7–9,26,30"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 7,
+            "reason": "Generated responsibilities distinguish parsed non-object business decision, JSON fallback and forwarding. Code hashes and lines match exact frozen artifacts.",
+            "source": "ledger.py:157–158; entry.py:11–16"
+          },
+          {
+            "status": "unresolved",
+            "path": "modules/architecture.md",
+            "line": 41,
+            "reason": "Opaque proposal binds a rehearsal reference. Plan/preservation effects require the separately captured native receipt; the fence is not the proof itself.",
+            "source": "modules/architecture.md:35–43"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "5176c65bf86d3fbaae3384ee4434f082be94b210d174bec02d7128ee61f11bee"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "f723e6107e2051903530173f7de25645b01815d913e0b3511bbb9ceb384f832f"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "a9b1784af2b66c200194ba1d1eeb0c8cc9595f41317e1e68437015fb6d7c1d55"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 104,
+          "total": 104
+        },
+        "protected": {
+          "passed": 22,
+          "total": 22
+        },
+        "required": {
+          "passed": 44,
+          "total": 44
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "blocked",
+      "nativePhase": "blocked",
+      "completion": {
+        "terminal": "blocked",
+        "classification": "native-blocked-and-idle",
+        "elapsedMs": 421703,
+        "quietMs": 30120,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 391583
+        }
+      },
+      "carry": "frozen-workspace-continuation-after-idle-stall",
+      "elapsedMs": 421703,
+      "postfreeze": {
+        "passed": 24,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 104,
+            "total": 104
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 104,
+            "total": 104
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 13,
+        "total": 13
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_fingerprint",
+            "check_event",
+            "check_event_batch",
+            "integer",
+            "name",
+            "read_active"
+          ],
+          "lineCount": 89
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "add",
+            "apply_events",
+            "collides",
+            "failure",
+            "process",
+            "remove",
+            "sort_key"
+          ],
+          "lineCount": 173
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_time_point",
+            "first_overlap",
+            "read_closed",
+            "touches_closed"
+          ],
+          "lineCount": 67
+        }
+      },
+      "usage": {
+        "tokenComparison": 2961804,
+        "cacheComparison": 93.3697,
+        "tokenAll": 5075723,
+        "cacheAll": 95.5446,
+        "usage": {
+          "comparison": {
+            "inputTokens": 193631,
+            "cacheReadTokens": 2726784,
+            "cacheWriteTokens": 0,
+            "outputTokens": 41389,
+            "totalTokens": 2961804,
+            "known": 83,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 30141,
+            "cacheReadTokens": 2071936,
+            "cacheWriteTokens": 0,
+            "outputTokens": 11842,
+            "totalTokens": 2113919,
+            "known": 29,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-eb6c46bc6fa6",
+      "rep": 2,
+      "run": "r-dzDW0T",
+      "mode": "standard",
+      "nativeStage": "g1",
+      "stage": "H1",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "not-applicable",
+          "location": "H1 contract",
+          "reason": "The requested stage does not add transfer and closed windows."
+        },
+        "stage": "H1",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:64–77; windows.py:29–38",
+          "reason": "Overlap is converted to incorrect `conflict`, and release membership branch is inverted. Window interval logic stays in windows."
+        },
+        "order": {
+          "status": "defect",
+          "location": "ledger.py:48–68; events.py:83–112",
+          "reason": "Batch-wide shape and identity pass prevents earlier business failure from winning. Returns empty staged outputs on failure."
+        },
+        "replay": {
+          "status": "defect",
+          "location": "ledger.py:64–78,85–114",
+          "reason": "Key-order retry passes, but successful release and replay-after-release fail because ledger rejects a present ID. An independent release-only positive case isolates the cause."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "windows.py:15–48",
+          "reason": "178.2 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Bisects a maintained resource list. Measured reserve path is fast, even though other business cases fail."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:48–49,65–67",
+            "reason": "Explicitly documents batch-first precedence and the comment about release of a missing ID sits under the opposite membership predicate."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:53–55",
+            "reason": "Clear local staging and no-partial-response rationale."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "ledger.py:85–114",
+          "reason": "Extra merge logic copies prior rows through, with no explicit absent-book filtering in that path."
+        }
+      },
+      "documents": {
+        "stage": "H1",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "99d22fbedbc349bc2293b361acb47145bd7292b6eb73b3dc8260b47c1db22ccb"
+        },
+        {
+          "path": "events.py",
+          "sha256": "610c6227a0dd49e7a2beecd6d91a6618289a5f12c0d94e829955b63e213c5770"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "71c24440f56ba551f09a9114451b8d9eef2835c6f9f1b6a6eafd2b0be9a92387"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "a29cba5d2a7c90271e2b03806dfa7297a65974854230df35d6e630213a84739d"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 36,
+          "total": 60
+        },
+        "protected": {
+          "passed": 18,
+          "total": 18
+        },
+        "required": {
+          "passed": 18,
+          "total": 42
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 93831,
+        "quietMs": 2077,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 91754
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 93831,
+      "postfreeze": {
+        "passed": 0,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 36,
+            "total": 60
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 36,
+            "total": 60
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 4,
+        "total": 6
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "identity",
+            "integer",
+            "name",
+            "plan",
+            "read_active",
+            "read_event"
+          ],
+          "lineCount": 112
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "apply",
+            "failure",
+            "inspect",
+            "merged",
+            "process",
+            "sort_key"
+          ],
+          "lineCount": 114
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "add",
+            "first_overlap",
+            "free",
+            "remove"
+          ],
+          "lineCount": 48
+        }
+      },
+      "usage": {
+        "tokenComparison": 491302,
+        "cacheComparison": 97.3755,
+        "tokenAll": 491302,
+        "cacheAll": 97.3755,
+        "usage": {
+          "comparison": {
+            "inputTokens": 12554,
+            "cacheReadTokens": 465792,
+            "cacheWriteTokens": 0,
+            "outputTokens": 12956,
+            "totalTokens": 491302,
+            "known": 24,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-9a2ccee2a8d9",
+      "rep": 2,
+      "run": "r-dzDW0T",
+      "mode": "standard",
+      "nativeStage": "g2",
+      "stage": "H2",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "defect",
+          "location": "ledger.py:91–108,126–156; windows.py:89–98",
+          "reason": "Revision/window precedence positive passed, but missing ID returns revision-conflict and changed state after release is wrong. Equal-start overlap can be missed because lookup uses tuple order in bisect and examines the wrong neighbor."
+        },
+        "stage": "H2",
+        "owner": {
+          "status": "defect",
+          "location": "events.py:4; ledger.py:126–132,135–156",
+          "reason": "Events introduces a new dependency on windows. Ledger reports `conflict` instead of `overlap` and can miss a live interval. Published fixed-import predicate fails."
+        },
+        "order": {
+          "status": "defect",
+          "location": "ledger.py:38–63; events.py:97–126",
+          "reason": "Initial overlap checks are present; later invalid-event still wins before earlier unknown reservation because all events are pre-scanned."
+        },
+        "replay": {
+          "status": "defect",
+          "location": "ledger.py:74–87,123,135–156",
+          "reason": "Replay output shape is right, but final active resurrects a released seed row and resurrects earlier reserve/transfer in public controls. Final merge uses stale ordered rows or stale fresh entries."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "windows.py:48–111",
+          "reason": "187.9 and 206.3 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Maintained resource index and separately merged static windows run quickly, but correct overlap is not established by the end-appending load case."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:135–156",
+            "reason": "Docstring calls rows untouched, while merger ignores removals absent from fresh."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:91–102; windows.py:54–62",
+            "reason": "Explains revisions before windows and static window lookup."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "ledger.py:72–123,135–156; events.py:4",
+          "reason": "Maintains current map, interval index and fresh map, then reconstructs output with stale base. The extra state creates inconsistencies and breaks fixed import direction."
+        }
+      },
+      "documents": {
+        "stage": "H2",
+        "artifactStatus": "missing-authored-document",
+        "documents": [],
+        "findings": [],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "99d22fbedbc349bc2293b361acb47145bd7292b6eb73b3dc8260b47c1db22ccb"
+        },
+        {
+          "path": "events.py",
+          "sha256": "a87b271008d1563b962520860e9529d4b6ca049d9b50898b453ea3650885e8cf"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "eea13adcf7d6e74a899678a789c91c01da6baa1af2081e9508c855bf173ec73e"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "a7f3d3c2c7330bdca16a8ee98a1ae4cdddbabe49ccac895591807809fd848a67"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 63,
+          "total": 104
+        },
+        "protected": {
+          "passed": 36,
+          "total": 36
+        },
+        "required": {
+          "passed": 25,
+          "total": 44
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "waiting-user",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "waiting-user",
+        "classification": "native-input-required",
+        "inputKinds": [
+          "question"
+        ],
+        "waitingAgents": 1,
+        "elapsedMs": 299878,
+        "quietMs": 77
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 299878,
+      "postfreeze": {
+        "passed": 6,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 63,
+            "total": 104
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 63,
+            "total": 104
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 10,
+        "total": 13
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [
+            "windows"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "identity",
+            "integer",
+            "name",
+            "plan",
+            "read_active",
+            "read_event"
+          ],
+          "lineCount": 126
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "apply",
+            "failure",
+            "inspect",
+            "merged",
+            "placement",
+            "process",
+            "sort_key"
+          ],
+          "lineCount": 156
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "add",
+            "closed",
+            "finish",
+            "first_overlap",
+            "free",
+            "read_windows",
+            "remove"
+          ],
+          "lineCount": 111
+        }
+      },
+      "usage": {
+        "tokenComparison": 2363691,
+        "cacheComparison": 98.8163,
+        "tokenAll": 2363691,
+        "cacheAll": 98.8163,
+        "usage": {
+          "comparison": {
+            "inputTokens": 27667,
+            "cacheReadTokens": 2309632,
+            "cacheWriteTokens": 0,
+            "outputTokens": 26392,
+            "totalTokens": 2363691,
+            "known": 62,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-0a4b0196ff0a",
+      "rep": 2,
+      "run": "r-dzDW0T",
+      "mode": "standard-checklist",
+      "nativeStage": "g1",
+      "stage": "H1",
+      "finalOwnerDocDrift": [
+        {
+          "path": "CHANGE-G2.md",
+          "suppliedSha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc",
+          "frozenSha256": "589d96f31af7d4f55ac414d1443615d0ff45eba75d4e8171069ad986f7667de6"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "defect",
+          "location": "ledger.py:24–31; operation-json-array",
+          "reason": "Decode and delegation are separated, but dictionary membership hashes an array operation and exits 1 instead of producing invalid-request."
+        },
+        "revision": {
+          "status": "not-applicable",
+          "location": "H1 contract",
+          "reason": "The requested stage does not add transfer and closed windows."
+        },
+        "stage": "H1",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:39–54,61–62,85–89; windows.py:64–77",
+          "reason": "No initial overlap check runs for apply; invalid later item wins for the invalid overlapping initial state probe."
+        },
+        "order": {
+          "status": "defect",
+          "location": "ledger.py:48–71; events.py:78–107",
+          "reason": "Batch-wide identity/shape pre-pass returns invalid-event@1 rather than the earlier unknown-reservation@0. Output remains atomic."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:64–73; events.py:45–52,78–107",
+          "reason": "Canonical identity and skip path pass retry-after-release."
+        },
+        "scale": {
+          "status": "defect",
+          "location": "windows.py:40–51,64–74",
+          "reason": "Process timed out at 1,010.8 ms. Rebuilds keys on every initial insert and a list of all starts on each lookup. Binary search does not remove the scans."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:49–53; windows.py:69–74",
+            "reason": "Claims contract allows all later shape errors to outrank earlier business errors. The binary-search explanation omits full-list rebuilding."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:58–60,69–76,85–87",
+            "reason": "Explains private staging, response commit and using staged rather than original booking state."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "windows.py:49–74",
+          "reason": "An ostensibly indexed interface hides repeated whole-list work."
+        }
+      },
+      "documents": {
+        "stage": "H1",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "c7f28a0d892f3c68d1edd192857dfa03a120c84cf15cc8862de8f521a173eb97"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "c1bd8c699ef608d86e0980a0483973b9531fce052ae2aa6d5ce721998601f38c"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 48,
+            "reason": "Presents a whole-batch shape/identity pass as the only valid interpretation, contrary to the explicit earlier-business-error clause. The public positive contrast fails on that exact branch.",
+            "source": "ledger.py:48–71; SPEC.md:9"
+          },
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 17,
+            "reason": "Asserts normal zero exit generally; well-formed JSON with an array operation raises TypeError in ledger and exits 1.",
+            "source": "ledger.py:24–31; operation-json-array"
+          },
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 57,
+            "reason": "Canonical fingerprint and replay skip are both accurately described and reproduced.",
+            "source": "events.py:45–52,78–107; ledger.py:64–73"
+          },
+          {
+            "status": "unresolved",
+            "path": "TEST-REPORT.md",
+            "line": 55,
+            "reason": "Reported 0.14 s uses mixed release and reserve, while the independent end-appending reserve load timed out near 1,011 ms. Different workloads do not verify or contradict reported time directly.",
+            "source": "windows.py:40–51,64–74; performance-hot-resource"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "55d37c972f8f4b5406d0a2f82a140acba3bb39166806a1c9198a5ee2cc297153"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "0158921a22ac8155e8312cae26d359b8fdb0ec9b7737667a31abd44430853c77"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "44012fa57033a3e85e87455d56924dffd9ce15736ccc8f74f51a3765f78b1cad"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 51,
+          "total": 60
+        },
+        "protected": {
+          "passed": 18,
+          "total": 18
+        },
+        "required": {
+          "passed": 33,
+          "total": 42
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 247059,
+        "quietMs": 2117,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 244942
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 247059,
+      "postfreeze": {
+        "passed": 18,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 51,
+            "total": 60
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 51,
+            "total": 60
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 4,
+        "total": 6
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "canonical",
+            "event_shape",
+            "integer",
+            "name",
+            "read_active",
+            "read_events"
+          ],
+          "lineCount": 107
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "apply_events",
+            "failure",
+            "process",
+            "release",
+            "reserve",
+            "sort_key"
+          ],
+          "lineCount": 103
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_insert",
+            "_key",
+            "add",
+            "conflicts",
+            "find_conflict",
+            "first_overlap",
+            "remove"
+          ],
+          "lineCount": 80
+        }
+      },
+      "usage": {
+        "tokenComparison": 1985803,
+        "cacheComparison": 98.7515,
+        "tokenAll": 1985803,
+        "cacheAll": 98.7515,
+        "usage": {
+          "comparison": {
+            "inputTokens": 24458,
+            "cacheReadTokens": 1934464,
+            "cacheWriteTokens": 0,
+            "outputTokens": 26881,
+            "totalTokens": 1985803,
+            "known": 61,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-a91f20248e1a",
+      "rep": 2,
+      "run": "r-dzDW0T",
+      "mode": "standard-checklist",
+      "nativeStage": "g2",
+      "stage": "H2",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "defect",
+          "location": "ledger.py:25–35; operation-json-array",
+          "reason": "Typed transport delegation stays separate, but dictionary membership raises on array operation, exiting 1."
+        },
+        "revision": {
+          "status": "defect",
+          "location": "ledger.py:158–187; windows.py:46–88",
+          "reason": "Selected transfer, closure order and self-overlap controls pass. Two identical closed windows are valid overlaps but rejected by an extra policy."
+        },
+        "stage": "H2",
+        "owner": {
+          "status": "defect",
+          "location": "events.py:53–76; ledger.py:52–69; windows.py:46–88",
+          "reason": "Three layers validate closed input, violating one owner. Windows also invents a duplicate-closure rejection; the valid duplicate-window control proves it."
+        },
+        "order": {
+          "status": "defect",
+          "location": "ledger.py:52–80,92–116",
+          "reason": "Whole-batch pre-validation hides earlier business errors and has no initial active overlap check. Output remains atomic."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:92–98; events.py:79–86,129–158",
+          "reason": "Sorted-key identity and early replay behavior pass."
+        },
+        "scale": {
+          "status": "defect",
+          "location": "windows.py:138–160,175–190",
+          "reason": "Both 24,000-reservation load controls hit about 1,010 ms; per-row key materialization during initial construction and per-event rebuilding of starts defeat bisect."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:53–77; windows.py:46–65",
+            "reason": "Comments disclose and justify duplicated validation and unsupported duplicate policy, and incorrectly say the spec puts later event errors before earlier business errors."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:85–97,163–181",
+            "reason": "Useful staging-copy, replay shape, bounded revision and re-indexing rationale."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "ledger.py:52–71; events.py:53–76; windows.py:46–88,138–190",
+          "reason": "Duplicated validation authorities, unnecessary policy and expensive nominal interval index."
+        }
+      },
+      "documents": {
+        "stage": "H2",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "bf2799cc40250f5c95fd5dd59a1de5ea3793761e06e84f007d9b12ebf7957a30"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "a7a39187eab79a5dbb765385b716b9e397a4f2dd2d2e113ad8ae3deacf0a92dd"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 21,
+            "reason": "Places invalid-window in events despite specific clause assigning it to windows. Three gates are implemented, allowing ownership drift and an extra rule.",
+            "source": "events.py:53–76; ledger.py:52–69; windows.py:46–88"
+          },
+          {
+            "status": "defect",
+            "path": "ARCHITECTURE.md",
+            "line": 64,
+            "reason": "Treats the batch-wide shape/identity pre-pass as compatible with earlier business error priority. Public registered order control failed.",
+            "source": "ledger.py:73–116; SPEC.md:9"
+          },
+          {
+            "status": "defect",
+            "path": "TEST-REPORT.md",
+            "line": 33,
+            "reason": "Treats rejecting duplicate closed rows as valid coverage; frozen code rejects a duplicated valid overlapping window under a fabricated restriction.",
+            "source": "windows.py:82–84; identical-closed-windows-remain-legal"
+          },
+          {
+            "status": "supported",
+            "path": "ARCHITECTURE.md",
+            "line": 122,
+            "reason": "Staged state and re-indexing describe actual record/index updates and no partial response.",
+            "source": "ledger.py:89–125,177–187"
+          },
+          {
+            "status": "unresolved",
+            "path": "TEST-REPORT.md",
+            "line": 56,
+            "reason": "The reported 0.41 s is a different workload from the independent hot-resource suite. Both matched 24k load cases timed out around 1,010 ms.",
+            "source": "performance-hot-resource; performance-hot-resource-closed"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7"
+        },
+        {
+          "path": "events.py",
+          "sha256": "2580afa81c66f7cd1080fdebabd7d1363dee60403e69038ba27ff419bed406be"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "b6e0497a82b1763ee67a0a275e30f6c010340b0a28fc8732a2d81a3031e6445f"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "f4378f9dc8ca5d3ac3747793e5e29ab21b9b172cc969a0cae07b1f1a273355dd"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 84,
+          "total": 104
+        },
+        "protected": {
+          "passed": 51,
+          "total": 51
+        },
+        "required": {
+          "passed": 33,
+          "total": 44
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 387901,
+        "quietMs": 2155,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 385746
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 387901,
+      "postfreeze": {
+        "passed": 12,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 84,
+            "total": 104
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 84,
+            "total": 104
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 10,
+        "total": 13
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 20
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "canonical",
+            "event_shape",
+            "integer",
+            "name",
+            "read_active",
+            "read_closed",
+            "read_events"
+          ],
+          "lineCount": 158
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "apply_events",
+            "failure",
+            "process",
+            "release",
+            "reserve",
+            "sort_key",
+            "transfer"
+          ],
+          "lineCount": 187
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_insert",
+            "_integer",
+            "_key",
+            "add",
+            "conflicts",
+            "find_conflict",
+            "first_overlap",
+            "intersects",
+            "read_closed",
+            "remove"
+          ],
+          "lineCount": 193
+        }
+      },
+      "usage": {
+        "tokenComparison": 4041435,
+        "cacheComparison": 98.5559,
+        "tokenAll": 6192918,
+        "cacheAll": 98.922,
+        "usage": {
+          "comparison": {
+            "inputTokens": 57882,
+            "cacheReadTokens": 3950336,
+            "cacheWriteTokens": 0,
+            "outputTokens": 33217,
+            "totalTokens": 4041435,
+            "known": 66,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 8426,
+            "cacheReadTokens": 2134656,
+            "cacheWriteTokens": 0,
+            "outputTokens": 8401,
+            "totalTokens": 2151483,
+            "known": 22,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-fa0413214c18",
+      "rep": 2,
+      "run": "r-dzDW0T",
+      "mode": "building-loop",
+      "nativeStage": "g1",
+      "stage": "H1",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "not-applicable",
+          "location": "H1 contract",
+          "reason": "The requested stage does not add transfer and closed windows."
+        },
+        "stage": "H1",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:19–64; windows.py:4–11",
+          "reason": "Base overlap lives in windows, but dynamic reservation overlap is a business predicate implemented in ledger despite the contract assigning resource interval rules to windows."
+        },
+        "order": {
+          "status": "supported",
+          "location": "ledger.py:67–116; events.py:35–58",
+          "reason": "Shape, fingerprint, then business per input and only published after all pass. All public atomicity and ordering controls pass."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:85–102; events.py:61–68",
+          "reason": "Fingerprint canonicalizes object ordering and replay exits before state. Both public replays pass."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "ledger.py:32–64",
+          "reason": "153.5 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. End-appending fixture passes. Python list shifts and copying `entries[position:]` can cost O(n) for other update distributions."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:22–24,39–59",
+            "reason": "Claims insert/remove and lookup O(log n + group), but list mutation shifts elements and slice makes a suffix copy."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:67–72,123–127",
+            "reason": "Explains atomic output and initial-data validation."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "ledger.py:19–64",
+          "reason": "Module owns dispatch and interval algorithms together; interval ownership not reflected by unchanged direct imports."
+        }
+      },
+      "documents": {
+        "stage": "H1",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "4dbec851f0db99e8939f0dfdd885cd9649c2885c59e43e1bdf13a0a184c7c451"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "d5517903356cc2afe8b5a92adef9f17adecd8631ca1685662951e4e9780ec926"
+          }
+        ],
+        "findings": [
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 24,
+            "reason": "Says only existing windows interval checks are reused without outward change, but does not say the dynamic interval check is implemented in ledger. The preceding ownership summary overstates the separation.",
+            "source": "ledger.py:19–64; windows.py:4–11"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 26,
+            "reason": "Per-event logarithmic claim misses list insertion/removal shifts and suffix copying on lookup. Declared end-append public load still passed.",
+            "source": "ledger.py:39–64"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 21,
+            "reason": "Entry delegation and three responsibilities are linked to exact generated roles and actual implementation.",
+            "source": "entry.py:8–19; ledger.py:119–140"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 23,
+            "reason": "Frozen source and public controls support first-event error, replay-before-state and no partial result.",
+            "source": "ledger.py:67–116"
+          },
+          {
+            "status": "defect",
+            "path": "LEDGER.md",
+            "line": 19,
+            "reason": "Original user request remains pending and its note says it will be covered after closure, while the same snapshot already records K01 completed. The ledger describes closure but did not resolve the covered request.",
+            "source": "LEDGER.md:13,19–37"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "c7619f0bf745136bdb0b296f5b623e123689f6a4efc8bf80f96cdc162c5fe063"
+        },
+        {
+          "path": "events.py",
+          "sha256": "6097273d6022f6b172fa4b3e043e54bbe500b8f96504d7ba4eb1fb9bf539cbc2"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "1d599fde9726063e3e51f8502c80a5cefb215fc457104d5e0eecd0d3ecb7ccdd"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "328713da3b98b3097db0a2fe17901e88ddd1085763be26ee44ce182d8423ea12"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 60,
+          "total": 60
+        },
+        "protected": {
+          "passed": 18,
+          "total": 18
+        },
+        "required": {
+          "passed": 42,
+          "total": 42
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "completion": {
+        "terminal": "closed",
+        "classification": "native-workflow-end",
+        "elapsedMs": 433948,
+        "quietMs": 2027,
+        "hostWorkflowEnd": {
+          "phase": "closed",
+          "elapsedMs": 423712
+        },
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 431921
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 433948,
+      "postfreeze": {
+        "passed": 24,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 60,
+            "total": 60
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 60,
+            "total": 60
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 6,
+        "total": 6
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 23
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "fingerprint",
+            "integer",
+            "name",
+            "read_active",
+            "read_event"
+          ],
+          "lineCount": 68
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "add",
+            "failure",
+            "overlaps",
+            "process",
+            "remove",
+            "run_apply",
+            "sort_key"
+          ],
+          "lineCount": 140
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "first_overlap"
+          ],
+          "lineCount": 11
+        }
+      },
+      "usage": {
+        "tokenComparison": 3378535,
+        "cacheComparison": 94.6048,
+        "tokenAll": 6762511,
+        "cacheAll": 96.05,
+        "usage": {
+          "comparison": {
+            "inputTokens": 180178,
+            "cacheReadTokens": 3159424,
+            "cacheWriteTokens": 0,
+            "outputTokens": 38933,
+            "totalTokens": 3378535,
+            "known": 90,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 84740,
+            "cacheReadTokens": 3282432,
+            "cacheWriteTokens": 0,
+            "outputTokens": 16804,
+            "totalTokens": 3383976,
+            "known": 36,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-cbfeb9348a83",
+      "rep": 2,
+      "run": "r-dzDW0T",
+      "mode": "building-loop",
+      "nativeStage": "g2",
+      "stage": "H2",
+      "status": "frozen",
+      "codeEngineering": {
+        "entry": {
+          "status": "supported",
+          "location": "entry.py:8–19; decoded-json-array public contrast",
+          "reason": "JSON transport delegates parsed data to ledger and emits its result. Four-module import and I/O shape also checked."
+        },
+        "revision": {
+          "status": "supported",
+          "location": "ledger.py:130–153; windows.py:76–87",
+          "reason": "Correct missing, stale or saturated revision and window priority. Replacing row is removed in batch-local state before overlap and failed batch returns no partial."
+        },
+        "stage": "H2",
+        "owner": {
+          "status": "defect",
+          "location": "ledger.py:20–65; windows.py:18–87",
+          "reason": "Closed windows owned by windows, while overlap for staged active resides in ledger. Direct import shape alone does not see the ownership breach."
+        },
+        "order": {
+          "status": "supported",
+          "location": "ledger.py:68–153",
+          "reason": "Validates initial overlap and closed windows, interleaves event and business handling, atomically returns only after complete processing."
+        },
+        "replay": {
+          "status": "supported",
+          "location": "ledger.py:91–105; events.py:74–82",
+          "reason": "Exact event canonicalization and replay-before-state pass, including replay after release."
+        },
+        "scale": {
+          "status": "supported",
+          "location": "ledger.py:20–65; windows.py:46–87",
+          "reason": "155.8 and 172.2 ms in the public 24,000-booking, 4,096-event probe(s) against a 1,000 ms process threshold. Per-resource index probes and closed runs pass. Python list slicing and shifts can still cost O(n) in other event distributions."
+        },
+        "comments": [
+          {
+            "status": "defect",
+            "location": "ledger.py:22–25,39–64,138–139",
+            "reason": "Overstates list mutation/lookup complexity, and 'overlaps only other records fails' can be misread. Explains remove-self but should state why early tentative removal requires no rollback on abort."
+          },
+          {
+            "status": "supported",
+            "location": "ledger.py:69–73,82–87,122–125,130–137",
+            "reason": "Grounds atomic publication, window-before-events, release unaffected, and revision precedence."
+          }
+        ],
+        "maintainability": {
+          "status": "defect",
+          "location": "ledger.py:20–65; windows.py:18–87",
+          "reason": "Reuses one batch-local interval index, but splits implementation of interval business rules across modules."
+        }
+      },
+      "documents": {
+        "stage": "H2",
+        "artifactStatus": "reviewed",
+        "documents": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "41694f8c27e51645f69656d6739c63c2cbb7d82f04551b1c5e57618875af6f79"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "c126bef038938dc0994914f111d75706fab09d8991d9de7607c703fe456ddec3"
+          }
+        ],
+        "findings": [
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 25,
+            "reason": "Identifies nested predecessor masking and describes valid merged-interval or prefix-max strategy. Frozen code uses merged intervals and the published nested contrast is consistent with it.",
+            "source": "windows.py:46–87"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 19,
+            "reason": "The document assigns resource interval validation to windows but the dynamic live-overlap predicate lives in ledger. The frozen source import graph is correct, which does not establish the claimed ownership.",
+            "source": "ledger.py:20–65; windows.py:18–87"
+          },
+          {
+            "status": "defect",
+            "path": "modules/architecture.md",
+            "line": 35,
+            "reason": "Whole event described as logarithmic, but Python lists shift on mutation and overlap lookup copies a suffix. Declared stress passes without establishing general complexity.",
+            "source": "ledger.py:40–65"
+          },
+          {
+            "status": "supported",
+            "path": "modules/architecture.md",
+            "line": 32,
+            "reason": "Transfer ordering, self-removal and output fields agree with code and public revision contrasts.",
+            "source": "ledger.py:130–153"
+          },
+          {
+            "status": "defect",
+            "path": "LEDGER.md",
+            "line": 20,
+            "reason": "Both request records stay pending despite their matching units already marked completed. This is stale task bookkeeping even though native K02 closure exists.",
+            "source": "LEDGER.md:13–23,29–43,54–62"
+          },
+          {
+            "status": "unresolved",
+            "path": "modules/architecture.md",
+            "line": 46,
+            "reason": "Reference is a signed proposal identifier; native receipt is required to verify actual isolated rehearsal and its scope.",
+            "source": "modules/architecture.md:37–47"
+          }
+        ],
+        "planningProcess": "Frozen documents establish content only. Workflow chronology requires separately revealed native evidence."
+      },
+      "artifactPins": [
+        {
+          "path": "entry.py",
+          "sha256": "c7619f0bf745136bdb0b296f5b623e123689f6a4efc8bf80f96cdc162c5fe063"
+        },
+        {
+          "path": "events.py",
+          "sha256": "bbc018ac95df28867d5c61b67d14b16d1f71712c88cb44dc021d8f8c950559a2"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "e86e6c8bb42baab7b8c4b1b33f092dc8643a6dd27e028054a8510c8a7edf3e79"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 104,
+          "total": 104
+        },
+        "protected": {
+          "passed": 60,
+          "total": 60
+        },
+        "required": {
+          "passed": 44,
+          "total": 44
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "completion": {
+        "terminal": "closed",
+        "classification": "native-workflow-end",
+        "elapsedMs": 866759,
+        "quietMs": 2053,
+        "hostWorkflowEnd": {
+          "phase": "closed",
+          "elapsedMs": 855324
+        },
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 864707
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 866759,
+      "postfreeze": {
+        "passed": 24,
+        "total": 24
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 103,
+            "total": 104
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 103,
+            "total": 104
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 13,
+        "total": 13
+      },
+      "architectureBoundaries": {
+        "entry": {
+          "parse": true,
+          "moduleImports": [
+            "ledger"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 23
+        },
+        "events": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "fingerprint",
+            "integer",
+            "name",
+            "read_active",
+            "read_event"
+          ],
+          "lineCount": 82
+        },
+        "ledger": {
+          "parse": true,
+          "moduleImports": [
+            "events",
+            "windows"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "add",
+            "failure",
+            "overlaps",
+            "process",
+            "remove",
+            "run_apply",
+            "sort_key"
+          ],
+          "lineCount": 180
+        },
+        "windows": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_integer",
+            "_name",
+            "first_overlap",
+            "intersects",
+            "window_problem"
+          ],
+          "lineCount": 87
+        }
+      },
+      "usage": {
+        "tokenComparison": 2963114,
+        "cacheComparison": 93.3206,
+        "tokenAll": 14108000,
+        "cacheAll": 96.4372,
+        "usage": {
+          "comparison": {
+            "inputTokens": 195381,
+            "cacheReadTokens": 2729728,
+            "cacheWriteTokens": 0,
+            "outputTokens": 38005,
+            "totalTokens": 2963114,
+            "known": 89,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 303442,
+            "cacheReadTokens": 10772224,
+            "cacheWriteTokens": 0,
+            "outputTokens": 69220,
+            "totalTokens": 11144886,
+            "known": 158,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    }
+  ]
+}
