@@ -37,7 +37,7 @@ test("signed list cost review surfaces exact source and excludes explicit linear
 }));
 
 function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false,
-  receiptReads = true, diagnostics, text = goalText } = {}) {
+  receiptReads = true, diagnostics, text = goalText, nativeOpening = false } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = [entry, worker];
   const grant = { read: [...sources, ...(receiptReads ? ["first.json", "final.json"] : []), ...(proseEdit ? ["notes.md"] : [])],
@@ -60,13 +60,15 @@ function prepareProject(root, write, { evidence = false, proseEdit = false, part
   saveProof(tests.regression.baselineFile, { spec: "building-loop-code-regression-baseline/1", unit: "K01",
     policySha256: policy.hash, suiteSha256: tests.previousSuiteSha256,
     artifacts: codeRegressionArtifacts(root, policy.units.K01), cases: [{ id: "old-negative", status: "passed" }], runId: "frozen" });
+  const opening = "开始建设：按 SPEC.md 实现批次上限并保住旧行为";
   const current = latestConversationUser([{ type: "user/message", seq: 12, data: { source: { kind: "user" },
-    content: [{ type: "text", text: "开始建设：按 SPEC.md 实现批次上限并保住旧行为" }] } }]);
+    content: [{ type: "text", text: opening }] } }]);
   const { proposal } = proposeConversationTask(process.env.DSH_HOME, "root", current,
     { goal: "实现批次上限", deliverable: "代码和真实测试", scope: "SPEC 和授权代码" });
   decideConversationStart(process.env.DSH_HOME, "root", current, proposal.id, "start",
     () => ({ kind: "workspace", root }), { typed: true });
-  const harness = host(root, { automaticCoverage: false });
+  const harness = host(root, { automaticCoverage: false, nativeOpening });
+  if (nativeOpening) harness.setOwner("root", 12, opening);
   async function qualify(actor, runId = "tested-current") {
     const ready = await harness.flow(actor, "prepare");
     const { file, previousCases, requiredCases, protectedCases, ...binding } = ready.codeTask.regressionProof;
@@ -113,7 +115,7 @@ async function prepareReview(harness, actor) {
 }
 
 test("signed code review uses actual changed lines and an independent receipt before ledger closure", () => fixture(async (root, write) => {
-  const { harness, qualify } = prepareProject(root, write);
+  const { harness, qualify } = prepareProject(root, write, { nativeOpening: true });
   const executor = (await harness.flow("root", "advance")).childId;
   write(worker, update);
   assert.equal((await qualify(executor)).phase, "review-ready");
@@ -177,7 +179,13 @@ test("signed code review uses actual changed lines and an independent receipt be
   assert.equal(valid.progress.ready, true);
   assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
   await assert.rejects(harness.ledger("root", "review", { decisions: [] }), /复核阶段/);
-  const auditor = (await harness.flow("root", "advance")).childId;
+  harness.setOwner("root", 13, "先停一下。");
+  await harness.finish("root");
+  assert.equal(harness.activations.length, 2);
+  harness.setOwner("root", 12, "开始建设：按 SPEC.md 实现批次上限并保住旧行为");
+  await Promise.all([harness.finish("root"), harness.finish("root")]);
+  assert.equal(harness.activations.length, 3);
+  const auditor = harness.activations.at(-1).childId;
   assert.notEqual(auditor, reviewer);
   assert.notEqual(auditor, executor);
   const blind = await prepareReview(harness, auditor);

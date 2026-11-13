@@ -566,6 +566,35 @@ export function apply(ctx, config = {}) {
     } finally { observed[Symbol.dispose](); }
   }
 
+  /** A passing code review already authorizes only the blind check of the
+   * same signed delivery. Leaving that receipt idle adds no owner decision. */
+  async function finishCodeAuditDispatch(frame) {
+    if (frame.role !== "coordinator" || !frame.started) return;
+    const checkpoint = engineeringStatus(frame);
+    if (checkpoint?.blocked) return;
+    const ready = Object.entries(frame.state.units).filter(([id, active]) =>
+      (!checkpoint || checkpoint.unit === id) && active.owner === frame.agent.id &&
+      ["first-audit-ready", "final-audit-ready"].includes(active.phase) && active.pendingReceipt?.codeReview &&
+      active.pendingReceipt.decision === "pending-audit" && active.auditActivationAttempt !== active.serial);
+    if (ready.length !== 1 || !await openingStillConfirmed(frame)) return;
+    const [[unit, active]] = ready;
+    const claimed = change(frame.agent, current => {
+      const row = current.state.units[unit];
+      if (current.started?.proposal.id !== frame.started.proposal.id || row?.owner !== frame.agent.id || row.phase !== active.phase ||
+        row.serial !== active.serial || row.auditActivationAttempt === row.serial || needsRevalidation(current, unit, row)) return false;
+      row.auditActivationAttempt = row.serial;
+      current.changed = true;
+      return true;
+    }, { requestedUnit: unit, claim: false });
+    if (!claimed) return;
+    try { await advance({ unit }, { agent: frame.agent, signal: AbortSignal.timeout(20_000) }); }
+    catch (error) {
+      // The ready receipt stays valid. Explicit advance remains available if
+      // native startup failed; do not wake the same coordinator repeatedly.
+      ctx.logger.warn("building-loop 独立复核仍待派发：" + error.message);
+    }
+  }
+
   /** Reconcile a completed coordinator turn with the confirmed opening. Only
    * an actual native activation counts as dispatch. One repair turn per opening
    * can finish the plan; a durable blocker prevents an endless wake loop. */
@@ -576,7 +605,7 @@ export function apply(ctx, config = {}) {
     try {
       const frame = scope(agent, { inspection: true });
       const unit = firstDispatchUnit(frame);
-      if (!unit) return;
+      if (!unit) return await finishCodeAuditDispatch(frame);
       const opening = frame.started.proposal.id;
       if (frame.state.dispatchRecovery?.openingId === opening && frame.state.dispatchRecovery.status === "blocked") return;
       if (!await openingStillConfirmed(frame)) return;
