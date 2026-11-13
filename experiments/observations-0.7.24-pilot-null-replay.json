@@ -1,0 +1,205 @@
+{
+  "method": "Independent WSL bubblewrap on exact pilot candidate snapshots",
+  "interpretation": "SPEC declares depends_on and applied arrays, rejecting non-array dependencies or journal input. G2 does not spell out literal null, but describes retain as a list and rejects malformed lists; omitted fields still get the documented default and a plan ignores retain.",
+  "inputs": {
+    "explicit-null-retain": {
+      "environment": "staging",
+      "action": "rollback",
+      "budget": 3,
+      "changes": [
+        {
+          "id": "a",
+          "component": "a",
+          "units": 1
+        }
+      ],
+      "applied": [
+        "a"
+      ],
+      "retain": null
+    },
+    "absent-retain": {
+      "environment": "staging",
+      "action": "rollback",
+      "budget": 3,
+      "changes": [
+        {
+          "id": "a",
+          "component": "a",
+          "units": 1
+        }
+      ],
+      "applied": [
+        "a"
+      ]
+    },
+    "explicit-null-depends": {
+      "environment": "staging",
+      "action": "plan",
+      "budget": 3,
+      "changes": [
+        {
+          "id": "a",
+          "component": "a",
+          "units": 1,
+          "depends_on": null
+        }
+      ],
+      "applied": [
+        "a"
+      ]
+    },
+    "explicit-null-applied": {
+      "environment": "staging",
+      "action": "plan",
+      "budget": 3,
+      "changes": [
+        {
+          "id": "a",
+          "component": "a",
+          "units": 1
+        }
+      ],
+      "applied": null
+    },
+    "plan-ignores-retain": {
+      "environment": "staging",
+      "action": "plan",
+      "budget": 3,
+      "changes": [
+        {
+          "id": "a",
+          "component": "a",
+          "units": 1
+        }
+      ],
+      "applied": [
+        "a"
+      ],
+      "retain": null
+    }
+  },
+  "versions": {
+    "reviewed": {
+      "sourcePins": {
+        "journal.py": "e81aca25fa55b3ef68f4b4d1630f142d8cf041c2e7ed80ed02f0646e1d613c09",
+        "planner.py": "83e776dbc7b02a2c8d4cf9db7abf52c48c86258d861240ba47395c1492aedb7c",
+        "policy.py": "f2270ae8214085b7c60551aeb46c15e2efdad986e1ec50ed65c49842e1a83d8c",
+        "release.py": "c4e82a3f81efe533beb2f4d851ecd44a2d30dc1f01cf188a68cba7770add4969"
+      },
+      "cases": {
+        "explicit-null-retain": [
+          {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          0,
+          null
+        ],
+        "absent-retain": [
+          {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          0,
+          null
+        ],
+        "explicit-null-depends": [
+          {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          0,
+          null
+        ],
+        "explicit-null-applied": [
+          {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          0,
+          null
+        ],
+        "plan-ignores-retain": [
+          {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          0,
+          null
+        ]
+      }
+    },
+    "repaired": {
+      "sourcePins": {
+        "journal.py": "ca09ded6320c1c0344fa8a0e71701febcb15a6b4235909c5585ffa954a080464",
+        "planner.py": "c3ea241bb7c14ba229d4c7bb393f234f7eeb4bdcafbe184935a550e3d7b32bea",
+        "policy.py": "f2270ae8214085b7c60551aeb46c15e2efdad986e1ec50ed65c49842e1a83d8c",
+        "release.py": "c4e82a3f81efe533beb2f4d851ecd44a2d30dc1f01cf188a68cba7770add4969"
+      },
+      "cases": {
+        "explicit-null-retain": [
+          {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          0,
+          null
+        ],
+        "absent-retain": [
+          {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          0,
+          null
+        ],
+        "explicit-null-depends": [
+          {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          0,
+          null
+        ],
+        "explicit-null-applied": [
+          {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          0,
+          null
+        ],
+        "plan-ignores-retain": [
+          {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          0,
+          null
+        ]
+      }
+    }
+  }
+}

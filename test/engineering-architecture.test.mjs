@@ -7,7 +7,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
+import { inspectArchitectureProse } from "../governance/engineering-architecture.mjs";
 import { authority, digest, parseAuthority } from "../governance/policy.mjs";
+import { pythonImportEvidence } from "../governance/python-dependencies.mjs";
 import { fixture, host } from "./helpers.mjs";
 
 const candidate = "runtime.py";
@@ -61,6 +63,56 @@ const fileJudgment = { file: candidate, basis: "The cap protects downstream capa
   comment: { status: "verified", start: 2, end: 2, basis: "This clamp implements the stated limit." } };
 const constraint = { caseId: "limit", status: "pass", requirement: ref(goal, 3), code: ref(candidate, 3),
   basis: "The signed test checks the cap that is applied before returning." };
+
+test("the host preloads architecture sources and both reviewers decide only the compact section rows", () => fixture(async (root, write) => {
+  const { harness, save } = project(root, write);
+  await harness.file("root", "write", architecture, { content: plan, note: "Record the design for this goal" });
+  await harness.flow("root", "architecture");
+  const executor = (await harness.flow("root", "advance")).childId;
+  const updated = "def budget(value):\n    # Clamp before handing off to protect capacity.\n    return min(value, 5)\n";
+  write(candidate, updated);
+  const { codeTask } = await harness.flow(executor, "prepare");
+  const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
+  save(file, { ...challenge, runId: "compact-candidate", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+  assert.equal((await harness.flow(executor, "submit")).phase, "review-ready");
+  const action = (actor, name, fields) => harness.invoke(actor, "building_loop_code_review", { action: name, ...fields });
+  const judge = async (actor, basis, leaveGap = false) => {
+    const { codeReview: packet } = await action(actor, "prepare");
+    const alias = name => packet.refs.find(row => row.file === name).prefix;
+    const rows = [
+      { id: "file:1", status: "verified", basis: "The nearby comment explains the capacity bound." },
+      { id: "test:1", status: "pass", basis: "The clamp implements the stated limit.",
+        refs: [alias(goal) + ":3", alias(candidate) + ":3"] },
+      { id: "section:1", status: "pass", basis, refs: [alias(candidate) + ":3"] },
+      { id: "section:2", status: "pass", basis: "The current budget obligation remains explicit.",
+        refs: [alias(goal) + ":3"] },
+    ];
+    assert.deepEqual(packet.pending.filter(row => row.kind === "section").map(({ id, heading, file }) => ({ id, heading, file })), [
+      { id: "section:1", heading: "职责", file: architecture }, { id: "section:2", heading: "回退", file: architecture },
+    ]);
+    const result = await action(actor, "record", { decisions: leaveGap ? rows.slice(0, 3) : rows, findingsDone: true });
+    assert.deepEqual(result.errors, []);
+    if (leaveGap) {
+      const incomplete = await action(actor, "submit");
+      assert.equal(incomplete.status, "needs-review");
+      assert.deepEqual(incomplete.next.pending.map(row => row.id), ["section:2"]);
+      assert.equal((await action(actor, "record", { decisions: rows.slice(3) })).progress.ready, true);
+    } else assert.equal(result.progress.ready, true);
+    return action(actor, "submit");
+  };
+  const reviewer = (await harness.flow("root", "advance")).childId;
+  assert.equal((await judge(reviewer, "The first reviewer grounds ownership in the actual clamp.", true)).phase, "first-audit-ready");
+  const auditor = (await harness.flow("root", "advance")).childId;
+  assert.notEqual(auditor, reviewer);
+  assert.equal((await judge(auditor, "The independent auditor located the decision in the actual module.")).phase, "ledger-review");
+  const receipt = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
+  for (const proof of [receipt.codeReview, receipt.independentAudit.codeReview]) {
+    assert.equal(proof.architecture.status, "pass");
+    assert.equal(proof.architecture.source.sha256, digest(plan));
+    assert.equal(proof.architecture.sections[0].evidence[0].sha256, digest(updated));
+    assert.equal(proof.architecture.sections[0].status, "pass");
+  }
+}));
 
 async function approve(harness, actor, changed) {
   const review = (action, fields) => harness.invoke(actor, "building_loop_code_review", { action, ...fields });
@@ -141,6 +193,78 @@ test("only the coordinator checkpoint renders the generated import section after
   assert.deepEqual(packet.codeReview.imports.edges, [{ file: candidate, line: 1, imports: ["limits.py"] }]);
   write(architecture, first);
   await assert.rejects(harness.invoke(reviewer, "building_loop_code_review", { action: "prepare" }), /架构|变化/);
+}));
+
+test("the signed checkpoint sends a wrong direct-call claim back to the coordinator with actual source lines", () => fixture(async (root, write) => {
+  const { harness, save } = project(root, write, { importsHeading: "静态导入" });
+  const inaccurate = plan.replace("入口限制请求预算。", "- `runtime.py`（入口）：只做传输，调用 `limits.py` 处理额度。");
+  const initial = inaccurate + "\n## 静态导入\n\n待由宿主生成。\n";
+  const readPlan = () => fs.readFileSync(path.join(root, architecture), "utf8");
+  await harness.file("root", "write", architecture, { content: initial, note: "Register the planned module boundary" });
+  await harness.flow("root", "architecture");
+  const executor = (await harness.flow("root", "advance")).childId;
+  write(candidate, "from limits import MAXIMUM\n\ndef budget(value):\n    # Clamp before passing a request downstream.\n    return min(value, MAXIMUM)\n");
+  const { codeTask } = await harness.flow(executor, "prepare");
+  const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
+  save(file, { ...challenge, runId: "actual-candidate", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+  assert.equal((await harness.flow(executor, "submit")).phase, "architecture-sync");
+  const status = (await harness.flow("root", "prepare")).architecture;
+  assert.equal(status.status, "sync");
+  assert.deepEqual(status.conflicts, ["架构稿第 5 行称 runtime.py 直接调用 limits.py，当前签名源码没有可定位的本地直接调用。请按实际路径改写，间接关系写清中间模块。"]);
+  await assert.rejects(harness.flow("root", "architecture"), /架构稿第 5 行.*直接调用 limits\.py/u);
+  const corrected = readPlan().replace("调用 `limits.py` 处理额度", "从 `limits.py` 导入预算常量并约束额度");
+  await harness.file("root", "write", architecture, { content: corrected, note: "Document the source-confirmed import instead of a call" });
+  assert.equal((await harness.flow("root", "architecture")).phase, "review-ready");
+  assert.match(readPlan(), /"runtime\.py" -> "limits\.py"/u);
+  const reviewer = (await harness.flow("root", "advance")).childId;
+  assert.equal((await harness.invoke(reviewer, "building_loop_code_review", { action: "prepare" })).phase, "first-review");
+}));
+
+test("Python call facts distinguish aliases from imports, conditional bindings, and uncertain shadowing", () => fixture(async (root, write) => {
+  const pkg = path.join(root, "pkg");
+  fs.mkdirSync(pkg);
+  const files = ["pkg/entry.py", "pkg/journal.py", "pkg/limits.py", "pkg/planner.py", "pkg/shadowed.py", "pkg/parameter.py",
+    "pkg/dynamic.py", "pkg/nested.py", "pkg/nonlocal.py", "pkg/conditional.py"];
+  const entry = ["from . import planner as p", "from .journal import filter_rows as clean", "from .limits import MAX",
+    "p.run()", "clean()", "print(MAX)"].join("\n");
+  const source = {
+    "pkg/entry.py": entry,
+    "pkg/journal.py": "def filter_rows(): return []\n",
+    "pkg/limits.py": "MAX = 7\n",
+    "pkg/planner.py": "from . import limits\ndef run(): return limits.MAX\n",
+    "pkg/shadowed.py": "from .planner import run as work\nwork = lambda: False\nwork()\n",
+    "pkg/parameter.py": "from .planner import run as work\ndef invoke(work): return work()\n",
+    "pkg/dynamic.py": "import importlib\nimportlib.import_module('pkg.planner').run()\n",
+    "pkg/nested.py": "from .planner import run as work\ndef run():\n    from pathlib import Path as work\n    return work()\n",
+    "pkg/nonlocal.py": "from .planner import run as work\ndef outer():\n    work = lambda: False\n    def inner():\n        nonlocal work\n        return work()\n    return inner()\n",
+    "pkg/conditional.py": "if SELECT_LOCAL:\n    from .planner import run as work\nwork()\n",
+  };
+  for (const file of files) write(file, source[file]);
+  const graph = pythonImportEvidence({ root, reads: files }, files.map(file => ({ path: file, sha256: digest(source[file]) })));
+  assert.deepEqual(graph.calls, [{ file: "pkg/entry.py", line: 4, target: "pkg/planner.py", symbol: "run" },
+    { file: "pkg/entry.py", line: 5, target: "pkg/journal.py", symbol: "filter_rows" }]);
+  assert.deepEqual(graph.uncertainCalls, [{ file: "pkg/shadowed.py", targets: ["pkg/planner.py"] },
+    { file: "pkg/parameter.py", targets: ["pkg/planner.py"] }, { file: "pkg/dynamic.py" },
+    ...["pkg/nested.py", "pkg/nonlocal.py", "pkg/conditional.py"].map(file => ({ file, targets: ["pkg/planner.py"] }))]);
+  const note = [
+    "# 模块",
+    "- `pkg/entry.py`（入口）：直接导入 `pkg/limits.py`。",
+    "- `pkg/journal.py`：直接导入 `pkg/planner.py`。",
+    "- `pkg/journal.py`：计划调用 `pkg/planner.py`。",
+    "- `pkg/journal.py`：不调用 `pkg/planner.py`。",
+    "- `pkg/journal.py`：通过另一模块调用 `pkg/planner.py`。",
+    "- `pkg/shadowed.py`：调用 `pkg/planner.py`。",
+    "- `pkg/parameter.py`：调用 `pkg/planner.py`。",
+    "- `pkg/dynamic.py`：调用 `pkg/planner.py`。",
+    "",
+    "> `pkg/journal.py`：直接导入 `pkg/planner.py`。",
+    "",
+    "~~~text",
+    "`pkg/journal.py`：直接导入 `pkg/planner.py`。",
+    "~~~",
+  ].join("\n");
+  assert.deepEqual(inspectArchitectureProse(note, graph),
+    [{ line: 3, from: "pkg/journal.py", to: "pkg/planner.py", relation: "import", actual: [] }]);
 }));
 
 test("architecture registration pins one bounded fence of explicitly granted examples", () => fixture(async (root, write) => {
@@ -256,7 +380,9 @@ test("a signed architecture mismatch blocks approval, then both roles verify the
     const reviewer = (await harness.flow("root", "advance")).childId;
     const end = await prepare(reviewer);
     assert.equal((await record(reviewer, end)).progress.ready, false);
-    await assert.rejects(action(reviewer, "submit"), /待复现架构示例 budget.*\{action:'probe',assertion:'architecture'\}/u);
+    const pending = await action(reviewer, "submit");
+    assert.equal(pending.status, "needs-review");
+    assert.match(pending.message, /待复现架构示例 budget.*\{action:'probe',assertion:'architecture'\}/u);
     const syntax = await action(reviewer, "probe", { assertion: "syntax", file: candidate });
     assert.equal(syntax.outcome, "match");
     const incorrect = await probe(reviewer);

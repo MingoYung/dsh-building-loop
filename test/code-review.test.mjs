@@ -87,9 +87,11 @@ test("signed code review uses actual changed lines and an independent receipt be
   assert.equal(harness.visible(executor).includes("building_loop_code_review"), false);
   await assert.rejects(async () => codeReview(harness, executor, "submit", verified), /没有纯代码核验授权/);
   assert.deepEqual(packet.codeReview.changes.map(row => [row.path, row.ranges]), [[worker, [{ start: 2, end: 3, removed: 2 }]]]);
-  assert.ok(packet.files.every(row => row.path === goal));
+  assert.deepEqual(packet.files.map(row => row.path).sort(), [entry, goal, worker].sort());
   await assert.rejects(async () => codeReview(harness, reviewer, "submit", verified), /record/);
-  const unread = await codeReview(harness, reviewer, "record", { files: verified.files });
+  const unread = await codeReview(harness, reviewer, "record", {
+    files: [{ ...verified.files[0], comment: { ...verified.files[0].comment, start: 99, end: 99 } }],
+  });
   assert.match(unread.errors[0].reason, /读取当前版本/);
   await harness.file(reviewer, "read", worker, { start: 2, count: 2 });
   assert.match(packet.codeReview.submission.fields.commentQuote, /宿主从源码提取原文/);
@@ -111,7 +113,10 @@ test("signed code review uses actual changed lines and an independent receipt be
   const invalidReplacement = await codeReview(harness, reviewer, "record", { constraints: [longBasis] });
   assert.match(invalidReplacement.errors[0].reason, /batch-bound 的 constraints\.basis.*当前长度 401/);
   assert.deepEqual(invalidReplacement.progress.pendingCorrections, [{ field: "constraints", id: "batch-bound" }]);
-  await assert.rejects(codeReview(harness, reviewer, "submit"), /待修正 batch-bound/);
+  const needsReview = await codeReview(harness, reviewer, "submit");
+  assert.equal(needsReview.status, "needs-review");
+  assert.deepEqual(needsReview.progress.pendingCorrections, [{ field: "constraints", id: "batch-bound" }]);
+  assert.deepEqual(needsReview.next.pending.map(row => row.id), ["test:1"]);
   assert.equal((await codeReview(harness, reviewer, "record", { constraints: verified.constraints })).progress.ready, true);
   const note = { ...ref(worker, 2), id: "cap-note", kind: "annotation", observation: "The memory rationale is sufficient.",
     suggestion: "Consider documenting the value at its configuration source later.",
@@ -231,6 +236,49 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   const stale = await codeReview(harness, second, "submit");
   assert.equal(stale.phase, "goal-review-ready");
   assert.equal((await harness.flow("root", "advance")).phase, "supplement");
+}));
+
+test("prefilled review rows carry only current observed evidence and independently record compact decisions", () => fixture(async (root, write) => {
+  const { harness, qualify } = prepareProject(root, write);
+  const executor = (await harness.flow("root", "advance")).childId;
+  write(worker, update);
+  assert.equal((await qualify(executor)).phase, "review-ready");
+  const reviewer = (await harness.flow("root", "advance")).childId;
+  const packet = await codeReview(harness, reviewer, "prepare");
+  const alias = file => packet.codeReview.refs.find(row => row.file === file).prefix;
+  const fileDecision = { id: "file:1", status: "verified", basis: "Explains the bounded batch before downstream memory is used" };
+  const testDecision = { id: "test:1", status: "pass", basis: "The clamp applies the stated upper and lower bounds.",
+    refs: [alias(goal) + ":2", alias(worker) + ":3"] };
+  assert.deepEqual(packet.codeReview.pending, [
+    { id: "file:1", kind: "file", file: worker, refs: [alias(worker) + ":2-3"], annotationRef: alias(worker) + ":2" },
+    { id: "test:1", kind: "test", caseId: "batch-bound", signedStatus: "passed" },
+  ]);
+  const bad = await codeReview(harness, reviewer, "record", {
+    decisions: [fileDecision, { ...testDecision, refs: [alias(goal) + ":2", alias(worker) + ":99"] }],
+    findingsDone: true,
+  });
+  assert.match(bad.errors[0].reason, /读取当前版本/);
+  assert.deepEqual(bad.next.pending.map(row => row.id), ["test:1"]);
+  const waiting = await codeReview(harness, reviewer, "submit");
+  assert.equal(waiting.status, "needs-review");
+  assert.deepEqual(waiting.next.pending, bad.next.pending);
+  assert.equal((await codeReview(harness, reviewer, "record", { decisions: [testDecision] })).progress.ready, true);
+  assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
+  const auditor = (await harness.flow("root", "advance")).childId;
+  assert.notEqual(auditor, reviewer);
+  const blind = await codeReview(harness, auditor, "prepare");
+  assert.deepEqual(blind.codeReview.pending, packet.codeReview.pending);
+  assert.ok(!JSON.stringify(blind).includes(fileDecision.basis));
+  const judgment = { ...fileDecision, basis: "The actual memory bound is explained at its source" };
+  assert.equal((await codeReview(harness, auditor, "record", {
+    decisions: [judgment, testDecision], findingsDone: true,
+  })).progress.ready, true);
+  assert.equal((await codeReview(harness, auditor, "submit")).phase, "ledger-review");
+  const receipt = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
+  assert.equal(receipt.codeReview.files[0].comment.quote, verified.files[0].comment.quote);
+  assert.equal(receipt.codeReview.files[0].basis, fileDecision.basis);
+  assert.equal(receipt.independentAudit.codeReview.files[0].basis, judgment.basis);
+  assert.deepEqual(receipt.codeReview.constraints[0].code, { ...ref(worker, 3), sha256: digest(update) });
 }));
 
 test("signed deliveries with declared evidence or writable prose keep the original text review contract", async t => {

@@ -23,14 +23,14 @@ import { existingConversationProject, initializeConversationProject, privateProj
 import { claimEngineeringCoordinator, EngineeringHandoffDenied, engineeringAccess, engineeringStatus, resolveBoundUnit } from "./engineering-handoff.mjs";
 import { captureCodeIntake, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake, verifySignedCodeSubmission } from "./code-intake.mjs";
 import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./code-submission.mjs";
-import { CODE_COMMENT_RULE, captureCodeReviewBaseline, codeReviewSchema, currentCodeReview, isCodeReviewUnit,
-  inspectArchitectureImports, prepareCodeReview, recordCodeReview, verifyCodeReview } from "./code-review.mjs";
+import { CODE_COMMENT_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding, codeReviewReadPaths, codeReviewSchema,
+  currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview, verifyCodeReview } from "./code-review.mjs";
 import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeDiagnostics, prepareCodeReproduction, prepareReviewReproduction, runCodeDiagnostics } from "./code-diagnostics.mjs";
 import { requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, saveReviewProbe } from "./code-review-probes.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
-  requireHostImportSectionUnchanged } from "./engineering-architecture.mjs";
+  requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims } from "./engineering-architecture.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQuery"];
@@ -142,7 +142,7 @@ const COORDINATOR = {
   "review-ready": "接单方已交付。advance 发起首次独立核验。",
   "supplement-ready": "核验退回。依据回执用 advance 发起补查，默认续用执行会话。",
   "architecture-repair": "独立核验指出架构稿问题。总控读退回回执，自己修正架构正文，再用 building_loop architecture 登记；源码退回仍由执行方处理。",
-  "architecture-sync": "候选已通过签名。总控用 building_loop architecture 按当前源码同步宿主生成的静态导入章节，随后推进独立核验。",
+  "architecture-sync": "候选已通过签名。总控先看 prepare 的架构差异及实际定位，按需修正文稿，再用 building_loop architecture 同步宿主生成的依赖，随后推进独立核验。",
   "final-review-ready": "补查已交付。advance 发起终审。",
   "goal-review-ready": "目标已改变或旧验收版本失效。advance 续用核验会话验证当前交付，原事实记录保留。",
   "first-audit-ready": "首次核验暂通过，尚未验收。advance 启动独立反证子会话，不能提前关单。",
@@ -243,14 +243,14 @@ function architectureNext(frame, unit) {
   const status = engineeringArchitectureStatus(frame, unit);
   if (!status?.next) return status;
   const register = { tool: WORKFLOW, ...status.next };
-  if (!["required", "repair"].includes(status.status) || !includes(frame.writes, status.file)) return { ...status, next: register };
+  if (!["required", "repair", "sync"].includes(status.status) || !includes(frame.writes, status.file)) return { ...status, next: register };
   const previous = frame.state.units[unit]?.engineeringArchitecture ?? frame.state.engineeringArchitecture?.[keyOf(status.file)];
   let needsWrite = true;
   try {
     const spec = frame.policy.units[unit];
     const plan = architectureDocument(frame, spec.architecture, spec.codeTask?.diagnostics);
     const sameContents = plan.contentsSha256 === previous?.contentsSha256;
-    needsWrite = sameContents && (status.status === "repair" || previous.goalSha256 !== goalSnapshot(frame).sha256);
+    needsWrite = !!status.conflicts?.length || sameContents && (status.status === "repair" || previous.goalSha256 !== goalSnapshot(frame).sha256);
   } catch { /* Missing or incomplete plans need a concrete write first. */ }
   return { ...status, next: needsWrite ? { tool: FILE, action: "write", path: status.file,
     required: ["content", "note"], then: register } : register };
@@ -832,11 +832,13 @@ export function apply(ctx, config = {}) {
       const phase = assignment?.[1].phase ?? current?.phase ?? "dispatch";
       if(spec)refreshCheckpoints(frame,current,spec);
       const codeReviewMode = codeReviewRole(frame);
-      // The code contract names actual changed ranges. Send goals and
-      // instructions here, then let each reviewer read those precise ranges.
+      // Goals, architecture and current changed-source evidence share one
+      // read budget. Stamps are recorded only for lines actually returned.
+      const codePaths = codeReviewMode ? codeReviewReadPaths(frame, assignment[0], current, spec) : [];
+      const codeRanges = new Map(codePaths.map(({ file, ranges }) => [keyOf(file), ranges]));
       const order = checkpoint ? coordinatorPacketPaths(frame, checkpoint.unit, current) : [...new Set([...frame.policy.goalContext,...frame.policy.instructions,
         ...(codeReviewMode && spec.architecture ? [spec.architecture.file] : []),
-        ...(codeReviewMode ? [] : [...(spec?[spec.candidate]:[]),...frame.reads])])].filter(file=>includes(frame.reads,file));
+        ...(codeReviewMode ? codePaths.map(({ file }) => file) : [...(spec?[spec.candidate]:[]),...frame.reads])])].filter(file=>includes(frame.reads,file));
       const seen = assignment ? current.seen : !checkpoint || phase === "ledger-review" ? current?.ledgerSeen : coordinatorPacketCursor(frame)?.seen;
       const files=[], pending=[];
       let bytesUsed=0, instruction, deliverableTable;
@@ -860,7 +862,9 @@ export function apply(ctx, config = {}) {
         const lines=lineList(bytes),hash=digest(bytes);
         const key = keyOf(file), prior = seen && Object.hasOwn(seen, key) ? seen[key] : undefined;
         const ranges=prior?.hash===hash?prior.ranges:[];
-        const unread=lines.map((_,i)=>i+1).filter(line=>!ranges.some(([a,b])=>a<=line&&b>=line));
+        const focus = codeRanges.get(key);
+        const unread=lines.map((_,i)=>i+1).filter(line=>(!focus || focus.some(({ start, end }) => start<=line&&line<=end)) &&
+          !ranges.some(([a,b])=>a<=line&&b>=line));
         if (!unread.length) continue;
         const returned=[];
         for (const line of unread.slice(0, 250)) {
@@ -1776,7 +1780,8 @@ export function apply(ctx, config = {}) {
           }
           active.phase = "review-ready";
         }
-        if (spec.architecture?.importsHeading && !inspectArchitectureImports(frame, spec, active).match) {
+        if (spec.architecture?.importsHeading && (!inspectArchitectureImports(frame, spec, active).match ||
+          inspectEngineeringArchitectureClaims(frame, spec, active).conflicts.length)) {
           active.architectureSyncResume = active.phase;
           active.phase = "architecture-sync";
         }
@@ -1946,7 +1951,7 @@ export function apply(ctx, config = {}) {
     if (frame.role === "auditor" && !currentCodeReview(frame, id, active, spec, active.pendingReceipt)) {
       throw new Error("待复核代码、架构、目标或签名结果已经变化，须重新核验");
     }
-    const { binding } = prepareCodeReview(frame, id, active, spec);
+    const binding = codeReviewBinding(frame, active, signed);
     return { active, spec, signed, architecture, binding };
   }
 
@@ -2000,8 +2005,8 @@ export function apply(ctx, config = {}) {
   function codeReviewAction(args, exec) {
     const frame = scope(exec.agent);
     if (!codeReviewRole(frame)) throw new Error("当前会话没有纯代码核验授权");
-    const { files, constraints, findings, observations, architecture, findingsDone, removeFindings, removeObservations, unit } = args;
-    const fields = { files, constraints, findings, observations, architecture, findingsDone, removeFindings, removeObservations };
+    const { files, constraints, decisions, findings, observations, architecture, findingsDone, removeFindings, removeObservations, unit } = args;
+    const fields = { files, constraints, decisions, findings, observations, architecture, findingsDone, removeFindings, removeObservations };
     const { assertion, file, exampleId, recipe, stdin, expectedExitCode, expectedJson } = args;
     if (args.action === "probe") {
       if (Object.values(fields).some(value => value !== undefined)) throw new Error("复现动作与回执登记分开调用");
@@ -2020,7 +2025,7 @@ export function apply(ctx, config = {}) {
       if (current.role === "auditor" && !currentCodeReview(current, id, active, spec, active.pendingReceipt)) {
         throw new Error("待复核代码、架构、目标或签名结果已经变化，须重新核验");
       }
-      const { binding } = prepareCodeReview(current, id, active, spec);
+      const binding = codeReviewBinding(current, active, signed);
       return recordCodeReview(current, active, spec, Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)), signed, {
         resolveReproduction: (proof, location) => reviewReproduction(current, active, binding, proof, location),
       });
@@ -2030,7 +2035,10 @@ export function apply(ctx, config = {}) {
       throw new Error("submit 使用已登记的条目，不需要重发。先用 record 逐项登记或补正，再调用不带条目的 submit");
     }
     return workflow({ action: frame.role === "auditor" ? "audit" : "review", unit,
-      [dedicatedCodeReview]: true }, exec);
+      [dedicatedCodeReview]: true }, exec).catch(error => {
+      if (!(error instanceof CodeReviewIncomplete)) throw error;
+      return { status: "needs-review", message: error.message, progress: error.progress, next: error.next };
+    });
   }
 
   const deny = exec => {
@@ -2163,7 +2171,7 @@ export function apply(ctx, config = {}) {
   }, assess, [...qualityNames, "revise", "sourceRefs", "unverifiedSources", "unlisted", "goalFit"]), {when:visible(["reviewer"], proseReview)});
   // Keep the prose schema out of the code reviewer's tool catalog. Both code
   // roles still submit through the same signed version and independence checks.
-  register(tool(CODE_REVIEW, "已授权的纯代码核验。prepare 获取改动、签名必测和未核条目。用 record 分批登记。只有待修缺陷写 findings，符合规则或无需修改的观察写 observations。probe 用已授权配方复现当前签名代码。核验完成后填 findingsDone:true，最后仅传 action=submit。", ["prepare", "probe", "record", "submit", "status", "block"], {
+  register(tool(CODE_REVIEW, "已授权的纯代码核验。prepare 返回真实改动、签名必测、架构章节和当前未核条目。用 record.decisions 只交编号、判断、简短理由和必要依据编号。只有待修缺陷写 findings。probe 可复现当前签名代码。核验完成填 findingsDone:true，最后只传 action=submit。", ["prepare", "probe", "record", "submit", "status", "block"], {
     ...codeReviewSchema.properties,
     unit: { ...string, description: "可省略，沿用宿主分配的当前单元。" },
     note: { ...string, description: "仅 block 填写可核实的阻塞原因。" },
@@ -2225,7 +2233,7 @@ export function apply(ctx, config = {}) {
           : frame.managed && phase === "intake"
             ? "接单。按已确认总纲和索引撰写第一版交付稿，只写 DELIVERY.md。会话原文是用户提供的材料，不能证明外部事实。材料不足时注明待核事项。完整读回目标和新正文后 submit。"
             : codeReview
-              ? "用 building_loop_code_review prepare 获取改动、测试和待读项。以实际源码路径和行核对关键约束、必要注释和当前架构。用 record 分批登记，仅补未通过条目。退回理由要沿实际变量读写或调用查反证，不能从一行猜整个控制流。确认 findingsDone 后只传 action=submit。"
+              ? "先用 building_loop_code_review prepare 读取宿主预填的文件、测试、架构和依据。用 record.decisions 只补未判断的编号及理由，选择宿主提供的证据引用。发现真实缺陷再填 findings。退回理由须对照实际控制流或复现。提交返回 needs-review 时按 next 补缺项。"
             : frame.role === "executor" && assignment?.[1].codeIntake?.regression
               ? "按当前目标修改授权代码。先用 prepare 读目标和当前文件。签名运行者须证明改前通过的旧用例和新增必测用例都通过；回退时按失败用例修复后重跑。" + CODE_SUBMIT_RULE
             : phase === "intake" && assignment?.[1].codeIntake

@@ -10,6 +10,8 @@
 | 查各版本原始运行器、事件记录器和统计脚本 | [运行脚本快照](data/harnesses.json) |
 | 标准模式与 Building-loop 0.7.14 | [资料核对、工程规划与失败记录的真实配对](results-standard-comparison.md) |
 | 短业务原文下的三组长工程对照 | [标准、标准＋清单和 Building-loop](results-natural-engineering-retry.md) |
+| 0.7.24 回执减负和架构直接调用核对 | [短提示三组复测](results-0.7.24.md) |
+| 亿级累计 Token 长工程和进阶题 | [规模边界、真实长跑和独立难题校验](long-horizon-validation.md) |
 | 0.7.23 可执行审核与派单前同目录接手 | [真实长工程、批量复现及失败回放](results-0.7.23.md) |
 | 0.7.22 分批代码核验、架构和同目录接手 | [长工程提示、实测及边界](results-0.7.22.md) |
 | 0.7.21 达标稿送审与独立代码核验 | [跨会话、多模块和目标变更配对](results-0.7.21.md) |

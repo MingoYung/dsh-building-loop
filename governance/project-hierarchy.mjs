@@ -214,6 +214,28 @@ export function architectureImportsSection(frame, spec, proposed) {
   return { source, sha256: digest(bytes), bodyStart: anchor.end, bodyEnd: anchor.stop };
 }
 
+/** Retain literal code spans naming modules inside visible prose only. Quoted
+ * examples, fenced code and HTML may contain intentionally false statements. */
+export function architectureProseLines(source) {
+  const result = new Map();
+  const pending = [...fromMarkdown(source, options).children];
+  const structure = markdownStructure(source.split(/\r\n|\n|\r/u));
+  while (pending.length) {
+    const node = pending.pop();
+    if (["blockquote", "code", "footnoteDefinition", "definition", "html"].includes(node.type)) continue;
+    if (node.type === "paragraph") {
+      // Inline Markdown is kept in the line so a backticked filename remains
+      // distinguishable from ordinary prose and exact line positions survive.
+      const first = node.position.start.line, last = node.position.end.line;
+      const lines = source.slice(node.position.start.offset, node.position.end.offset).split(/\r\n|\n|\r/u);
+      for (let line = first; line <= last; line++) {
+        if (structure.visible[line - 1]?.trim()) result.set(line, lines[line - first]);
+      }
+    } else if (node.children) pending.push(...node.children);
+  }
+  return [...result].sort(([left], [right]) => left - right);
+}
+
 /** Central-file edits can replace one existing section, preserving the route and every other section. */
 export function checkHierarchyWrite(frame, file, proposed, requestedHeading) {
   const hierarchy = frame.policy.hierarchy;

@@ -1,10 +1,10 @@
-import path from "node:path";
 import { requireCodeRegressionCurrent } from "./code-intake.mjs";
 import { expectedClaims } from "./evidence.mjs";
 import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { lineList } from "./preflight.mjs";
 import { architectureImportsSection } from "./project-hierarchy.mjs";
 import { parser as pythonParser } from "./vendor/python-parser.cjs";
+import { pythonImportEvidence } from "./python-dependencies.mjs";
 
 export const CODE_COMMENT_RULE = "必要注释写在非显然的职责、调用方向、跨模块状态、权限、数据保护、回滚或重试边界旁，交代原因与成立条件。改动使旧说明失实时同步更新。核验对照实际控制流和测试证据。";
 const BASELINE_LINES = 16000;
@@ -14,7 +14,7 @@ const PLAN_PAGE_BYTES = 16 * 1024;
 const PROOF_BYTES = 96 * 1024;
 const RECORD_LIMIT = 32;
 const KEYS = ["files", "constraints", "findings", "observations", "architecture"];
-const RECORD_KEYS = [...KEYS, "removeFindings", "removeObservations", "findingsDone"];
+const RECORD_KEYS = [...KEYS, "decisions", "removeFindings", "removeObservations", "findingsDone"];
 const FINDING_KINDS = ["behavior", "maintenance", "annotation", "architecture"];
 const VIOLATION_TYPES = ["requirement", "regression", "annotation", "architecture", "maintainability", "runtime", "syntax"];
 const EVIDENCE_RELATIONS = ["supports", "contradicts", "reproduces"];
@@ -48,6 +48,12 @@ const architectureSections = rows(12, { heading: { type: "string" }, basis: brie
   evidence: { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation } });
 const architecture = { type: "object", properties: { status: judgment, basis: brief, source: locator, sections: architectureSections },
   additionalProperties: false };
+const compactRef = { anyOf: [{ type: "string", pattern: "^[SG][1-9][0-9]*:[1-9][0-9]*(?:-[1-9][0-9]*)?$" }, locator] };
+const compactDecisions = rows(RECORD_LIMIT, {
+  id: { type: "string", pattern: "^(?:file|test|section):[1-9][0-9]*$" }, basis: brief,
+  status: { enum: ["pass", "revise", "verified", "missing", "not-needed"] },
+  refs: { type: "array", maxItems: 6, items: compactRef },
+}, ["id", "basis", "status"]);
 const reasonEvidence = { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation };
 const violation = { type: "object", properties: {
   type: { enum: VIOLATION_TYPES },
@@ -58,6 +64,7 @@ const violation = { type: "object", properties: {
 }, required: ["type", "expected", "actual"], additionalProperties: false };
 export const codeReviewSchema = {
   type: "object", properties: {
+    decisions: compactDecisions,
     files: rows(256, { file: locator.properties.file, basis: brief, comment, comments: { type: "array", maxItems: 6, items: comment } }, ["file", "basis"]),
     constraints: rows(80, { caseId: { type: "string" }, requirement: locator, code: locator, basis: brief, status: judgment }),
     findings: rows(MAX_FINDINGS, { ...locator.properties, id: findingId, kind: { enum: FINDING_KINDS },
@@ -182,6 +189,10 @@ function reviewArchitecture(frame, active, requireReadGrant) {
   return architecture;
 }
 
+export function codeReviewBinding(frame, active, signed) {
+  return proofBinding(signed, active.goal, reviewArchitecture(frame, active, true));
+}
+
 function plan(frame, active, spec, regression) {
   const before = new Map(active.codeIntake.regression.artifacts.map(row => [keyOf(row.path), row.sha256]));
   const baselines = new Map((active.codeReviewBaseline ?? []).map(row => [keyOf(row.path), row.lines]));
@@ -204,64 +215,22 @@ function plan(frame, active, spec, regression) {
     throw new Error("架构稿中的静态依赖章节与当前签名源码不一致，须由总控同步");
   }
   return { binding: proofBinding(regression, active.goal, architecture), changes, artifacts, architecture,
-    requiredCases: active.codeIntake.qualification.requiredCases };
+    requiredCases: active.codeIntake.qualification.requiredCases, signedCases: active.codeIntake.qualification.cases };
 }
 
-/** Import facts supplement the actual review reads. Exact signed local files are
- * resolved when the explicit statement unambiguously names them. */
-function pythonImportEvidence(frame, artifacts) {
-  const files = artifacts.filter(row => row.sha256 && /\.py$/iu.test(row.path));
-  const local = new Map(files.filter(row => includes(frame.reads, row.path)).map(({ path }) => [keyOf(path), path]));
-  const checkedFiles = [], unparsedFiles = [], edges = [], ambiguous = [];
-  let truncated = false;
-  const add = (file, node, source) => {
-    const tokens = [];
-    for (let child = node.firstChild; child; child = child.nextSibling) {
-      if (child.name !== "Comment") tokens.push(source.slice(child.from, child.to));
-    }
-    const split = tokens.indexOf("import");
-    const members = tokens.slice(split + 1).join(" ").split(",").map(value => value.trim()
-      .replace(/^[()]\s*|\s*[()]$/gu, "").split(/\s+as\s+/u, 1)[0].replaceAll(" ", ""));
-    const from = tokens[0] === "from" ? tokens.slice(1, split).join("") : "";
-    const prefix = /^\.+/u.exec(from)?.[0] ?? "";
-    const depth = prefix.length, module = from.slice(depth);
-    const directory = depth ? path.posix.join(path.posix.dirname(file), ...Array(depth - 1).fill("..")) : ".";
-    if (directory === ".." || directory.startsWith("../")) return;
-    const modulePath = module.replaceAll(".", "/");
-    const names = from ? modulePath ? [modulePath] : members.filter(name => name !== "*") :
-      members.map(name => name.replaceAll(".", "/"));
-    const imports = new Set();
-    for (const name of names.filter(value => /^[\p{ID_Start}_][\p{ID_Continue}\/]*$/u.test(value))) {
-      const base = path.posix.join(directory, name);
-      const candidates = [base + ".py", path.posix.join(base, "__init__.py")].map(value => local.get(keyOf(value))).filter(Boolean);
-      if (candidates.length === 1 && candidates[0] !== file) imports.add(candidates[0]);
-      if (candidates.length > 1 && ambiguous.length < 64) ambiguous.push({ file, module: name });
-    }
-    if (!imports.size) return;
-    const line = source.slice(0, node.from).split("\n").length;
-    if (edges.length < 64) edges.push({ file, line, imports: [...imports] });
-    else truncated = true;
-  };
-  for (const { path: file, sha256 } of files) {
-    if (!includes(frame.reads, file)) continue;
-    if (checkedFiles.length + unparsedFiles.length >= 64) { truncated = true; break; }
-    const bytes = readBytes(frame.root, file);
-    if (!bytes || digest(bytes) !== sha256) throw new Error("已签名源码已变化：" + file);
-    const source = lineList(bytes).join("\n"), tree = pythonParser.parse(source);
-    const nodes = [];
-    let invalid = false;
-    tree.iterate({ enter(node) {
-      if (node.type.isError) invalid = true;
-      if (node.name === "ImportStatement") nodes.push(node.node);
-    } });
-    if (invalid) unparsedFiles.push(file);
-    else {
-      checkedFiles.push(file);
-      for (const node of nodes) add(file, node, source);
-    }
+/** Packet assembly still verifies each digest and records only bytes it
+ * actually displays. A large unchanged source stays available by explicit read. */
+export function codeReviewReadPaths(frame, id, active, spec) {
+  const signed = requireCodeRegressionCurrent(frame, id, active, spec, active.goal);
+  const { changes, artifacts } = plan(frame, active, spec, signed);
+  const changed = new Set(changes.map(row => keyOf(row.path)));
+  const paths = changes.map(row => ({ file: row.path, ...(row.lines > 250 ? { ranges: row.ranges } : {}) }));
+  for (const { path, sha256 } of artifacts) {
+    if (!sha256 || changed.has(keyOf(path)) || !sourceArtifact(path) || !includes(frame.reads, path)) continue;
+    const bytes = readBytes(frame.root, path);
+    if (bytes && digest(bytes) === sha256 && bytes.length <= 24 * 1024 && lineList(bytes).length <= 250) paths.push({ file: path });
   }
-  return { kind: "python-static-local", checkedFiles, unparsedFiles, edges, ambiguous, truncated,
-    scope: "只列已签名且获准读取的 Python 源码中可定位的本地静态 import。动态导入、外部包和运行路径仍由核验方判断。" };
+  return paths;
 }
 
 /** The explicitly opted-in section is a generated inventory, not a model's
@@ -299,7 +268,7 @@ export function inspectArchitectureImports(frame, spec, active) {
   const match = current === expected;
   const proposed = match ? source : source.slice(0, bodyStart) + eol + eol + expected.replaceAll("\n", eol) +
     (bodyEnd < source.length ? eol + eol : eol) + source.slice(bodyEnd);
-  return { heading, expected, current, match, proposed, bodyStart, bodyEnd, sha256 };
+  return { heading, expected, current, match, proposed, bodyStart, bodyEnd, sha256, graph };
 }
 
 /** Only the assigned reviewer sees the current contract, never the other
@@ -320,6 +289,8 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
   }
   const nextOffset = offset + page.length;
   const progress = reviewProgress(frame, active, current, reviewDraft(frame, active, binding));
+  const refs = reviewRefs(frame, active, current);
+  const pending = pendingReviewRows(frame, current, progress, page, refs);
   // Start with the registered examples so the model need not copy each input
   // into an ad hoc runtime request before discovering the required checks.
   const architectureProbe = progress.architectureExamples?.missing.length
@@ -328,18 +299,21 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     ...(nextOffset < changes.length ? { nextChangePage: { action: "prepare", codeReviewOffset: nextOffset } } : {}),
     requiredCases, signed, goalFiles: active.goal.files.map(({ file }) => file),
     ...(architecture ? { architecture, imports: pythonImportEvidence(frame, current.artifacts) } : {}),
-    progress, ...(architectureProbe ? { architectureProbe } : {}),
+    progress, pending, refs,
+    ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {
-      files: "[{file,basis,comment:{status,basis,start,end}}]；同一文件有多个注释用 comments 数组替代 comment",
+      decisions: "[{id,status,basis,refs?}]；id 用 pending 所列编号；只填未核或需更正的项。已读证据写 S1:12、G1:4-6，也可用实际 {file,start,end}。",
+      fileDecision: "status=verified|missing|not-needed。选相应源码注释或位置，唯一预填注释可省略 refs。需要另评不同注释时可追加对应范围。",
+      testDecision: "status=pass|revise。refs 填目标原文及实际源码，各一个。签名测试本身只证明行为通过。",
+      sectionDecision: "status=pass|revise。refs 填支持判断的已读目标或实际源码。宿主携带章节位置并生成架构总判定。revise 应另登记该节真实发现。",
+      example: "{action:'record',decisions:[{id:'test:1',status:'pass',basis:'这里比较实际限制条件与原需求',refs:['G1:4','S1:12-13']}],findingsDone:true}；例中编号和行号须替换成实际 pending 与 refs。",
       commentQuote: COMMENT_QUOTE_RULE,
-      constraints: "[{caseId,requirement:{file,start,end},code:{file,start,end},basis,status}]",
       findings: "仅需修复的问题 [{id,kind,file,start,end,observation,issue,fix,violation:{type,expected,actual,requirement?,reproduction?},evidence:[{file,start,end,relation}]}]；用相同 id 修正，removeFindings 删除",
       observations: "通过的核对、可选优化或无需修改的备注 [{id,kind,file,start,end,observation,suggestion?,evidence:[{file,start,end,relation}]}]；removeObservations 删除",
-      ...(architecture ? { architecture: "{status,basis,source:{file,start,end},sections:[{heading,basis,evidence:[{file,start,end,relation}]}]}；逐标题分批补，保留其他已登记段" } : {}),
     } },
     next: (architectureProbe ? "先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 一次，宿主运行当前角色未完成的已登记示例。不要把示例逐个复制到 runtime。" : "") +
-      "用 record 分批记改动、必测和发现，只补错项或缺项。仅把明确违反的要求和必须落实的修法写入 findings；结果已符合、无需改、可选建议写 observations。把通过或无需修复的核对写成 issue/fix 会造成错误退回。先沿控制流找反证，再写实际差异。运行或语法失败用受信复现，不能以推测要求改作者稿。" +
-      (architecture ? "完整读架构稿，按 architecture.sections 逐节登记判断，对照当前要求和实际代码，涉及依赖时用 imports 提示查源码。" : "") +
+      "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。仅把确须修改的缺陷填 findings；符合或可选优化填 observations。运行或语法失败须有受信复现。" +
+      (architecture ? "完整读架构稿，对照实际目标和源码判断各节。静态导入仅能证明静态依赖。" : "") +
       (architecture?.examples ? "登记示例实际有差异时，按原示例位置记录架构退回并链接复现编号。" : "") +
       "每批最多 32 项。发现记齐后填 findingsDone:true，无发现也如此。progress.ready 后空参数 submit。",
     commentRule: CODE_COMMENT_RULE };
@@ -420,6 +394,85 @@ function reviewReaders(frame, active, current) {
   if (current.architecture) expected.set(keyOf(current.architecture.file), current.architecture.sha256);
   return { sources, goals, architecturePaths, all: [...goals, ...sources, ...architecturePaths],
     read: (ref, paths, extract) => observed(frame, active, ref, paths, expected, extract) };
+}
+
+/** Aliases identify exact authorized artifacts in this signed snapshot.
+ * Visibility and full-range proof still come from this role's own reads. */
+function reviewRefs(frame, active, current) {
+  const sources = current.artifacts.filter(row => row.sha256 && sourceArtifact(row.path))
+    .map(({ path, sha256 }) => ({ file: path, sha256 }));
+  return [["S", "source", sources], ["G", "goal", active.goal.files]].flatMap(([letter, kind, files]) =>
+    files.map(({ file, sha256 }, i) => {
+      const stamp = active.seen?.[keyOf(file)];
+      return { prefix: letter + (i + 1), kind, file, seen: stamp?.hash === sha256 ? stamp.ranges : [] };
+    }).filter(row => includes(frame.reads, row.file)));
+}
+
+function decisionRows(current) {
+  return [
+    ...current.changes.map((value, i) => ({ id: "file:" + (i + 1), kind: "file", value })),
+    ...current.requiredCases.map((value, i) => ({ id: "test:" + (i + 1), kind: "test", value })),
+    ...(current.architecture?.sections ?? []).map((value, i) => ({ id: "section:" + (i + 1), kind: "section", value })),
+  ];
+}
+
+function aliasLocation(ref, start, end = start) {
+  return ref.prefix + ":" + start + (end === start ? "" : "-" + end);
+}
+
+function fileDecisionHint(frame, change, ref) {
+  if (!ref) return {};
+  const spans = change.ranges.filter(({ start, end }) =>
+    ref.seen.some(([left, right]) => left <= start && right >= end));
+  const locations = spans.map(({ start, end }) => aliasLocation(ref, start, end));
+  const first = spans[0];
+  // A suggested annotation must come from source the actor has already seen.
+  // Other languages can use explicit locators without a Python-only guess.
+  let annotationRef;
+  if (spans.length === 1 && change.ranges.length === 1 && first.end - first.start <= 6 && /\.py$/iu.test(change.path)) {
+    const bytes = readBytes(frame.root, change.path);
+    if (bytes && digest(bytes) === change.sha256) {
+      const lines = lineList(bytes);
+      const comments = [];
+      for (let line = first.start; line <= first.end; line++) {
+        if (codeAnnotation(change.path, lines, line, line).trim()) comments.push(line);
+      }
+      if (comments.length === 1) annotationRef = aliasLocation(ref, comments[0]);
+    }
+  }
+  return { refs: locations, ...(annotationRef ? { annotationRef } : {}) };
+}
+
+function pendingReviewRows(frame, current, progress, page, refs) {
+  const sourceRefs = new Map(refs.filter(row => row.kind === "source").map(row => [keyOf(row.file), row]));
+  const visibleChanges = new Set(page.map(row => row.path));
+  const rows = decisionRows(current);
+  const corrections = new Set(progress.pendingCorrections.map(({ field, id }) => field + ":" + id));
+  const missingFiles = new Set(progress.missingFiles), missingCases = new Set(progress.missingCases);
+  const missingSections = new Set(progress.missingArchitectureSections);
+  return rows.flatMap(({ id, kind, value }) => {
+    if (kind === "file" && visibleChanges.has(value.path) &&
+      (missingFiles.has(value.path) || corrections.has("files:" + value.path))) {
+      return [{ id, kind, file: value.path, ...fileDecisionHint(frame, value, sourceRefs.get(keyOf(value.path))) }];
+    }
+    if (kind === "test" && (missingCases.has(value) || corrections.has("constraints:" + value))) {
+      return [{ id, kind, caseId: value, signedStatus: current.signedCases?.find(row => row.id === value)?.status }];
+    }
+    if (kind === "section" && (missingSections.has(value.heading) || corrections.has("architectureSections:" + value.heading) ||
+      progress.architectureCodeEvidence === false && value.heading === current.architecture.sections[0]?.heading)) {
+      return [{ id, kind, ...value, file: current.architecture.file, ...(progress.sectionFindingsMissing?.includes(value.heading)
+        ? { needs: "请关联该节具体 findings，或更正该节判断" } : {}) }];
+    }
+    return [];
+  });
+}
+
+function chosenRef(value, refs) {
+  if (record(value, locatorKeys)) return value;
+  const found = typeof value === "string" && /^([SG][1-9][0-9]*):([1-9][0-9]*)(?:-([1-9][0-9]*))?$/u.exec(value);
+  const row = found && refs.find(item => item.prefix === found[1]);
+  if (!row) throw new Error("证据请用本轮 refs 中的编号及实际已读行，或 {file,start,end}");
+  return { file: row.file, start: Number(found[2]), end: Number(found[3] ?? found[2]) };
 }
 
 function checkedFile(row, change, readers) {
@@ -593,6 +646,64 @@ function checkedArchitectureSection(row, section, current, readers) {
   return { heading: section.heading, source, basis: rationale(row.basis, section.heading + " 的 basis"), evidence };
 }
 
+/** Reuse the same evidence validators for legacy verbose rows and compact
+ * decisions. A compact decision cannot cite an unobserved or stale alias. */
+function checkedDecision(row, descriptor, refs, frame, current, readers) {
+  if (!record(row, ["id", "basis", "status", "refs"]) || !descriptor ||
+    row.refs !== undefined && (!Array.isArray(row.refs) || row.refs.length > 6)) {
+    throw new Error("决策须使用 pending 中的编号、判断、依据和已读证据");
+  }
+  const selected = (row.refs ?? []).map(value => chosenRef(value, refs));
+  const { kind, value } = descriptor;
+  if (kind === "file") {
+    if (!["verified", "missing", "not-needed"].includes(row.status)) throw new Error("文件判断须使用 verified、missing 或 not-needed");
+    if (selected.some(ref => typeof ref.file !== "string" || keyOf(ref.file) !== keyOf(value.path))) {
+      throw new Error("文件判断须定位到该实际变更文件的已读行");
+    }
+    if (!selected.length) {
+      if (row.status === "verified") {
+        const alias = refs.find(ref => ref.file === value.path && ref.kind === "source");
+        const hint = fileDecisionHint(frame, value, alias);
+        if (!hint.annotationRef) throw new Error("没有唯一可预填的已读注释，请选择实际注释位置");
+        selected.push(chosenRef(hint.annotationRef, refs));
+      } else {
+        const { start, end } = value.ranges[0];
+        selected.push({ file: value.path, start, end });
+      }
+    }
+    const comments = selected.map(({ start, end }) => ({ start, end, status: row.status, basis: row.basis }));
+    return checkedFile({ file: value.path, basis: row.basis,
+      ...(comments.length === 1 ? { comment: comments[0] } : { comments }) }, value, readers);
+  }
+  if (kind === "test") {
+    const goal = selected.filter(ref => includes(readers.goals, ref.file));
+    const source = selected.filter(ref => includes(readers.sources, ref.file));
+    if (selected.length !== 2 || goal.length !== 1 || source.length !== 1) {
+      throw new Error("必测判断需要一个已读目标原文位置和一个已读实际源码位置");
+    }
+    return checkedConstraint({ caseId: value, requirement: goal[0], code: source[0], status: row.status, basis: row.basis }, readers);
+  }
+  if (!["pass", "revise"].includes(row.status)) throw new Error("架构章节判断须使用 pass 或 revise");
+  const evidence = selected.map(ref => ({ ...ref, relation: "supports" }));
+  return { ...checkedArchitectureSection({ heading: value.heading, basis: row.basis, evidence }, value, current, readers),
+    status: row.status };
+}
+
+function compactArchitecture(frame, active, current, draft) {
+  if (!draft.compactArchitecture || !current.architecture) return draft.architecture;
+  const sections = draft.architectureSections ?? [];
+  if (!current.architecture.sections.every(section => sections.some(row => row.heading === section.heading))) return;
+  const bytes = readBytes(frame.root, current.architecture.file);
+  if (!bytes || digest(bytes) !== current.architecture.sha256) return;
+  const lines = lineList(bytes);
+  const end = lines.at(-1) === "" ? Math.max(1, lines.length - 1) : lines.length;
+  const seen = active.seen?.[keyOf(current.architecture.file)];
+  if (seen?.hash !== current.architecture.sha256 || !seen.ranges.some(([start, last]) => start === 1 && last >= end)) return;
+  const source = { file: current.architecture.file, start: 1, end, sha256: seen.hash };
+  const status = sections.some(row => row.status === "revise") || draft.findings.some(row => row.owner === "coordinator") ? "revise" : "pass";
+  return { source, status, basis: "依据各节核验、已读完整架构稿和退回记录生成" };
+}
+
 /** Save only the actor's own validated rows for this activation and exact proof
  * input. In particular, the auditor cannot inherit the first reviewer's draft. */
 function reviewDraft(frame, active, binding) {
@@ -602,7 +713,7 @@ function reviewDraft(frame, active, binding) {
   return { ...identity, files: [], constraints: [], findings: [], observations: [], findingsDone: false, pendingCorrections: [] };
 }
 
-function architectureProbeProgress(frame, active, current, draft) {
+function architectureProbeProgress(frame, active, current, draft, architectureVerdict) {
   const cases = current.architecture?.examples?.cases ?? [];
   if (!cases.length) return;
   const saved = active.codeReviewProbes;
@@ -620,7 +731,7 @@ function architectureProbeProgress(frame, active, current, draft) {
     const probe = finding.violation?.reproduction;
     return finding.owner === "coordinator" && probe?.type === "architecture" && probe.exampleId === row.id && probe.outcome === "mismatch";
   })).map(row => row.id);
-  return { rows, missing, unaddressed, passWithMismatch: mismatches.length > 0 && draft.architecture?.status === "pass" };
+  return { rows, missing, unaddressed, passWithMismatch: mismatches.length > 0 && architectureVerdict?.status === "pass" };
 }
 
 function reviewProgress(frame, active, current, draft) {
@@ -636,18 +747,24 @@ function reviewProgress(frame, active, current, draft) {
   const sections = draft.architectureSections ?? [];
   const missingArchitectureSections = (current.architecture?.sections ?? []).filter(section =>
     !sections.some(row => row.heading === section.heading)).map(row => row.heading);
+  const sectionFindingsMissing = sections.filter(({ status, source }) => status === "revise" && !draft.findings.some(finding =>
+    finding.owner === "coordinator" && finding.sha256 === source.sha256 && finding.file === source.file &&
+    finding.start <= source.end && finding.end >= source.start)).map(row => row.heading);
+  const unfinishedSections = [...new Set([...missingArchitectureSections, ...sectionFindingsMissing])];
   const candidatePaths = current.artifacts.filter(row => sourceArtifact(row.path)).map(row => row.path);
   const architectureCodeEvidence = !current.architecture || !current.architecture.sections?.length ||
     sections.some(row => row.evidence.some(item => item.relation !== "contradicts" && includes(candidatePaths, item.file)));
-  const architectureIssue = draft.architecture && draft.findingsDone &&
-    ((draft.architecture.status === "revise") !== draft.findings.some(row => row.owner === "coordinator"));
-  const architecture = current.architecture ? draft.architecture ? architectureIssue ? "inconsistent" : "recorded" : "missing" : "not-required";
-  const examples = architectureProbeProgress(frame, active, current, draft);
+  const architectureVerdict = compactArchitecture(frame, active, current, draft);
+  const architectureIssue = architectureVerdict && draft.findingsDone &&
+    ((architectureVerdict.status === "revise") !== draft.findings.some(row => row.owner === "coordinator"));
+  const architecture = current.architecture ? architectureVerdict ? architectureIssue ? "inconsistent" : "recorded" : "missing" : "not-required";
+  const examples = architectureProbeProgress(frame, active, current, draft, architectureVerdict);
   return { missingFiles, missingCases, findingIds, observationIds, findingsDone: draft.findingsDone, architecture, pendingCorrections,
-    ...(current.architecture ? { missingArchitectureSections, architectureCodeEvidence } : {}),
+    ...(current.architecture ? { missingArchitectureSections: unfinishedSections, architectureCodeEvidence,
+      ...(sectionFindingsMissing.length ? { sectionFindingsMissing } : {}) } : {}),
     ...(examples ? { architectureExamples: examples } : {}),
     ready: !missingFiles.length && !missingCases.length && !pendingCorrections.length && draft.findingsDone &&
-      !missingArchitectureSections.length && architectureCodeEvidence && !["missing", "inconsistent"].includes(architecture) &&
+      !unfinishedSections.length && architectureCodeEvidence && !["missing", "inconsistent"].includes(architecture) &&
       (!examples || !examples.missing.length && !examples.unaddressed.length && !examples.passWithMismatch) };
 }
 
@@ -702,6 +819,37 @@ function applyReviewRows(frame, active, current, input, signed, resolveReproduct
   // replacement is still possible when the reviewer withdraws a claim.
   const requested = Object.fromEntries(correctionGroups.map(field => [field, new Set(
     (Array.isArray(input[field]) ? input[field] : []).map(row => row?.id).filter(id => typeof id === "string"))]));
+  if (input.decisions !== undefined) {
+    if (!Array.isArray(input.decisions) || input.decisions.length > RECORD_LIMIT ||
+      input.files !== undefined || input.constraints !== undefined || input.architecture !== undefined) {
+      errors.push({ field: "decisions", reason: "决策每批最多 32 项，不能与旧版 files、constraints 或 architecture 一并提交" });
+    } else {
+      const refs = reviewRefs(frame, active, current);
+      const byId = new Map(decisionRows(current).map(row => [row.id, row]));
+      const recorded = new Set();
+      for (const row of input.decisions) {
+        const descriptor = byId.get(row?.id);
+        if (!descriptor) {
+          errors.push({ field: "decisions", id: typeof row?.id === "string" ? row.id : undefined, reason: "使用 pending 中实际变更、必测或章节的编号" });
+          continue;
+        }
+        const { id, kind, value } = descriptor;
+        const [field, key, match] = kind === "file" ? ["files", value.path, item => item.file === value.path] :
+          kind === "test" ? ["constraints", value, item => item.caseId === value] :
+          ["architectureSections", value.heading, item => item.heading === value.heading];
+        if (kind === "section") draft.architectureSections ??= [];
+        if (recorded.has(id)) {
+          errors.push({ field, id: key, reason: "同一批只提交该项一次" });
+          continue;
+        }
+        recorded.add(id);
+        add(field, key, () => {
+          put(field, match, checkedDecision(row, descriptor, refs, frame, current, readers));
+          if (kind === "section") draft.compactArchitecture = true;
+        }, draft[field].some(match));
+      }
+    }
+  }
   for (const [field, cap] of [["files", 256], ["constraints", 80], ["findings", MAX_FINDINGS], ["observations", MAX_FINDINGS]]) {
     const rows = input[field];
     if (rows === undefined) continue;
@@ -796,7 +944,8 @@ function applyReviewRows(frame, active, current, input, signed, resolveReproduct
   }
   const progress = reviewProgress(frame, active, current, draft);
   if (progress.architecture === "inconsistent") errors.push({ field: "architecture", id: current.architecture.file,
-    reason: draft.architecture.status === "revise" ? "revise 须有定位到实际架构稿的发现" : "pass 不能同时保留架构退回项" });
+    reason: compactArchitecture(frame, active, current, draft)?.status === "revise" ?
+      "revise 须有定位到实际架构稿的发现" : "pass 不能同时保留架构退回项" });
   if (progress.architectureExamples?.passWithMismatch) errors.push({ field: "architecture", id: current.architecture.file,
     reason: "已登记架构示例出现可复现差异，须核对并登记关联的架构退回项" });
   return { draft, progress, errors };
@@ -807,7 +956,32 @@ export function recordCodeReview(frame, active, spec, input, signed, { resolveRe
   const { draft, progress, errors } = applyReviewRows(frame, active, current, input, signed, resolveReproduction);
   active.codeReviewDraft = draft;
   frame.changed = true;
-  return { progress, errors };
+  const refs = reviewRefs(frame, active, current);
+  return { progress, errors, next: reviewNext(frame, current, progress, refs) };
+}
+
+function reviewNext(frame, current, progress, refs) {
+  if (progress.ready) return { tool: "building_loop_code_review", action: "submit" };
+  if (progress.architectureExamples?.missing.length) return { tool: "building_loop_code_review", action: "probe", assertion: "architecture" };
+  const rows = pendingReviewRows(frame, current, progress, current.changes, refs).slice(0, RECORD_LIMIT);
+  if (!rows.length && progress.architecture === "missing" && current.architecture) {
+    return { tool: "building_loop_code_review", action: "prepare", read: current.architecture.file };
+  }
+  if (!rows.length && !progress.findingsDone && !progress.pendingCorrections.length) {
+    return { tool: "building_loop_code_review", action: "record", findingsDone: true };
+  }
+  return { tool: "building_loop_code_review", action: "record",
+    ...(rows.length ? { pending: rows } : {}),
+    ...(progress.findingsDone ? {} : { findingsDoneRequired: true }) };
+}
+
+export class CodeReviewIncomplete extends Error {
+  constructor(message, progress, next) {
+    super(message);
+    this.name = "CodeReviewIncomplete";
+    this.progress = progress;
+    this.next = next;
+  }
 }
 
 export function verifyCodeReview(frame, active, spec, signed) {
@@ -827,9 +1001,11 @@ export function verifyCodeReview(frame, active, spec, signed) {
         "，先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 批量核验",
       progress.architectureExamples?.unaddressed.length && "架构示例退回未绑定实际差异 " + progress.architectureExamples.unaddressed.join("、"),
       progress.architectureExamples?.passWithMismatch && "架构判断与实际复现不一致"].filter(Boolean);
-    throw new Error("代码核验尚不能提交：" + missing.join("；") + "。用 record 补齐这些项。");
+    throw new CodeReviewIncomplete("代码核验尚不能提交：" + missing.join("；") + "。用 record 补齐这些项。",
+      progress, reviewNext(frame, current, progress, reviewRefs(frame, active, current)));
   }
-  const { files, constraints, findings, observations, architecture } = draft;
+  const { files, constraints, findings, observations } = draft;
+  const architecture = compactArchitecture(frame, active, current, draft);
   const missing = files.some(row => (row.comments ?? [row.comment]).some(item => item.status === "missing"));
   const failing = constraints.some(row => row.status === "revise");
   const proof = { version: 1, actor: frame.agent.id, binding: current.binding, files, constraints, findings,

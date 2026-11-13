@@ -1,7 +1,98 @@
 import { goalSnapshot } from "./goals.mjs";
 import { inspectArchitectureImports } from "./code-review.mjs";
 import { digest, includes, keyOf, readBytes, replaceWithHistory } from "./policy.mjs";
-import { architectureDocument, architectureImportsSection } from "./project-hierarchy.mjs";
+import { architectureDocument, architectureImportsSection, architectureProseLines } from "./project-hierarchy.mjs";
+
+const declaration = /^(?:[-+*]\s+|\d+[.)]\s+)?(?:\*\*)?\x60?([^\s`:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(][^）)]{1,80}[）)])?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?/iu;
+const sentence = /[。！？!?；;]|\.(?=\s|$)/u;
+const notCurrent = /(?:不|未|无|禁止|避免|只能|否则|如果|若|计划|拟|将|应|需要|建议|可选|可能|目标|改为|待|示例|例如|比如|回退|反例|误写|旧版|原先|历史|通过|经由|间接|委托|(?:\b(?:does not|never|should|may|could|would|will|planned|previously|formerly|indirectly|via|if|example|incorrect)\b))/iu;
+const relation = /(?:直接\s*)?(调用|导入|\bcalls?\b|\bimports?\b)\s*/giu;
+const name = /^(\x60)?([\p{ID_Start}_][\p{ID_Continue}./-]*)(?:\x60|(?=[\s、，,和及与。！？；;:(（]|$))/u;
+const list = /^(?:\s*(?:、|，|,|和|及|与|\band\b)\s*)/iu;
+
+function moduleLookup(files) {
+  const aliases = new Map();
+  for (const file of files) {
+    const module = file.replace(/\.py$/iu, "").replace(/\/__init__$/u, "").replaceAll("/", ".");
+    for (const alias of new Set([file, module, module.split(".").at(-1), file.split("/").at(-1)])) {
+      if (aliases.has(alias) && aliases.get(alias) !== file) aliases.set(alias, null);
+      else aliases.set(alias, file);
+    }
+  }
+  return token => {
+    const path = aliases.get(token);
+    if (path !== undefined) return path;
+    // A module-qualified call identifies its module if the exact prefix is
+    // already unique. An ordinary variable name never becomes a module here.
+    const split = token.lastIndexOf(".");
+    return split > 0 ? aliases.get(token.slice(0, split)) : undefined;
+  };
+}
+
+function mentionedTargets(tail, locate) {
+  const result = [];
+  let rest = tail;
+  while (rest) {
+    const item = name.exec(rest);
+    if (!item || !locate(item[2])) break;
+    result.push(locate(item[2]));
+    const delimiter = list.exec(rest.slice(item[0].length));
+    if (!delimiter) break;
+    rest = rest.slice(item[0].length + delimiter[0].length);
+  }
+  return result;
+}
+
+/** Validate only explicit current claims attached to a named module. Local
+ * module identity, relation and line are data. Interpretations of a sentence,
+ * uncertain call binding and future designs stay with independent review. */
+export function inspectArchitectureProse(source, graph) {
+  const locate = moduleLookup(graph.checkedFiles);
+  const conflicting = [];
+  for (const [line, row] of architectureProseLines(source)) {
+    const label = declaration.exec(row);
+    const from = label && locate(label[1]);
+    if (!from) continue;
+    const body = row.slice(label[0].length);
+    for (const claim of body.split(sentence)) {
+      if (notCurrent.test(claim)) continue;
+      for (const verb of claim.matchAll(relation)) {
+        const kind = /导入|import/iu.test(verb[1]) ? "import" : "call";
+        const uncertainty = kind === "call" && graph.uncertainCalls.find(row => row.file === from);
+        if (uncertainty && !uncertainty.targets) continue;
+        const known = kind === "import" ? graph.edges.filter(edge => edge.file === from).flatMap(edge =>
+          edge.imports.map(target => ({ target, line: edge.line }))) : graph.calls.filter(call => call.file === from);
+        for (const target of mentionedTargets(claim.slice(verb.index + verb[0].length), locate)) {
+          if (target === from || uncertainty?.targets?.includes(target) || known.some(edge => edge.target === target) ||
+              conflicting.some(item => item.line === line && item.relation === kind && item.to === target)) continue;
+          conflicting.push({ line, from, to: target, relation: kind, actual: known.map(({ target, line }) => ({ file: target, line })) });
+          if (conflicting.length >= 12) return conflicting;
+        }
+      }
+    }
+  }
+  return conflicting;
+}
+
+/** Signed bytes supersede the planning-time graph. The coordinator receives
+ * only registered module names and line positions, never source contents. */
+export function inspectEngineeringArchitectureClaims(frame, spec, active, graph) {
+  if (!spec.architecture?.importsHeading || !active?.codeIntake?.qualification) return { conflicts: [], calls: [] };
+  const current = graph ?? inspectArchitectureImports(frame, spec, active);
+  const source = readBytes(frame.root, spec.architecture.file);
+  if (!source || digest(source) !== current.sha256) throw new Error("检查架构调用关系时架构稿已变化");
+  return { conflicts: inspectArchitectureProse(source.toString("utf8"), current.graph), calls: current.graph.calls };
+}
+
+export function architectureClaimIssues(conflicts) {
+  return conflicts.map(({ line, from, to, relation, actual }) => {
+    const verb = relation === "call" ? "调用" : "导入";
+    const targets = [...new Set(actual.map(item => item.file + "（" + from + " 第 " + item.line + " 行）"))];
+    return "架构稿第 " + line + " 行称 " + from + " 直接" + verb + " " + to +
+      "，当前签名源码" + (targets.length ? "可定位的直接" + verb + "为 " + targets.join("、") : "没有可定位的本地直接" + verb) +
+      "。请按实际路径改写，间接关系写清中间模块。";
+  });
+}
 
 /** A plan is published by the coordinator under the same lock as dispatch. */
 export function registerEngineeringArchitecture(frame, unit, spec, tag) {
@@ -22,6 +113,8 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag) {
     throw new Error("架构已退回，请实际修改对应内容后再登记");
   }
   const imports = inspectArchitectureImports(frame, spec, active);
+  const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports);
+  if (claims.conflicts.length) throw new Error(architectureClaimIssues(claims.conflicts).join("\n"));
   if (imports && !imports.match) {
     replaceWithHistory(frame.root, plan.file, before => {
       if (!before || digest(before) !== imports.sha256) throw new Error("静态导入生成时架构正文已变化，请重新登记");
@@ -61,8 +154,10 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
     const plan = architectureDocument(frame, spec.architecture, spec.codeTask.diagnostics);
     // Rebuild the typed data from the exact document before any runner uses the
     // stored examples. The validated data must still be that revision's data.
-    return plan.sha256 === snapshot.sha256 && JSON.stringify(plan.examples) === JSON.stringify(snapshot.examples) &&
-      (!checkImports || !spec.architecture.importsHeading || inspectArchitectureImports(frame, spec, active).match);
+    if (plan.sha256 !== snapshot.sha256 || JSON.stringify(plan.examples) !== JSON.stringify(snapshot.examples)) return false;
+    if (!checkImports || !spec.architecture.importsHeading) return true;
+    const imports = inspectArchitectureImports(frame, spec, active);
+    return imports.match && !inspectEngineeringArchitectureClaims(frame, spec, active, imports).conflicts.length;
   }
   catch { return false; }
 }
@@ -88,7 +183,11 @@ export function engineeringArchitectureStatus(frame, unit) {
     return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };
   }
   if (active?.phase === "architecture-sync") {
-    return { ...contract, status: "sync", next: { action: "architecture", unit } };
+    const sync = { ...contract, status: "sync", next: { action: "architecture", unit } };
+    try {
+      const { conflicts } = inspectEngineeringArchitectureClaims(frame, spec, active);
+      return conflicts.length ? { ...sync, conflicts: architectureClaimIssues(conflicts) } : sync;
+    } catch (error) { return { ...sync, reason: error.message }; }
   }
   try {
     const snapshot = requireEngineeringArchitecture(frame, unit, spec, active);
