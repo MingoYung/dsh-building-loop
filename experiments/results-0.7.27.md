@@ -88,6 +88,24 @@ Building-loop 的 369 条供应商计量响应均计入表中，另有 1 条缺�
 
 宿主已补条款裁剪校验，真实差异仍须绑定当前签名、当前角色和准确条款。误填架构回执返回可执行的字段修正，并保留原待修编号；核验方仍须提供原位置与有效依据，或明确撤回。增加了可证的同函数拒绝顺序、解码符号和判定职责检测。登记的本地导入边界在签名之后、送审之前检查；未登记的动态关系仍由独立复核判断。总控在已核实诊断和原会话恢复之间可重新登记；完整源码核对仍在签名后。简表只提示能提交的引用数，格式错误不会覆盖已接收的同版回执，失效证据仍须纠正。 [条款正反例](observations-0.7.27-review-quote-boundary-fix.json) · [架构正反例](observations-0.7.27-architecture-order-followup.json)
 
-上述补强冻结为独立候选包 `9ad054c0c8fbe0538c60f5a1f188555bbc969f6d2e1970c06dac0913e04d532a`。整合版串行 394/394，随后按最终回执改动再跑定向 12/12。Windows DSH 零模型预跑 `r-IOx19s`（短题基线 8/8、输入对照 4/4）和 `r-DNLJYg`（难题基线 21/21、输入对照 5/5）均通过；两个宿主已退出，正式 Profile 指纹不变。新隔离环境的提示和评分器不变，只给 Building-loop 的授权登记原入口的真实边界。 [隔离方案](observations-0.7.27-integrated-setup.json) · [Windows 预跑](observations-0.7.27-integrated-preflight.json)
+上述补强冻结为独立候选包 `9ad054c0c8fbe0538c60f5a1f188555bbc969f6d2e1970c06dac0913e04d532a`。精确提交的全套串行 394/394，定向 12/12。Windows DSH 零模型预跑 `r-IOx19s`（短题基线 8/8、输入对照 4/4）和 `r-DNLJYg`（难题基线 21/21、输入对照 5/5）均通过；两个宿主已退出，正式 Profile 指纹不变。新隔离环境的提示和评分器不变，只给 Building-loop 的授权登记原入口的真实边界。 [隔离方案](observations-0.7.27-integrated-setup.json) · [Windows 预跑](observations-0.7.27-integrated-preflight.json)
 
-以上补强不属于前述已完成难题盲测的冻结包。正式 DSH 保留 0.7.18；ClearAI 仅有隔离无模型预跑，真实同题对比尚未放行。
+以上补强不属于前述已完成难题盲测的冻结包。补强包真实短题 `r-9CyRwq`、`r-v7UYLt` 的 G1 均为 18/18，并同目录接手 G2 后 21/21 关单。两轮首审和独立复核都放过了错误的校验归属。相同六条冻结稿运行对照证实，非对象的拒绝在 planner，额外字段可通过，缺字段的错误码分别由对应的实际校验产生。G2 还查实一条 retain 与 change 校验先后叙述和源码不符。已实现的规则可核对具体、可定位的陈述，无法从任意架构自然语言中可靠地提取所有条件和责任。新包 G3/G4 付费对照未启动。 [补强包 G1 原生核对](observations-0.7.27-integrated-short-g1-semantic.json) · [两关独立核对](observations-0.7.27-integrated-short-architecture-semantic.json)
+
+`r-9CyRwq` 实际触发简表错误字段修正；审核随后还因证据混入其他文件的目标行停顿。宿主仍拒绝越界引用，同审核会话恢复后使用该文件实际注释行、去除不适用的 `obligation`，待补项才清除并进入独立复核。旧稿被坏格式替换的保留逻辑已通过本地正反回归，未在本轮真实轨迹中触发完全同样的替换。 [真实回执恢复](observations-0.7.27-integrated-short-review-recovery.json)
+
+标准、标准＋清单两轮也分别为 18/18 → 21/21。全部六份 G2 冻结稿通过 5/5 补测，补强包的两轮 Building-loop 均通过接口和导入边界检查。合计 600 条模型响应全部有用量。两轮合计：
+
+| 模式 | 总 Token | 输入缓存命中 | 210 秒对齐窗口 Token |
+|---|---:|---:|---:|
+| 标准 | 1,057,205 | 96.9298% | 1,057,205 |
+| 标准＋清单 | 8,816,081 | 98.6269% | 5,315,111 |
+| Building-loop | 8,715,039 | 94.8561% | 6,424,914 |
+
+[精确短题门槛](observations-0.7.27-integrated-short-exact-gate.json) · [完整脱敏事件](observations-0.7.27-integrated-short-public.json) · [用量及阶段](observations-0.7.27-integrated-short-compact-summary.json)
+
+使用补强包的精确 52 个运行文件重放四份旧难题、两份新 G1 及一份准确旧 G2。四份难题中，两份错误解码符号被检出，两份越界入口均被业主静态规则拦住；准确旧稿保持通过。两个新 G1 的归属仍未被自动发现。 [签名重放及正确对照](observations-0.7.27-integrated-hard-architecture-replay.json)
+
+后续优先验证结构化职责：把目标条款、实际判定入口、错误条件及最小输入登记为可独立核对的事实。宿主只从当前签名源码和真实响应生成事实栏，架构说明仍保留设计理由和适用范围。用两份短题冻结稿、两个难题失败和真实多模块正例验证。计划内容不能代替现状，生成的直接导入也不能证明委托后由哪一层作决定。 [实现范围及验收设计](architecture-claims-next-step-0.7.27.md)
+
+正式 DSH 保留 0.7.18；ClearAI 0.6.0 已在隔离 Profile 安装并识别预设，基线 21/21，零模型调用。真实同题对比尚未放行。 [ClearAI 预跑](observations-0.7.27-clearai-preflight.json)

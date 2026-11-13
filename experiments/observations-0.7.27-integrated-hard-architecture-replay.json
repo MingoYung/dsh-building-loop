@@ -1,0 +1,679 @@
+{
+  "spec": "building-loop-integrated-hard-architecture-replay/1",
+  "modelCalls": 0,
+  "scope": "Byte-pinned, read-only replay using integrated package runtime, one real Windows installed copy, and signed historical snapshots. Changes to the architecture draft are in-memory controls only.",
+  "package": {
+    "archiveSha256": "9ad054c0c8fbe0538c60f5a1f188555bbc969f6d2e1970c06dac0913e04d532a",
+    "sourceCommit": "42c50883511d83b0ee75b123ca29f5a1abecb09c",
+    "verifiedArchiveFiles": 52,
+    "verifiedWindowsInstalledFiles": 52,
+    "verifiedCommittedFiles": 52,
+    "nativePreflight": "r-DNLJYg"
+  },
+  "ownerRule": {
+    "allowedLocalImports": [
+      {
+        "file": "release.py",
+        "imports": [
+          "planner.py"
+        ]
+      }
+    ],
+    "source": {
+      "file": "SPEC.md",
+      "line": 3
+    },
+    "scope": "Production policy only enforces opted-in static local edges. It does not compare every old edge, certify calls, or certify responsibility."
+  },
+  "hard": [
+    {
+      "run": "r-QRyWYi",
+      "stage": "G3",
+      "internalStage": "g1",
+      "terminal": "closed",
+      "architectureSha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54"
+        }
+      ],
+      "regression": {
+        "candidateReceiptSha256": "5796587bad91a6506cf331812f4c80960b048dd017ba7253aa1f7265ea7e624f",
+        "baselineReceiptSha256": "cecf4445ae1010b9517d7331a89840f55d7795034ef3a2b5746f0f757d35f05f",
+        "signaturesVerified": 2
+      },
+      "priorProseFindings": [],
+      "integratedProseFindings": [
+        {
+          "line": 7,
+          "from": "release.py",
+          "relation": "json-decoder-call",
+          "symbol": "json.loads",
+          "actual": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "symbol": "json.load"
+            }
+          ]
+        }
+      ],
+      "optInOwnerBoundary": null,
+      "originalConfigOptedIn": false,
+      "baselineOwnerBoundary": null,
+      "correctedCodecControl": {
+        "sha256": "ca60c647ea6ff82e4d7f97f3dc1f6739ba338d84bcaa020036c9651aed56db11",
+        "findings": 0,
+        "scope": "Codec claim only; dynamic dispatch not judged by this control."
+      },
+      "unchangedAccurateGraphControl": {
+        "checked": true,
+        "matches": true
+      },
+      "independentReviewScope": [
+        {
+          "category": "architecture-source",
+          "judgment": "The architecture names json.loads and a conditional release.py batch dispatch. The source calls json.load and unconditionally delegates parsed requests to planner.plan, where the batch branch resides.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644",
+              "lines": [
+                7,
+                19,
+                24
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+              "lines": [
+                10,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+              "lines": [
+                172,
+                173,
+                174,
+                175,
+                176,
+                177,
+                178,
+                179
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "stage": "G4",
+      "internalStage": "g2",
+      "terminal": "closed",
+      "architectureSha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54"
+        }
+      ],
+      "regression": {
+        "candidateReceiptSha256": "fc42f56a3c48e944bc7c20dae6518078e2dd0e371d90854c76468ffe08410d19",
+        "baselineReceiptSha256": "fd50a55bd715c0b7781a43e64d3ccc3b3e33737a06c05424aebe9a792c6002af",
+        "signaturesVerified": 2
+      },
+      "priorProseFindings": [],
+      "integratedProseFindings": [
+        {
+          "line": 7,
+          "from": "release.py",
+          "relation": "json-decoder-call",
+          "symbol": "json.loads",
+          "actual": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "symbol": "json.load"
+            }
+          ]
+        }
+      ],
+      "optInOwnerBoundary": null,
+      "originalConfigOptedIn": false,
+      "baselineOwnerBoundary": null,
+      "correctedCodecControl": {
+        "sha256": "54af6fbb6af569481f0ba6d4859e6e92d433fc079999ad5c2ce20d1ddb8278d5",
+        "findings": 0,
+        "scope": "Codec claim only; dynamic dispatch not judged by this control."
+      },
+      "unchangedAccurateGraphControl": {
+        "checked": true,
+        "matches": true
+      },
+      "independentReviewScope": [
+        {
+          "category": "architecture-source",
+          "judgment": "The G4 architecture repeats the wrong JSON decoder and prescribes removing a rollback-many branch from release.py. The actual transport delegates to planner.plan, which owns the branch.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393",
+              "lines": [
+                7,
+                33,
+                38
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+              "lines": [
+                10,
+                16,
+                17,
+                18
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+              "lines": [
+                208,
+                209,
+                210,
+                211,
+                212,
+                213,
+                214,
+                215
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "stage": "G3",
+      "internalStage": "g1",
+      "terminal": "closed",
+      "architectureSha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "86f4032c73c1ecb9465f88b24596a290cf880db6039d6f0316d91b80f1b4b7e1"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "99ef6be432dc7e93c8ac04f7a8cff34d5d047050c3bf81045eedd6d0cd759349"
+        },
+        {
+          "path": "release.py",
+          "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4"
+        }
+      ],
+      "regression": {
+        "candidateReceiptSha256": "dfc419bc27969cf779ae39e8014a9958a0893e61307f2f2d1ea36d9de2c6fe15",
+        "baselineReceiptSha256": "8a341081455e882c52fa00a66bf7049c36f23e543743feeb1e4e7ac1d3444e53",
+        "signaturesVerified": 2
+      },
+      "priorProseFindings": [],
+      "integratedProseFindings": [],
+      "optInOwnerBoundary": {
+        "status": "architecture-import-boundary",
+        "violations": [
+          {
+            "file": "release.py",
+            "line": 6,
+            "target": "journal.py"
+          },
+          {
+            "file": "release.py",
+            "line": 7,
+            "target": "policy.py"
+          }
+        ],
+        "next": {
+          "tool": "building_loop",
+          "action": "submit"
+        }
+      },
+      "originalConfigOptedIn": false,
+      "baselineOwnerBoundary": null,
+      "correctedCodecControl": null,
+      "unchangedAccurateGraphControl": {
+        "checked": true,
+        "matches": true
+      },
+      "independentReviewScope": [
+        {
+          "category": "owner-responsibility",
+          "judgment": "SPEC assigns environment and budget to policy. The batch loop in planner directly validates environment, applies the freeze, checks the budget, then calls policy.limit_for again.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+              "lines": [
+                8,
+                9,
+                10
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+              "lines": [
+                150,
+                151,
+                152,
+                153,
+                154,
+                155,
+                156,
+                157,
+                158,
+                159
+              ]
+            },
+            {
+              "file": "SPEC.md",
+              "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+              "lines": [
+                3
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "stage": "G4",
+      "internalStage": "g2",
+      "terminal": "blocked",
+      "architectureSha256": "5fb70b45cac63bd89b3f9900aa23d1ddde2e86e77ede1d2fa5b462a7e0706ec1",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "6d5046e6d8b406bd6db70266a1daa17c94b3428edccd2ab474accb2f3e70174e"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "9ace5c23e040952b8a3edcc45c2d6fd680ab750e0956b265386c87075abdc4f2"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "bd3203eab7575653029303ec94163c585226d6da4d421427f50453b899c022fd"
+        },
+        {
+          "path": "release.py",
+          "sha256": "83cf2c0155df9d53a0bcd347576c5a286c54878f86d29211cf0ee8f9ecb5ed42"
+        }
+      ],
+      "regression": {
+        "candidateReceiptSha256": "3dfdb68f0faf755e842048b0678cac5ecac7d0783a1859be8df20098987742cd",
+        "baselineReceiptSha256": "25edb6f42bbb63e2bd49b79167a4dce792c25c719867e664aebba4c0f9dfc8ca",
+        "signaturesVerified": 2
+      },
+      "priorProseFindings": [],
+      "integratedProseFindings": [],
+      "optInOwnerBoundary": {
+        "status": "architecture-import-boundary",
+        "violations": [
+          {
+            "file": "release.py",
+            "line": 6,
+            "target": "journal.py"
+          },
+          {
+            "file": "release.py",
+            "line": 7,
+            "target": "policy.py"
+          }
+        ],
+        "next": {
+          "tool": "building_loop",
+          "action": "submit"
+        }
+      },
+      "originalConfigOptedIn": false,
+      "baselineOwnerBoundary": {
+        "status": "architecture-import-boundary",
+        "violations": [
+          {
+            "file": "release.py",
+            "line": 6,
+            "target": "journal.py"
+          },
+          {
+            "file": "release.py",
+            "line": 7,
+            "target": "policy.py"
+          }
+        ],
+        "next": {
+          "tool": "building_loop",
+          "action": "submit"
+        }
+      },
+      "correctedCodecControl": null,
+      "unchangedAccurateGraphControl": {
+        "checked": true,
+        "matches": true
+      },
+      "independentReviewScope": [
+        {
+          "category": "owner-responsibility",
+          "judgment": "The planner owns environment, freeze, and budget validation inside the batch despite the owner boundary. It also implements request_identity although the implementation plan assigns the request-equivalence key to journal.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "5fb70b45cac63bd89b3f9900aa23d1ddde2e86e77ede1d2fa5b462a7e0706ec1",
+              "lines": [
+                8,
+                9,
+                15
+              ]
+            },
+            {
+              "file": "journal.py",
+              "sha256": "6d5046e6d8b406bd6db70266a1daa17c94b3428edccd2ab474accb2f3e70174e",
+              "lines": [
+                83,
+                97
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "9ace5c23e040952b8a3edcc45c2d6fd680ab750e0956b265386c87075abdc4f2",
+              "lines": [
+                132,
+                190,
+                191,
+                192,
+                193,
+                194,
+                197,
+                238
+              ]
+            },
+            {
+              "file": "SPEC.md",
+              "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+              "lines": [
+                3
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "short": [
+    {
+      "run": "r-9CyRwq",
+      "stage": "G1",
+      "terminal": "closed",
+      "architectureSha256": "69db457bf322343f169bfaae5a3d05a4a85dd13f37848e51ebc78592f91bf255",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "1cd8367bca1ac32d69718f4ff5623dcbf45fdc44f5de5c21d73c15f1c621a58b"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "c1a0135800277a2da3138e83c4b04f1f3def757cba5bd7dd0da103220592493d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "regression": {
+        "candidateReceiptSha256": "cb5331dd8caef3473cd6fb23627901f80c157ac7a938a380e0fe9a27d28dace7",
+        "baselineReceiptSha256": "07528a782a23c7eb5a4b6ce715afdef0ab11b5995c16013c4cf4a6976280d729",
+        "signaturesVerified": 2
+      },
+      "integratedProseFindings": [],
+      "optInOwnerBoundary": null,
+      "originalReceipt": {
+        "path": "receipts/K01-first.json",
+        "sha256": "f6c827113e86b3fccc1cfba2b8a65559bfcbbe7290465b706c1481512becdc99",
+        "reviews": [
+          "pass",
+          "pass"
+        ]
+      },
+      "remainingArchitectureMismatch": {
+        "architecture": {
+          "file": "modules/architecture.md",
+          "sha256": "69db457bf322343f169bfaae5a3d05a4a85dd13f37848e51ebc78592f91bf255",
+          "lines": [
+            {
+              "line": 9,
+              "text": "- journal.py：输入校验、身份与回放。校验请求对象与字段（非对象/缺字段/类型错 -> invalid-request 或 invalid-change），校验 change 的 id/component 为非空字符串、units 为正整数且排除 bool、depends_on 与 applied 必须是字符串数组（否则 invalid-change）；对 change 记录做去重：id、component、units、depends_on 集合完全相同的重复记录合并为一条，同一 id 但内容冲突返回 conflicting-change；返回规范化的变化集合与已应用 id 集合。"
+            }
+          ]
+        },
+        "planner": {
+          "file": "planner.py",
+          "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+          "lines": [
+            {
+              "line": 59,
+              "text": "    if not isinstance(request, dict):"
+            },
+            {
+              "line": 60,
+              "text": "        return failure(\"invalid-request\")"
+            },
+            {
+              "line": 62,
+              "text": "        action, budget = limit_for(request)"
+            },
+            {
+              "line": 63,
+              "text": "        changes = read_changes(request.get(\"changes\"))"
+            }
+          ]
+        },
+        "release": {
+          "file": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+          "lines": [
+            {
+              "line": 10,
+              "text": "        request = json.load(sys.stdin)"
+            },
+            {
+              "line": 12,
+              "text": "        result = {\"status\": \"error\", \"error\": \"invalid-json\", \"actions\": [], \"units\": 0}"
+            },
+            {
+              "line": 14,
+              "text": "        result = plan(request)"
+            }
+          ]
+        },
+        "description": "Journal is assigned combined request-object and field checking. The concrete top-level object guard emitting invalid-request is planner.plan; code alternatives in prose prevent a unique lexical claim."
+      }
+    },
+    {
+      "run": "r-v7UYLt",
+      "stage": "G1",
+      "terminal": "closed",
+      "architectureSha256": "48fdf7c72c92e07d0e90ec38b5acbcf0d5338a7e73a77d1de33b2bc876cb5ca9",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "8802bc1dc03168e4fb5a22b6d70ac8d9832bafe36f3fd6500afd8a9a1318367b"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "9acdb1326f1a23924e2b0171ac0485f9b863b9ae8f8b3e0ba5d85123ca17593e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69"
+        }
+      ],
+      "regression": {
+        "candidateReceiptSha256": "34d14e3836727fc1a4f4c01b770d92cf25fc2db0da45ea2e79edbe3bce65afe6",
+        "baselineReceiptSha256": "eaceba55de5075fd5fd55b0e1fed1c83b162d2bf7385daddbdef35c5603ca78b",
+        "signaturesVerified": 2
+      },
+      "integratedProseFindings": [],
+      "optInOwnerBoundary": null,
+      "originalReceipt": {
+        "path": "receipts/K01-first.json",
+        "sha256": "4651c81a35047943813c7dfaa0f1e625c4e625d237bac8a41e15b4b4a74f362d",
+        "reviews": [
+          "pass",
+          "pass"
+        ]
+      },
+      "remainingArchitectureMismatch": {
+        "architecture": {
+          "file": "modules/architecture.md",
+          "sha256": "48fdf7c72c92e07d0e90ec38b5acbcf0d5338a7e73a77d1de33b2bc876cb5ca9",
+          "lines": [
+            {
+              "line": 9,
+              "text": "- `release.py`：JSON 解析失败 → `invalid-json`；请求不是对象或缺少/多余顶层字段结构 → `invalid-request`；保证输出恰好为 `{\"status\":\"ok\",\"actions\":[...],\"units\":n}` 或 `{\"status\":\"error\",\"error\":code,\"actions\":[],\"units\":0}`，退出码 0。"
+            }
+          ]
+        },
+        "planner": {
+          "file": "planner.py",
+          "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+          "lines": [
+            {
+              "line": 67,
+              "text": "    if not isinstance(request, dict):"
+            },
+            {
+              "line": 68,
+              "text": "        return failure(\"invalid-request\")"
+            },
+            {
+              "line": 70,
+              "text": "        limit_for(request)"
+            },
+            {
+              "line": 71,
+              "text": "        changes = read_changes(request.get(\"changes\"))"
+            }
+          ]
+        },
+        "release": {
+          "file": "release.py",
+          "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+          "lines": [
+            {
+              "line": 18,
+              "text": "INVALID_REQUEST = {\"status\": \"error\", \"error\": \"invalid-request\", \"actions\": [], \"units\": 0}"
+            },
+            {
+              "line": 23,
+              "text": "        request = json.load(sys.stdin)"
+            },
+            {
+              "line": 26,
+              "text": "        result = dict(INVALID_JSON)"
+            },
+            {
+              "line": 29,
+              "text": "            result = plan(request)"
+            },
+            {
+              "line": 30,
+              "text": "        except Exception:"
+            },
+            {
+              "line": 37,
+              "text": "            result = dict(INVALID_REQUEST)"
+            }
+          ]
+        },
+        "description": "Release is assigned non-object and extra/missing top-level field rejection. Planner.plan owns the explicit non-object guard; release maps only an unexpected exception to the same code, and the planner guard does not assert extra/missing keys."
+      }
+    }
+  ],
+  "unchangedAccurateProseControl": {
+    "run": "r-eXVclv",
+    "stage": "G2",
+    "documentSha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f",
+    "sourcePins": [
+      {
+        "path": "journal.py",
+        "sha256": "c843f340ae5517c34322fa441c6aa6a63320998667738f2eb50a2bd90278c16f"
+      },
+      {
+        "path": "planner.py",
+        "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad"
+      },
+      {
+        "path": "policy.py",
+        "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31"
+      },
+      {
+        "path": "release.py",
+        "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+      }
+    ],
+    "regression": {
+      "candidateReceiptSha256": "3b145d6545ed82783649ddc5a0de2ffb69ae927a0ad972a19ed9b177ea92d289",
+      "baselineReceiptSha256": "f684758bf4d1c95ecefe3be28d0acb789091952ad4e3fb6acd99c06cf2c7306c",
+      "signaturesVerified": 2
+    },
+    "generatedGraphMatches": true,
+    "findings": []
+  }
+}
