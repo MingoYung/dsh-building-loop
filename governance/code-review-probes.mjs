@@ -44,6 +44,11 @@ const clauseLiterals = requirement => new Set(requirement.quote.match(/[\p{L}\p{
 const pointerSegments = pointer => pointer.split("/").slice(1).map(token => token.replace(/~1/gu, "/").replace(/~0/gu, "~"));
 const regexLiteral = value => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 const conditionalClause = /(?:\b(?:if|when|whenever|provided\s+that|assuming|unless)\b|\b(?:in|for)\s+(?:the\s+)?case\s+(?:of|that)\b|如果|若|倘若|仅当|一旦|除非|前提(?:是|为)|(?:^|[。！？；，\s])当|[\p{L}\p{N}）)]\s*时(?=[，,。\s]|则|返回|输出|应|须))/iu;
+const GROUNDING_VERSION = 2;
+
+export function hasConditionalContext(text) {
+  return conditionalClause.test(text.replace(/\x60[^\x60\r\n]+\x60/gu, " "));
+}
 
 function projectedOutput(value, pointer) {
   for (const field of pointerSegments(pointer)) {
@@ -74,14 +79,12 @@ function namesExitCode(quote, exitCode) {
 /** Compare literal, output-specific assertions. A token elsewhere in the
  * clause can describe the input, another branch or an unrelated number. */
 function clauseGrounding(requirement, expected) {
-  if (!requirement) return;
+  if (!requirement?.clauseComplete || requirement.conditionalContext) return;
   const { quote } = requirement;
-  // Literal input and output snippets are data. Conditions in the prose
-  // still require an owner example that fixes the applicable input.
-  if (conditionalClause.test(quote.replace(/\x60[^\x60\r\n]+\x60/gu, " "))) return;
+  if (hasConditionalContext(quote)) return;
   if (/(?:不得|不能|不会|禁止|除非|例如|比如|示例|反例|否则|或者|\b(?:not|never|unless|example|e\.g\.|otherwise|or)\b)/iu.test(quote)) return;
   const exit = namesExitCode(quote, expected.exitCode);
-  if (!Object.hasOwn(expected, "json")) return exit ? { kind: "clause", exit: true } : undefined;
+  if (!Object.hasOwn(expected, "json")) return exit ? { kind: "clause", version: GROUNDING_VERSION, exit: true } : undefined;
   const inline = [...quote.matchAll(/(?:\b(?:returns?|outputs?|responds?\s+with)\s+(?:exactly\s+)?|返回\s*|输出\s*|响应(?:为|是)\s*)\x60([^\x60\r\n]+)\x60/giu)].flatMap(([, value]) => {
     try {
       const parsed = JSON.parse(value);
@@ -89,7 +92,7 @@ function clauseGrounding(requirement, expected) {
     } catch { return []; }
   });
   if (inline.length && inline.every(value => hasExpectedValue(value, expected))) {
-    return { kind: "clause", field: true, exit };
+    return { kind: "clause", version: GROUNDING_VERSION, field: true, exit };
   }
   const segments = pointerSegments(expected.pointer);
   // A leaf name does not establish the location of a nested JSON value.
@@ -98,7 +101,7 @@ function clauseGrounding(requirement, expected) {
   if (/^(?:error|(?:error[_-]?)?code)$/iu.test(field) && typeof expected.json === "string" && !expected.operator) {
     const returned = [...quote.matchAll(/(?:\breturns?\s+|返回\s*|报(?:错|出)?\s*)\x60([a-z0-9]+(?:[-_][a-z0-9]+)+)\x60/giu)];
     if (returned.length && returned.every(([, code]) => code === expected.json)) {
-      return { kind: "clause", field: true, exit };
+      return { kind: "clause", version: GROUNDING_VERSION, field: true, exit };
     }
   }
   const operators = expected.operator === "at-most" ? "(?:at most|<=|≤|至多|不超过|上限(?:为|是)?)"
@@ -111,7 +114,7 @@ function clauseGrounding(requirement, expected) {
   const namedValue = new RegExp("^\\s*(?:is\\s+)?" + operators + "\\s*(?:\\x60" + literal +
     "\\x60|" + literal + "(?=$|[\\s,，;；:：!?！？。]|\\.(?![\\p{L}\\p{N}_.-])))", "iu");
   const [{ 0: mention, index }] = mentions;
-  if (namedValue.test(quote.slice(index + mention.length))) return { kind: "clause", field: true, exit };
+  if (namedValue.test(quote.slice(index + mention.length))) return { kind: "clause", version: GROUNDING_VERSION, field: true, exit };
 }
 
 function sameRegisteredClause(requirement, registered) {
@@ -120,8 +123,8 @@ function sameRegisteredClause(requirement, registered) {
 }
 
 function registeredGrounding(requirement, registered, expected) {
-  if (sameRegisteredClause(requirement, registered.requirement)) {
-    return { kind: "registered-example", caseId: registered.id, exit: true, field: true };
+  if (requirement?.visibleClause && sameRegisteredClause(requirement, registered.requirement)) {
+    return { kind: "registered-example", version: GROUNDING_VERSION, caseId: registered.id, exit: true, field: true };
   }
   if (!registered.requirement && expected.pointer !== undefined) return clauseGrounding(requirement, expected);
 }
@@ -318,7 +321,7 @@ function runtimeProofSummary(expected, actual, pin) {
 
 export function isGroundedRuntimeProof(proof) {
   return proof?.type === "runtime" && proof.outcome === "mismatch" && proof.blocking === true &&
-    !!proof.requirement && !!proof.grounding && !!proof.replay && !!proof.summary;
+    !!proof.requirement && proof.grounding?.version === GROUNDING_VERSION && !!proof.replay && !!proof.summary;
 }
 
 /** A proof can only support a finding by this actor for the bound bytes. */

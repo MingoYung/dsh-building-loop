@@ -251,8 +251,10 @@ test("behavior rejection requires the current reviewer's exact clause and a real
     const input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     assert.equal(request.headers.authorization, "Bearer " + token);
     calls.push(input);
-    const { missing, overCap } = JSON.parse(input.probe.stdin);
-    const stdout = JSON.stringify(missing ? { error: "unknown-reference" } : { size: overCap ? 6 : 5 });
+    const { missing, overCap, entries } = JSON.parse(input.probe.stdin);
+    const registeredFault = Array.isArray(entries) && !entries.length && input.phase.includes("audit");
+    const stdout = JSON.stringify(missing ? { error: "unknown-reference" } : { size: registeredFault ? 1
+      : Array.isArray(entries) && !entries.length ? 0 : overCap ? 6 : 5 });
     response.end(JSON.stringify({ spec: input.spec, requestId: input.requestId, snapshotSha256: input.snapshotSha256,
       status: "passed", probe: { exitCode: 0, stdout } }));
   });
@@ -264,8 +266,14 @@ test("behavior rejection requires the current reviewer's exact clause and a real
   Object.assign(process.env, env);
   try {
     const unknown = "Missing queue or missing worker both return `unknown-reference`.";
-    const diagnostics = { checkSet: "review-clause", protocol: 2, recipes: ["queue"], reviewRecipes: ["queue"] };
-    const { harness, qualify } = prepareProject(root, write, { diagnostics, receiptReads: false, text: goalText + unknown + "\n" });
+    const conditionalSuffix = "output field `size` equals 0.";
+    const conditionalLine = "When the input contains no entries, " + conditionalSuffix;
+    const previousCondition = "When the input contains no entries:\nOutput field `size` equals 0.";
+    const clauseText = goalText + unknown + "\n\n" + conditionalLine + "\n\n" + previousCondition + "\n";
+    const diagnostics = { checkSet: "review-clause", protocol: 2, recipes: ["queue"], reviewRecipes: ["queue"],
+      inputContracts: [{ id: "entries", recipe: "queue", examples: [{ id: "empty", input: { entries: [] },
+        expectedJson: { size: 0 }, requirement: { ...ref(goal, 5), quote: conditionalLine } }] }] };
+    const { harness, qualify } = prepareProject(root, write, { diagnostics, receiptReads: false, text: clauseText });
     const executor = (await harness.flow("root", "advance")).childId;
     write(worker, update);
     assert.equal((await qualify(executor)).phase, "review-ready");
@@ -276,6 +284,7 @@ test("behavior rejection requires the current reviewer's exact clause and a real
     const auditor = (await harness.flow("root", "advance")).childId;
     const packet = await prepareReview(harness, auditor);
     assert.match(packet.codeReview.reproduction.requirement, /quote/u);
+    calls.length = 0;
     const finding = { id: "reference-order", kind: "behavior", ...ref(worker, 3), caseId: "batch-bound",
       observation: "Two invalid references take different code paths.", issue: "The implementation lacks priority for missing references.",
       fix: "Give the missing queue priority over the missing worker.", evidence: [{ ...ref(worker, 3), relation: "supports" }],
@@ -319,13 +328,32 @@ test("behavior rejection requires the current reviewer's exact clause and a real
     const exploratory = await codeReview(harness, auditor, "probe", { ...probe, expectedJson: '{"error":"queue-first"}' });
     assert.equal(exploratory.outcome, "mismatch");
     assert.match((await recordFinding({ ...finding, violation: { ...finding.violation, reproduction: exploratory.id } })).errors[0].reason, /探索复现不能用于退回/);
+    const conditionalExpectation = { ...probe, stdin: '{"entries":[1]}', expectedPointer: "/size", expectedJson: "0" };
+    for (const requirement of [
+      { ...ref(goal, 5), quote: conditionalLine },
+      { ...ref(goal, 5), quote: conditionalSuffix },
+      { ...ref(goal, 8), quote: "Output field `size` equals 0." },
+    ]) {
+      const observed = await codeReview(harness, auditor, "probe", { ...conditionalExpectation, requirement });
+      assert.equal(observed.outcome, "mismatch");
+      assert.equal(observed.actual.json, 5);
+      assert.equal(observed.blocking, false);
+    }
+    const registered = await codeReview(harness, auditor, "probe", {
+      assertion: "runtime", file: worker, exampleId: "entries:example:empty",
+    });
+    assert.equal(registered.outcome, "mismatch");
+    assert.equal(registered.actual.json.size, 1);
+    assert.equal(registered.blocking, true);
+    assert.equal(registered.grounding.kind, "registered-example");
+    assert.deepEqual(JSON.parse(calls.at(-1).probe.stdin), { entries: [] });
 
     const badDecision = { id: "test:1", status: "revise", basis: "The review has a concern about the ordering.", refs: [ref(goal, 2), ref(worker, 3)] };
     const decision = await codeReview(harness, auditor, "record", { decisions: [badDecision], findingsDone: true });
     assert.deepEqual(decision.progress.unsupportedCaseRevisions, ["batch-bound"]);
     assert.equal((await codeReview(harness, auditor, "submit")).status, "needs-review");
 
-    const capClause = { ...ref(goal, 2), quote: goalText.split("\n")[1] };
+    const capClause = { ...ref(goal, 2), quote: "Output field `size` is at most 5." };
     const failed = await codeReview(harness, auditor, "probe", { ...probe, stdin: '{"overCap":true}', requirement: capClause,
       expectedPointer: "/size", expectedOperator: "at-most", expectedJson: "5" });
     assert.equal(failed.outcome, "mismatch");
@@ -349,7 +377,7 @@ test("behavior rejection requires the current reviewer's exact clause and a real
     const handoff = (await harness.flow(executor, "prepare")).codeRepair;
     assert.equal(handoff.receipt, "first.json");
     assert.deepEqual(handoff.findings, [{ id: "over-cap", kind: "behavior", ...ref(worker, 3), issue: real.issue,
-      fix: real.fix, requirement: { ...ref(goal, 2), sha256: digest(goalText + unknown + "\n") } }]);
+      fix: real.fix, requirement: { ...ref(goal, 2), sha256: digest(clauseText) } }]);
     await assert.rejects(harness.file(executor, "read", "first.json"), /读白名单/u);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
@@ -491,6 +519,19 @@ test("prefilled review rows carry only current observed evidence and independent
   });
   assert.match(bad.errors[0].reason, /读取当前版本/);
   assert.deepEqual(bad.next.pending.map(row => row.id), ["test:1"]);
+  const badShape = await codeReview(harness, reviewer, "record", { decisions: [
+    { ...fileDecision, file: worker, comments: [], refs: Array.from({ length: 7 }, () => alias(worker) + ":2") },
+  ] });
+  assert.match(badShape.errors[0].reason, /删除简表字段 file、comments.*最多六个位置/u);
+  assert.deepEqual(badShape.errors[0].correction, { code: "compact-decision-shape",
+    allowed: ["id", "basis", "status", "refs", "obligation"], maxRefs: 6, previousAccepted: true });
+  assert.deepEqual(badShape.next.pending.map(row => row.id), ["test:1"]);
+  const wrongEvidence = await codeReview(harness, reviewer, "record", {
+    decisions: [{ ...fileDecision, refs: [alias(worker) + ":3"] }],
+  });
+  assert.match(wrongEvidence.errors[0].reason, /没有可核对的注释/u);
+  assert.deepEqual(wrongEvidence.progress.pendingCorrections, [{ field: "files", id: worker }]);
+  await codeReview(harness, reviewer, "record", { decisions: [fileDecision] });
   const waiting = await codeReview(harness, reviewer, "submit");
   assert.equal(waiting.status, "needs-review");
   assert.deepEqual(waiting.next.pending, bad.next.pending);

@@ -13,7 +13,7 @@ export const footnoteDefinition = new RegExp("^ {0,3}\\[\\^(" + footnoteId + ")\
 /** Classify Markdown from one syntax tree and retain physical line positions.
  * The project consumes original text and can impose stricter requirements
  * than CommonMark on HTML and the authority fence. */
-export function markdownStructure(lines) {
+export function markdownStructure(lines, { collectParagraphs = false } = {}) {
   const source = lines.join("\n");
   const root = fromMarkdown(source, parserOptions);
   const hidden = new Int32Array(lines.length + 1);
@@ -23,6 +23,7 @@ export function markdownStructure(lines) {
   const standaloneFootnotes = new Uint8Array(lines.length);
   const continuedFootnotes = new Uint8Array(lines.length);
   const fences = [];
+  const paragraphs = [];
   const htmlScopes = new Map();
   const pending = [{ node: root, parent: null, item: null, list: null }];
 
@@ -105,6 +106,7 @@ export function markdownStructure(lines) {
     }
 
     if (node.type === "paragraph" || node.type === "heading") {
+      if (collectParagraphs && node.type === "paragraph") paragraphs.push({ start, end });
       if (parent === root) closingRows.fill(1, first, last + 1);
       // An explicit footer immediately after a top-level list item is an
       // allowed project form, even when CommonMark makes it a lazy line.
@@ -132,5 +134,7 @@ export function markdownStructure(lines) {
     if (depth || htmlDepth) visible[line] = "";
     if (htmlDepth) standaloneFootnotes[line] = 0;
   }
-  return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, closingRows, standaloneFootnotes, continuedFootnotes };
+  return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, closingRows, standaloneFootnotes, continuedFootnotes,
+    ...(collectParagraphs ? { paragraphs: paragraphs.filter(({ start, end }) =>
+      !htmlHidden.slice(start.line - 1, end.line).some(Boolean)) } : {}) };
 }

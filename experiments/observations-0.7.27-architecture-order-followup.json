@@ -1,0 +1,371 @@
+{
+  "spec": "building-loop-architecture-guard-order-replay/1",
+  "modelCalls": 0,
+  "previousArchiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+  "candidateFiles": [
+    {
+      "file": "engineering-architecture.mjs",
+      "sha256": "2d290e4c47a0497e9d91f68145acf9a2c5a0be3e296eca2985975f45ea833068"
+    },
+    {
+      "file": "python-dependencies.mjs",
+      "sha256": "45921b441c1f5e72f9a9bec3b0dad20102ff4dfcd3a89450f55bcba208527e8c"
+    },
+    {
+      "file": "project-hierarchy.mjs",
+      "sha256": "c7ecb0353dcb15f4b859c0875424e9769daa2268706a98adb0853e1803dfba88"
+    }
+  ],
+  "tests": {
+    "passed": 30,
+    "failed": 0,
+    "logSha256": "d99b5b69ace81040012a7473056f6a71f4319e42239dcd300b5a0c65d75c9ccb"
+  },
+  "revised": [
+    {
+      "run": "r-b9dxay",
+      "stage": "g1",
+      "originalTerminal": "closed",
+      "documentSha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "4038a073eaddc32eec4df3d764b768151d14b99aed1d1ac0ac3c3c6c5e457b63"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "646bca5b71e393b5f44064d4bd083300e6e946b061631a4743899b7d988dd71f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72"
+        }
+      ],
+      "receipt": {
+        "path": "receipts/K01-first.json",
+        "sha256": "b8fc70ef06cdd4fbe7193bbeea8fbd29027067255023f30fb2f831269e510e23",
+        "status": "accept",
+        "reviews": [
+          {
+            "status": "pass",
+            "sourceSha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+          },
+          {
+            "status": "pass",
+            "sourceSha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+          }
+        ]
+      },
+      "priorFindings": [],
+      "candidateFindings": []
+    },
+    {
+      "run": "r-b9dxay",
+      "stage": "g2",
+      "originalTerminal": "closed",
+      "documentSha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "a560216b75b959a43f7ea3d18cfdb083ac1110d42d73b640831944754dae24eb"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd"
+        },
+        {
+          "path": "release.py",
+          "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72"
+        }
+      ],
+      "receipt": {
+        "path": "receipts/K02-first.json",
+        "sha256": "f80a17184ee948e3d8bb74ed8f9286411a55b424c76576543a3bafd987e37723",
+        "status": "accept",
+        "reviews": [
+          {
+            "status": "pass",
+            "sourceSha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+          },
+          {
+            "status": "pass",
+            "sourceSha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+          }
+        ]
+      },
+      "priorFindings": [],
+      "candidateFindings": [
+        {
+          "line": 14,
+          "from": "policy.py",
+          "relation": "rejection-order",
+          "code": "production-frozen",
+          "check": "action",
+          "claimedBefore": true,
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "code": "production-frozen",
+              "line": 58,
+              "functionLine": 26,
+              "field": "environment"
+            },
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "code": "unsupported-action",
+              "line": 51,
+              "functionLine": 26,
+              "field": "action"
+            }
+          ]
+        }
+      ],
+      "ownerClause": {
+        "path": "CHANGE-G2.md",
+        "line": 5,
+        "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+        "requires": "Production plan and rollback freeze before graph or change validation.",
+        "precedenceNotSpecified": [
+          "unsupported-action",
+          "invalid-budget",
+          "retain-before-graph"
+        ]
+      },
+      "correctedProse": {
+        "sha256": "1f8d52ea392a5073e63e4405a1cfbcd7b67735b3604cf844b37cfa7e5b5d3826",
+        "findingCount": 0
+      },
+      "independentFindings": [
+        {
+          "architectureLine": 39,
+          "source": [
+            {
+              "file": "policy.py",
+              "start": 50,
+              "end": 58
+            }
+          ],
+          "description": "The implementation plan repeats the opposite order. The host blocks the direct current claim at line 14. The plan sentence is not a typed current precedence statement."
+        },
+        {
+          "architectureLine": 22,
+          "source": [
+            {
+              "file": "journal.py",
+              "start": 84,
+              "end": 85
+            },
+            {
+              "file": "planner.py",
+              "start": 114,
+              "end": 120
+            }
+          ],
+          "description": "The document and journal comment say invalid retain fails before graph construction. The caller builds and orders the graph before calling retain validation within rollback. Cross-function flow remains independent review."
+        }
+      ]
+    },
+    {
+      "run": "r-eXVclv",
+      "stage": "g1",
+      "originalTerminal": "closed",
+      "documentSha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "84eac530db795d0f7f28b46a79fa0e4a504d9c70f7133384d6a48a34c79885a5"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "receipt": {
+        "path": "receipts/K01-first.json",
+        "sha256": "ad89bf03be2bef47aa52de3d6aca79cb0520f53ebfde2bdb1b70a7b6b7a00400",
+        "status": "accept",
+        "reviews": [
+          {
+            "status": "pass",
+            "sourceSha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+          },
+          {
+            "status": "pass",
+            "sourceSha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+          }
+        ]
+      },
+      "priorFindings": [],
+      "candidateFindings": []
+    },
+    {
+      "run": "r-eXVclv",
+      "stage": "g2",
+      "originalTerminal": "closed",
+      "documentSha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "c843f340ae5517c34322fa441c6aa6a63320998667738f2eb50a2bd90278c16f"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "receipt": {
+        "path": "receipts/K02-first.json",
+        "sha256": "b79bb149d792f276715ea474bf7aa1c8a3d49469935a7c5fba47967b82d4b3a4",
+        "status": "accept",
+        "reviews": [
+          {
+            "status": "pass",
+            "sourceSha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+          },
+          {
+            "status": "pass",
+            "sourceSha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+          }
+        ]
+      },
+      "priorFindings": [],
+      "candidateFindings": [],
+      "ownerClause": {
+        "path": "CHANGE-G2.md",
+        "line": 5,
+        "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+        "requires": "Production plan and rollback freeze before graph or change validation.",
+        "precedenceNotSpecified": [
+          "unsupported-action",
+          "invalid-budget",
+          "retain-before-graph"
+        ]
+      }
+    }
+  ],
+  "historical": [
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g1",
+      "documentSha256": "16a5f9e84b6e2799d3c85643a238cad232269476a3dc28a4b0a2b11120c57db6",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g2",
+      "documentSha256": "4349bf3d0d4cb391087d79a5357fb5222bba919f154ef8ea136147130cd74d22",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g1",
+      "documentSha256": "5bb1eb95e82a1372039715bc0684e8de3d68f2cb6d5a41891a796642054121ee",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g2",
+      "documentSha256": "4aee1aede1221c7664a154bf52ea4d7cb11cb2d02627bb32efab9949b966fddc",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-AWu8XL",
+      "stage": "g1",
+      "documentSha256": "95431f86cc78605278750e6ef435347f4dd8e99cc978bfb676b401f460dc2634",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-AWu8XL",
+      "stage": "g2",
+      "documentSha256": "145b618a34fef6f55e1cd4cdc24451dac99fa0c5cc17d4ca5f4c2312d7a45a08",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g1",
+      "documentSha256": "22edf7effd0ccb129911c4c51e4e5f584ee31fcec2cdc3ca90c8774b1b48f6a0",
+      "findingsUnchanged": true
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g2",
+      "documentSha256": "e0ca9cf7b678b57465fd3ef65bad7f7b62f2b26bd6a1ffbcd7c25df95bbca7bf",
+      "findingsUnchanged": true
+    }
+  ],
+  "earlierHardDraft": {
+    "run": "r-QRyWYi",
+    "scope": "Stopped working copy without a terminal G3/G4 Building-loop result.",
+    "documentSha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393",
+    "sourcePins": [
+      {
+        "path": "journal.py",
+        "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac"
+      },
+      {
+        "path": "planner.py",
+        "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f"
+      },
+      {
+        "path": "policy.py",
+        "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+      },
+      {
+        "path": "release.py",
+        "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54"
+      }
+    ],
+    "priorFindings": [],
+    "candidateFindings": [
+      {
+        "line": 7,
+        "from": "release.py",
+        "relation": "json-decoder-call",
+        "symbol": "json.loads",
+        "actual": [
+          {
+            "file": "release.py",
+            "line": 10,
+            "symbol": "json.load"
+          }
+        ]
+      }
+    ],
+    "correctedCodecControl": {
+      "documentSha256": "54af6fbb6af569481f0ba6d4859e6e92d433fc079999ad5c2ce20d1ddb8278d5",
+      "findingCount": 0
+    },
+    "separateUnenforcedClaim": {
+      "architectureLine": 7,
+      "file": "release.py",
+      "line": 18,
+      "description": "The entrypoint calls planner.plan directly. The doc attributes conditional batch dispatch to the transport clause. Static codec checks do not infer this dynamic responsibility."
+    }
+  }
+}

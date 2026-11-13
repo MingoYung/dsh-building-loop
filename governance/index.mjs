@@ -25,7 +25,7 @@ import { captureCodeIntake, codeRegressionArtifacts, prepareCodeIntake, requireC
 import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./code-submission.mjs";
 import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
-  currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview, verifyCodeReview } from "./code-review.mjs";
+  currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview, signedLocalImportBoundary, verifyCodeReview } from "./code-review.mjs";
 import { codeDiagnosticsCurrent, compareInputContract, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
   prepareInputContractBatch, prepareReviewReproduction, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
 import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
@@ -158,7 +158,7 @@ const COORDINATOR = {
   "final-audit-ready": "修订核验暂通过，尚未验收。advance 续用独立反证子会话核全文与推导，之后才能复盘账本。",
   "diagnosis-ready": "执行停滞。根据宿主提供的失败类别、版本和次数，判断是参数、运行器、语法或行为层。用 building_loop_diagnose triage 写明依据，再 advance 派只读诊断。诊断耗尽时保留明确阻塞。",
   "diagnosis-verify": "只读诊断已交回执。核对当前版本、源码定位、宿主最小复现回执和修复范围。用 building_loop_diagnose verify 确认或明确退回依据。",
-  "diagnosis-repair-ready": "诊断已核实。用 advance 将定点修复交回原执行会话，随后仍须通过签名回归、独立审核与复核。",
+  "diagnosis-repair-ready": "诊断已核实。若总控改过架构稿，先用 architecture 登记当前版本。用 advance 将定点修复交回原执行会话，随后仍须通过签名回归、独立审核与复核。",
   blocked: "先确认解阻条件，再用 advance 恢复原阶段和原子会话。模型首次中断可以续派，反复中断则把实际阻塞记入台账。",
   "ledger-review": "本轮事实已验收。用 building_loop_ledger read 读当前待复盘事项，再读授权项目现状与本轮验收回执。结合现状，对本页事项决定 keep/resume/defer/completed/covered/obsolete。完成、被覆盖或失效须附当前原文行依据。分页时将 reviewPage.cursor 交给 review，之后用不带游标的 read 读下一页，直到关单。历史事项可按 ID lookup。"+LEDGER_BASIS_RULE,
   closed: "单元已验收关单。读通过回执、核对执行身份并更新授权台账。汇报先给结论，再按需展开出处、方法、备选和未证边界，最后一句大白话。",
@@ -964,7 +964,7 @@ export function apply(ctx, config = {}) {
           runtimeRecipes: reviewRecipes.filter(recipe => recipe !== syntaxRecipe), syntax: Boolean(syntaxRecipe),
           ...(recipeInputs ? { recipeInputs } : {}),
           ...(publicExamples.length ? { publicExamples } : {}),
-          requirement: "阻塞退回的 runtime 探针带 {file,start,end,quote}。quote 须明确支持预期字段和值。JSON 只核一个字段，例如 expectedPointer:'/error',expectedJson:'\"invalid-input\"'。登记示例用 exampleId 执行原输入；数值界限可用 expectedOperator:'at-most' 或 'at-least'。",
+          requirement: "阻塞退回的 runtime 探针带 {file,start,end,quote}。自拟探针 quote 引用完整规格句，明确支持预期字段和值。登记示例只需用 exampleId 和匹配的 requirement，省略 recipe、stdin 和已登记的预期。",
           architectureExamples: (current.engineeringArchitecture?.examples?.cases ?? []).map(({ id }) => id) };
       } else if(spec&&["reviewer","auditor"].includes(frame.role)) {
         try {
@@ -988,12 +988,14 @@ export function apply(ctx, config = {}) {
         const publicExamples = publicInputExamples(spec.codeTask?.diagnostics?.inputContracts);
         if (recipeInputs || publicExamples.length) codeTask.reproduction = { tool: REPRODUCE,
           ...(recipeInputs ? { recipeInputs } : {}), ...(publicExamples.length ? { publicExamples } : {}) };
+        if (spec.architecture?.allowedLocalImports) codeTask.allowedLocalImports = spec.architecture.allowedLocalImports;
       }
       let submission;
       if (frame.role === "executor" && isCodeReviewUnit(frame, current, spec)) {
         try {
           const { qualification, pending } = signedSubmission(frame, assignment[0], current, spec);
-          submission = { status: pending.length ? "read-back" : "ready", receiptSha256: qualification.receiptSha256,
+          submission = (!pending.length && signedLocalImportBoundary(frame, spec, qualification)) ||
+            { status: pending.length ? "read-back" : "ready", receiptSha256: qualification.receiptSha256,
             pending: submissionGaps(pending, current), next: { tool: WORKFLOW, action: "submit" } };
         } catch (error) {
           submission = { status: "blocked", reason: error.message };
@@ -1007,6 +1009,7 @@ export function apply(ctx, config = {}) {
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
         : submission?.status === "ready" ? "当前签名回归和读回已齐，直接 submit"
         : submission?.status === "read-back" ? "当前签名回归已通过，submit 会返回待读回的准确页"
+        : submission?.status === "architecture-import-boundary" ? "按 violations 修正实际越界导入，读回并获取新的签名后 submit"
         : codeTask?.regressionProof ? "落实当前目标，读回改动和候选，取得当前版本的签名回归回执后 submit"
         : phase==="supplement" ? "按退回项修改，读回、preflight、submit"
         : frame.role==="executor"&&phase==="intake" ? (frame.managed ? "按当前目标写出首稿，完整读回后 submit" : "保留原稿 submit")
@@ -1565,7 +1568,11 @@ export function apply(ctx, config = {}) {
       };
       // A stalled implementation may not parse. Reconcile the architecture
       // against repaired code at ordinary submission, never during diagnosis.
-      if (spec.architecture && !plan.stallId) record.engineeringArchitecture = requireEngineeringArchitecture(frame, id, spec, plan.prior);
+      if (spec.architecture && (!plan.stallId || plan.repair)) {
+        const needsRepairedSource = !plan.repair &&
+          !(plan.prior?.phase === "blocked" && plan.role === "executor");
+        record.engineeringArchitecture = requireEngineeringArchitecture(frame, id, spec, plan.prior, needsRepairedSource);
+      }
       if (plan.phase === "intake" && !plan.prior) {
         const codeIntake = captureCodeIntake(frame, spec, id);
         if (codeIntake) {
@@ -2115,7 +2122,10 @@ export function apply(ctx, config = {}) {
       const spec = unitOf(frame, id);
       if (!spec.codeTask?.diagnostics?.inputContracts || !active.codeIntake?.regression) return;
       if (isCodeReviewUnit(frame, active, spec)) {
-        if (signedSubmission(frame, id, active, spec).pending.length) return;
+        const { pending, qualification } = signedSubmission(frame, id, active, spec);
+        // Save runner calls on a known static violation. Publication still
+        // checks the boundary again against the current signed bytes.
+        if (pending.length || signedLocalImportBoundary(frame, spec, qualification)) return;
       } else {
         verifySignedCodeSubmission(frame, id, active, spec, goalSnapshot(frame));
       }
@@ -2172,6 +2182,8 @@ export function apply(ctx, config = {}) {
         if (codeRoute) {
           const { goal, qualification, pending } = signedSubmission(frame, id, active, spec);
           if (pending.length) return { unit: id, phase: active.phase, submission: serveSubmissionReadback(frame, active, pending) };
+          const boundary = signedLocalImportBoundary(frame, spec, qualification);
+          if (boundary) return { unit: id, phase: active.phase, submission: boundary };
           signed = { goal, qualification };
         }
         let inputProof;

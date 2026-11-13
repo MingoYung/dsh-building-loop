@@ -26,6 +26,8 @@ const oldCase = "old-green";
 const newCase = "new-required";
 const syntaxPath = "journal.py";
 const behaviorPath = "planner.py";
+const architectureFile = "modules/architecture.md";
+const architecturePlan = "# Architecture\n\n## Responsibility\n\nThe input boundary normalizes requests.\n";
 const compilerSource = '"""Normalize records."""\n\nA boundary owner records identities.\n"""\n\ndef parse(data):\n    return data\n';
 const closureSource = [
   "def retained_closure(by_id, applied, retained):",
@@ -76,7 +78,7 @@ function signReceipt(write, file, receipt, keys) {
   write(file, JSON.stringify({ ...receipt, signature }));
 }
 
-function configure(root, write, kind) {
+function configure(root, write, kind, { architecture = false } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = [entry, kind === "syntax" ? syntaxPath : behaviorPath];
   const tests = {
@@ -88,19 +90,31 @@ function configure(root, write, kind) {
     regression: { baselineFile, previousCases: [oldCase], inputs: [] },
   };
   write(entry, "print('entry')\n");
-  if (kind === "syntax") write(syntaxPath, compilerSource);
+  if (kind === "syntax") write(syntaxPath, architecture ?
+    compilerSource.replace(stallCases.syntax.oldText, stallCases.syntax.newText) : compilerSource);
   else write(behaviorPath, closureSource);
   write(privateFile, "separate private artifact\n");
-  write(specFile, "# Release planner\nKeep transitive installed dependencies through unapplied intermediaries; omit kept IDs from rollback actions.\n");
+  write(specFile, "# Release planner\nKeep transitive installed dependencies through unapplied intermediaries; omit kept IDs from rollback actions.\n" +
+    (architecture ? "\n## Navigation\n\n- [Index](INDEX.md)\n" : ""));
+  if (architecture) {
+    write("INDEX.md", "# Index\n\n## Modules\n\n- [Architecture](modules/architecture.md)\n");
+    fs.mkdirSync(path.join(root, "modules"));
+    write(architectureFile, architecturePlan + "\n## Imports\n\nPending.\n");
+  }
+  const review = [...sources, ...(architecture ? [architectureFile] : [])];
   write("BUILDING-LOOP.json", JSON.stringify({
-    spec: "building-loop/1", coordinator: { read: [specFile] }, goalContext: [specFile],
+    spec: "building-loop/1", coordinator: { read: [specFile, ...(architecture ? ["INDEX.md", architectureFile] : [])],
+      ...(architecture ? { write: [architectureFile] } : {}) }, goalContext: [specFile],
+    ...(architecture ? { hierarchy: { overview: { path: specFile, heading: "Navigation" },
+      index: { path: "INDEX.md", heading: "Modules" }, modules: { architecture: architectureFile } } } : {}),
     units: { [unit]: {
       candidate: entry, continuation: "reuse",
+      ...(architecture ? { plainLast: false, architecture: { module: "architecture", headings: ["Responsibility"], importsHeading: "Imports" } } : {}),
       phases: {
         intake: { read: sources, write: sources },
         supplement: { read: sources, write: sources },
-        "first-review": { read: sources, receipt: "first.json" },
-        "final-review": { read: sources, receipt: "final.json" },
+        "first-review": { read: review, receipt: "first.json" },
+        "final-review": { read: review, receipt: "final.json" },
       },
       codeTask: { sources, tests, diagnostics: {
         checkSet: "registered-host-stalls", protocol: 2, recipes: [syntaxRecipe, behaviorRecipe],
@@ -303,12 +317,15 @@ for (const kind of ["syntax", "behavior"]) {
   test("registered host escalates " + kind + " stalls, verifies bounded proof and resumes the same executor",
     () => fixture(async (root, write) => runWithRunner(kind, async ({ requests }) => {
       const scenario = stallCases[kind];
-      const keys = configure(root, write, kind);
+      const withArchitecture = kind === "syntax";
+      const keys = configure(root, write, kind, { architecture: withArchitecture });
       const harness = host(root, { automaticCoverage: false });
+      if (withArchitecture) await harness.flow("root", "architecture");
       const { childId: executor } = await harness.flow("root", "advance");
       assert.ok(harness.visible(executor).includes(reproduction));
       assert.ok(!harness.visible(executor).includes(behaviorProbe));
       await harness.flow(executor, "prepare");
+      if (withArchitecture) write(syntaxPath, compilerSource);
       await forceStall(kind, harness, executor, requests);
       assert.ok(harness.concluded.includes(executor));
       const investigator = await startInvestigation(kind, harness, executor);
@@ -343,6 +360,14 @@ for (const kind of ["syntax", "behavior"]) {
       const verified = await harness.invoke("root", diagnosis, verification);
       assert.equal(verified.phase, "diagnosis-repair-ready");
       assert.match(harness.prompt("root"), /role=coordinator phase=diagnosis-repair-ready[\s\S]*原执行会话[\s\S]*签名回归/u);
+      if (withArchitecture) {
+        const amended = fs.readFileSync(path.join(root, architectureFile), "utf8").replace("normalizes requests", "normalizes requests after decoding");
+        await harness.file("root", "write", architectureFile, { content: amended, note: "Update the architecture after verified diagnosis" });
+        await assert.rejects(harness.flow("root", "advance"), /登记实际版本/u);
+        const registered = await harness.flow("root", "architecture");
+        assert.equal(registered.phase, "diagnosis-repair-ready");
+        assert.equal(registered.architecture.sha256, digest(amended));
+      }
       const resumed = await harness.flow("root", "advance");
       assert.equal(resumed.phase, "intake");
       assert.equal(resumed.childId, executor);

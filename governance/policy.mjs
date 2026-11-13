@@ -458,7 +458,7 @@ export function parseAuthority(bytes) {
   const hierarchy = source.hierarchy === undefined ? undefined : hierarchyPolicy(source.hierarchy, coordinator, goalContext, protectedFiles, ledgerDocument);
   const managedImportSections = new Map();
   for (const [id, entry] of architectureEntries) {
-    object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading"]);
+    object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading", "allowedLocalImports"]);
     const file = hierarchyBodyPath(hierarchy, entry.module, false);
     const unit = units[id];
     const review = [unit.phases["first-review"], unit.phases["final-review"]];
@@ -491,8 +491,24 @@ export function parseAuthority(bytes) {
     if (managedImportSections.has(keyOf(file)) && managedImportSections.get(keyOf(file)) !== importsHeading) {
       throw new Error("共用架构稿的工程单元须使用相同的宿主静态导入章节");
     }
+    let allowedLocalImports;
+    if (entry.allowedLocalImports !== undefined) {
+      const rules = entry.allowedLocalImports;
+      const sources = new Set(unit.codeTask.sources);
+      if (!importsHeading || !Array.isArray(rules) || !rules.length || rules.length > 32 ||
+        rules.some(rule => !rule || typeof rule !== "object" || Array.isArray(rule) ||
+          Object.keys(rule).some(key => !["file", "imports"].includes(key)) || !sources.has(rule.file) ||
+          !Array.isArray(rule.imports) || new Set(rule.imports).size !== rule.imports.length ||
+          rule.imports.some(target => target === rule.file || !sources.has(target))) ||
+        new Set(rules.map(rule => rule.file)).size !== rules.length) {
+        throw new Error("本地静态导入边界须指定已登记的 Python 源码及唯一的允许目标，且须启用静态导入章节");
+      }
+      // Per-unit owner policy: unlisted sources remain free to evolve.
+      allowedLocalImports = rules.map(({ file, imports }) => ({ file, imports: imports.slice() }));
+    }
     managedImportSections.set(keyOf(file), importsHeading);
-    unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}), ...(examplesHeading ? { examplesHeading } : {}) };
+    unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}), ...(examplesHeading ? { examplesHeading } : {}),
+      ...(allowedLocalImports ? { allowedLocalImports } : {}) };
   }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }

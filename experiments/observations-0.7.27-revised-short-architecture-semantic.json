@@ -1,0 +1,2126 @@
+{
+  "scope": "Selected architecture claims checked against signed frozen source, exact receipts and WSL black-box output. These are independent semantic checks and do not change fixed scores.",
+  "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+  "ownerScope": "The G2 owner clause explicitly sets production freeze before graph or change validation. It does not explicitly decide unsupported-action versus freeze or retain validation versus graph validation, so those observed order contradictions are architecture or source-comment findings rather than hidden benchmark failures.",
+  "observations": [
+    {
+      "run": "r-b9dxay",
+      "stage": "g1",
+      "terminal": "closed",
+      "checkedClaims": [
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82",
+            "lines": [
+              {
+                "line": 8,
+                "text": "  - 从 stdin 读取一段文本，解析 JSON，解析失败返回 `invalid-json`；顶层必须是对象，否则 `invalid-request`。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "The CLI transport owns the non-object input rejection. Planner also keeps an internal direct-call guard.",
+          "source": [
+            {
+              "file": "release.py",
+              "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+              "lines": [
+                {
+                  "line": 15,
+                  "text": "INVALID_REQUEST = {\"status\": \"error\", \"error\": \"invalid-request\", \"actions\": [], \"units\": 0}"
+                },
+                {
+                  "line": 24,
+                  "text": "        result = plan(request) if isinstance(request, dict) else INVALID_REQUEST"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+              "lines": [
+                {
+                  "line": 81,
+                  "text": "    # the rule that a disallowed operation never produces partial output."
+                },
+                {
+                  "line": 82,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 83,
+                  "text": "        return failure(\"invalid-request\")"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82",
+            "lines": [
+              {
+                "line": 24,
+                "text": "  - 建图：以去重后的 changes 为节点，`depends_on` 为边；目标缺失或 `applied` 中出现未知 id → `unknown-dependency`；任意位置成环 → `dependency-cycle`。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "The planner owns both dangling dependency rejection and unknown applied ID rejection.",
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+              "lines": [
+                {
+                  "line": 41,
+                  "text": "            if dep not in nodes:"
+                },
+                {
+                  "line": 42,
+                  "text": "                raise JournalError(\"unknown-dependency\")"
+                },
+                {
+                  "line": 44,
+                  "text": "    for change_id in applied:"
+                },
+                {
+                  "line": 45,
+                  "text": "        if change_id not in nodes:"
+                },
+                {
+                  "line": 46,
+                  "text": "            raise JournalError(\"unknown-dependency\")"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "receipt": {
+        "file": "K01-first.json",
+        "sha256": "b8fc70ef06cdd4fbe7193bbeea8fbd29027067255023f30fb2f831269e510e23",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 39,
+                  "end": 45,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "回退顺序与实现结构吻合：拓扑用最小堆可稳定替换、预算在 planner 求和后统一比较、去重用 frozenset，各阶段可独立回退。",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 51,
+                    "end": 76,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "37ded515a28b16387e547335991d229ede22847ad6daea3cd81e208ef3a6c8b4"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 98,
+                    "end": 100,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "1b81c52ca96ea69dcaadb9dc6ab1f7b977b55c131c993763abe01f4cd42a66a4"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 47,
+                    "end": 47,
+                    "sha256": "4038a073eaddc32eec4df3d764b768151d14b99aed1d1ac0ac3c3c6c5e457b63",
+                    "relation": "supports",
+                    "excerptSha256": "4996d2669a8b685a5cac0a71b5709ff3d203ba1997ed0e74de9c13569dec9564"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 29,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "该节四模块职责与导入方向同源码：release 只做传输、policy 管环境预算、journal 管校验/身份/重放、planner 管图与装配。",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 3,
+                    "end": 6,
+                    "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+                    "relation": "supports",
+                    "excerptSha256": "029ebec7d7d94fe9880e358a774be31c14a355ab7d56cc01cfcb81d6f15bebd8"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 17,
+                    "end": 40,
+                    "sha256": "646bca5b71e393b5f44064d4bd083300e6e946b061631a4743899b7d988dd71f",
+                    "relation": "supports",
+                    "excerptSha256": "3ed344187b5123154106774203bc3b26ff168407f292d6412b33b1bb12fd5d5f"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 28,
+                    "end": 71,
+                    "sha256": "4038a073eaddc32eec4df3d764b768151d14b99aed1d1ac0ac3c3c6c5e457b63",
+                    "relation": "supports",
+                    "excerptSha256": "fba5e03fa25e55febfec65f485cccfc0cfcd110985bb53f03995e7893dfc5df1"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 30,
+                  "end": 38,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "六步实施顺序均能在源码定位：invalid-request 边界、journal 校验去重、建图成环、plan/rollback、policy 收敛，与实际实现一致。",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 24,
+                    "end": 24,
+                    "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+                    "relation": "supports",
+                    "excerptSha256": "7f3d8a8e5cabd9d8b98ee6f8c390f90ff9b64912b75ed4787118c096472fd64d"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 44,
+                    "end": 55,
+                    "sha256": "4038a073eaddc32eec4df3d764b768151d14b99aed1d1ac0ac3c3c6c5e457b63",
+                    "relation": "supports",
+                    "excerptSha256": "3e6d64e3f52ca47cae59e7107d7f235c2b14e59a0d639567ab08271f1c516e7c"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 31,
+                    "end": 39,
+                    "sha256": "646bca5b71e393b5f44064d4bd083300e6e946b061631a4743899b7d988dd71f",
+                    "relation": "supports",
+                    "excerptSha256": "ec3ff84c86088c4fbc3de3720f151f3011c0bf1bd176dc9b6c6b248c3c43579c"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 46,
+                  "end": 56,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "关键验证各项经 probe 复核：输出结构精确、六个传输错误、去重冲突、图错误、确定性顺序、plan/rollback 语义均成立。",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 17,
+                    "end": 23,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "d3c00e79393023a663f529ddb620e90f6fc96c1405ea452c44a1740e9c6f05dd"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 49,
+                    "end": 52,
+                    "sha256": "646bca5b71e393b5f44064d4bd083300e6e946b061631a4743899b7d988dd71f",
+                    "relation": "supports",
+                    "excerptSha256": "17ef5eb702b9c829ce30ac0ffc94976ebe09b3e72c60507e57bad79602d9c950"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 73,
+                    "end": 75,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "ca247e78c29d303b1b701da07d5cfa45bd884eafd4048345183cd929dafc7ce4"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 29,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "四模块职责划分与源码一致：release 只管传输、policy 管环境与预算、journal 管校验身份重放、planner 管图序装配",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 19,
+                    "end": 25,
+                    "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+                    "relation": "supports",
+                    "excerptSha256": "362538b52dff2f258f6e0a08a06c62a8aa0620ce07118f3fdd9371735da65dcc"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 17,
+                    "end": 52,
+                    "sha256": "646bca5b71e393b5f44064d4bd083300e6e946b061631a4743899b7d988dd71f",
+                    "relation": "supports",
+                    "excerptSha256": "2c30cbadaa60d45b72b8d9ac7bf01054bb4d8996b8c5d0d114f3f713b83238f9"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 30,
+                  "end": 38,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "实施顺序各步在源码中均可对应：release 边界、journal 身份、planner 建图与拓扑、plan/rollback、policy 收敛校验",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 79,
+                    "end": 103,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "2c9bbe86fe715e7802fff1fd28f07141cfe13c22e7d217ac8af955e9602a165c"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 28,
+                    "end": 56,
+                    "sha256": "4038a073eaddc32eec4df3d764b768151d14b99aed1d1ac0ac3c3c6c5e457b63",
+                    "relation": "supports",
+                    "excerptSha256": "920931bbbc9028a835d9ba31fb1b80caacf3808d2a15486f7fc266f59adb5c6f"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 39,
+                  "end": 45,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "回退顺序可操作：稳定 Kahn 已是当前实现，预算判定确在 planner 统一比较，去重为 frozenset 集合语义",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 100,
+                    "end": 100,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "e6de844436ea1c9fae3dedf51cc9bbca8e10994426f4145746b89731f72d5c03"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 51,
+                    "end": 56,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "b435ed2fd7bf9df8392d25179d3328e04ac802cf5df12513df249f2c26e85b3b"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 46,
+                  "end": 56,
+                  "sha256": "659ee9ab1830d5138c38ad93f487fdb73304ba3871851c08ca8fe771a838be82"
+                },
+                "basis": "关键验证各项由已签名用例覆盖，成功/失败响应形状由 success/failure 精确构造",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 17,
+                    "end": 23,
+                    "sha256": "12f0fcfe4d30cb5d87cc37b21536e340f7dce44e5585abd18c5448f059d2a159",
+                    "relation": "supports",
+                    "excerptSha256": "d3c00e79393023a663f529ddb620e90f6fc96c1405ea452c44a1740e9c6f05dd"
+                  },
+                  {
+                    "file": "SPEC.md",
+                    "start": 7,
+                    "end": 7,
+                    "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                    "relation": "supports",
+                    "excerptSha256": "c6e2ec984d204665d86e7df65abca7c51b2eda953e9d548cb1bed7de6194fa2d"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "run": "r-eXVclv",
+      "stage": "g1",
+      "terminal": "closed",
+      "checkedClaims": [
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6",
+            "lines": [
+              {
+                "line": 7,
+                "text": "- `journal.py`：请求与变更记录校验、重复记录折叠与冲突判定、`applied` 回放集解析。负责 `invalid-change`、`conflicting-change`、未知回放 ID 对应的 `unknown-dependency`。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "The planner passes known IDs to the journal, which rejects unknown applied IDs.",
+          "source": [
+            {
+              "file": "journal.py",
+              "sha256": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac",
+              "lines": [
+                {
+                  "line": 65,
+                  "text": "    applied = set()"
+                },
+                {
+                  "line": 66,
+                  "text": "    for value in values:"
+                },
+                {
+                  "line": 67,
+                  "text": "        if not isinstance(value, str) or not value:"
+                },
+                {
+                  "line": 68,
+                  "text": "            raise JournalError(\"invalid-change\")"
+                },
+                {
+                  "line": 69,
+                  "text": "        if value not in known_ids:"
+                },
+                {
+                  "line": 70,
+                  "text": "            raise JournalError(\"unknown-dependency\")"
+                },
+                {
+                  "line": 71,
+                  "text": "        applied.add(value)"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+              "lines": [
+                {
+                  "line": 55,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 56,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 57,
+                  "text": "        applied = read_applied(request.get(\"applied\", []), {row[\"id\"] for row in changes})"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6",
+            "lines": [
+              {
+                "line": 8,
+                "text": "- `planner.py`：构造依赖图、检测环（`dependency-cycle`）与缺失依赖（`unknown-dependency`）、给出字典序稳定拓扑序，按 action 产出动作与单位数，并组装最终结果。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "The planner independently checks dangling graph dependencies.",
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+              "lines": [
+                {
+                  "line": 25,
+                  "text": "        for target in depends[change_id]:"
+                },
+                {
+                  "line": 26,
+                  "text": "            if target not in units:"
+                },
+                {
+                  "line": 27,
+                  "text": "                raise JournalError(\"unknown-dependency\")"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "receipt": {
+        "file": "K01-first.json",
+        "sha256": "ad89bf03be2bef47aa52de3d6aca79cb0520f53ebfde2bdb1b70a7b6b7a00400",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 12,
+                  "end": 19,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "实施顺序与落地代码一致：journal 先折叠/回放，planner 后构图与组装，src 与描述相符。",
+                "evidence": [
+                  {
+                    "file": "journal.py",
+                    "start": 24,
+                    "end": 52,
+                    "sha256": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac",
+                    "relation": "supports",
+                    "excerptSha256": "bedfb8073015b2eabc81b57a79d0897afd6af21f912daffb907e79459965c701"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 12,
+                    "end": 48,
+                    "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+                    "relation": "supports",
+                    "excerptSha256": "bea5e3886d9f2b69c97c413438e14292ed3628d56090876e731198ee5a0a9ffc"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 20,
+                  "end": 25,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "回退顺序按单文件回退并重跑基线，未与当前结构冲突，导入方向独立可单文件回退。",
+                "evidence": [
+                  {
+                    "file": "SPEC.md",
+                    "start": 3,
+                    "end": 3,
+                    "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                    "relation": "supports",
+                    "excerptSha256": "82f2c113ec6e861a98537e0aff5c4733a5c6f0910495b6f23605ca6da8a18edc"
+                  },
+                  {
+                    "file": "release.py",
+                    "start": 5,
+                    "end": 5,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "8b69d4da645035baa083ea7077524ec4be08355dd5f45d0f2eef5dc970749020"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 26,
+                  "end": 34,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "关键验证清单与实际控制流吻合：release 11 行捕获 ValueError 输出 invalid-json，planner 52-53 行非字典→invalid-request，policy 校验含 type is not int 排除布尔，错误形状统一。",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 9,
+                    "end": 14,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "bbb25643b674f47552d63479d6c2eccdb67dbf0252ab49be6ddd91250c7bc5a6"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 52,
+                    "end": 53,
+                    "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+                    "relation": "supports",
+                    "excerptSha256": "a1caf3a065442e88fd244f74cac2cd16a02867629bdfefd3539a5dc503ab73a1"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 27,
+                    "end": 28,
+                    "sha256": "84eac530db795d0f7f28b46a79fa0e4a504d9c70f7133384d6a48a34c79885a5",
+                    "relation": "supports",
+                    "excerptSha256": "5409a58691fc9eadc16bf950811edfb194658ee38848289ce22a35360d61026b"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 8,
+                    "end": 9,
+                    "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+                    "relation": "supports",
+                    "excerptSha256": "8fb027436ef991d4951a779282b882830308852fd816b482d24140cab5f93980"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 11,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "四模块职责划分与 SPEC 3 行一致：release 只转 JSON、policy 校验环境/预算/action、journal 校验折叠与回放、planner 构图排序组装；architecture 行 10 的导入方向与静态导入边一致。",
+                "evidence": [
+                  {
+                    "file": "SPEC.md",
+                    "start": 3,
+                    "end": 3,
+                    "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                    "relation": "supports",
+                    "excerptSha256": "82f2c113ec6e861a98537e0aff5c4733a5c6f0910495b6f23605ca6da8a18edc"
+                  },
+                  {
+                    "file": "release.py",
+                    "start": 9,
+                    "end": 15,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "1957fb7e9e11125c7f62369fffd925f7f10ecd8c9f378fcc57dc30fa010d8bbf"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 11,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "四模块职责与实现一致：release 只做传输、policy 只校验、journal 只归一、planner 组图与组装；静态导入方向与声明一致",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 8,
+                    "end": 15,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "31a52b5e8a07a2ea970fc4a03234e025d56cbb00a527df477eb6d58949f0620b"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 4,
+                    "end": 5,
+                    "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+                    "relation": "supports",
+                    "excerptSha256": "8b2a35005770f6383caef29eba2ef608838f10d314dbdb4134f6f18b5e81bfa8"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 14,
+                    "end": 29,
+                    "sha256": "84eac530db795d0f7f28b46a79fa0e4a504d9c70f7133384d6a48a34c79885a5",
+                    "relation": "supports",
+                    "excerptSha256": "ffff9e71d2736631dc0659e50a8de25734271b3bd12c35773b2c23690b86ea23"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 12,
+                  "end": 19,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "实施顺序要求基线保留且先 journal 后 planner，实际改动符合该顺序与最小改动原则",
+                "evidence": [
+                  {
+                    "file": "journal.py",
+                    "start": 24,
+                    "end": 52,
+                    "sha256": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac",
+                    "relation": "supports",
+                    "excerptSha256": "bedfb8073015b2eabc81b57a79d0897afd6af21f912daffb907e79459965c701"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 12,
+                    "end": 50,
+                    "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+                    "relation": "supports",
+                    "excerptSha256": "a8ead8603c9246ade87f47773f14486d7accb24892cf60d7de7e3e5212f6bca6"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 20,
+                  "end": 25,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "回退顺序以单文件为单位可执行，改动独立于 policy/release，可按序回退",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 14,
+                    "end": 29,
+                    "sha256": "84eac530db795d0f7f28b46a79fa0e4a504d9c70f7133384d6a48a34c79885a5",
+                    "relation": "supports",
+                    "excerptSha256": "ffff9e71d2736631dc0659e50a8de25734271b3bd12c35773b2c23690b86ea23"
+                  },
+                  {
+                    "file": "release.py",
+                    "start": 8,
+                    "end": 15,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "31a52b5e8a07a2ea970fc4a03234e025d56cbb00a527df477eb6d58949f0620b"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 26,
+                  "end": 34,
+                  "sha256": "81c3937038ab45150a7fe0c262f2f568bed820376c96270480e01f21db9601e6"
+                },
+                "basis": "关键验证各项与实现对应：传输错误、字段映射、折叠与环、顺序确定性、预算边界与负向形状",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 9,
+                    "end": 14,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "bbb25643b674f47552d63479d6c2eccdb67dbf0252ab49be6ddd91250c7bc5a6"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 8,
+                    "end": 9,
+                    "sha256": "374a2c43ad6d3a022dfaf6ac64ae0f03e0e4b25f64edac5c53a4f89049ace060",
+                    "relation": "supports",
+                    "excerptSha256": "8fb027436ef991d4951a779282b882830308852fd816b482d24140cab5f93980"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 34,
+                    "end": 47,
+                    "sha256": "4f74c521fb0b6443c2060c04611e5d4c6d7251a0fd1744d6aa11e1fb7e6ec1ac",
+                    "relation": "supports",
+                    "excerptSha256": "d4d2007f3191c25f2179322759e33003da86ae0bf490db2c18172d4ca5ad27b8"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "run": "r-b9dxay",
+      "stage": "g2",
+      "terminal": "closed",
+      "checkedClaims": [
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9",
+            "lines": [
+              {
+                "line": 14,
+                "text": "  - G2-1 生产冻结：环境为 `production` 时，在 `budget` 校验之后、`action` 判断与 changes 校验/建图之前直接返回 `production-frozen`。plan 与 rollback 都冻结；即使 changes 畸形、图成环、action 不合法，也先返回 `production-frozen`；不产生任何部分 actions。`staging` 的 `action` 只接受 `plan` 与 `rollback`，其余 `unsupported-action`。"
+              }
+            ]
+          },
+          "observed": "contradicted",
+          "reason": "Unsupported actions fail before freeze. The document explicitly asserts the reverse and repeats it on line 39.",
+          "source": [
+            {
+              "file": "policy.py",
+              "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+              "lines": [
+                {
+                  "line": 44,
+                  "text": "        raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 45,
+                  "text": "    action = request.get(\"action\")"
+                },
+                {
+                  "line": 46,
+                  "text": "    # `plan` stays the default only when the field is absent; an explicitly"
+                },
+                {
+                  "line": 47,
+                  "text": "    # supplied null or unknown value is unsupported rather than a silent plan."
+                },
+                {
+                  "line": 48,
+                  "text": "    if action is None and \"action\" not in request:"
+                },
+                {
+                  "line": 49,
+                  "text": "        action = \"plan\""
+                },
+                {
+                  "line": 50,
+                  "text": "    if not isinstance(action, str) or action not in ACTIONS:"
+                },
+                {
+                  "line": 51,
+                  "text": "        raise PolicyError(\"unsupported-action\")"
+                },
+                {
+                  "line": 52,
+                  "text": "    budget = request.get(\"budget\")"
+                },
+                {
+                  "line": 53,
+                  "text": "    if type(budget) is not int or budget < 0:  # type() excludes bool"
+                },
+                {
+                  "line": 54,
+                  "text": "        raise PolicyError(\"invalid-budget\")"
+                },
+                {
+                  "line": 55,
+                  "text": "    if environment in FROZEN_ENVIRONMENTS:"
+                },
+                {
+                  "line": 56,
+                  "text": "        # Deliberately before graph/change validation: frozen wins over any"
+                },
+                {
+                  "line": 57,
+                  "text": "        # malformed input, and no partial actions may be produced."
+                },
+                {
+                  "line": 58,
+                  "text": "        raise PolicyError(\"production-frozen\")"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9",
+            "lines": [
+              {
+                "line": 16,
+                "text": "  - 冻结判断发生在图与变更校验之前，因此生产请求不会因畸形输入改报 `invalid-change`、`unknown-dependency` 或 `dependency-cycle`。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "Production policy is evaluated before the changes parser and graph. The owner requirement explicitly prescribes this order.",
+          "source": [
+            {
+              "file": "planner.py",
+              "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+              "lines": [
+                {
+                  "line": 108,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 109,
+                  "text": "        action = request.get(\"action\")"
+                },
+                {
+                  "line": 110,
+                  "text": "        if action is None:"
+                },
+                {
+                  "line": 111,
+                  "text": "            action = \"plan\""
+                },
+                {
+                  "line": 112,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 113,
+                  "text": "        applied = read_applied(request)"
+                },
+                {
+                  "line": 114,
+                  "text": "        nodes, applied_set = build_graph(changes, applied)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9",
+            "lines": [
+              {
+                "line": 22,
+                "text": "  - G2-3 `retain`：缺省为空数组；仅 rollback 消费。必须为字符串数组（元素为非空 id 字符串），去重后每个都必须在 `applied` 中，否则 `invalid-retain`。保留集合不合法时在建图前失败，保证不产生部分 actions；plan 请求忽略 `retain`。"
+              }
+            ]
+          },
+          "observed": "contradicted",
+          "reason": "The architecture and a source docstring assert retain validation before graph construction. The planner constructs and sorts the graph before it calls read_retain.",
+          "source": [
+            {
+              "file": "journal.py",
+              "sha256": "a560216b75b959a43f7ea3d18cfdb083ac1110d42d73b640831944754dae24eb",
+              "lines": [
+                {
+                  "line": 83,
+                  "text": "    checked for membership there because an id that was never applied cannot"
+                },
+                {
+                  "line": 84,
+                  "text": "    be kept (nothing would be omitted for it) and masking that would hide a"
+                },
+                {
+                  "line": 85,
+                  "text": "    stale caller journal. Both checks run before planner builds the graph, so"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+              "lines": [
+                {
+                  "line": 114,
+                  "text": "        nodes, applied_set = build_graph(changes, applied)"
+                },
+                {
+                  "line": 115,
+                  "text": "        order = topological_order(nodes)"
+                },
+                {
+                  "line": 116,
+                  "text": "        if action == \"rollback\":"
+                },
+                {
+                  "line": 117,
+                  "text": "            # Undo in reverse of the full order, limited to what is applied."
+                },
+                {
+                  "line": 118,
+                  "text": "            # `retain` only narrows this branch; validated here (before any"
+                },
+                {
+                  "line": 119,
+                  "text": "            # emission) so a bad retain list yields no partial actions."
+                },
+                {
+                  "line": 120,
+                  "text": "            retained = retained_set(nodes, applied_set, read_retain(request, applied))"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "receipt": {
+        "file": "K02-first.json",
+        "sha256": "f80a17184ee948e3d8bb74ed8f9286411a55b424c76576543a3bafd987e37723",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 30,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "模块职责与四个模块实际分工及导入方向一致（release→planner→journal/policy）",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 11,
+                    "end": 11,
+                    "sha256": "adc7b6413699206da2e901eeee3a30cc5469e74f08a3a9b8860ad54abc911a72",
+                    "relation": "supports",
+                    "excerptSha256": "8b69d4da645035baa083ea7077524ec4be08355dd5f45d0f2eef5dc970749020"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 13,
+                    "end": 14,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "65ba888a1fad7c211505c1b8d1c0a54663d0655ed43bf34f53807d63a2de77be"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 74,
+                    "end": 104,
+                    "sha256": "a560216b75b959a43f7ea3d18cfdb083ac1110d42d73b640831944754dae24eb",
+                    "relation": "supports",
+                    "excerptSha256": "2ea2cf6347a13c1ae958bc44e22ccabf23ff812913bb3d8d044ea7f6ebe56445"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 31,
+                  "end": 43,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "G2 实施步骤 7-10 与实际改动位置对应：policy 冻结与上限、journal retain、planner 过滤",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 19,
+                    "end": 19,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "60c523d7e84b44c63e7243a6f4a08cfff92bfa8959d3b7293033f2b2b28649a7"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 55,
+                    "end": 58,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "cf02493bedfdd5ebaccfcc3ba91203ee88e3478483eff1c8319bd300cf52056b"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 120,
+                    "end": 120,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "51403664a0db5d42e5e3d49fb7b1121bf25bcf3a4666ba6acee1a60038c29be2"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 44,
+                  "end": 51,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "回退顺序与代码分层吻合：retain 过滤、上限、冻结各自独立可撤",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 55,
+                    "end": 58,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "cf02493bedfdd5ebaccfcc3ba91203ee88e3478483eff1c8319bd300cf52056b"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 120,
+                    "end": 120,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "51403664a0db5d42e5e3d49fb7b1121bf25bcf3a4666ba6acee1a60038c29be2"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 52,
+                  "end": 66,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "关键验证条目均可由当前源码路径支持，输出形状由 failure/success 统一装配",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 17,
+                    "end": 23,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "d3c00e79393023a663f529ddb620e90f6fc96c1405ea452c44a1740e9c6f05dd"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 75,
+                    "end": 76,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "abcaf9029163925104e9a195971f22a0c3cca7d87eab0bb6d9367f61f4b425e7"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 30,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "模块职责节与源码主体一致：release 只传输、policy 管环境与预算、journal 管校验/去重/retain、planner 管图与装配。唯一叙述偏差（14 行称 action 非法也先报 production-frozen，实际 policy 45-51 先校验 action）已在 observation obs-frozen-vs-action-order 记录，不属本节主体职责判断错误。",
+                "evidence": [
+                  {
+                    "file": "journal.py",
+                    "start": 74,
+                    "end": 103,
+                    "sha256": "a560216b75b959a43f7ea3d18cfdb083ac1110d42d73b640831944754dae24eb",
+                    "relation": "supports",
+                    "excerptSha256": "533dfc919149702d56c7a0673bec645077da001edba6fa9f1f92238490a34e98"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 108,
+                    "end": 129,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "ee2e5e61a218b6f1e9ea96b40ce2e50a14d11ce323d73fa515df128010a6af7c"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 42,
+                    "end": 58,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "1627f7eacb47ea30096c2af5393caba71db70cf1264b1121e2613848682e513b"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 31,
+                  "end": 43,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "实施顺序 7-10 条与实际改动对应：policy 先行加冻结与上限、journal 加 retain 校验、planner 先逆序再闭包过滤、G1 回归保持。",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 55,
+                    "end": 58,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "cf02493bedfdd5ebaccfcc3ba91203ee88e3478483eff1c8319bd300cf52056b"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 75,
+                    "end": 75,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "ba187d4a47fb02b8ec17faae217b0e107224924b7b5f879d2f8949be10b04a51"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 74,
+                    "end": 103,
+                    "sha256": "a560216b75b959a43f7ea3d18cfdb083ac1110d42d73b640831944754dae24eb",
+                    "relation": "supports",
+                    "excerptSha256": "533dfc919149702d56c7a0673bec645077da001edba6fa9f1f92238490a34e98"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 118,
+                    "end": 122,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "cebc0775b1de26bd08c8076d25f72d46b534e55a406e0bf32ec79ea1f40bef28"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 44,
+                  "end": 51,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "回退顺序逐层可独立回退：retain 过滤→上限 3→production-frozen，各层位于独立分支，回退不影响其余。",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 73,
+                    "end": 76,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "de20c15a384d937e41caa178c57d8fa984daf365a6b8d4a28d7af3d50497c9d5"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 118,
+                    "end": 122,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "cebc0775b1de26bd08c8076d25f72d46b534e55a406e0bf32ec79ea1f40bef28"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 55,
+                    "end": 58,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "cf02493bedfdd5ebaccfcc3ba91203ee88e3478483eff1c8319bd300cf52056b"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 52,
+                  "end": 66,
+                  "sha256": "e431b9e63189d59f3b02f7cd9d76b2acb14272adfee37355a0186160bd0127b9"
+                },
+                "basis": "关键验证各条对应实际控制流；G2-1 的 action 非法情形与实现不符（同 section:1）。",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 42,
+                    "end": 58,
+                    "sha256": "caa430ab3bd0542666d21d8900764a89aeff840a3dad9fde774c2b7aefe213cd",
+                    "relation": "supports",
+                    "excerptSha256": "1627f7eacb47ea30096c2af5393caba71db70cf1264b1121e2613848682e513b"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 108,
+                    "end": 129,
+                    "sha256": "0e3ade8adb726e2957063cec26f9985448fb55d70087c4a90af275fad38d1690",
+                    "relation": "supports",
+                    "excerptSha256": "ee2e5e61a218b6f1e9ea96b40ce2e50a14d11ce323d73fa515df128010a6af7c"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 74,
+                    "end": 103,
+                    "sha256": "a560216b75b959a43f7ea3d18cfdb083ac1110d42d73b640831944754dae24eb",
+                    "relation": "supports",
+                    "excerptSha256": "533dfc919149702d56c7a0673bec645077da001edba6fa9f1f92238490a34e98"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          }
+        ]
+      },
+      "ownerClause": {
+        "file": "CHANGE-G2.md",
+        "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+        "lines": [
+          {
+            "line": 5,
+            "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+          },
+          {
+            "line": 7,
+            "text": "3. Staging rollback accepts `retain`, default empty. It lists IDs that are already applied and must remain. Reject malformed or nonapplied retain lists with `invalid-retain`. Retain the transitive dependencies that are applied and required by those retained changes. Emit other applied IDs in the original deterministic reverse order. This applies only to rollback."
+          }
+        ]
+      },
+      "behaviorChecks": [
+        {
+          "id": "production-unsupported-action",
+          "input": {
+            "environment": "production",
+            "action": "warp",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "id": "production-valid-action-bad-change",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "id": "staging-bad-retain-and-cycle",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "b"
+                ]
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "retain": null
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "id": "staging-bad-retain-valid-graph",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "retain": null
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        }
+      ],
+      "auditAttempts": [
+        {
+          "seq": 111,
+          "role": "auditor",
+          "findings": [
+            {
+              "id": "arch-frozen-action-order",
+              "kind": "annotation",
+              "file": "modules/architecture.md",
+              "start": 14,
+              "end": 14,
+              "issueChars": 204,
+              "fixChars": 164,
+              "observation": "modules/architecture.md:14 声称“即使 changes 畸形、图成环、action 不合法，也先返回 production-frozen”。",
+              "issue": "架构稿称 action 非法时也先报 production-frozen，但 policy.limit_for 先校验 action（50-51 行 unsupported-action）后 ms 冻结（55-58 行），且 CHANGE-G2.md 第 5 条只要求冻结先于 graph 或 change validation，并未规定先于 action 校验。文档描述比目标与实现都强，属过时/失实说明。",
+              "fix": "将 14 行末句改为：即使 changes 畸形、图成环，也先返回 production-frozen；再附一句说明 action 非法时按 policy 实现先报 unsupported-action（G2 只规定冻结先于图与变更校验，未规定先于 action 校验）。保持与 policy.py 42-58 实际控制流一致。",
+              "evidence": [
+                {
+                  "file": "policy.py",
+                  "start": 45,
+                  "end": 51,
+                  "relation": "supports"
+                },
+                {
+                  "file": "modules/architecture.md",
+                  "start": 14,
+                  "end": 14,
+                  "relation": "supports"
+                },
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 5,
+                  "relation": "supports"
+                }
+              ]
+            },
+            {
+              "id": "frozen-after-action",
+              "kind": "behavior",
+              "file": "policy.py",
+              "start": 45,
+              "end": 58,
+              "issueChars": 254,
+              "fixChars": 158,
+              "observation": "production + action:\"warp\" + 合法 changes/budget 时，实测输出 error 字段为 unsupported-action。",
+              "issue": "CHANGE-G2.md 第 5 条要求 production 在任何图或变更校验前返回 production-frozen；但 action 校验（50-51）排在冻结（55-58）之前，production + 非法 action 得到 unsupported-action。已用当前 release.py 实测产出 {status:error,error:unsupported-action,actions:[],units:0}。该子情形目标未逐字固定预期值，未作为阻塞退回，但存在真实偏差需处置。",
+              "fix": "在 limit_for 中把 FROZEN_ENVIRONMENTS 判定提到 action 校验之前（保留 environment 与 budget 校验在前，因为 G2 未改变这两个错误码的优先级），并同步更新 31-37 行注释与架构稿 14 行。若有意保留 action 优先，则只需修正架构稿并记录该取舍。",
+              "evidence": [
+                {
+                  "file": "policy.py",
+                  "start": 45,
+                  "end": 51,
+                  "relation": "supports"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 55,
+                  "end": 58,
+                  "relation": "contradicts"
+                },
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 5,
+                  "relation": "contradicts"
+                }
+              ]
+            }
+          ],
+          "result": {
+            "error": false,
+            "progress": {
+              "missingFiles": [],
+              "missingCases": [],
+              "findingIds": [],
+              "observationIds": [],
+              "findingsDone": false,
+              "architecture": "recorded",
+              "pendingCorrections": [],
+              "missingArchitectureSections": [
+                "模块职责"
+              ],
+              "architectureCodeEvidence": true,
+              "sectionFindingsMissing": [
+                "模块职责"
+              ],
+              "ready": false
+            },
+            "problems": [
+              {
+                "field": "findings",
+                "id": "arch-frozen-action-order",
+                "reason": "架构发现须以已授权架构稿为位置；其余发现用 behavior、maintenance 或 annotation"
+              },
+              {
+                "field": "findings",
+                "id": "frozen-after-action",
+                "reason": "复现证明不属于当前角色、签名版本或发现位置"
+              }
+            ]
+          }
+        },
+        {
+          "seq": 123,
+          "role": "auditor",
+          "findings": [
+            {
+              "id": "arch-s1-frozen-action",
+              "kind": "annotation",
+              "file": "modules/architecture.md",
+              "start": 14,
+              "end": 14,
+              "issueChars": 195,
+              "fixChars": 180,
+              "observation": "“模块职责”节第 14 行称 G2-1 中“即使 changes 畸形、图成环、action 不合法，也先返回 production-frozen”。",
+              "issue": "该句称 action 不合法也先报 production-frozen，但 policy.limit_for 在 50-51 行先校验 action 并 raise unsupported-action，55-58 行才冻结；CHANGE-G2.md 第 5 条只要求冻结先于 graph 或 change validation，未包含 action。架构说明比目标与实现都强，属失实注释。",
+              "fix": "将 modules/architecture.md:14 的“即使 changes 畸形、图成环、action 不合法，也先返回 production-frozen”改为只保留 changes 畸形与图成环两种情形，并补充一句：action 非法时按 policy.py 先报 unsupported-action（G2 未规定冻结先于 action 校验）。",
+              "evidence": [
+                {
+                  "file": "modules/architecture.md",
+                  "start": 14,
+                  "end": 14,
+                  "relation": "supports"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 45,
+                  "end": 51,
+                  "relation": "contradicts"
+                },
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 5,
+                  "relation": "supports"
+                }
+              ]
+            }
+          ],
+          "result": {
+            "error": false,
+            "progress": {
+              "missingFiles": [],
+              "missingCases": [],
+              "findingIds": [],
+              "observationIds": [
+                "obs-frozen-vs-action-order"
+              ],
+              "findingsDone": false,
+              "architecture": "recorded",
+              "pendingCorrections": [],
+              "missingArchitectureSections": [
+                "模块职责"
+              ],
+              "architectureCodeEvidence": true,
+              "sectionFindingsMissing": [
+                "模块职责"
+              ],
+              "ready": false
+            },
+            "problems": [
+              {
+                "field": "findings",
+                "id": "arch-s1-frozen-action",
+                "reason": "架构发现须以已授权架构稿为位置；其余发现用 behavior、maintenance 或 annotation"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-eXVclv",
+      "stage": "g2",
+      "terminal": "closed",
+      "checkedClaims": [
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f",
+            "lines": [
+              {
+                "line": 6,
+                "text": "- `policy.py`：环境（`staging`/`production`）与预算校验，以及本轮允许的 action 集合。G2 起 production 被冻结：环境校验通过后立即返回 `production-frozen`，且该判定先于 action 分发与图/变更校验；预算校验仍保持类型优先（先测类型再比值，避免不可哈希输入崩溃），`effective_budget` 取请求预算与 3 的较小值，仅用于 staging `plan`。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "The planner dispatches to the production freeze check before checking action, budget, changes and graph.",
+          "source": [
+            {
+              "file": "policy.py",
+              "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+              "lines": [
+                {
+                  "line": 36,
+                  "text": "    environment = request.get(\"environment\")"
+                },
+                {
+                  "line": 37,
+                  "text": "    if not isinstance(environment, str) or environment not in (\"staging\", \"production\"):"
+                },
+                {
+                  "line": 38,
+                  "text": "        raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 39,
+                  "text": "    if environment == \"production\":"
+                },
+                {
+                  "line": 40,
+                  "text": "        raise PolicyError(\"production-frozen\")"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+              "lines": [
+                {
+                  "line": 91,
+                  "text": "        check_environment(request)"
+                },
+                {
+                  "line": 92,
+                  "text": "        action = read_action(request)"
+                },
+                {
+                  "line": 93,
+                  "text": "        budget = effective_budget(read_budget(request), action)"
+                },
+                {
+                  "line": 94,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 95,
+                  "text": "        applied = read_applied(request.get(\"applied\", []), {row[\"id\"] for row in changes})"
+                },
+                {
+                  "line": 96,
+                  "text": "        order, units = _graph(changes)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f",
+            "lines": [
+              {
+                "line": 7,
+                "text": "- `journal.py`：请求与变更记录校验、重复记录折叠与冲突判定、`applied` 回放集解析，以及 staging `rollback` 的 `retain` 列表校验（`invalid-retain`）。负责 `invalid-change`、`conflicting-change`、未知回放 ID 对应的 `unknown-dependency`。"
+              }
+            ]
+          },
+          "observed": "supported",
+          "reason": "Journal owns replay membership and retain validation, which planner calls on the rollback branch. This document makes no contrary claim about graph order.",
+          "source": [
+            {
+              "file": "journal.py",
+              "sha256": "c843f340ae5517c34322fa441c6aa6a63320998667738f2eb50a2bd90278c16f",
+              "lines": [
+                {
+                  "line": 69,
+                  "text": "        if value not in known_ids:"
+                },
+                {
+                  "line": 70,
+                  "text": "            raise JournalError(\"unknown-dependency\")"
+                },
+                {
+                  "line": 75,
+                  "text": "def read_retain(values, applied):"
+                },
+                {
+                  "line": 90,
+                  "text": "    if not isinstance(values, list):"
+                },
+                {
+                  "line": 91,
+                  "text": "        raise JournalError(\"invalid-retain\")"
+                },
+                {
+                  "line": 94,
+                  "text": "        if not isinstance(value, str) or not value:"
+                },
+                {
+                  "line": 95,
+                  "text": "            raise JournalError(\"invalid-retain\")"
+                },
+                {
+                  "line": 96,
+                  "text": "        if value not in applied:"
+                },
+                {
+                  "line": 97,
+                  "text": "            raise JournalError(\"invalid-retain\")"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+              "lines": [
+                {
+                  "line": 95,
+                  "text": "        applied = read_applied(request.get(\"applied\", []), {row[\"id\"] for row in changes})"
+                },
+                {
+                  "line": 104,
+                  "text": "        # `retain` is a rollback-only field (CHANGE-G2.md item 3): the retained"
+                },
+                {
+                  "line": 109,
+                  "text": "            retain = read_retain(request.get(\"retain\", []), applied)"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "receipt": {
+        "file": "K02-first.json",
+        "sha256": "b79bb149d792f276715ea474bf7aa1c8a3d49469935a7c5fba47967b82d4b3a4",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 11,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "各模块职责描述与源码一致：release.py 仅传输，policy 冻结与预算封顶，journal 含 retain 校验，planner 含 retain 闭包与逆序过滤。",
+                "evidence": [
+                  {
+                    "file": "release.py",
+                    "start": 8,
+                    "end": 15,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "31a52b5e8a07a2ea970fc4a03234e025d56cbb00a527df477eb6d58949f0620b"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 23,
+                    "end": 74,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "e94e00b897ca54f44a51ccc7f9236eb0f0944688158c48235be614cf4e201a38"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 100,
+                    "end": 117,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "35d9c992fcb48da2941b1a65bf785b83e02b4e2e2370c7ee3fc1b4be71922c2b"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 12,
+                  "end": 20,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "实施顺序逐条与已实现控制流对应，错误统一为 failure() 形状。",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 14,
+                    "end": 15,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "8fb027436ef991d4951a779282b882830308852fd816b482d24140cab5f93980"
+                  },
+                  {
+                    "file": "journal.py",
+                    "start": 75,
+                    "end": 99,
+                    "sha256": "c843f340ae5517c34322fa441c6aa6a63320998667738f2eb50a2bd90278c16f",
+                    "relation": "supports",
+                    "excerptSha256": "735309e73355f08703a62794582d055ccee98e006cba4a4a1d85c3a20856dbca"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 21,
+                  "end": 26,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "回退顺序把 policy 前置冻结与预算封顶视为独立可单独回退，与源码隔离相符。",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 23,
+                    "end": 41,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "9a9643c4886c19fffb81b30b3685562e0b05b365e72ebebefb529191b1932b3f"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 64,
+                    "end": 74,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "8bc49393e13322f6391084f598ea24bf3193b856fa5cc6994b10cbe196b42a79"
+                  }
+                ],
+                "status": "pass"
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 27,
+                  "end": 36,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "关键验证各条与探针实测一致，含 production 未知 action 定序（已由探针固化）。",
+                "evidence": [
+                  {
+                    "file": "CHANGE-G2.md",
+                    "start": 5,
+                    "end": 5,
+                    "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+                    "relation": "supports",
+                    "excerptSha256": "e1b9921273d92a22d7ec2bf0fc71da3601fab83d7726443f00c1d391eb1b2e23"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 44,
+                    "end": 51,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "3a8c3ed72e6d28a66c6abc11038ad1fecb57c727b6a3f577e72935874b99f578"
+                  }
+                ],
+                "status": "pass"
+              }
+            ]
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architectureStatus": "pass",
+            "findingsCount": 0,
+            "sections": [
+              {
+                "heading": "模块职责",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 3,
+                  "end": 11,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "职责描述与实际源码一致：release.py 仅传输，policy 先冻结后预算且 effective_budget 取 min(·,3)，journal 负责 change/applied/retain 校验，planner 负责图、环、拓扑序与 retain 闭包；导入方向与静态登记相符，无反向导入。",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 72,
+                    "end": 74,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "07a888e3c5ba19c43d407bf5c874dd18a64716bf48090d0892a8ebbefd5fe5f8"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 4,
+                    "end": 11,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "0c4c6c41f301aaea0a48899a5a9f2f05251a43ef1187a6084c1cf649a96dbd71"
+                  }
+                ]
+              },
+              {
+                "heading": "实施顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 12,
+                  "end": 20,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "实施顺序各步均可在源码定位：policy 冻结与预算（S3:39-40、S3:72-74）、journal retain 校验（S1:75-99）、planner retain 闭包与逆序过滤（S2:57-81、S2:104-116）、plan 沿用 G1 判定点改用 effective_budget（S2:120-125）、failure() 统一错误形态（S2:14-15）；release.py 未出现在变更清单，与“release.py 不改动”一致。",
+                "evidence": [
+                  {
+                    "file": "policy.py",
+                    "start": 72,
+                    "end": 74,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "07a888e3c5ba19c43d407bf5c874dd18a64716bf48090d0892a8ebbefd5fe5f8"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 120,
+                    "end": 125,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "f62715cae2e648ec628c8670bd6235aa7853a8a053e3dcaef97a3a456df44789"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 14,
+                    "end": 15,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "8fb027436ef991d4951a779282b882830308852fd816b482d24140cab5f93980"
+                  }
+                ]
+              },
+              {
+                "heading": "回退顺序",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 21,
+                  "end": 26,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "回退顺序按文件拆分且与模块独立性相符：policy 的冻结与封顶相互独立，planner 依赖 journal.read_retain（S2:4、S2:109），故先回退 planner 再评估 journal 的次序合理；S4 确实无需回退；重跑基线要求有签署回执 protected 16 / required 5 通过支撑。",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 109,
+                    "end": 109,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "087d7f426b8a13ecc8010a061bc7de23c28dccb0ff3193e03c495166335f7e05"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 4,
+                    "end": 4,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "9003f98a983c1664d4690a8b6902c249e5071396274687ad5e30bed88c5bdd8c"
+                  },
+                  {
+                    "file": "policy.py",
+                    "start": 64,
+                    "end": 74,
+                    "sha256": "81fa9e76882087d489d3039f5f0c7d9878f200363456a57e945af28d3f182a31",
+                    "relation": "supports",
+                    "excerptSha256": "8bc49393e13322f6391084f598ea24bf3193b856fa5cc6994b10cbe196b42a79"
+                  }
+                ]
+              },
+              {
+                "heading": "关键验证",
+                "source": {
+                  "file": "modules/architecture.md",
+                  "start": 27,
+                  "end": 36,
+                  "sha256": "dadc2485037976ced21c82a68a6b7199de35d5edae206e6ee6dd5792e2a2493f"
+                },
+                "basis": "关键验证各项均有实测或源码支撑：invalid-json（S4:11-12）；字段与 action 错误码（S3:37-38、S3:49-50、S3:59-60）；冻结先于图（S2:91 于 S2:94-96 之前）；配额由探针 probe-9ab12ac1 实测 budget-exceeded，保留与传递依赖由探针 probe-71042de6 实测 /actions=[\"d\",\"c\"]；负向形状由 failure() 固定 actions=[]、units=0（S2:14-15）。production 非法 action 定序一项，源码在 request 形态检查后即冻结（仅 environment 类型检查先于冻结），截稿已声明需固化用例，不构成与目标冲突。",
+                "evidence": [
+                  {
+                    "file": "planner.py",
+                    "start": 14,
+                    "end": 15,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "8fb027436ef991d4951a779282b882830308852fd816b482d24140cab5f93980"
+                  },
+                  {
+                    "file": "release.py",
+                    "start": 11,
+                    "end": 12,
+                    "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                    "relation": "supports",
+                    "excerptSha256": "d1e037f8f6207fcb8f3e5b2c06131871efb459ac8e63ba9321aa306bee2f0034"
+                  },
+                  {
+                    "file": "planner.py",
+                    "start": 88,
+                    "end": 93,
+                    "sha256": "c718f484d6a9bfe102976dbdf56c24222b12bb34983475b342e013f7429603ad",
+                    "relation": "supports",
+                    "excerptSha256": "55c5fc77cb026c830f3b9545d064602c7b00653d7cf328fd977c80f97adf9515"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "ownerClause": {
+        "file": "CHANGE-G2.md",
+        "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+        "lines": [
+          {
+            "line": 5,
+            "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+          },
+          {
+            "line": 7,
+            "text": "3. Staging rollback accepts `retain`, default empty. It lists IDs that are already applied and must remain. Reject malformed or nonapplied retain lists with `invalid-retain`. Retain the transitive dependencies that are applied and required by those retained changes. Emit other applied IDs in the original deterministic reverse order. This applies only to rollback."
+          }
+        ]
+      },
+      "behaviorChecks": [
+        {
+          "id": "production-unsupported-action",
+          "input": {
+            "environment": "production",
+            "action": "warp",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "id": "production-valid-action-bad-change",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "id": "staging-bad-retain-and-cycle",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "b"
+                ]
+              },
+              {
+                "id": "b",
+                "component": "api",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              }
+            ],
+            "retain": null
+          },
+          "actual": {
+            "status": "error",
+            "error": "dependency-cycle",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "id": "staging-bad-retain-valid-graph",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "retain": null
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        }
+      ]
+    }
+  ]
+}

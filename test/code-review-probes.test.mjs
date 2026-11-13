@@ -84,12 +84,12 @@ test("a registered reviewer example binds exact input, owner clause, response an
     ] }],
   } } };
   const args = { assertion: "runtime", file: signedFile, exampleId: "sort:example:ordered" };
-  const prepare = (data = {}, clause = requirement) =>
+  const prepare = (data = {}, clause = { ...requirement, visibleClause: true }) =>
     reviewProbeRequest({ ...args, ...data }, frame, active, withCases, architecture, clause);
   const check = prepare();
   assert.deepEqual(check.input, { recipe: "app-json", stdin: JSON.stringify(input) + "\n" });
   assert.deepEqual(check.expected, { exitCode: 0, json: expected });
-  assert.deepEqual(check.grounding, { kind: "registered-example", caseId: args.exampleId, exit: true, field: true });
+  assert.deepEqual(check.grounding, { kind: "registered-example", version: 2, caseId: args.exampleId, exit: true, field: true });
   assert.throws(() => prepare({ stdin: "{}" }), /固定的配方和输入/u);
   assert.throws(() => prepare({ expectedJson: "0", expectedPointer: "/requestIndex" }), /已登记示例不一致/u);
   assert.equal(prepare({}, { ...requirement, quote: "A different clause" }).grounding, undefined);
@@ -126,7 +126,7 @@ test("a registered reviewer example binds exact input, owner clause, response an
 test("output clauses reject branch alternatives, examples and negated assertions as proof", () => {
   const { frame, active } = fixture();
   const prepare = quote => reviewProbeRequest({ assertion: "runtime", file: signedFile, recipe: "app-json",
-    expectedExitCode: 0, expectedPointer: "/size", expectedJson: "5" }, frame, active, spec, architecture, { quote });
+    expectedExitCode: 0, expectedPointer: "/size", expectedJson: "5" }, frame, active, spec, architecture, { quote, clauseComplete: true });
   for (const quote of [
     "Output field `size` equals 5 or 7.",
     "For branch A output field `size` equals 5. For branch B output field `size` equals 7.",
@@ -146,5 +146,6 @@ test("output clauses reject branch alternatives, examples and negated assertions
     assert.equal(probe.outcome, "mismatch");
     assert.equal(probe.blocking, false, quote);
   }
-  assert.deepEqual(prepare("The command returns `{\"size\":5}`.").grounding, { kind: "clause", field: true, exit: false });
+  assert.deepEqual(prepare("The command returns `{\"size\":5}`.").grounding,
+    { kind: "clause", version: 2, field: true, exit: false });
 });

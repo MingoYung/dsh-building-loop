@@ -21,7 +21,7 @@ const plan = "# 架构\n\n## 职责\n\n入口限制请求预算。\n\n## 回退\
 const revised = plan.replace("验证旧预算", "重放已发请求并验证旧预算");
 const ref = (file, start, end = start) => ({ file, start, end });
 
-function project(root, write, { importsHeading, examplesHeading, diagnostics } = {}) {
+function project(root, write, { importsHeading, examplesHeading, diagnostics, allowedLocalImports } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = importsHeading ? [candidate, "limits.py"] : [candidate];
   const files = [...sources, architecture];
@@ -41,7 +41,7 @@ function project(root, write, { importsHeading, examplesHeading, diagnostics } =
       modules: { architecture } },
     coordinator: { read: [goal, "INDEX.md", architecture, "first.json", "final.json"], write: [architecture] },
     units: { K01: { candidate, plainLast: false, architecture: {
-      module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading, examplesHeading,
+      module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading, examplesHeading, allowedLocalImports,
     },
       codeTask: { sources, tests, diagnostics }, phases: { intake: execute, supplement: execute,
         "first-review": review("first.json"), "final-review": review("final.json") } } } }));
@@ -63,6 +63,32 @@ const fileJudgment = { file: candidate, basis: "The cap protects downstream capa
   comment: { status: "verified", start: 2, end: 2, basis: "This clamp implements the stated limit." } };
 const constraint = { caseId: "limit", status: "pass", requirement: ref(goal, 3), code: ref(candidate, 3),
   basis: "The signed test checks the cap that is applied before returning." };
+
+test("an owner's explicit static import boundary rejects a signed behavioral pass before review", () => fixture(async (root, write) => {
+  const importsHeading = "静态导入";
+  const { harness, save } = project(root, write, { importsHeading, allowedLocalImports: [{ file: candidate, imports: [] }] });
+  const authorityBytes = fs.readFileSync(path.join(root, "BUILDING-LOOP.json"));
+  const unregisteredTarget = JSON.parse(authorityBytes);
+  unregisteredTarget.units.K01.architecture.allowedLocalImports[0].imports = ["private.py"];
+  assert.throws(() => parseAuthority(Buffer.from(JSON.stringify(unregisteredTarget))), /本地静态导入边界/u);
+  await harness.file("root", "write", architecture, { content: plan + "\n## " + importsHeading + "\n\n待由宿主生成。\n",
+    note: "Record the current design and import scope" });
+  await harness.flow("root", "architecture");
+  const executor = (await harness.flow("root", "advance")).childId;
+  const submit = async source => {
+    write(candidate, source);
+    const { codeTask } = await harness.flow(executor, "prepare");
+    const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
+    save(file, { ...challenge, runId: "signed-limit", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+    return harness.flow(executor, "submit");
+  };
+  const rejected = await submit("from limits import MAXIMUM\n\ndef budget(value):\n    return min(value, MAXIMUM)\n");
+  assert.equal(rejected.phase, "intake");
+  assert.deepEqual(rejected.submission, { status: "architecture-import-boundary",
+    violations: [{ file: candidate, line: 1, target: "limits.py" }], next: { tool: "building_loop", action: "submit" } });
+  await assert.rejects(harness.file("root", "read", candidate), /读白名单/u);
+  assert.equal((await submit("import math\n\ndef budget(value):\n    return min(math.floor(value), 5)\n")).phase, "review-ready");
+}));
 
 test("the host preloads architecture sources and both reviewers decide only the compact section rows", () => fixture(async (root, write) => {
   const { harness, save } = project(root, write);
@@ -445,6 +471,114 @@ test("architecture attributes definite guards and definitions without accusing d
   ]);
 }));
 
+test("signed architecture assigns rejection decisions at their source while allowing transport and shared ownership", () => fixture(async (root, write) => {
+  const { harness, save } = project(root, write, { importsHeading: "静态导入" });
+  const claims = [
+    "- `runtime.py`：请求不是对象当 `bad-root`，未知条目 → `unknown-item`。",
+    "- `runtime.py`：错误码只负责 `bad-json`/`bad-root`。",
+    "- `runtime.py`：对外返回约定，缺失条目返回 `unknown-item`。",
+    "- `runtime.py`：将规则层错误码原样透传给调用方，未知条目 → `unknown-item`。",
+    "- `runtime.py`: end-to-end response, missing item -> `unknown-item`.",
+    "- `runtime.py`: forwards the response unchanged, missing item -> `unknown-item`.",
+    "- `runtime.py`：请求交给 `limits.py` 检查，未知条目 → `unknown-item`。",
+    "- `runtime.py`：未知分组 → `unknown-group`。",
+    "- `limits.py`：请求不是对象当 `bad-root`，未知条目 → `unknown-item`。",
+    "- `limits.py`: owns error codes `bad-root` and `unknown-item`.",
+  ];
+  const initial = plan.replace("入口限制请求预算。", claims.join("\n")) + "\n## 静态导入\n\n待由宿主生成。\n";
+  await harness.file("root", "write", architecture, { content: initial, note: "Register runtime ownership claims" });
+  await harness.flow("root", "architecture");
+  const executor = (await harness.flow("root", "advance")).childId;
+  write(candidate, [
+    "from limits import check",
+    "",
+    "def budget(value):",
+    "    if value == 'undecodable':",
+    "        return {'error': 'bad-json'}",
+    "    if value == 'ungrouped':",
+    "        return {'error': 'unknown-group'}",
+    "    return check(value)",
+    "",
+  ].join("\n"));
+  write("limits.py", [
+    "def check(request):",
+    "    if not isinstance(request, dict):",
+    "        return {'error': 'bad-root'}",
+    "    if request.get('item') == 'absent':",
+    "        return {'error': 'unknown-item'}",
+    "    if request.get('group') == 'absent':",
+    "        return {'error': 'unknown-group'}",
+    "    return {'units': 5}",
+    "",
+  ].join("\n"));
+  const { codeTask } = await harness.flow(executor, "prepare");
+  const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
+  save(file, { ...challenge, runId: "signed-rejection-ownership", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+  assert.equal((await harness.flow(executor, "submit")).phase, "architecture-sync");
+  const status = (await harness.flow("root", "prepare")).architecture;
+  assert.equal(status.status, "sync");
+  assert.equal(status.conflicts.length, 3);
+  assert.match(status.conflicts[0], /第 5 行.*bad-root.*limits\.py 第 3 行/u);
+  assert.match(status.conflicts[1], /第 5 行.*unknown-item.*limits\.py 第 5 行/u);
+  assert.match(status.conflicts[2], /第 6 行.*bad-root.*limits\.py 第 3 行/u);
+  await assert.rejects(harness.flow("root", "architecture"), /架构稿第 5 行.*bad-root/u);
+  const corrected = fs.readFileSync(path.join(root, architecture), "utf8").replace(claims[0],
+    "- `runtime.py`：交由规则模块决定输入和条目错误，原样返回检查结果。").replace(claims[1],
+    "- `runtime.py`：错误码只负责 `bad-json`。");
+  await harness.file("root", "write", architecture, { content: corrected, note: "Separate transport and check ownership" });
+  assert.equal((await harness.flow("root", "architecture")).phase, "review-ready");
+  const reviewer = (await harness.flow("root", "advance")).childId;
+  assert.equal((await harness.invoke(reviewer, "building_loop_code_review", { action: "prepare" })).phase, "first-review");
+}));
+
+test("source-proven sibling rejection order and explicit codec failures reject wrong claims only", () => fixture(async (root, write) => {
+  const sources = {
+    "policy.py": [
+      "def validate(request):",
+      "    operation = request.get('mode')",
+      "    if operation is None and 'mode' not in request:",
+      "        operation = 'run'",
+      "    if operation != 'run':",
+      "        return {'error': 'bad-mode'}",
+      "    if request.get('site') == 'blocked':",
+      "        return {'error': 'closed-site'}",
+      "    if request.get('legacy'):",
+      "        if request.get('version') != 2:",
+      "            return {'error': 'bad-version'}",
+      "    return {}",
+    ].join("\n"),
+    "entry.py": "import json\n\ndef parse(stream):\n    return json.load(stream)\n",
+  };
+  for (const [file, content] of Object.entries(sources)) write(file, content + "\n");
+  const reads = Object.keys(sources);
+  const graph = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file, sha256: digest(sources[file] + "\n") })),
+    { responsibilities: true });
+  const note = [
+    "# Modules",
+    "- `policy.py`（校验）",
+    "  - 在 `mode` 检查之前返回 `closed-site`。",
+    "  - 在 `mode` 检查之后返回 `closed-site`。",
+    "  - 在 `version` 检查之前返回 `closed-site`。",
+    "  - 将来在 `mode` 检查之前返回 `closed-site`。",
+    "  - 对外约定，在 `mode` 检查之前返回 `closed-site`。",
+    "- `policy.py`: `closed-site` precedes `bad-mode`.",
+    "- `policy.py`: `closed-site` follows `bad-mode`.",
+    "- 其他说明",
+    "  - 在 `mode` 检查之前返回 `closed-site`。",
+    "- `entry.py`：读取 stdin，`json.loads` 失败返回 `bad-json`。",
+    "- `entry.py`：读取 stdin，`json.load` 失败返回 `bad-json`。",
+    "- `entry.py`：将来改用 `json.loads`，`json.loads` 失败返回 `bad-json`。",
+    "- `entry.py`：错误由下游负责，不在入口调用 `json.loads`。",
+    "- `entry.py`：请求交由解码模块，`json.loads` 失败返回 `bad-json`。",
+  ].join("\n");
+  const conflicts = inspectArchitectureProse(note, graph);
+  assert.deepEqual(conflicts.map(({ line, relation, code, symbol }) => [line, relation, code ?? symbol]), [
+    [3, "rejection-order", "closed-site"], [8, "rejection-order", "closed-site"], [12, "json-decoder-call", "json.loads"],
+  ]);
+  assert.deepEqual(conflicts[0].actual.map(({ file, line }) => [file, line]), [["policy.py", 8], ["policy.py", 6]]);
+}));
+
+
 test("architecture registration pins one bounded fence of explicitly granted examples", () => fixture(async (root, write) => {
   const examplesHeading = "可执行验证";
   const diagnostics = { checkSet: "smoke", protocol: 2, recipes: ["entry", "compile", "writer-only"],
@@ -568,6 +702,33 @@ test("a signed architecture mismatch blocks approval, then both roles verify the
     assert.deepEqual((await action(reviewer, "probe", { assertion: "architecture" })).examples.map(({ id, outcome }) => ({ id, outcome })),
       [{ id: incorrect.id, outcome: "mismatch" }]);
     assert.equal((await action(reviewer, "prepare")).codeReview.architectureProbe, undefined);
+    const location = ref(architecture, examples.start, examples.end);
+    const submittedAsAnnotation = { id: "budget-example", kind: "annotation", ...location,
+      observation: "This section documents the wrong bound.", issue: "The stated bound exceeds the observed bound.",
+      fix: "Describe the checked bound.", evidence: [{ ...ref(candidate, 3), relation: "supports" }],
+      violation: { type: "annotation", obligation: "invariant", expected: "Five units", actual: "Eight units" } };
+    const correction = { code: "architecture-finding-kind", ...location, kind: "architecture",
+      violationType: "architecture", omit: "violation.obligation" };
+    const invalidKind = await action(reviewer, "record", { findings: [submittedAsAnnotation], findingsDone: true });
+    assert.deepEqual(invalidKind.errors[0].correction, correction);
+    assert.match(invalidKind.errors[0].reason, /位置已确认.*同一 findings.id/u);
+    assert.deepEqual(invalidKind.next.findingCorrections, [{ id: "budget-example", ...correction }]);
+    const observation = { id: "obs-budget", kind: "architecture", ...location,
+      observation: submittedAsAnnotation.observation, evidence: submittedAsAnnotation.evidence };
+    const downgraded = await action(reviewer, "record", { observations: [observation], findingsDone: true });
+    assert.equal(downgraded.progress.ready, false);
+    assert.deepEqual(downgraded.next.findingCorrections, [{ id: "budget-example", ...correction }]);
+    const stillPending = await action(reviewer, "submit");
+    assert.equal(stillPending.status, "needs-review");
+    assert.deepEqual(stillPending.next.findingCorrections, [{ id: "budget-example", ...correction }]);
+    const repurposed = await action(reviewer, "record", { findings: [{ ...submittedAsAnnotation, ...ref(candidate, 2) }] });
+    assert.match(repurposed.errors[0].reason, /原登记架构位置/u);
+    assert.deepEqual(repurposed.next.findingCorrections, [{ id: "budget-example", ...correction }]);
+    const insufficient = await action(reviewer, "record", { findings: [{ ...submittedAsAnnotation, kind: "architecture",
+      evidence: [{ ...location, relation: "supports" }],
+      violation: { type: "architecture", expected: "Five units", actual: "Eight units" } }] });
+    assert.match(insufficient.errors[0].reason, /引用相关当前源码或目标/u);
+    assert.deepEqual(insufficient.next.findingCorrections, [{ id: "budget-example", ...correction }]);
     assert.equal((await record(reviewer, end, incorrect)).progress.ready, true);
     assert.equal((await action(reviewer, "submit")).phase, "architecture-repair");
     examples = await publish(5);
@@ -580,6 +741,11 @@ test("a signed architecture mismatch blocks approval, then both roles verify the
     assert.notEqual(auditor, finalReviewer);
     const auditEnd = await prepare(auditor);
     assert.equal((await probe(auditor)).outcome, "match");
+    const mistaken = await action(auditor, "record", { findings: [{ ...submittedAsAnnotation, id: "rechecked" }] });
+    assert.deepEqual(mistaken.next.findingCorrections, [{ id: "rechecked", ...correction }]);
+    const withdrawn = await action(auditor, "record", { removeFindings: ["rechecked"], findingsDone: true });
+    assert.equal(withdrawn.next.findingCorrections, undefined);
+    assert.deepEqual(withdrawn.progress.pendingCorrections, []);
     assert.equal((await record(auditor, auditEnd)).progress.ready, true);
     assert.equal((await action(auditor, "submit")).phase, "ledger-review");
     assert.deepEqual(calls.map(({ probe }) => probe.recipe), ["compile", "entry", "entry", "entry"]);

@@ -218,10 +218,10 @@ export function architectureImportsSection(frame, spec, proposed) {
  * examples, fenced code and HTML may contain intentionally false statements. */
 export function architectureProseLines(source) {
   const result = new Map();
-  const pending = [...fromMarkdown(source, options).children];
+  const pending = fromMarkdown(source, options).children.map(node => ({ node }));
   const structure = markdownStructure(source.split(/\r\n|\n|\r/u));
   while (pending.length) {
-    const node = pending.pop();
+    const { node, parentItem } = pending.pop();
     if (["blockquote", "code", "footnoteDefinition", "definition", "html"].includes(node.type)) continue;
     if (node.type === "paragraph") {
       // Inline Markdown is kept in the line so a backticked filename remains
@@ -229,11 +229,15 @@ export function architectureProseLines(source) {
       const first = node.position.start.line, last = node.position.end.line;
       const lines = source.slice(node.position.start.offset, node.position.end.offset).split(/\r\n|\n|\r/u);
       for (let line = first; line <= last; line++) {
-        if (structure.visible[line - 1]?.trim()) result.set(line, lines[line - first]);
+        if (structure.visible[line - 1]?.trim()) result.set(line, [lines[line - first], parentItem]);
       }
-    } else if (node.children) pending.push(...node.children);
+    } else if (node.children) {
+      const paragraph = node.type === "listItem" && node.children[0]?.type === "paragraph" ? node.children[0] : null;
+      const item = paragraph && source.slice(paragraph.position.start.offset, paragraph.position.end.offset).split(/\r\n|\n|\r/u)[0];
+      pending.push(...node.children.map(child => ({ node: child, parentItem: child === paragraph ? parentItem : item || parentItem })));
+    }
   }
-  return [...result].sort(([left], [right]) => left - right);
+  return [...result].sort(([left], [right]) => left - right).map(([line, [row, parentItem]]) => [line, row, parentItem]);
 }
 
 /** Central-file edits can replace one existing section, preserving the route and every other section. */

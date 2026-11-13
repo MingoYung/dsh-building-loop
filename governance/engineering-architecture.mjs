@@ -5,6 +5,7 @@ import { architectureDocument, architectureImportsSection, architectureProseLine
 import { pythonImportEvidence } from "./python-dependencies.mjs";
 
 const declaration = /^(?:[-+*]\s+|\d+[.)]\s+)?(?:\*\*)?\x60?([^\s`:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(][^）)]{1,80}[）)])?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?/iu;
+const moduleItem = /^(?:\*\*)?\x60?([^\s\x60:：()（）]+\.py)\x60?(?:\*\*)?(?:\s*[（(][^）)]{1,80}[）)])?(?:\*\*)?\s*$/iu;
 const sentence = /[。！？!?；;]|\.(?=\s|$)/u;
 const notCurrent = /(?:不|未|无|禁止|避免|只能|否则|如果|若|计划|拟|将|应|需要|建议|可选|可能|目标|改为|待|示例|例如|比如|回退|反例|误写|旧版|原先|历史|通过|经由|间接|委托|(?:\b(?:does not|never|should|may|could|would|will|planned|previously|formerly|indirectly|via|if|example|incorrect)\b))/iu;
 const relation = /(?:直接\s*)?(调用|导入|\bcalls?\b|\bimports?\b)\s*/giu;
@@ -22,9 +23,15 @@ const rejectionDecision = /(?:做|作|给出|执行)\s*\x60([\p{ID_Start}_][\p{I
 const conditionalRejection = /(?:超出|超过|不符(?:合)?|失败|缺失|无效|畸形|否则|对照)[^，,。！？；;\x60]{0,16}(?:给出|返回|抛出|报出)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const shapeRejection = /^(?:(?:当前|实际|负责|直接)\s*)*(?:校验|验证|检查)\s*[\p{L}\p{N}_ -]{1,24}(?:形态|形状|结构|格式|类型)\s*[（(]\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*[）)]/iu;
 const decisionOutcome = /(?:判定|判断|核定)[^，,。！？；;（）()]{1,32}[（(]\s*(?:超出|超过|不符(?:合)?|失败|缺失|无效|畸形)\s*(?:→|->)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*[）)]/iu;
+const conditionOutcome = /(?:未知|缺失|不存在|不符(?:合)?|失败|无效|畸形|不(?:是|为|属于)|\b(?:unknown|missing|malformed|invalid|not (?:an?|the))\b)[^\x60，,。！？；;（）()→]{0,28}?(?:→|->|当(?:作)?|视为)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/giu;
+const assignedCodes = /(?:^|[，,:：])\s*(?:错误码(?:由本模块|仅|只)?负责|(?:this (?:module|file) )?(?:owns|is responsible for) error codes?)\s*(\x60[\p{ID_Start}_][\p{ID_Continue}_-]*\x60(?:\s*(?:\/|、|\band\b)\s*\x60[\p{ID_Start}_][\p{ID_Continue}_-]*\x60){0,7})/giu;
 const guardedAlternatives = /(?:检查|校验|验证|以及|并核对)\s*[\p{L}\p{N}_ -]{1,24}(?:是否属于|是否为|仅允许|只能是)\s*\x60[\p{ID_Start}_][\p{ID_Continue}_-]*\x60(?:\s*(?:\/|、|或)\s*\x60[\p{ID_Start}_][\p{ID_Continue}_-]*\x60){1,7}\s*[（(]\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60(?=[，,）)])/iu;
 const forwardsRejection = /(?:透传|转发|原样|包装|序列化|下游|上游|代为|沿用|保留)/u;
+const documentsResponse = /(?:端到端|对外|调用方(?:收到|看到)|交(?:给|由)|\b(?:pass[- ]?through|forwards?|propagates?|serializes?|end[- ]to[- ]end|caller (?:sees|receives))\b)/iu;
 const explicitJsonDecoder = /(?:调用|使用|通过|(?:→|->)|\b(?:calls?|uses?)\b|\b(?:and|using)\b|(?:并|用))\s*\x60(json\.loads?)\x60(?!\s*(?:\/|或|\bor\b))/iu;
+const failingJsonDecoder = /(?:^|[，,：:])\s*\x60(json\.loads?)\x60\s*(?:解析)?失败(?:时)?\s*(?:直接)?(?:返回|抛出|给出|报出)\s*\x60/iu;
+const checkBeforeRejection = /\x60([\p{ID_Start}_][\p{ID_Continue}_]*)\x60\s*(?:校验|验证|检查|判断|分发)(?:\s*(?:与|和|及)[^，,。！？；;]{1,28}?)?\s*(之前|之后)\s*(?:直接)?(?:返回|抛出|给出|报出)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
+const rejectionBeforeCode = /^\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*(先于|晚于|\b(?:precedes|follows)\b)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const parseDelegation = /(?:交付(?:给)?|交给|传给|委托(?:给|由)?)\s*(\x60[^\x60]+\x60|[\p{ID_Start}_][\p{ID_Continue}.-]*)\s*(?:解析|解码)|\b(?:hands?|passes?|delegates?)\b[^。;；]{0,60}\bto\s+(\x60[^\x60]+\x60|[\p{ID_Start}_][\p{ID_Continue}.-]*)\s+for\s+(?:JSON\s+)?(?:parsing|decoding)/iu;
 const rawInput = /(?:原始(?:文本|字符串|输入|字节)|\b(?:raw\s+(?:input|text|bytes)|JSON)\b)/iu;
 const decodedInput = /(?:解码后|解析后|已(?:经)?(?:解析|解码)|\b(?:already\s+)?decoded\b)/iu;
@@ -183,9 +190,16 @@ function sourceResponsibilityConflicts(claim, line, from, locate, graph) {
     }
   }
   const decision = rejectionDecision.exec(claim);
-  if (!delegated.test(claim) && !forwardsRejection.test(claim)) {
+  // A direct condition-to-code statement or named code responsibility
+  // needs a unique literal rejection site. Describing what an external
+  // caller receives does not assign the branch to the transport module.
+  if (!delegated.test(claim) && !forwardsRejection.test(claim) && !documentsResponse.test(claim)) {
     const codes = new Set([decision?.[1] ?? decision?.[2],
       conditionalRejection.exec(claim)?.[1], shapeRejection.exec(claim.trim())?.[1], decisionOutcome.exec(claim)?.[1]]);
+    for (const [, code] of claim.matchAll(conditionOutcome)) codes.add(code);
+    for (const [, names] of claim.matchAll(assignedCodes)) {
+      for (const [, code] of names.matchAll(inlineLabel)) codes.add(code);
+    }
     const guardedCode = guardedAlternatives.exec(claim)?.[1];
     // A semantic label may differ from its field identifier. This narrow
     // case still requires the exact code in a unique parsed field guard.
@@ -197,9 +211,10 @@ function sourceResponsibilityConflicts(claim, line, from, locate, graph) {
       if (isUnique(actual) && actual[0].file !== from) result.push({ line, from, relation: "decision", code, actual });
     }
   }
-  const decoder = explicitJsonDecoder.exec(claim)?.[1];
+  const decoder = (explicitJsonDecoder.exec(claim) ?? failingJsonDecoder.exec(claim))?.[1];
   const localDecoders = graph.jsonDecoders?.filter(row => row.file === from) ?? [];
-  if (decoder && !notCurrent.test(claim) && !/(?:两者|二者|等价|类似|equivalent|alternatives?)/iu.test(claim) && localDecoders.length &&
+  if (decoder && !notCurrent.test(claim.replace(/\x60[^\x60]+\x60/gu, "")) && !documentsResponse.test(claim) &&
+      !/(?:两者|二者|等价|类似|equivalent|alternatives?)/iu.test(claim) && localDecoders.length &&
       !localDecoders.some(row => row.symbol === decoder)) {
     result.push({ line, from, relation: "json-decoder-call", symbol: decoder, actual: localDecoders });
   }
@@ -216,22 +231,49 @@ function sourceResponsibilityConflicts(claim, line, from, locate, graph) {
   return result;
 }
 
+/** Explicit precedence between a rejection and a named check is verifiable
+ * only when both resolve to unique early guards in the same function. */
+function rejectionOrderConflict(claim, line, from, graph) {
+  if (graph.responsibilitiesTruncated || graph.truncated || graph.unparsedFiles?.length ||
+      ownershipNotCurrent.test(claim) || negatedResponsibility.test(claim) ||
+      delegated.test(claim) || forwardsRejection.test(claim) || documentsResponse.test(claim)) return;
+  const fieldOrder = checkBeforeRejection.exec(claim);
+  const codeOrder = rejectionBeforeCode.exec(claim);
+  if (!fieldOrder && !codeOrder) return;
+  const [, name, direction, code] = fieldOrder ?? [null, codeOrder[3], codeOrder[2], codeOrder[1]];
+  const before = /^(?:之前|先于|precedes)$/iu.test(direction);
+  const guards = graph.orderedGuards?.filter(row => row.file === from) ?? [];
+  const emissions = guards.filter(row => row.code === code);
+  if (emissions.length !== 1) return;
+  const [emission] = emissions;
+  const checks = guards.filter(row => row.functionLine === emission.functionLine && row.code !== code &&
+    (fieldOrder ? row.field === name : row.code === name));
+  if (checks.length !== 1 || (emission.line < checks[0].line) === before) return;
+  return { line, from, relation: "rejection-order", code, check: name, claimedBefore: before, actual: [emission, checks[0]] };
+}
+
 /** Validate only explicit current claims attached to a named module. Local
  * module identity, relation and line are data. Uncertain responsibility, call
  * binding and future designs stay with independent review. */
 export function inspectArchitectureProse(source, graph) {
   const locate = moduleLookup(graph.checkedFiles);
   const conflicting = [];
-  for (const [line, row] of architectureProseLines(source)) {
+  for (const [line, row, parentItem] of architectureProseLines(source)) {
     for (const conflict of explicitImportClauses(row, line, locate, graph)) {
       conflicting.push(conflict);
       if (conflicting.length >= 12) return conflicting;
     }
     const label = declaration.exec(row);
-    const from = label && locate(label[1]);
+    const parent = !moduleItem.test(row) && parentItem && moduleItem.exec(parentItem);
+    const module = (label || parent)?.[1];
+    const from = module && locate(module);
     if (!from) continue;
-    const body = row.slice(label[0].length);
+    const body = label ? row.slice(label[0].length) : row;
     for (const claim of body.split(sentence)) {
+      const order = rejectionOrderConflict(claim, line, from, graph);
+      if (order) conflicting.push(order);
+      if (conflicting.length >= 12) return conflicting;
+      if (!label) continue;
       const responsibility = responsibilityConflict(claim, line, from, graph);
       const sourceClaims = sourceResponsibilityConflicts(claim, line, from, locate, graph);
       for (const conflict of [...(responsibility ? [responsibility] : []), ...sourceClaims]) {
@@ -308,7 +350,7 @@ export function engineeringArchitectureSourceFacts(frame, unit) {
 }
 
 export function architectureClaimIssues(conflicts) {
-  return conflicts.map(({ line, from, to, relation, actual, field, symbol, code }) => {
+  return conflicts.map(({ line, from, to, relation, actual, field, symbol, code, check, claimedBefore }) => {
     if (relation === "source-presence") {
       return "架构稿第 " + line + " 行称当前源码缺失。宿主已确认这些登记源码存在：" +
         actual.map(row => row.file).join("、") + "。请按当前项目状态描述。";
@@ -328,6 +370,12 @@ export function architectureClaimIssues(conflicts) {
       return "架构稿第 " + line + " 行将「" + code + "」判定归于 " + from + "。当前签名源码的明确拒绝分支在 " +
         witnesses.join("、") + "。请区分规则参数和实际拒绝分支。";
     }
+    if (relation === "rejection-order") {
+      const [emission, other] = actual;
+      return "架构稿第 " + line + " 行称「" + code + "」判定" + (claimedBefore ? "先于" : "晚于") +
+        "「" + check + "」检查。当前签名源码 " + from + " 的 " + emission.symbol + " 在第 " + emission.line +
+        " 行触发「" + emission.code + "」，第 " + other.line + " 行触发「" + other.code + "」。请按实际顺序描述。";
+    }
     if (relation === "definition" || relation === "validation") {
       const claimed = relation === "definition" ? "实现 " + symbol : "校验字段 " + field;
       const witnesses = [...new Set(actual.map(row => row.file + " 第 " + row.line + " 行 " + row.symbol +
@@ -342,13 +390,12 @@ export function architectureClaimIssues(conflicts) {
       "。请按实际路径改写，间接关系写清中间模块。";
   });
 }
-
 /** A plan is published by the coordinator under the same lock as dispatch. */
 export function registerEngineeringArchitecture(frame, unit, spec, tag) {
   const active = frame.state.units[unit];
   if (!spec.architecture || frame.role !== "coordinator" || !includes(frame.writes, spec.architecture.file) ||
     active && active.owner !== frame.agent.id) throw new Error("只有获授权的本单元总控能登记架构稿");
-  if (active && !["review-ready", "final-review-ready", "architecture-sync", "architecture-repair", "ledger-review", "blocked"].includes(active.phase)) {
+  if (active && !["review-ready", "final-review-ready", "architecture-sync", "architecture-repair", "ledger-review", "blocked", "diagnosis-repair-ready"].includes(active.phase)) {
     throw new Error("只在派单前、代码待审或架构退回时登记架构稿；正在工作的子会话须先结束阶段");
   }
   const goal = goalSnapshot(frame);
@@ -365,9 +412,15 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag) {
   const presenceConflicts = inventory.truncated ? [] :
     inspectArchitectureSourcePresence(text(readBytes(frame.root, plan.file)), inventory.rows);
   if (presenceConflicts.length) throw new Error(architectureClaimIssues(presenceConflicts).join("\n"));
-  const imports = inspectArchitectureImports(frame, spec, active);
-  const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports);
-  if (claims.conflicts.length) throw new Error(architectureClaimIssues(claims.conflicts).join("\n"));
+  // Verified diagnosis may point at code that still cannot parse. Pin only
+  // the owner's current plan here; signed submission checks the repaired source.
+  const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
+    active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase);
+  const imports = pendingCodeRepair ? undefined : inspectArchitectureImports(frame, spec, active);
+  if (!pendingCodeRepair) {
+    const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports);
+    if (claims.conflicts.length) throw new Error(architectureClaimIssues(claims.conflicts).join("\n"));
+  }
   if (imports && !imports.match) {
     replaceWithHistory(frame.root, plan.file, before => {
       if (!before || digest(before) !== imports.sha256) throw new Error("静态导入生成时架构正文已变化，请重新登记");
@@ -442,8 +495,10 @@ export function engineeringArchitectureStatus(frame, unit) {
       return conflicts.length ? { ...sync, conflicts: architectureClaimIssues(conflicts) } : sync;
     } catch (error) { return { ...sync, reason: error.message }; }
   }
+  const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
+    active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase);
   try {
-    const snapshot = requireEngineeringArchitecture(frame, unit, spec, active);
+    const snapshot = requireEngineeringArchitecture(frame, unit, spec, active, !pendingCodeRepair);
     return { ...contract, status: "registered", sha256: snapshot.sha256 };
   } catch (error) {
     return { ...contract, status: "required", reason: error.message, next: { action: "architecture", unit } };
