@@ -155,7 +155,7 @@ const COORDINATOR = {
   "goal-review-ready": "目标已改变或旧验收版本失效。advance 续用核验会话验证当前交付，原事实记录保留。",
   "first-audit-ready": "首次核验暂通过，尚未验收。advance 启动独立反证子会话，不能提前关单。",
   "final-audit-ready": "修订核验暂通过，尚未验收。advance 续用独立反证子会话核全文与推导，之后才能复盘账本。",
-  "diagnosis-ready": "执行停滞。根据宿主提供的失败类别、版本和次数，判断是参数、运行器、语法或行为层。用 building_loop_diagnose triage 写明依据，再 advance 派只读诊断。",
+  "diagnosis-ready": "执行停滞。根据宿主提供的失败类别、版本和次数，判断是参数、运行器、语法或行为层。用 building_loop_diagnose triage 写明依据，再 advance 派只读诊断。诊断耗尽时保留明确阻塞。",
   "diagnosis-verify": "只读诊断已交回执。核对当前版本、源码定位、宿主最小复现回执和修复范围。用 building_loop_diagnose verify 确认或明确退回依据。",
   "diagnosis-repair-ready": "诊断已核实。用 advance 将定点修复交回原执行会话，随后仍须通过签名回归、独立审核与复核。",
   blocked: "先确认解阻条件，再用 advance 恢复原阶段和原子会话。模型首次中断可以续派，反复中断则把实际阻塞记入台账。",
@@ -313,6 +313,10 @@ function diagnosisNext(active) {
     ? { tool: WORKFLOW, action: "advance" } : { tool: DIAGNOSE, action: "triage" };
   if (active?.phase === "diagnosis-verify") return { tool: DIAGNOSE, action: "verify" };
   if (active?.phase === "diagnosis-repair-ready") return { tool: WORKFLOW, action: "advance" };
+  if (active?.phase === "blocked" && active.resumePhase === "diagnosis") {
+    return active.stallDiagnostic?.status === "exhausted"
+      ? { status: "exhausted", reason: active.blocked } : { tool: WORKFLOW, action: "advance" };
+  }
 }
 
 /** The coordinator can see diagnostics and source locators, but never probe
@@ -323,7 +327,9 @@ function diagnosisPacket(active, role) {
   const { evidence, triageReason, retryReason, verificationReason } = row;
   const summary = stallDiagnosticSummary(active);
   if (!summary) return;
-  return { ...summary, ...(triageReason ? { triageReason } : {}), ...(retryReason ? { retryReason } : {}),
+  return { ...summary, ...(row.emptyCompletions ? { emptyCompletions: row.emptyCompletions } : {}),
+    ...(row.replacements ? { replacements: row.replacements } : {}),
+    ...(triageReason ? { triageReason } : {}), ...(retryReason ? { retryReason } : {}),
     ...(verificationReason ? { verificationReason } : {}),
     ...(evidence ? { evidence: { ...evidence, ...(role === "executor" && row.replay ? { replay: row.replay } : {}) } } : {}) };
 }
@@ -749,6 +755,15 @@ export function apply(ctx, config = {}) {
     return { goal, qualification, pending };
   }
 
+  /** The executor receives only host-authorized repair instructions, not
+   * access to the review receipt or to the reviewer's private evidence. */
+  function codeRepairPacket(frame, active) {
+    const rejection = active.codeReviewRejection;
+    if (frame.role !== "executor" || active.phase !== "supplement" || !rejection?.repair ||
+      rejection.goalSha256 !== goalSnapshot(frame).sha256) return;
+    return { receipt: active.receipt, sha256: rejection.receiptSha256, ...rejection.repair };
+  }
+
   /** Return one exact unread range per file. Repeated submit calls advance it. */
   function submissionGaps(pending, active) {
     return pending.flatMap(({ path, sha256, lines }) => {
@@ -877,6 +892,12 @@ export function apply(ctx, config = {}) {
       const architecture = checkpoint ? architectureNext(frame, architectureUnit) : engineeringArchitectureStatus(frame, architectureUnit);
       const phase = assignment?.[1].phase ?? current?.phase ?? "dispatch";
       if(spec)refreshCheckpoints(frame,current,spec);
+      if (frame.role === "diagnostician" && current.stallDiagnostic.preparedSerial !== current.serial) {
+        // A new activation must expose its own version before a probe or
+        // receipt can rely on source reads from that diagnostic session.
+        current.stallDiagnostic.preparedSerial = current.serial;
+        frame.changed = true;
+      }
       const codeReviewMode = codeReviewRole(frame);
       // Goals, architecture and current changed-source evidence share one
       // read budget. Stamps are recorded only for lines actually returned.
@@ -953,6 +974,7 @@ export function apply(ctx, config = {}) {
         frame.role === "coordinator" && current?.owner === frame.agent.id ? diagnosisPacket(current, frame.role) : undefined;
       const codeTask = frame.role === "executor" && assignment && current.codeIntake &&
         (phase === "intake" || current.codeIntake.regression) ? prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) : null;
+      const codeRepair = codeTask && codeRepairPacket(frame, current);
       const recipeInputs = codeTask && visibleRecipeInputs(reproductionPolicy(frame));
       if (recipeInputs) codeTask.reproduction = { tool: REPRODUCE, recipeInputs };
       let submission;
@@ -984,6 +1006,7 @@ export function apply(ctx, config = {}) {
         ...(instruction ? { instruction } : {}),
         ...(architecture ? { architecture } : {}),
         ...(codeTask ? { codeTask } : {}),
+        ...(codeRepair ? { codeRepair } : {}),
         ...(stallDiagnostic ? { stallDiagnostic } : {}),
         ...(diagnostic ? { reproduction: { recipes: diagnostic.recipes ?? [], syntaxRecipe: diagnostic.syntaxRecipe,
           recipeInputs: visibleRecipeInputs(diagnostic),
@@ -1291,6 +1314,9 @@ export function apply(ctx, config = {}) {
       if (!policy) throw new Error("仅已登记复现的当前代码执行方或只读诊断方可以运行");
       const { expectedExitCode, expectedJson, expectedPointer, expectedOperator, requirement: clause, ...probe } = args;
       const { active, spec } = diagnosticContext(frame);
+      if (frame.role === "diagnostician" && active.stallDiagnostic.preparedSerial !== active.serial) {
+        throw new Error("先用 prepare 读取本次诊断的版本和配方");
+      }
       let investigation;
       if ([expectedExitCode, expectedJson, expectedPointer, expectedOperator, clause].some(value => value !== undefined)) {
         if (!behavior || frame.role !== "diagnostician" || args.action !== "probe" || args.recipe === policy.syntaxRecipe ||
@@ -1355,6 +1381,7 @@ export function apply(ctx, config = {}) {
           triageReason: requireText(args.reason, "分层判断依据", 500) });
       } else if (investigator && ["submit", "reroute"].includes(args.action)) {
         if (!current || record.status !== "investigating") throw new Error("诊断版本或阶段已变化，请总控重新分层");
+        if (record.preparedSerial !== active.serial) throw new Error("先用 prepare 读取本次诊断的版本和配方");
         if (frame.started?.proposal.instruction && active.instructionReadSerial !== active.serial) {
           throw new Error("先用 prepare 读取本阶段完整的用户开工指令");
         }
@@ -1449,7 +1476,7 @@ export function apply(ctx, config = {}) {
         throw new Error("无法确认原执行身份，不能改派修复");
       }
       return { prior, phase: repair ? stall.resumePhase : "diagnosis", role: repair ? "executor" : "diagnostician",
-        reusable: repair ? stall.executor : interrupted ? prior.actor : prior.diagnostician,
+        reusable: repair ? stall.executor : stall.investigator ?? (interrupted ? prior.actor : undefined),
         serial: prior.serial + 1, stallId: stall.id, repair };
     }
     const revalidating = needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted;
@@ -1520,8 +1547,13 @@ export function apply(ctx, config = {}) {
         }
       }
       if (["reviewer", "auditor"].includes(plan.role)) requireCodeRegressionCurrent(frame, id, record, spec, record.goal);
-      if (plan.stallId) record.stallDiagnostic = { ...record.stallDiagnostic,
-        status: plan.repair ? "resolved" : "investigating" };
+      if (plan.stallId) {
+        // A later stall may be on different bytes or a different failure.
+        // A child session is reused only within the same diagnostic record.
+        record.stallDiagnostic = { ...record.stallDiagnostic,
+          status: plan.repair ? "resolved" : "investigating",
+          ...(!plan.repair ? { investigator: childId } : {}) };
+      }
       // A new activation cannot consume an earlier turn/end from the same
       // native session, even if that event is delivered again after the resume.
       if (Number.isSafeInteger(resident?.session.seq)) record.activationStartSeq = resident.session.seq;
@@ -1589,12 +1621,16 @@ export function apply(ctx, config = {}) {
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
         + (plan.repair ? "。原执行会话继续定点修复。prepare 会返回总控核实的诊断、修法和可重跑输入。" : "")
         + (plan.regressionRetry ? "。当前代码或目标需要重新取得受信回归回执并提交，改前通过的用例集合保持固定。" : "")
-        + (record.receipt && plan.phase === "supplement" ? "。请读取退回回执 " + record.receipt : "")
+        + (record.receipt && plan.phase === "supplement" ?
+          record.codeReviewRejection?.repair ? "。用 prepare 查看宿主登记的本次代码退回项。"
+          : includes(spec.phases.supplement.read, record.receipt) ? "。请读取退回回执 " + record.receipt : "" : "")
         + "。执行前依据已注入的阶段规则与授权范围。"
         // Reviewer/auditor activation never consumes the coordinator's free-text
         // note, which can contain previous verdicts or proposed answers. Required
         // user changes belong in authorized project files, read at the new stage.
-        + (plan.role==="diagnostician" ? "本次只读诊断分层为 " + record.stallDiagnostic.layer + "。用 prepare 查看当前授权和可用复现配方。"
+        + (plan.role==="diagnostician" ? "当前只读诊断 " + record.stallDiagnostic.id
+          + "，工件摘要 " + record.stallDiagnostic.artifactSha256 + "，分层 " + record.stallDiagnostic.layer
+          + "。先用 prepare 领取本次版本与复现配方，再取得该版本的实测回执。"
           : plan.role!=="executor"?"独立依据当前授权目标、候选和原始材料核验，不预设结论。"
           : plan.repair ? ""
           : ownerTableIntake ? "先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。"
@@ -1694,6 +1730,32 @@ export function apply(ctx, config = {}) {
       const previous = Object.hasOwn(active.interruptionEvents ?? {}, event.session) ? active.interruptionEvents[event.session] : -1;
       if (event.seq < (active.activationStartSeq ?? 0) || event.seq <= previous) return;
       active.interruptionEvents = { ...active.interruptionEvents, [event.session]: event.seq };
+    }
+    if (active.phase === "diagnosis" && event.reason === "completed") {
+      const row = active.stallDiagnostic;
+      row.emptyCompletions = (row.emptyCompletions ?? 0) + 1;
+      if (row.emptyCompletions >= 2) {
+        delete row.probes;
+        delete row.preparedSerial;
+        delete row.investigator;
+        if (row.replacements) {
+          row.status = "exhausted";
+          pause(active, "两名只读诊断者均未交付当前版本的复现回执。已挂起待查，保留签名和证据门槛。");
+          trackUnit(frame, id, active, true);
+        } else {
+          row.replacements = 1;
+          row.emptyCompletions = 0;
+          row.retryReason = "诊断两次结束均未交回执。根据当前版本重新分层后改派另一个只读会话。";
+          row.status = "needs-triage";
+          delete row.layer;
+          delete active.blocked;
+          delete active.resumePhase;
+          active.phase = "diagnosis-ready";
+          trackUnit(frame, id, active);
+        }
+        frame.changed = true;
+        return;
+      }
     }
     // A conversational end without a workflow receipt is not a delivery.
     pause(active, event.reason === "completed"
@@ -1918,7 +1980,18 @@ export function apply(ctx, config = {}) {
     delete active.pendingReceipt;
     if (rejected) {
       const { architecture, code } = engineeringRepair(proof);
-      if (code) active.codeReviewRejection = { artifactsSha256: signed.artifactsSha256, goalSha256: goal.sha256 };
+      if (code) active.codeReviewRejection = { artifactsSha256: signed.artifactsSha256, goalSha256: goal.sha256,
+        receiptSha256: digest(receiptBytes), repair: {
+          findings: proof.findings.filter(row => row.owner !== "coordinator")
+            .map(({ id, kind, file, start, end, issue, fix, violation }) => ({
+              id, kind, file, start, end, issue, fix, requirement: violation.requirement,
+            })),
+          comments: proof.files.flatMap(row => (row.comments ?? [row.comment])
+            .filter(comment => comment?.status === "missing")
+            .map(({ start, end, staticProof, basis }) => ({ file: row.file, start, end, obligation: staticProof?.obligation, basis }))),
+          constraints: proof.constraints.filter(row => row.status === "revise")
+            .map(({ caseId, requirement, code, basis }) => ({ caseId, requirement, code, basis })),
+        } };
       else delete active.codeReviewRejection;
       active.phase = architecture ? "architecture-repair" : "supplement-ready";
     } else {

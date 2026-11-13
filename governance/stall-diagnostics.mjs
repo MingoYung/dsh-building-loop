@@ -5,6 +5,7 @@ export const STALL_LAYERS = Object.freeze(["parameters", "runner", "syntax", "be
 export const DIAGNOSIS_WAIT = new Set(["diagnosis-ready", "diagnosis-verify", "diagnosis-repair-ready"]);
 const REPEATED_FAILURES = 3;
 const UNPRODUCTIVE_PROBES = 4;
+const OSCILLATION_LENGTH = 5;
 const MAX_OBSERVATIONS = 64;
 const MAX_SIGNATURES = 16;
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -82,6 +83,30 @@ function failureKey(failure) {
     layer === "syntax" ? path : undefined]));
 }
 
+function oscillationKey(failure) {
+  if (failure.layer !== "syntax") return failureKey(failure);
+  // Line offsets and the protected case that first encounters an invalid
+  // file may vary between revisions. Keep the known parser family and any
+  // authenticated source path, never the last file the executor edited.
+  return digest(JSON.stringify(["syntax", failure.exception ?? failure.kind, failure.path]));
+}
+
+/** An ordinary new revision is progress. Escalate only after the five most
+ * recent failing revision visits alternate between exactly two proven byte
+ * identities. Rechecks within a visit never count as new revision visits. */
+function observeOscillation(window, artifactSha256, key) {
+  const visit = { artifactSha256, key };
+  const trail = window.failedRevisions ?? [];
+  const latest = trail.at(-1);
+  if (latest?.artifactSha256 === artifactSha256) {
+    if (latest.key !== key) window.failedRevisions = [visit];
+    return false;
+  }
+  const next = window.failedRevisions = [...trail.slice(1 - OSCILLATION_LENGTH), visit];
+  if (next.length !== OSCILLATION_LENGTH || next[0].artifactSha256 === next[1].artifactSha256) return false;
+  return next.every((row, index) => row.key === key && row.artifactSha256 === next[index % 2].artifactSha256);
+}
+
 function freezeDiagnostic(active, artifactSha256, failure, repeatCount, trigger) {
   const { layer, kind, caseId, path, fallbackPath, recipe } = failure;
   active.stallDiagnostic = {
@@ -104,6 +129,11 @@ export function observeExecutionDiagnostic(active, observation) {
   const fallbackPath = observation.fallbackPath ?? changed?.path;
   const classified = failureOf({ ...observation, operation, fallbackPath });
   const executed = result.status === "passed" || result.status === "failed";
+  // Count only a full check with a real case failure. A compiler probe may
+  // report the same parser error in a different shape, and must not replace
+  // an already observed full check for this revision.
+  const trustedSourceFailure = operation === "check" && result.status === "failed" &&
+    classified?.caseId !== undefined && SHA256.test(result.snapshotSha256 ?? "");
   if (!classified && !executed) return undefined;
   // Resuming the original executor gets a fresh observation window. The same
   // artifact can stall again if that repair attempt also makes no progress.
@@ -112,16 +142,22 @@ export function observeExecutionDiagnostic(active, observation) {
     delete active.stallObservations;
   }
   let window = active.stallObservations;
-  if (window?.artifactSha256 !== artifactSha256 || window.goalSha256 !== goalSha256 ||
-    window.phase !== active.phase || window.serial !== active.serial) {
-    window = { artifactSha256, goalSha256, phase: active.phase, serial: active.serial, attempts: [], failures: [], probes: 0 };
+  const sameAssignment = window && window.goalSha256 === goalSha256 && window.phase === active.phase && window.serial === active.serial;
+  if (sameAssignment && window.attempts.includes(requestId)) return undefined;
+  if (!sameAssignment || window.artifactSha256 !== artifactSha256) {
+    // Carry the bounded request IDs across versions within one assignment.
+    // A nonqualifying observation on different bytes breaks the source trail.
+    const attempts = sameAssignment ? window.attempts : [];
+    const failedRevisions = sameAssignment && trustedSourceFailure ? window.failedRevisions : undefined;
+    window = { artifactSha256, goalSha256, phase: active.phase, serial: active.serial,
+      attempts, failures: [], probes: 0, ...(failedRevisions?.length ? { failedRevisions } : {}) };
     if (active.stallObservations) delete active.stallObservations;
   }
-  if (window.attempts.includes(requestId)) return undefined;
   // An exploratory nonzero exit can be correct for intentionally invalid
   // input. Treat it as evidence of a stall only with a full failing check.
   const failure = classified?.kind === "probe-failed" && !window.pendingCheck?.eligible ? undefined : classified;
-  if (!failure && (operation === "check" ? !window.failures.length : !window.pendingCheck?.eligible)) return undefined;
+  if (!failure && (operation === "check" ? !window.failures.length && !window.failedRevisions?.length :
+    !window.pendingCheck?.eligible)) return undefined;
   // A replaced window is the signal for the host to persist an observation.
   // Ignore no-op probes and checks instead of rewriting the workspace backup.
   window = active.stallObservations = { ...window, attempts: [...window.attempts],
@@ -134,6 +170,7 @@ export function observeExecutionDiagnostic(active, observation) {
     window.failures = [];
     window.probes = 0;
     delete window.pendingCheck;
+    delete window.failedRevisions;
     return undefined;
   }
   if (failure) {
@@ -147,6 +184,9 @@ export function observeExecutionDiagnostic(active, observation) {
     row.count++;
     if (row.count >= REPEATED_FAILURES) {
       return freezeDiagnostic(active, artifactSha256, failure, row.count, "repeated-failure");
+    }
+    if (trustedSourceFailure && observeOscillation(window, artifactSha256, oscillationKey(failure))) {
+      return freezeDiagnostic(active, artifactSha256, failure, OSCILLATION_LENGTH, "recurring-failed-versions");
     }
     if (operation === "check" && result.status === "failed") {
       if (window.pendingCheck?.key !== key) {

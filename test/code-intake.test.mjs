@@ -157,10 +157,10 @@ test("regression executors must edit existing implementation against one exact p
   await assert.rejects(harness.file(childId, "write", module, { content: "    return value + 2\n", note }), /须用 edit 局部编辑/);
   await assert.rejects(harness.file(childId, "edit", writeOnly, { ...tail, note, beforeSha256: digest("keep = True\n") }), /读白名单/);
   await assert.rejects(harness.file(childId, "edit", fresh, { ...tail, note, beforeSha256: digest("") }), /只适用于已有文件/);
-  await assert.rejects(edit({ ...head, beforeSha256: digest("stale") }), /摘要不匹配/);
-  await assert.rejects(edit({ oldText: "# untouched", newText: "", }), /恰好出现一次/);
+  await assert.rejects(edit({ ...head, beforeSha256: digest("stale") }), /摘要不匹配.*stale-source/);
+  await assert.rejects(edit({ oldText: "# untouched", newText: "" }), /恰好出现一次.*anchor-ambiguous.*未落盘/);
   await assert.rejects(edit({ edits: [head, { oldText: "value + 1", newText: "value + 9" }] }), /不能重叠/);
-  await assert.rejects(edit({ edits: [head, { oldText: "missing", newText: "extra" }] }), /第 2 项.*恰好出现一次/);
+  await assert.rejects(edit({ edits: [head, { oldText: "missing", newText: "extra" }] }), /第 2 项.*anchor-not-found.*未落盘/);
   assert.equal(sourceOnDisk(), original);
   assert.equal(fs.existsSync(backup), false);
   const changed = await edit({ edits: [tail, head] });

@@ -24,6 +24,84 @@ function suiteFailure(message, caseId = "required-1") {
     required: [{ caseId, status: "failed", error: { caseId, message } }] };
 }
 
+test("A–B–A–B–A parser failures park the current bytes despite varying error text", () => {
+  const active = { phase: "supplement", serial: 2 };
+  // Pins and error classes from the two repeating, non-parsing journal
+  // revisions in the frozen G4 replay. Other registered files stay fixed.
+  const revisionA = [{ path: "journal.py", sha256: "e2fc62a6aea2aea51728e0a4c139292587d8273d08b1cbfdae3810da2b2ff4e0" }, ...versions];
+  const revisionB = [{ path: "journal.py", sha256: "420be7b797edaaf07e96c7b7eeeb7febbe24dbd39525f516114d4e51f34e4858" }, ...versions];
+  const failureA = suiteFailure("SyntaxError: invalid syntax");
+  const failureB = suiteFailure("SyntaxError: unterminated triple-quoted string literal (detected at line 254)", "required-2");
+  const attempts = [
+    [revisionA, failureA], [revisionB, failureB], [revisionA, failureA], [revisionB, failureB], [revisionA, failureA],
+  ];
+  const observeVisit = (index, [artifacts, result]) => observe(active, index, result,
+    { artifacts, goalSha256: digest("new G4 requirements"), changed: { path: "journal.py", sha256: artifacts[0].sha256 } });
+  for (const [index, row] of attempts.slice(0, -1).entries()) assert.equal(observeVisit(index, row), undefined);
+  assert.equal(observeVisit(0, attempts[0]), undefined, "a replay from the first visit cannot complete the pattern");
+  assert.equal(observeVisit("repeat", attempts[3]), undefined, "rechecking B is still the fourth visit");
+  const compiler = { status: "failed", snapshotSha256,
+    probe: { exitCode: 1, stdout: '{"status":"syntax-error","line":225}' } };
+  assert.equal(observe(active, "compile-B", compiler, { artifacts: revisionB, goalSha256: digest("new G4 requirements"),
+    operation: "probe", recipe: "compile-python", syntaxRecipe: "compile-python", input: { args: ["journal.py"] } }),
+  undefined, "the narrow compiler probe cannot replace B's authenticated full-check visit");
+  const record = observeVisit(4, attempts[4]);
+  assert.equal(record.trigger, "recurring-failed-versions");
+  assert.equal(record.artifactSha256, stallArtifactSha256(revisionA));
+  assert.equal(record.suggestedLayer, "syntax");
+  assert.equal(record.repeatCount, 5);
+  assert.doesNotMatch(JSON.stringify(active), /unterminated/u);
+});
+
+test("recurring exact behavior failures escalate, while new bytes and different evidence keep working", () => {
+  const revisionC = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("new third revision") } : row);
+  const failure = suiteFailure("result differed");
+  const observeVisits = (artifacts, results) => {
+    const active = {};
+    return artifacts.map((artifact, index) => observe(active, index, results?.[index] ?? failure, { artifacts: artifact }));
+  };
+  const alternating = [versions, changed, versions, changed, versions];
+  assert.equal(observeVisits(alternating).at(-1).trigger, "recurring-failed-versions");
+  const assertions = [
+    [alternating, [failure, suiteFailure("unexpected result shape"), failure, suiteFailure("unexpected result shape"), failure]],
+    [alternating, [failure, suiteFailure("result differed", "required-2"), failure, suiteFailure("result differed", "required-2"), failure]],
+    [alternating, [suiteFailure("SyntaxError: invalid syntax"), suiteFailure("IndentationError: unexpected indent"),
+      suiteFailure("SyntaxError: invalid syntax"), suiteFailure("IndentationError: unexpected indent"), suiteFailure("SyntaxError: invalid syntax")]],
+    [alternating, alternating.map(() => ({ status: "failed", snapshotSha256 }))],
+    [alternating, alternating.map(() => ({ ...failure, snapshotSha256: undefined }))],
+    [alternating, alternating.map(() => ({ status: "timeout" }))],
+    [alternating, alternating.map(() => ({ status: "invalid-input", reason: "recipe-input-invalid", recipe: "compile-python" }))],
+    [[versions, changed, versions, changed, revisionC], undefined],
+    [[versions, changed, revisionC, versions, changed, versions], undefined],
+  ];
+  for (const [artifacts, results] of assertions) {
+    assert.ok(observeVisits(artifacts, results).every(record => record === undefined));
+  }
+});
+
+test("a full pass, another observed version, or a new assignment breaks the recurring-version trail", () => {
+  const failure = suiteFailure("SyntaxError: invalid syntax");
+  const newVersion = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("another revision") } : row);
+  for (const interruption of ["pass-current", "pass-other", "probe-other", "new-goal", "new-phase", "new-serial"]) {
+    const active = { phase: "intake", serial: 1 };
+    let goalSha256 = digest("first goal");
+    const observeVisit = (index, artifacts, result = failure, extra) => observe(active, index, result, { artifacts, goalSha256, ...extra });
+    observeVisit(1, versions);
+    observeVisit(2, changed);
+    observeVisit(3, versions);
+    if (interruption === "pass-current") observeVisit(4, versions, { status: "passed", snapshotSha256 });
+    if (interruption === "pass-other") observeVisit(4, newVersion, { status: "passed", snapshotSha256 });
+    if (interruption === "probe-other") observeVisit(4, newVersion,
+      { status: "passed", snapshotSha256, probe: { exitCode: 0 } }, { operation: "probe" });
+    if (interruption === "new-goal") goalSha256 = digest("next goal");
+    if (interruption === "new-phase") active.phase = "supplement";
+    if (interruption === "new-serial") active.serial++;
+    assert.equal(observeVisit(5, changed), undefined, interruption);
+    assert.equal(observeVisit(6, versions), undefined, interruption);
+    assert.equal(observeVisit(7, changed), undefined, interruption);
+  }
+});
+
 test("immutable artifact version and distinct attempts gate repeated syntax classification", () => {
   const active = {};
   assert.equal(stallArtifactSha256(versions), stallArtifactSha256(versions.toReversed().map(({ path, sha256 }) => ({ path, sha256 }))));

@@ -18,10 +18,11 @@ const source = "def bounded(n):\n    # Reject negative batch sizes before enqueu
 const update = "def bounded(n):\n    # Clamp before enqueue to keep downstream memory bounded.\n    return min(5, max(0, n))\n";
 const goalText = "# Queue release\nBound each submitted batch between zero and five items.\n";
 
-function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false, diagnostics, text = goalText } = {}) {
+function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false,
+  receiptReads = true, diagnostics, text = goalText } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = [entry, worker];
-  const grant = { read: [...sources, "first.json", "final.json", ...(proseEdit ? ["notes.md"] : [])],
+  const grant = { read: [...sources, ...(receiptReads ? ["first.json", "final.json"] : []), ...(proseEdit ? ["notes.md"] : [])],
     write: [...sources, ...(proseEdit ? ["notes.md"] : [])] };
   const review = receipt => ({ read: [...(partialReview ? [entry] : sources), ...(evidence ? ["functional.csv"] : [])],
     evidence: evidence ? ["functional.csv"] : [], receipt });
@@ -351,7 +352,7 @@ test("behavior rejection requires the current reviewer's exact clause and a real
 }));
 
 test("a required missing annotation can block on a named rule and observed changed range", () => fixture(async (root, write) => {
-  const { harness, qualify } = prepareProject(root, write);
+  const { harness, qualify } = prepareProject(root, write, { receiptReads: false });
   const executor = (await harness.flow("root", "advance")).childId;
   const uncommented = "def bounded(n):\n    return min(5, max(0, n))\n";
   write(worker, uncommented);
@@ -371,6 +372,13 @@ test("a required missing annotation can block on a named rule and observed chang
   const proof = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8")).codeReview.files[0].comment.staticProof;
   assert.deepEqual(proof, { rule: "necessary-comment", obligation: "invariant", check: "missing-adjacent-annotation",
     start: 1, end: 2, sha256: digest(uncommented.trimEnd()) });
+  const repair = await harness.flow("root", "advance");
+  assert.equal(repair.childId, executor);
+  const packet = (await harness.flow(executor, "prepare")).codeRepair;
+  assert.equal(packet.receipt, "first.json");
+  assert.equal(packet.sha256, digest(fs.readFileSync(path.join(root, "first.json"))));
+  assert.deepEqual(packet.comments, [{ file: worker, start: 2, end: 2, obligation: "invariant", basis: file.basis }]);
+  await assert.rejects(harness.file(executor, "read", "first.json"), /读白名单/u);
 }));
 
 test("prefilled review rows carry only current observed evidence and independently record compact decisions", () => fixture(async (root, write) => {

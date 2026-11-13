@@ -457,17 +457,67 @@ test("a changed goal retires a verified repair even when the source bytes are un
     await harness.invoke("root", diagnosis, { action: "triage", unit, layer: "syntax",
       reason: "The owner revised the current goal; reproduce under its new pin." });
     const fresh = await harness.flow("root", "advance");
-    assert.equal(fresh.childId, investigator);
-    await harness.flow(investigator, "prepare");
-    await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.proofId }));
-    const currentProof = await reproduceFinding("syntax", harness, investigator);
+    assert.notEqual(fresh.childId, investigator);
+    assert.equal(fresh.reused, false);
+    await harness.flow(fresh.childId, "prepare");
+    await assert.rejects(harness.invoke(fresh.childId, diagnosis, { ...finding, proofId: proof.proofId }));
+    const currentProof = await reproduceFinding("syntax", harness, fresh.childId);
     assert.notEqual(currentProof.snapshotSha256, proof.snapshotSha256);
-    const current = await harness.invoke(investigator, diagnosis, { ...finding, proofId: currentProof.proofId });
+    const current = await harness.invoke(fresh.childId, diagnosis, { ...finding, proofId: currentProof.proofId });
     assert.equal(current.stallDiagnostic.artifactSha256, submitted.stallDiagnostic.artifactSha256);
     assert.notEqual(current.stallDiagnostic.id, submitted.stallDiagnostic.id);
     await assert.rejects(harness.invoke("root", diagnosis, review));
     await harness.invoke("root", diagnosis, { ...review, evidenceId: current.stallDiagnostic.evidence.id });
     assert.equal((await harness.flow("root", "advance")).childId, executor);
+  })));
+
+test("a second stall uses a new investigator and returns both repairs to the original executor",
+  () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
+    configure(root, write, "syntax");
+    const harness = host(root, { automaticCoverage: false });
+    const { childId: executor } = await harness.flow("root", "advance");
+    const finishInvestigation = async (investigator, proof, prepared) => {
+      const finding = submission("syntax");
+      const submitted = await harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.proofId });
+      assert.equal(submitted.stallDiagnostic.id, prepared.stallDiagnostic.id);
+      await harness.invoke("root", diagnosis, { action: "verify", unit, evidenceId: submitted.stallDiagnostic.evidence.id,
+        decision: "confirmed", reason: "The current authorized compiler reproduced the described failure." });
+      const repair = await harness.flow("root", "advance");
+      assert.equal(repair.phase, "intake");
+      assert.equal(repair.childId, executor);
+      assert.equal(repair.reused, true);
+      return harness.flow(executor, "prepare");
+    };
+    await forceStall("syntax", harness, executor, requests);
+    const first = await startInvestigation("syntax", harness, executor);
+    const firstPacket = await harness.flow(first, "prepare");
+    const firstProof = await reproduceFinding("syntax", harness, first);
+    const repair = await finishInvestigation(first, firstProof, firstPacket);
+    assert.equal(repair.stallDiagnostic.evidence.proof.id, firstProof.proofId);
+
+    // The first repair attempted a real edit. The new bytes still compile
+    // incorrectly and must never inherit the first investigator's completion.
+    const current = await harness.file(executor, "read", syntaxPath);
+    const changed = await harness.file(executor, "edit", syntaxPath, { beforeSha256: current.sha256,
+      oldText: "A boundary owner records identities.", newText: "The input boundary owns record identities.",
+      note: "First scoped repair changed explanatory text while leaving the compiler fault." });
+    assert.equal(changed.diagnostics.status, "failed");
+    assert.notEqual(changed.sha256, current.sha256);
+    await harness.invoke(executor, reproduction, { action: "check" });
+    await harness.invoke(executor, reproduction, { action: "check" });
+    const second = await startInvestigation("syntax", harness, executor);
+    assert.notEqual(second, first);
+    assert.deepEqual(harness.activations.map(x => x.childId), [executor, first, second]);
+    assert.equal((await harness.flow(first, "status")).role, "idle");
+    await assert.rejects(harness.invoke(first, reproduction, stallCases.syntax.probe));
+    const secondPacket = await harness.flow(second, "prepare");
+    assert.notEqual(secondPacket.stallDiagnostic.id, firstPacket.stallDiagnostic.id);
+    assert.notEqual(secondPacket.stallDiagnostic.artifactSha256, firstPacket.stallDiagnostic.artifactSha256);
+    await assert.rejects(harness.invoke(second, diagnosis, { ...submission("syntax"), proofId: firstProof.proofId }));
+    const secondProof = await reproduceFinding("syntax", harness, second);
+    assert.notEqual(secondProof.proofId, firstProof.proofId);
+    const secondRepair = await finishInvestigation(second, secondProof, secondPacket);
+    assert.equal(secondRepair.stallDiagnostic.evidence.proof.id, secondProof.proofId);
   })));
 
 
@@ -510,6 +560,42 @@ test("interrupted investigation and rejected evidence stay gated and resume the 
     assert.notEqual(current.proofId, proof.proofId);
     assert.equal((await harness.invoke(investigator, diagnosis, { ...finding, proofId: current.proofId })).phase,
       "diagnosis-verify");
+  })));
+
+test("two receiptless completions in one diagnosis require re-triage and a different read-only actor",
+  () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
+    configure(root, write, "syntax");
+    const harness = host(root, { automaticCoverage: false });
+    const { childId: executor } = await harness.flow("root", "advance");
+    await forceStall("syntax", harness, executor, requests);
+    const investigator = await startInvestigation("syntax", harness, executor);
+    const finding = submission("syntax");
+    const assigned = await harness.flow(investigator, "prepare");
+    const earlierProof = await reproduceFinding("syntax", harness, investigator);
+    await harness.interrupt(investigator, 21, "completed");
+    assert.equal((await harness.flow("root", "status")).units[0].phase, "blocked");
+    const resumed = await harness.flow("root", "advance");
+    assert.equal(resumed.childId, investigator);
+    assert.equal(resumed.reused, true);
+    await assert.rejects(harness.invoke(investigator, reproduction, { action: "check" }), /prepare/u);
+    await harness.interrupt(investigator, 23, "completed");
+    const parked = (await harness.flow("root", "status")).units[0];
+    assert.equal(parked.phase, "diagnosis-ready");
+    assert.equal(parked.stallDiagnostic.id, assigned.stallDiagnostic.id);
+    assert.equal((await harness.flow(investigator, "status")).role, "idle");
+    await assert.rejects(harness.flow("root", "advance"));
+    await harness.invoke("root", diagnosis, { action: "triage", unit, layer: "syntax",
+      reason: "Two ends without a receipt need a replacement investigator and current evidence." });
+    const replacement = await harness.flow("root", "advance");
+    assert.notEqual(replacement.childId, investigator);
+    assert.notEqual(replacement.childId, executor);
+    await harness.flow(replacement.childId, "prepare");
+    await assert.rejects(harness.invoke(replacement.childId, diagnosis, { ...finding, proofId: earlierProof.proofId }));
+    const proof = await reproduceFinding("syntax", harness, replacement.childId);
+    const result = await harness.invoke(replacement.childId, diagnosis, { ...finding, proofId: proof.proofId });
+    await harness.invoke("root", diagnosis, { action: "verify", unit, evidenceId: result.stallDiagnostic.evidence.id,
+      decision: "confirmed", reason: "The replacement reproduced the same pinned failure." });
+    assert.equal((await harness.flow("root", "advance")).childId, executor);
   })));
 
 

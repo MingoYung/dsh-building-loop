@@ -499,7 +499,10 @@ export function historyPaths(file) {
 /** Match every literal fragment against the same original UTF-8 file. */
 export function scopedEditContent(before, { beforeSha256, oldText, newText, edits }, recordSplice) {
   if (before === null) throw new Error("局部编辑只适用于已有文件，新建文件请用 write");
-  if (digest(before) !== beforeSha256) throw new Error("局部编辑的文件摘要不匹配，请先读取当前文件再重试");
+  const currentSha256 = digest(before);
+  if (currentSha256 !== beforeSha256) {
+    throw new Error("局部编辑的文件摘要不匹配（stale-source，当前摘要 " + currentSha256 + "）。请先用 read 读取当前文件再重试");
+  }
   if (edits !== undefined && (oldText !== undefined || newText !== undefined)) {
     throw new Error("局部编辑须使用 oldText/newText 或 edits，不能同时使用");
   }
@@ -522,8 +525,12 @@ export function scopedEditContent(before, { beforeSha256, oldText, newText, edit
     }
     const from = fileNewlines(old);
     const start = current.indexOf(from);
-    if (start < 0 || (from !== "" && current.indexOf(from, start + 1) !== -1)) {
-      throw new Error("第 " + (index + 1) + " 项 oldText 须在当前文件中恰好出现一次");
+    const duplicate = start >= 0 && from !== "" && current.indexOf(from, start + 1) !== -1;
+    if (start < 0 || duplicate) {
+      const recovery = start < 0 ? "anchor-not-found：逐字复制当前 read 返回的一个较短片段"
+        : "anchor-ambiguous：在当前 read 返回的范围内加一行相邻原文，使片段唯一";
+      throw new Error("第 " + (index + 1) + " 项 oldText 须在当前文件中恰好出现一次。"
+        + recovery + "。本次未落盘，未运行检查。");
     }
     return { start, end: start + from.length, to: fileNewlines(next) };
   }).sort((a, b) => a.start - b.start);

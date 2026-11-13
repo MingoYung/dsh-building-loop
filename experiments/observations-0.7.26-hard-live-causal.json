@@ -1,0 +1,2815 @@
+{
+  "spec": "building-loop-hard-live-causal-replay/1",
+  "scope": "Read-only sandbox replay of exact independently scored source snapshots. Public example generation uses owner clauses only; online failures are opaque case IDs.",
+  "snapshots": [
+    {
+      "run": "r-kBFuLn",
+      "stage": "G3",
+      "label": "rep1-before-retention-repair",
+      "sourceFingerprint": "ab7a784b08b0fb6227af997ee3fab71c48f184128a8ce5d09daf047ac1ae57bc",
+      "independentPinDigest": "728c0e9099da9d6c8e563b0725e6e71cb5812a83cdd8243746b46b5e2c56262a",
+      "sourceArtifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "d30368621db729e15ca023986bc06736e690e14f709b938e9bf184d2260be786"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "15da2b80f65c5842df191a340653d733fd147408831cfc9202f72c053c27be58"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+        }
+      ],
+      "signed": {
+        "elapsedMs": 57112,
+        "jointPass": false,
+        "protected": 21,
+        "required": 27
+      },
+      "online": {
+        "passed": 43,
+        "total": 48,
+        "oldPassed": 21,
+        "newPassed": 22,
+        "newTotal": 27,
+        "failedOpaqueIds": [
+          "heldout-42c244e0ce3aa49ab0d6",
+          "heldout-5db251a83c15bf71cee4",
+          "heldout-46c83944ef13b794448e",
+          "heldout-d230c7c4289dce1d26c4",
+          "heldout-521fd9e17eb77ca39476"
+        ]
+      },
+      "publicReplays": [
+        {
+          "case": "retention-small",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "bridge",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "bridge"
+                    ]
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove",
+                  "anchor"
+                ],
+                "units": 4
+              }
+            ],
+            "units": 4
+          },
+          "status": "failed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 32.9
+        },
+        {
+          "case": "retention-shared-unapplied-dag",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "layer-0-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-0-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-25-left",
+                      "layer-25-right"
+                    ]
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove",
+                  "anchor"
+                ],
+                "units": 4
+              }
+            ],
+            "units": 4
+          },
+          "status": "failed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 33.5
+        }
+      ]
+    },
+    {
+      "run": "r-kBFuLn",
+      "stage": "G3",
+      "label": "rep1-signed-retention-repair",
+      "sourceFingerprint": "aa4ebc8d38aeb11325d2105358e70868dc98113d150d6d69d76e2bc0e87d28c2",
+      "independentPinDigest": "d261d40c59b833b27af3f5b2afd9ed71cb7b132c4d4fb01e36055cc7d7cb58c5",
+      "sourceArtifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "d30368621db729e15ca023986bc06736e690e14f709b938e9bf184d2260be786"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e79d8a9cf6a22ab7a67b6444b8b66f9ba75aabe9d20491accc6c91c9142e98b0"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+        }
+      ],
+      "signed": {
+        "elapsedMs": 113015,
+        "jointPass": true,
+        "protected": 21,
+        "required": 27
+      },
+      "online": {
+        "passed": 48,
+        "total": 48,
+        "oldPassed": 21,
+        "newPassed": 27,
+        "newTotal": 27,
+        "failedOpaqueIds": []
+      },
+      "publicReplays": [
+        {
+          "case": "retention-small",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "bridge",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "bridge"
+                    ]
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "status": "passed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 33.0
+        },
+        {
+          "case": "retention-shared-unapplied-dag",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "layer-0-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-0-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-25-left",
+                      "layer-25-right"
+                    ]
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": null,
+          "status": "timeout",
+          "exitCode": null,
+          "error": "wall timeout at evaluator 3s",
+          "elapsedMs": 3002.1
+        }
+      ]
+    },
+    {
+      "run": "r-j5sGRU",
+      "stage": "G3",
+      "label": "rep2-before-index-repair",
+      "sourceFingerprint": "7d9aecd5bd755d9d73a04e08acf0343b0407ad2a36497cab9aef5d9b7565da06",
+      "independentPinDigest": "d421e387c62478480d7d076aea8ffcb878a26acb1abb8423563fc2cf5d406dcd",
+      "sourceArtifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "c1cd6b69e7f73802f9553786d1c23bcfc118a689f5488867bb296e53eb1aa46a"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "892aaaf1b5c4b7f938ce5b60aab13d91368a579858771f37ed19d3aa6a36272a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "signed": {
+        "elapsedMs": 52491,
+        "jointPass": false,
+        "protected": 21,
+        "required": 27
+      },
+      "online": {
+        "passed": 41,
+        "total": 48,
+        "oldPassed": 21,
+        "newPassed": 20,
+        "newTotal": 27,
+        "failedOpaqueIds": [
+          "heldout-235f7a607d044aa86816",
+          "heldout-bf716669ac207201f6a4",
+          "heldout-42c244e0ce3aa49ab0d6",
+          "heldout-5db251a83c15bf71cee4",
+          "heldout-46c83944ef13b794448e",
+          "heldout-d230c7c4289dce1d26c4",
+          "heldout-521fd9e17eb77ca39476"
+        ]
+      },
+      "publicReplays": [
+        {
+          "case": "structural-error-index",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "main",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "main"
+                ]
+              },
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-batch-item",
+            "requestIndex": 1,
+            "results": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-batch-item",
+            "requestIndex": null,
+            "results": [],
+            "units": 0
+          },
+          "status": "failed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 38.7
+        }
+      ]
+    },
+    {
+      "run": "r-j5sGRU",
+      "stage": "G3",
+      "label": "rep2-after-index-repair",
+      "sourceFingerprint": "fdb2b6c372105e10a6d8d3ac2141ec8140a0031410e612525cfc31cd17651692",
+      "independentPinDigest": "217d00c9d677a3967fa779d03388ab36d22830dac45ec959ec1baec470b9788d",
+      "sourceArtifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "ac0fed4b8466dd6fde364a185a626ffd2dece6421fb60860dd2c26ffc2ac8411"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "85ae254bf3740fa24d623967aacc54fecc4eb4a61ccc221c650da504f144e963"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "signed": {
+        "elapsedMs": 129533,
+        "jointPass": false,
+        "protected": 21,
+        "required": 27
+      },
+      "online": {
+        "passed": 43,
+        "total": 48,
+        "oldPassed": 21,
+        "newPassed": 22,
+        "newTotal": 27,
+        "failedOpaqueIds": [
+          "heldout-42c244e0ce3aa49ab0d6",
+          "heldout-5db251a83c15bf71cee4",
+          "heldout-46c83944ef13b794448e",
+          "heldout-d230c7c4289dce1d26c4",
+          "heldout-521fd9e17eb77ca39476"
+        ]
+      },
+      "publicReplays": [
+        {
+          "case": "structural-error-index",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "main",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "main"
+                ]
+              },
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-batch-item",
+            "requestIndex": 1,
+            "results": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-batch-item",
+            "requestIndex": 1,
+            "results": [],
+            "units": 0
+          },
+          "status": "passed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 38.8
+        }
+      ]
+    },
+    {
+      "run": "r-j5sGRU",
+      "stage": "G3",
+      "label": "rep2-before-retention-repair",
+      "sourceFingerprint": "9507afb93a361b08fbb2ffe02d2290d4dad87897dd731b6fbbdd170df4f784cf",
+      "independentPinDigest": "cc9be7298edef42f6a7abb3a26c460d5be0a709ffdacf8e2b9129d144464b063",
+      "sourceArtifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "fd5f6b3be439efb47ad85c3a8e0c58e9d64e055b2445277566f434ffbca7f367"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "85ae254bf3740fa24d623967aacc54fecc4eb4a61ccc221c650da504f144e963"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "signed": {
+        "elapsedMs": 161305,
+        "jointPass": false,
+        "protected": 21,
+        "required": 27
+      },
+      "online": {
+        "passed": 43,
+        "total": 48,
+        "oldPassed": 21,
+        "newPassed": 22,
+        "newTotal": 27,
+        "failedOpaqueIds": [
+          "heldout-42c244e0ce3aa49ab0d6",
+          "heldout-5db251a83c15bf71cee4",
+          "heldout-46c83944ef13b794448e",
+          "heldout-d230c7c4289dce1d26c4",
+          "heldout-521fd9e17eb77ca39476"
+        ]
+      },
+      "publicReplays": [
+        {
+          "case": "retention-small",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "bridge",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "bridge"
+                    ]
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove",
+                  "anchor"
+                ],
+                "units": 4
+              }
+            ],
+            "units": 4
+          },
+          "status": "failed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 42.6
+        },
+        {
+          "case": "retention-shared-unapplied-dag",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "layer-0-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-0-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-25-left",
+                      "layer-25-right"
+                    ]
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove",
+                  "anchor"
+                ],
+                "units": 4
+              }
+            ],
+            "units": 4
+          },
+          "status": "failed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 34.9
+        }
+      ]
+    },
+    {
+      "run": "r-j5sGRU",
+      "stage": "G3",
+      "label": "rep2-signed-retention-repair",
+      "sourceFingerprint": "568c1926c8c40fd24f1c1893b010d0f8c644fabd1d546b8b008ff66e858b9063",
+      "independentPinDigest": "1df9feaf59b602a181b7236201c1ac007185442f7260fa55d5c8c60149877959",
+      "sourceArtifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "fd5f6b3be439efb47ad85c3a8e0c58e9d64e055b2445277566f434ffbca7f367"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8bd6872fb6a2db71873622f54c2f2c627d240e1d0dfc312fce0366d573cd9af2"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "signed": {
+        "elapsedMs": 215373,
+        "jointPass": true,
+        "protected": 21,
+        "required": 27
+      },
+      "online": {
+        "passed": 48,
+        "total": 48,
+        "oldPassed": 21,
+        "newPassed": 27,
+        "newTotal": 27,
+        "failedOpaqueIds": []
+      },
+      "publicReplays": [
+        {
+          "case": "retention-small",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "bridge",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "bridge"
+                    ]
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "status": "passed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 36.3
+        },
+        {
+          "case": "retention-shared-unapplied-dag",
+          "input": {
+            "action": "rollback-many",
+            "requests": [
+              {
+                "environment": "staging",
+                "budget": 0,
+                "changes": [
+                  {
+                    "id": "anchor",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "remove",
+                    "component": "api",
+                    "units": 3,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "layer-0-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-0-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "anchor"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-1-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-0-left",
+                      "layer-0-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-2-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-1-left",
+                      "layer-1-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-3-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-2-left",
+                      "layer-2-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-4-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-3-left",
+                      "layer-3-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-5-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-4-left",
+                      "layer-4-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-6-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-5-left",
+                      "layer-5-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-7-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-6-left",
+                      "layer-6-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-8-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-7-left",
+                      "layer-7-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-9-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-8-left",
+                      "layer-8-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-10-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-9-left",
+                      "layer-9-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-11-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-10-left",
+                      "layer-10-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-12-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-11-left",
+                      "layer-11-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-13-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-12-left",
+                      "layer-12-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-14-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-13-left",
+                      "layer-13-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-15-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-14-left",
+                      "layer-14-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-16-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-15-left",
+                      "layer-15-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-17-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-16-left",
+                      "layer-16-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-18-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-17-left",
+                      "layer-17-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-19-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-18-left",
+                      "layer-18-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-20-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-19-left",
+                      "layer-19-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-21-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-20-left",
+                      "layer-20-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-22-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-21-left",
+                      "layer-21-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-23-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-22-left",
+                      "layer-22-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-24-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-23-left",
+                      "layer-23-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-left",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "layer-25-right",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-24-left",
+                      "layer-24-right"
+                    ]
+                  },
+                  {
+                    "id": "tip",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "layer-25-left",
+                      "layer-25-right"
+                    ]
+                  }
+                ],
+                "applied": [
+                  "anchor",
+                  "tip",
+                  "remove"
+                ],
+                "retain": [
+                  "tip"
+                ]
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "actual": {
+            "status": "ok",
+            "results": [
+              {
+                "actions": [
+                  "remove"
+                ],
+                "units": 3
+              }
+            ],
+            "units": 3
+          },
+          "status": "passed",
+          "exitCode": 0,
+          "error": null,
+          "elapsedMs": 36.0
+        }
+      ]
+    }
+  ]
+}
