@@ -1,0 +1,571 @@
+{
+  "scope": "Isolated after-freeze replay of documented selective rollback; source archives are never modified.",
+  "archiveSha256": "ae3152d06ed4740b6da3ba6e89f20fc87bf7d948444071507bc7884bafa3df8a",
+  "run": "r-J3dUWi",
+  "stage": "g2",
+  "architecture": {
+    "file": "modules/architecture.md",
+    "line": 38,
+    "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd",
+    "text": "5. G2 三项可各自独立回退：冻结判定退回 G1「两环境均支持」时只删 policy 的冻结分支与 planner 的透传；预算上限退回 G1 时只删 staging 有效预算；保留集退回 G1 时删 retain 解析与闭包，回到「全量 applied 逆序」。"
+  },
+  "code": {
+    "file": "policy.py",
+    "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+    "lines": [
+      {
+        "line": 9,
+        "text": "# G2 is staging-only: production is frozen for every action, so it intentionally"
+      },
+      {
+        "line": 12,
+        "text": "ALLOWED_ACTIONS = {"
+      },
+      {
+        "line": 13,
+        "text": "    \"staging\": frozenset({\"plan\", \"rollback\"}),"
+      },
+      {
+        "line": 14,
+        "text": "    \"production\": frozenset(),"
+      },
+      {
+        "line": 15,
+        "text": "}"
+      },
+      {
+        "line": 20,
+        "text": "FROZEN_ENVIRONMENTS = frozenset({\"production\"})"
+      },
+      {
+        "line": 43,
+        "text": "    if not isinstance(environment, str) or environment not in ALLOWED_ACTIONS:"
+      },
+      {
+        "line": 44,
+        "text": "        raise PolicyError(\"invalid-environment\")"
+      },
+      {
+        "line": 45,
+        "text": "    if environment in FROZEN_ENVIRONMENTS:"
+      },
+      {
+        "line": 46,
+        "text": "        raise PolicyError(\"production-frozen\")"
+      },
+      {
+        "line": 59,
+        "text": "    environment = check_environment(request)"
+      },
+      {
+        "line": 62,
+        "text": "    # Same unhashable guard as above for non-string actions."
+      },
+      {
+        "line": 64,
+        "text": "    if not isinstance(action, str) or action not in ALLOWED_ACTIONS[environment]:"
+      },
+      {
+        "line": 65,
+        "text": "        raise PolicyError(\"unsupported-action\")"
+      }
+    ]
+  },
+  "why": "Deleting the freeze branch exposes the independent empty production allowlist. Restore the G1 production actions as well to retain the other G2 features. A complete revert to the pinned G1 also restores dual production actions.",
+  "outcomes": [
+    {
+      "control": "current-g2-control",
+      "policySha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+      "cases": [
+        {
+          "case": "production-plan",
+          "input": {
+            "environment": "production",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": false
+        },
+        {
+          "case": "production-rollback",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": false
+        },
+        {
+          "case": "staging-plan-quota-still-enforced",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 9,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 4,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        },
+        {
+          "case": "staging-rollback-retain-still-enforced",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "control": "published-freeze-removal-only",
+      "policySha256": "a74acae50a2a08d11936c8040a5e0a77b67e25c63d5cfd97061c78a96b787e6b",
+      "cases": [
+        {
+          "case": "production-plan",
+          "input": {
+            "environment": "production",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": false
+        },
+        {
+          "case": "production-rollback",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": false
+        },
+        {
+          "case": "staging-plan-quota-still-enforced",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 9,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 4,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        },
+        {
+          "case": "staging-rollback-retain-still-enforced",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "control": "freeze-removal-and-restore-allowlist",
+      "policySha256": "37d998515747a1ce63133782ecc3f952aa9110bedffae8a25319b198f1878030",
+      "cases": [
+        {
+          "case": "production-plan",
+          "input": {
+            "environment": "production",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        },
+        {
+          "case": "production-rollback",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        },
+        {
+          "case": "staging-plan-quota-still-enforced",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 9,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 4,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        },
+        {
+          "case": "staging-rollback-retain-still-enforced",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "control": "whole-pinned-g1-positive-control",
+      "policySha256": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb",
+      "cases": [
+        {
+          "case": "production-plan",
+          "input": {
+            "environment": "production",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        },
+        {
+          "case": "production-rollback",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "error": null,
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

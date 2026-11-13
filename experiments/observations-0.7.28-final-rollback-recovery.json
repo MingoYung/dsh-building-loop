@@ -1,0 +1,303 @@
+{
+  "scope": "Frozen native G1 source replay. Test data is synthetic and independent of private signed-case inputs.",
+  "archiveSha256": "ae3152d06ed4740b6da3ba6e89f20fc87bf7d948444071507bc7884bafa3df8a",
+  "run": "r-iAiCGF",
+  "stage": "g1",
+  "signedFailure": {
+    "id": "rollback-order",
+    "status": "failed",
+    "exitCode": 0,
+    "failure": "Result differs for fields: actions"
+  },
+  "clause": {
+    "file": "SPEC.md",
+    "line": 14,
+    "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+    "text": "- `rollback` emits only applied changes, using the reverse of the full deterministic topological order. The budget field is validated but does not cap rollback. Both environments support plan and rollback in G1."
+  },
+  "source": {
+    "file": "planner.py",
+    "sha256": "d22ec923c19316dd3a3ae13731833c205ee6c7eadc9b3ce4f953f9dcc59d026e",
+    "lines": [
+      {
+        "line": 18,
+        "text": "def ordered_ids(changes, applied):"
+      },
+      {
+        "line": 19,
+        "text": "    \"\"\"Return the full deterministic topological order of all change IDs."
+      },
+      {
+        "line": 21,
+        "text": "    Dependencies that are already applied do not hold a change back: replay"
+      },
+      {
+        "line": 25,
+        "text": "    reporting it here keeps plan and rollback consistent, because rollback"
+      },
+      {
+        "line": 28,
+        "text": "    remaining = {change[\"id\"]: set(change[\"depends_on\"]) for change in changes}"
+      },
+      {
+        "line": 29,
+        "text": "    applied_set = set(applied)"
+      },
+      {
+        "line": 30,
+        "text": "    pending = {"
+      },
+      {
+        "line": 31,
+        "text": "        change_id: {dep for dep in deps if dep not in applied_set}"
+      },
+      {
+        "line": 34,
+        "text": "    ready = [change_id for change_id, deps in pending.items() if not deps]"
+      },
+      {
+        "line": 66,
+        "text": "        order = ordered_ids(changes, applied)"
+      },
+      {
+        "line": 71,
+        "text": "        else:"
+      },
+      {
+        "line": 72,
+        "text": "            actions = [change_id for change_id in reversed(order) if change_id in applied_set]"
+      }
+    ]
+  },
+  "mechanism": "The shared ordering function removes edges to already-applied prerequisites before constructing the order. Rollback reverses that reduced order; the required reverse of the full topological order retains those edges.",
+  "replays": [
+    {
+      "case": "synthetic-rollback-edge-applied",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "b-prerequisite"
+            ]
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "a-consumer",
+          "b-prerequisite"
+        ],
+        "units": 3
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "exitCode": 0,
+      "error": null,
+      "passed": false
+    },
+    {
+      "case": "same-edge-not-emitted-by-plan",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "b-prerequisite"
+            ]
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null,
+      "passed": true
+    },
+    {
+      "case": "no-applied-dependency-control",
+      "input": {
+        "environment": "staging",
+        "action": "rollback",
+        "budget": 0,
+        "changes": [
+          {
+            "id": "a-consumer",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "b-prerequisite",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          },
+          {
+            "id": "z-independent",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "a-consumer",
+          "b-prerequisite",
+          "z-independent"
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "actual": {
+        "status": "ok",
+        "actions": [
+          "z-independent",
+          "b-prerequisite",
+          "a-consumer"
+        ],
+        "units": 3
+      },
+      "exitCode": 0,
+      "error": null,
+      "passed": true
+    }
+  ],
+  "workflow": {
+    "verification": {
+      "seq": 158,
+      "elapsedMs": 161722,
+      "phase": "diagnosis-ready",
+      "stallDiagnostic": {
+        "status": "needs-triage",
+        "suggestedLayer": "behavior",
+        "failureKind": "required-check-failed",
+        "repeatCount": 4,
+        "trigger": "unchanged-after-probes",
+        "artifactSha256": "950dad60f539001a9ebc92f7c117e5ff1d82b525b6cb0930d4982f8c2be6e6d7"
+      }
+    },
+    "triage": {
+      "seq": 165,
+      "elapsedMs": 165243,
+      "phase": "diagnosis-ready",
+      "stallDiagnostic": {
+        "status": "triaged",
+        "suggestedLayer": "behavior",
+        "layer": "behavior",
+        "failureKind": "required-check-failed",
+        "repeatCount": 4,
+        "trigger": "unchanged-after-probes",
+        "artifactSha256": "950dad60f539001a9ebc92f7c117e5ff1d82b525b6cb0930d4982f8c2be6e6d7"
+      }
+    },
+    "reusedDiagnosticAgent": {
+      "seq": 172,
+      "elapsedMs": 170209,
+      "phase": "diagnosis",
+      "assignment": {
+        "reused": true,
+        "child": "cb270dce5fa7"
+      },
+      "stallDiagnostic": {
+        "status": "investigating",
+        "suggestedLayer": "behavior",
+        "layer": "behavior",
+        "failureKind": "required-check-failed",
+        "repeatCount": 4,
+        "trigger": "unchanged-after-probes",
+        "artifactSha256": "950dad60f539001a9ebc92f7c117e5ff1d82b525b6cb0930d4982f8c2be6e6d7"
+      }
+    },
+    "blocked": {
+      "seq": 193,
+      "elapsedMs": 179485,
+      "phase": "blocked",
+      "stallDiagnostic": {
+        "status": "investigating",
+        "suggestedLayer": "behavior",
+        "layer": "behavior",
+        "failureKind": "required-check-failed",
+        "repeatCount": 4,
+        "trigger": "unchanged-after-probes",
+        "artifactSha256": "950dad60f539001a9ebc92f7c117e5ff1d82b525b6cb0930d4982f8c2be6e6d7"
+      }
+    },
+    "resumePhase": "diagnosis",
+    "interruptions": 1,
+    "blockReason": "子会话已结束但本阶段未提交宿主回执。总控可从原阶段续派到同一会话。",
+    "ledgerStatus": "deferred",
+    "diagnosticStatus": "investigating",
+    "repeatCount": 4,
+    "retryReason": "诊断带宿主真实探针回执（exit 0，expected/actual 哈希不一致，输入哈希可复算）与 planner.py:71-72 及 SPEC.md:14 源码定位，但证据是\"不可复现\"：四组工程 JSON 的 rollback 与 plan 顺序均与预期一致，未能给出失败用例 rollback-order 的输入与期望 actions，也未触及职责 nonobject-request 的实测。故不确认根因，退回原执行会话：由执行方按宿主用例 runner 或输入哈希复算 rollback-order 的具体请求，并补测非对象输入与六个传输错误码后重新提交。",
+    "triageReason": "上一轮行为层诊断未复现失败也未覆盖 nonobject-request 实测，已退回重做。仍按行为层处理：失败表现为 rollback-order 用例 actions 不一致且 required-check-failed，属运行行为而非参数或语法；本轮需给出该用例的请求输入与实际输出，以及非对象请求的实测输出。",
+    "emptyCompletions": 1
+  }
+}
