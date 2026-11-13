@@ -67,6 +67,101 @@ function loadIsCallReceiver(node) {
   return receiver.parent?.name === "CallExpression" && receiver.parent.firstChild?.from === receiver.from;
 }
 
+function literalString(node, source) {
+  if (node?.name !== "String") return;
+  // Only unescaped literal identifiers can become field or error facts.
+  return /^(["'])([\p{ID_Start}_][\p{ID_Continue}_-]*)\1$/u.exec(source.slice(node.from, node.to))?.[2];
+}
+
+function fieldRead(node, source) {
+  if (node.name === "CallExpression" && /\.get$/u.test(nameParts(node.firstChild, source))) {
+    return literalString(node.lastChild?.firstChild?.nextSibling, source);
+  }
+  if (node.name === "MemberExpression" && node.firstChild?.nextSibling?.name === "[" &&
+    node.firstChild.nextSibling.nextSibling?.nextSibling?.name === "]") {
+    return literalString(node.firstChild.nextSibling.nextSibling, source);
+  }
+}
+
+function walk(root, visit, descend = () => true) {
+  const pending = [root];
+  while (pending.length) {
+    const node = pending.pop();
+    visit(node);
+    if (descend(node)) pending.push(...children(node));
+  }
+}
+
+function rejectionCode(node, source) {
+  const value = node.lastChild;
+  if (value?.name === "CallExpression" && value.lastChild?.name === "ArgList" &&
+      (node.name === "RaiseStatement" || /(?:error|fail|reject|invalid)/iu.test(nameParts(value.firstChild, source)))) {
+    return literalString(value.lastChild.firstChild?.nextSibling, source);
+  }
+  if (node.name !== "ReturnStatement" || value?.name !== "DictionaryExpression") return;
+  const fields = children(value);
+  for (const [index, item] of fields.entries()) {
+    if (literalString(item, source) === "error" && fields[index + 1]?.name === ":") {
+      return literalString(fields[index + 2], source);
+    }
+  }
+}
+
+/** Preserve definite validation sites separately from callable/import edges.
+ * A field read is never proof of validation by itself. Require an explicit
+ * conditional branch with a literal rejection, and keep weaker field guards
+ * so a plausible local validation is not falsely attributed elsewhere. */
+function functionResponsibilities(file, source, functions, lineOf) {
+  const definitions = [], validation = [], rejections = new Set();
+  for (const node of functions) {
+    const parts = children(node);
+    const named = parts.find(item => item.name === "VariableName");
+    const body = parts.find(item => item.name === "Body");
+    if (!named || !body) continue;
+    const symbol = source.slice(named.from, named.to);
+    definitions.push({ file, symbol, line: lineOf(named.from) });
+    const assignments = new Map();
+    const direct = new Set(children(body).map(item => item.from));
+    const conditionals = [];
+    walk(body, item => {
+      if (item.name === "IfStatement") conditionals.push(item);
+      if (["RaiseStatement", "ReturnStatement"].includes(item.name)) {
+        const code = rejectionCode(item, source);
+        if (code) rejections.add(code);
+      }
+      if (!["AssignStatement", "UpdateStatement"].includes(item.name) || item.firstChild?.name !== "VariableName") return;
+      const name = source.slice(item.firstChild.from, item.firstChild.to);
+      const field = item.name === "AssignStatement" && item.firstChild.nextSibling?.name === "AssignOp" &&
+        item.firstChild.nextSibling.nextSibling?.to === item.lastChild?.to && fieldRead(item.lastChild, source);
+      const top = direct.has(item.from);
+      assignments.set(name, assignments.has(name) || !field || !top ? null : { field, offset: item.to });
+    }, item => !["FunctionDefinition", "ClassDefinition", "LambdaExpression"].includes(item.name));
+    for (const branch of conditionals) {
+      const parts = children(branch);
+      for (const [index, part] of parts.entries()) {
+        if (!["if", "elif"].includes(part.name) || parts[index + 2]?.name !== "Body") continue;
+        const condition = parts[index + 1];
+        const fields = new Set();
+        walk(condition, item => {
+          const explicit = fieldRead(item, source);
+          if (explicit) fields.add(explicit);
+          if (item.name !== "VariableName") return;
+          const binding = assignments.get(source.slice(item.from, item.to));
+          if (binding?.offset <= item.from) fields.add(binding.field);
+        });
+        if (!fields.size) continue;
+        const exits = children(parts[index + 2]).filter(item => ["RaiseStatement", "ReturnStatement"].includes(item.name));
+        for (const exit of exits) {
+          const code = rejectionCode(exit, source);
+          for (const field of fields) validation.push({ file, symbol, field, line: lineOf(exit.from),
+            ...(code && fields.size === 1 ? { code } : {}) });
+        }
+      }
+    }
+  }
+  return { definitions, validation, rejections: [...rejections] };
+}
+
 /** Only prove directly resolvable syntactic calls. An alias that is rebound
  * or handed to another expression is uncertain and cannot disprove prose. */
 function localCalls(file, source, imports, callNodes, names, lineOf) {
@@ -112,23 +207,26 @@ function localCalls(file, source, imports, callNodes, names, lineOf) {
 
 /** Bound facts to exact signed readable source bytes and use only declared
  * local paths. This inventory does not execute Python or infer call reach. */
-export function pythonImportEvidence(frame, artifacts) {
+export function pythonImportEvidence(frame, artifacts, { responsibilities = false } = {}) {
   const files = artifacts.filter(row => row.sha256 && /\.py$/iu.test(row.path) && includes(frame.reads, row.path));
   const local = new Map(files.map(({ path }) => [keyOf(path), path]));
   const checkedFiles = [], unparsedFiles = [], edges = [], ambiguous = [], calls = [], uncertainCalls = [];
+  const definitions = [], validation = [], localRejections = [];
+  let responsibilitiesTruncated = false;
   let truncated = false;
   for (const { path: file, sha256 } of files) {
     if (checkedFiles.length + unparsedFiles.length >= 64) { truncated = true; break; }
     const bytes = readBytes(frame.root, file);
     if (!bytes || digest(bytes) !== sha256) throw new Error("已签名源码已变化：" + file);
     const source = text(bytes).replace(/\r\n?/gu, "\n");
-    const imports = [], callNodes = [], names = [];
+    const imports = [], callNodes = [], names = [], functions = [];
     let invalid = false;
     parser.parse(source).iterate({ enter(node) {
       if (node.type.isError) invalid = true;
       if (node.name === "ImportStatement") imports.push(node.node);
       if (node.name === "CallExpression") callNodes.push(node.node);
       if (node.name === "VariableName") names.push({ node: node.node, value: source.slice(node.from, node.to) });
+      if (responsibilities && node.name === "FunctionDefinition" && node.node.parent?.name === "Script") functions.push(node.node);
     } });
     if (invalid) { unparsedFiles.push(file); continue; }
     checkedFiles.push(file);
@@ -155,6 +253,16 @@ export function pythonImportEvidence(frame, artifacts) {
       return { statement, targets, scope: node.parent?.name };
     });
     const resolved = localCalls(file, source, bindings, callNodes, names, lineOf);
+    if (responsibilities) {
+      const current = functionResponsibilities(file, source, functions, lineOf);
+      if (definitions.length + current.definitions.length > 128 || validation.length + current.validation.length > 128 ||
+        current.rejections.length > 128) {
+        responsibilitiesTruncated = true;
+      }
+      definitions.push(...current.definitions.slice(0, 128 - definitions.length));
+      validation.push(...current.validation.slice(0, 128 - validation.length));
+      if (current.rejections.length && !responsibilitiesTruncated) localRejections.push({ file, codes: current.rejections });
+    }
     // Deduplicate repeated calls to one symbol. A large call inventory must
     // not invalidate the pre-existing bounded static import inventory.
     const unique = new Map();
@@ -167,6 +275,6 @@ export function pythonImportEvidence(frame, artifacts) {
     calls.push(...[...unique.values()].slice(0, 64 - calls.length));
   }
   return { kind: "python-static-local", checkedFiles, unparsedFiles, edges, ambiguous, truncated, calls,
-    uncertainCalls,
+    uncertainCalls, ...(responsibilities ? { definitions, validation, localRejections, responsibilitiesTruncated } : {}),
     scope: "仅登记当前可读取的 Python 本地静态导入和可定位的直接调用语法。别名传播、动态调用、间接调用和实际运行路径需另行验证。" };
 }

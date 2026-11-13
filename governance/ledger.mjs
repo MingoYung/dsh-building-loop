@@ -1,12 +1,12 @@
-import { digest, includes, keyOf, readBytes, replaceWithHistory } from "./policy.mjs";
+import { digest, includes, keyOf, readBytes } from "./policy.mjs";
+import { ledgerItemDocument, projectLedger } from "./ledger-projection.mjs";
 import { lineList } from "./preflight.mjs";
 import { acceptedVersion } from "./goals.mjs";
 
 export const TERMINAL = new Set(["closed", "retired"]);
 const FINISHED = new Set(["completed", "covered", "obsolete", "superseded"]);
-// The projection version distinguishes explicit model-reason labels from the
-// historical generic "依据" format without rewriting stored dispositions.
-const EXPORT_FORMAT="building-loop-ledger/2";
+const PAGE_SIZE = 32;
+const itemHash = item => digest(JSON.stringify(item));
 
 /** Keep the book in the same locked, atomic state file as workflow transitions. */
 function book(frame) {
@@ -61,7 +61,7 @@ export function captureRequest(frame, event) {
     if (recent) {
       const [unitId, active] = recent;
       const receipt = readBytes(frame.root, active.receipt);
-      if (receipt) beginLedgerReview(frame, unitId, active, receipt);
+      if (receipt) beginLedgerReview(frame, unitId, active, receipt, true);
     }
   }
 }
@@ -75,67 +75,36 @@ export function trackUnit(frame, id, active, interrupted = false) {
     ...(interrupted ? { lastInterruption: { reason: active.blocked, phase: active.resumePhase } } : {}) });
 }
 
-/** Expose open work; historical dispositions remain stored and available on demand. */
+/** The handoff grants read-only history, while active items stay with their owner. */
+function historyOwners(frame) {
+  const coordinator = frame.state.engineeringCoordinator;
+  return new Set(coordinator?.session === frame.agent.id ? coordinator.historyOwners : []);
+}
+
+function visibleItem(frame, item, includeClosed, history) {
+  return item.owner === frame.agent.id && (includeClosed || !FINISHED.has(item.status)) ||
+    includeClosed && history.has(item.owner) && FINISHED.has(item.status);
+}
+
+/** Expose open work; historical dispositions remain available on demand. */
 export function ledgerSummary(frame, includeClosed = false) {
   const ledger = book(frame);
-  const coordinator = frame.state.engineeringCoordinator;
-  const history = coordinator?.session === frame.agent.id ? new Set(coordinator.historyOwners) : new Set();
-  const items = Object.values(ledger.items).filter(item =>
-    item.owner === frame.agent.id && (includeClosed || !FINISHED.has(item.status)) ||
-    includeClosed && history.has(item.owner) && FINISHED.has(item.status));
-  return { revision: ledger.revision, items };
+  const history = historyOwners(frame);
+  return { revision: ledger.revision, items: Object.values(ledger.items).filter(item => visibleItem(frame, item, includeClosed, history)) };
 }
 
-/** Render stored strings as literal Markdown text, not new headings/table rows. */
-function literal(value) {
-  return String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-    .replace(/[\\`*_{}\[\]()#!|]/g,"\\$&").replace(/\r\n|\n|\r/g,"<br>");
+function currentProjection(frame) {
+  const projection = frame.state.ledgerProjection;
+  return projection?.owner === frame.agent.id && projection.path === frame.policy.ledgerDocument ? projection : null;
 }
 
-/** Project the complete current owned ledger, never a model-rewritten selection.
- * No historical stage sequence is inferred from current state or free prose.
- */
+/** The authorized document and volumes are derived views of the same ledger. */
 export function exportLedger(frame) {
-  const file=frame.policy.ledgerDocument;
-  if(!file)return {configured:false,exported:false,authority:"host-state",
-    next:"项目维护者可配置 ledgerDocument 并加入 coordinator.write；未配置时保留现有文档，宿主台账仍为权威。"};
-  if(frame.role!=="coordinator"||!includes(frame.policy.coordinator.write,file))throw new Error("账本导出缺少总控的精确路径授权");
-  const view=ledgerSummary(frame,true),items=[...view.items].sort((a,b)=>a.id.localeCompare(b.id));
-  const coordinator=frame.state.engineeringCoordinator;
-  const history=new Set(coordinator?.session===frame.agent.id?coordinator.historyOwners:[]);
-  const units=Object.entries(frame.state.units).filter(([,unit])=>unit.owner===frame.agent.id || history.has(unit.owner)&&TERMINAL.has(unit.phase))
-    .sort(([a],[b])=>a.localeCompare(b));
-  const counts=items.reduce((result,item)=>{result[item.status]=(result[item.status]??0)+1;return result;},{});
-  const lines=["# 当前总控账本快照","", "账本 revision："+view.revision,
-    "总控："+literal(frame.agent.id),"条目总数："+items.length,"",
-    "状态统计："+Object.entries(counts).map(([status,count])=>literal(status)+" = "+count).join("；"),"",
-    "## 当前工作单元","","| 单元 | 当前阶段 | 当前回执 |","|---|---|---|",
-    ...units.map(([id,unit])=>"| "+literal(id)+" | "+literal(unit.phase)+" | "+literal(unit.receipt??"未生成")+" |"),
-    "","## 全部当前账项","","| ID | 类型 | 当前状态 | 名称 |","|---|---|---|---|",
-    ...items.map(item=>"| "+[item.id,item.kind,item.status,item.title].map(literal).join(" | ")+" |")];
-  for(const item of items) {
-    const disposition=item.disposition,evidence=disposition?.evidence,coverage=disposition?.coverage;
-    lines.push("","### "+literal(item.id),"", "名称："+literal(item.title),
-      "当前状态："+literal(item.status),(disposition?"总控处置理由（模型判断）：":"账项说明（登记内容）：")+literal(disposition?.basis??item.note));
-    if(disposition)lines.push("已登记处置："+literal(disposition.outcome)+"；核对单元："+literal(disposition.checkpoint));
-    if(evidence)lines.push("已核定位证据："+literal(evidence.file)+" 第 "+evidence.start+"–"+evidence.end+" 行；SHA-256 "+literal(evidence.sha256));
-    if(coverage)lines.push("覆盖关系："+literal(coverage.unit)+"；验收回执 "+literal(coverage.receipt)+"；回执 SHA-256 "+literal(coverage.receiptHash)
-      +"；候选 SHA-256 "+literal(coverage.candidateSha256)+"；目标 SHA-256 "+literal(coverage.goal?.sha256));
-    if(item.origin)lines.push("原始请求："+literal(item.origin.session)+"；事件 "+item.origin.event+"；SHA-256 "+literal(item.origin.sha256));
-    if(item.retirement?.outcome === "superseded") {
-      const { newUnit, confirmedBy, userEvent, userSha256, oldGoalSha256, newGoalSha256 } = item.retirement;
-      lines.push("所有者确认替换为工作单元 "+literal(newUnit)+"；确认会话 "+literal(confirmedBy)+"；事件 "+userEvent
-        +"；原文 SHA-256 "+literal(userSha256)+"；原目标 SHA-256 "+literal(oldGoalSha256)+"；新目标 SHA-256 "+literal(newGoalSha256));
-    }
-    if(item.lastInterruption)lines.push("宿主最近中断："+literal(item.lastInterruption.phase)+"；"+literal(item.lastInterruption.reason));
-    if(item.updatedAt)lines.push("最近登记时间："+literal(item.updatedAt));
-  }
-  const content=lines.join("\n")+"\n";
-  const result=replaceWithHistory(frame.root,file,content,"宿主导出当前账本 revision "+view.revision,
-    frame.agent.id+"/ledger/"+view.revision,frame.state.markers,writes=>{frame.ledgerWrites=writes;});
-  const projection={format:EXPORT_FORMAT,path:file,revision:view.revision,owner:frame.agent.id,sha256:digest(content),itemIds:items.map(item=>item.id)};
-  frame.state.ledgerProjection=projection;frame.changed=true;
-  return {configured:true,exported:true,...projection,itemCount:items.length,changed:result.changed};
+  const history = historyOwners(frame);
+  const units = Object.entries(frame.state.units)
+    .filter(([, unit]) => unit.owner === frame.agent.id || history.has(unit.owner) && TERMINAL.has(unit.phase))
+    .sort(([a], [b]) => a.localeCompare(b));
+  return projectLedger(frame, ledgerSummary(frame, true), units);
 }
 
 /** Record a fresh coordinator read of a context file during the closing checkpoint. */
@@ -153,12 +122,19 @@ export function noteContextRead(frame, file, hash, start, end) {
 }
 
 /** Open a mandatory book review after factual acceptance, before workflow closure. */
-export function beginLedgerReview(frame, id, active, receiptBytes) {
+export function beginLedgerReview(frame, id, active, receiptBytes, reopened = false) {
   active.phase = "ledger-review";
   active.receiptHash = digest(receiptBytes);
   active.ledgerSeen = {};
   delete active.ledgerRead;
+  delete active.ledgerProgress;
   trackUnit(frame, id, active);
+  // Administrative reopening can keep decisions made against the same accepted
+  // version. Changes in the goal or context are checked again at read/review.
+  if (reopened && Object.keys(active.ledgerDecision?.retained ?? {}).length) {
+    active.ledgerProgress = { context: active.ledgerDecision.contextDigest,
+      rows: active.ledgerDecision.retained ?? {} };
+  }
 }
 
 /** Require an exact current context read and name the item that needs repair. */
@@ -183,11 +159,126 @@ function contextReference(frame, active, decision, currentUnitItem) {
   return { file, start, end, sha256: digest(bytes) };
 }
 
+/** Pin the context of staged decisions to this acceptance and all current
+ * authorized project context. A changed source drops the whole old page set.
+ */
+function checkpointDigest(frame, active) {
+  const files = [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext, active.receipt])];
+  const inputs = files.map(file => {
+    const bytes = readBytes(frame.root, file);
+    return [file, bytes ? digest(bytes) : null];
+  });
+  return digest(JSON.stringify([frame.policy.hash, active.serial, active.receiptHash, inputs]));
+}
+
+/** Preserve completed pages after unrelated arrivals, never after changes to
+ * their item version or the acceptance material they were judged against.
+ */
+function validProgress(frame, active, items, context = checkpointDigest(frame, active)) {
+  if (active.ledgerProgress?.context !== context) return new Map();
+  const rows = active.ledgerProgress.rows;
+  const covered = new Map();
+  return new Map(items.flatMap(item => {
+    const row = rows[item.id];
+    if (row?.itemSha256 !== itemHash(item)) return [];
+    if (row.decision.outcome === "covered") {
+      const id = row.decision.coveredBy;
+      if (!covered.has(id)) {
+        const unit = frame.state.units[id];
+        let version = null;
+        if (unit?.owner === frame.agent.id && ["closed", "ledger-review"].includes(unit.phase)) {
+          try {
+            acceptedVersion(frame, id, unit);
+            version = unit.receiptHash;
+          } catch { /* A previously staged decision cannot borrow an expired acceptance. */ }
+        }
+        covered.set(id, version);
+      }
+      if (covered.get(id) !== row.coveringVersion) return [];
+    }
+    return [[item.id, row]];
+  }));
+}
+
+function pageLimit(value) {
+  if (value === undefined) return PAGE_SIZE;
+  if (!Number.isSafeInteger(value) || value < 1 || value > PAGE_SIZE) throw new Error("账本 limit 必须为 1 至 " + PAGE_SIZE);
+  return value;
+}
+
+function browseRows(frame, args, view, limit) {
+  const scope = JSON.stringify([frame.file, frame.agent.id, [...historyOwners(frame)].sort(), view.revision, args.includeClosed === true]);
+  let offset = 0;
+  if (args.cursor !== undefined) {
+    const match = /^([1-9]\d*)\.([a-f0-9]{64})$/u.exec(args.cursor);
+    if (!match || match[2] !== digest(scope + "/" + match[1])) throw new Error("账本分页版本或范围已变化，请重新调用 read");
+    offset = Number(match[1]);
+    if (offset >= view.items.length) throw new Error("账本分页位置已失效，请重新调用 read");
+  }
+  const items = view.items.slice(offset, offset + limit);
+  const next = offset + items.length;
+  return { items, ...(next < view.items.length ? { nextCursor: next + "." + digest(scope + "/" + next) } : {}) };
+}
+
+/** A review reads the next unreviewed batch. Historical browsing is independent
+ * and cannot authorize a write. Small default calls keep the previous schema.
+ */
+function ledgerRead(frame, args, unitId, active) {
+  if (active && active.owner !== frame.agent.id) throw new Error("账本读取不能指定其他总控持有的单元");
+  const view = ledgerSummary(frame, args.includeClosed === true);
+  const limit = pageLimit(args.limit);
+  const reviewing = active?.phase === "ledger-review" && args.includeClosed !== true;
+  let page;
+  if (reviewing) {
+    if (args.cursor !== undefined) throw new Error("复盘请直接 read 获取待审页；将返回的 reviewPage.cursor 用于 review");
+    let marker = { revision: view.revision, serial: active.serial };
+    if (view.items.length > limit || active.ledgerProgress) {
+      const context = checkpointDigest(frame, active);
+      const progress = validProgress(frame, active, view.items, context);
+      const remaining = view.items.filter(item => !progress.has(item.id));
+      const items = remaining.slice(0, limit);
+      const ids = items.map(item => item.id);
+      const cursor = digest(JSON.stringify([frame.file, frame.agent.id, unitId, marker, context, ids]));
+      marker = { ...marker, cursor, context, ids, progress: progress.size };
+      page = { items, reviewPage: { cursor, reviewed: progress.size, remaining: remaining.length, total: view.items.length } };
+    } else page = { items: view.items };
+    active.ledgerRead = marker;
+    frame.changed = true;
+  } else page = browseRows(frame, args, view, limit);
+  const covered = new Set(active ? frame.policy.units[unitId].covers : []);
+  return { revision: view.revision, ...page, itemCount: view.items.length,
+    items: page.items.map(item => ({ ...item, itemSha256: itemHash(item) })),
+    context: [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])],
+    document: frame.policy.ledgerDocument ? { path: frame.policy.ledgerDocument, managedBy: "host", projection: currentProjection(frame) }
+      : { configured: false, authority: "host-state", next: "维护者可配置 ledgerDocument；不会按文件名自动覆盖现有叙事文档。" },
+    coverage: [...covered].map(id => ({ id, coveredBy: unitId })),
+    current: active ? { unit: unitId, phase: active.phase, receipt: active.receipt } : null,
+    constraints: page.items.filter(item => !FINISHED.has(item.status)).map(item => ({ id: item.id,
+      outcomes: item.id === "unit-" + unitId ? ["completed"] : covered.has(item.id) ? ["covered", "obsolete"]
+        : item.origin && !item.unit ? ["keep", "resume", "defer", "completed", "covered", "obsolete"] : ["keep", "resume", "defer", "covered", "obsolete"],
+      ...(item.id === "unit-" + unitId ? { requiredEvidenceFile: active.receipt } : {}),
+      evidenceRequiredFor: ["completed", "covered", "obsolete"], coveredByRequiredFor: "covered" })) };
+}
+
 /** Apply explicit dispositions to every open item, guarding stale and partial reads. */
 export function ledgerAction(frame, args) {
   if (frame.role !== "coordinator") throw new Error("账本由总控维护，执行方通过阻塞回执登记中断");
   const ledger = book(frame);
-  if(args.action==="export")return exportLedger(frame);
+  if (args.action === "export") return exportLedger(frame);
+  if (args.action === "lookup") {
+    const item = ledger.items[args.id];
+    if (!item || !visibleItem(frame, item, true, historyOwners(frame))) return { found: false };
+    const projection = ledgerItemDocument(frame, currentProjection(frame), item.id, ledger.revision);
+    let document = null;
+    if (projection) {
+      try {
+        const bytes = readBytes(frame.root, projection.path);
+        if (bytes && digest(bytes) === projection.sha256) document = projection;
+      } catch { /* A missing or unreadable view must not hide the authoritative entry. */ }
+    }
+    return { found: true, revision: ledger.revision, item: { ...item, itemSha256: itemHash(item) },
+      document };
+  }
   if (args.action === "record") {
     const linked = args.originId && ledger.items[args.originId];
     if (args.originId && (!linked?.origin || linked.owner !== frame.agent.id)) throw new Error("originId 须指向本总控已有的自动请求记录");
@@ -226,52 +317,37 @@ export function ledgerAction(frame, args) {
   const unitId = args.unit ?? Object.keys(frame.state.units).find(id =>
     frame.state.units[id].owner === frame.agent.id && frame.state.units[id].phase === "ledger-review");
   const active = frame.state.units[unitId];
-  if (args.action === "read") {
-    if(active&&active.owner!==frame.agent.id)throw new Error("账本读取不能指定其他总控持有的单元");
-    const view = ledgerSummary(frame, args.includeClosed === true);
-    if (active?.owner === frame.agent.id && active.phase === "ledger-review") {
-      active.ledgerRead = { revision: ledger.revision, serial: active.serial };
-      frame.changed = true;
-    }
-    // A workspace has one configured output path. Its last generated metadata
-    // belongs only to that exporting coordinator; never expose another owner's
-    // item IDs through the shared state slot or imply it is this caller's book.
-    const projection=frame.state.ledgerProjection?.owner===frame.agent.id
-      &&frame.state.ledgerProjection.path===frame.policy.ledgerDocument?frame.state.ledgerProjection:null;
-    return { ...view, items: view.items.map(item => ({ ...item, itemSha256: digest(JSON.stringify(item)) })),
-      context: [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])],
-      document:frame.policy.ledgerDocument?{path:frame.policy.ledgerDocument,managedBy:"host",projection}
-        :{configured:false,authority:"host-state",next:"维护者可配置 ledgerDocument；不会按文件名自动覆盖现有叙事文档。"},
-      coverage: active ? frame.policy.units[unitId].covers.map(id => ({ id,coveredBy:unitId })) : [],
-      current: active ? { unit: unitId, phase: active.phase, receipt: active.receipt } : null,
-      // Publish the existing mechanical contract, never choose a semantic outcome
-      // for the coordinator. Exact IDs and evidence files prevent paid trial/error.
-      constraints: view.items.map(item=>({id:item.id,
-        outcomes:item.id==="unit-"+unitId?["completed"]
-          : active&&frame.policy.units[unitId].covers.includes(item.id)?["covered","obsolete"]
-          : item.origin&&!item.unit?["keep","resume","defer","completed","covered","obsolete"]
-          : ["keep","resume","defer","covered","obsolete"],
-        ...(item.id==="unit-"+unitId?{requiredEvidenceFile:active.receipt}:{}),
-        evidenceRequiredFor:["completed","covered","obsolete"],coveredByRequiredFor:"covered"})) };
-  }
-  const requestHash = digest(JSON.stringify({ note: args.note, decisions: args.decisions }));
+  if (args.action === "read") return ledgerRead(frame, args, unitId, active);
+  const requestHash = digest(JSON.stringify({ note: args.note, decisions: args.decisions, cursor: args.cursor }));
   if (args.action === "review" && active?.owner === frame.agent.id && active.phase === "closed"
     && active.ledgerDecision?.requestHash === requestHash) {
     acceptedVersion(frame, unitId, active);
     return { unit: unitId, phase: "closed", replayed: true,document:exportLedger(frame) };
   }
   if (args.action !== "review" || !active || active.owner !== frame.agent.id || active.phase !== "ledger-review") throw new Error("当前没有由本总控持有的账本复核阶段");
-  if (active.ledgerRead?.revision !== ledger.revision || active.ledgerRead?.serial !== active.serial) throw new Error("请先调用账本 read（unit=" + unitId + "）读取最新账本，变更后须重新读取");
+  const read = active.ledgerRead;
+  if (read?.revision !== ledger.revision || read?.serial !== active.serial || read.cursor !== args.cursor) {
+    throw new Error("请先调用账本 read（unit=" + unitId + "）读取最新账本，分批处置须提供最新 cursor，变更后须重新读取");
+  }
   acceptedVersion(frame, unitId, active);
   for (const file of [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])]) {
     const bytes = readBytes(frame.root, file);
     if (!bytes || active.ledgerSeen?.[keyOf(file)]?.hash !== digest(bytes)) throw new Error("请先读取最新项目现状 " + file);
   }
   const items = ledgerSummary(frame).items;
-  if (!Array.isArray(args.decisions) || args.decisions.length !== items.length
-    || new Set(args.decisions.map(row => row.id)).size !== items.length) throw new Error("请逐项处置全部未结账目，保留或续做也需给原因");
-  const planned = items.map(item => {
-    const decision = args.decisions.find(row => row.id === item.id);
+  const contextVersion = read.cursor && checkpointDigest(frame, active);
+  const progress = read.cursor ? validProgress(frame, active, items, contextVersion) : new Map();
+  if (read.cursor && (read.context !== contextVersion || read.progress !== progress.size)) {
+    throw new Error("账本复盘依据已变化，请先重新读取当前项目现状及账本页");
+  }
+  const current = read.cursor ? read.ids.map(id => ledger.items[id]) : items;
+  if (!Array.isArray(args.decisions) || args.decisions.length !== current.length
+    || new Set(args.decisions.map(row => row.id)).size !== current.length) {
+    throw new Error(read.cursor ? "请逐项处置本页的全部未复盘账目，保留或续做也需给原因" : "请逐项处置全部未结账目，保留或续做也需给原因");
+  }
+  const decisions = new Map(args.decisions.map(row => [row.id, row]));
+  function validate(item) {
+    const decision = decisions.get(item.id);
     if (!decision || !["keep", "resume", "defer", "completed", "covered", "obsolete"].includes(decision.outcome)) throw new Error("账本处置项缺失或状态无效 " + item.id);
     const basis = reason(decision.basis);
     // Completion belongs to this unit's own independently accepted checkpoint.
@@ -309,7 +385,23 @@ export function ledgerAction(frame, args) {
     if (unit && item.unit !== unitId && FINISHED.has(decision.outcome)
       && (unit.owner !== frame.agent.id || unit.phase !== "blocked")) throw new Error("其他运行中单元的权限和验收由其原总控维护");
     return { item, outcome: decision.outcome, basis, evidence, unit, coverage };
-  });
+  }
+  let planned = current.map(validate);
+  if (read.cursor) {
+    for (const row of planned) progress.set(row.item.id, { itemSha256: itemHash(row.item), decision: decisions.get(row.item.id),
+      ...(row.coverage ? { coveringVersion: row.coverage.receiptHash } : {}) });
+    if (progress.size < items.length) {
+      active.ledgerProgress = { context: read.context, rows: Object.fromEntries(progress) };
+      delete active.ledgerRead;
+      frame.changed = true;
+      return { unit: unitId, phase: "ledger-review", reviewed: progress.size, remaining: items.length - progress.size,
+        next: { action: "read", unit: unitId } };
+    }
+    // Validate all staged decisions against the current acceptance and evidence
+    // again before applying any result. Partial pages never retire a task.
+    for (const [id, row] of progress) decisions.set(id, row.decision);
+    planned = items.map(validate);
+  }
   // Per-item reasons and evidence above are mandatory. An omitted duplicate
   // overview is transport metadata, not a reason to discard valid dispositions.
   const context = args.note === undefined
@@ -325,11 +417,15 @@ export function ledgerAction(frame, args) {
       unit.retirement = { outcome, basis, evidence };
     }
   }
+  delete active.ledgerProgress;
   active.phase = "closed";
   active.closedAt = new Date().toISOString();
+  const retained = Object.fromEntries(planned.filter(row => !FINISHED.has(row.outcome)).map(row => [row.item.id, {
+    itemSha256: itemHash(ledger.items[row.item.id]), decision: decisions.get(row.item.id),
+  }]));
   active.ledgerDecision = { revision: ledger.revision, context,
     contextOrigin: args.note === undefined ? "host-from-validated-decisions" : "provided",
-    reviewed: planned.map(row => row.item.id), requestHash };
+    reviewed: planned.map(row => row.item.id), requestHash, contextDigest: checkpointDigest(frame, active), retained };
   frame.changed = true;
   // Export runs inside the existing locked state transaction. A write failure
   // aborts it: callers never receive closed while a configured document failed.

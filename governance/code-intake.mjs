@@ -211,10 +211,15 @@ export function requireCodeRegressionCurrent(frame, id, active, spec, goal) {
   if (submission?.goalSha256 !== check.goalSha256 || digest(JSON.stringify(submission.artifacts)) !== artifactsSha256) {
     throw new Error("[building-loop/code-regression] 交付文件或目标已经变化，须由执行方重新提交当前版本");
   }
+  const inputContracts = submission.inputContracts;
+  if (spec.codeTask?.diagnostics?.inputContracts && (inputContracts?.status !== "passed" ||
+    inputContracts.policySha256 !== frame.policy.hash || inputContracts.artifactsSha256 !== artifactsSha256)) {
+    throw new Error("[building-loop/code-regression] 当前版本缺少已登记输入契约的宿主复现，请由执行方重新提交");
+  }
   return { receiptSha256: check.receiptSha256, suiteSha256: check.suiteSha256,
     baselineReceiptSha256: active.codeIntake.regression.receiptSha256,
     artifactsSha256, protectedPassed: check.protectedCases.length,
-    requiredPassed: check.requiredCases.length };
+    requiredPassed: check.requiredCases.length, ...(inputContracts ? { inputContracts } : {}) };
 }
 
 /** Audits and closure also bind unchanged sibling files, which prose checks do not track. */

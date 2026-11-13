@@ -13,17 +13,19 @@ const files = ["ledger.md", ".building-loop/changes/ledger.md.md", ".building-lo
   ".building-loop/latest_backup/.building-loop/changes/ledger.md.md"];
 
 /** Build an actual ledger-review checkpoint and a prior generated snapshot. */
-async function scenario(root, write) {
+async function scenario(root, write, setup, configure) {
   const config = structuredClone(policy);
   config.units.K01.claims = ["C1"];
   config.units.K01.calculations = {};
   config.coordinator.write = ["ledger.md"];
   config.coordinator.read.push("ledger.md");
   config.ledgerDocument = "ledger.md";
+  configure?.(config);
   write("BUILDING-LOOP.json", JSON.stringify(config));
   write("candidate.md", "- C1：本例通过19/20（出处：functional.csv 第 2 行）。\n");
   write("ledger.md", "# 项目既有快照\n");
   const h = host(root);
+  await setup?.(h);
   const executor = (await h.flow("root", "advance")).childId;
   await h.flow(executor, "prepare");
   await h.flow(executor, "submit");
@@ -48,7 +50,7 @@ async function scenario(root, write) {
 function crashAt(root, fixture, target, phase, action = "review") {
   const source = `import fs from "node:fs"; import path from "node:path";
 import { host } from ${JSON.stringify(new URL("./helpers.mjs", import.meta.url).href)};
-const [root,target,phase,decisions,action] = process.argv.slice(1);
+const [root,target,phase,decisions,action,cursor] = process.argv.slice(1);
 const h=host(root),rename=fs.renameSync;
 fs.renameSync=(from,to)=>{
   if(path.resolve(to)!==target)return rename(from,to);
@@ -56,15 +58,154 @@ fs.renameSync=(from,to)=>{
   fs.writeSync(1,"terminated before returning from "+phase+" rename\\n");
   process.kill(process.pid,"SIGKILL");
 };
-await h.ledger("root",action,{decisions:JSON.parse(decisions)});
+await h.ledger("root",action,{decisions:JSON.parse(decisions),cursor:cursor||undefined});
 throw new Error("crash point was not reached");`;
   const result = spawnSync(process.execPath, ["--input-type=module", "--eval", source, root, target, phase,
-    JSON.stringify(fixture.decisions), action], { env: process.env, encoding: "utf8", timeout: 10_000 });
+    JSON.stringify(fixture.decisions), action, fixture.cursor ?? ""], { env: process.env, encoding: "utf8", timeout: 10_000 });
   assert.ifError(result.error);
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, new RegExp("terminated before returning from " + phase + " rename"), result.stderr);
   assert.equal(fs.existsSync(fixture.statePath + ".lock"), true, "The actual process cannot run its finally clause.");
 }
+
+function pageDecisions(book, keep = new Set()) {
+  return book.items.map(item => item.id === "unit-K01"
+    ? { id: item.id, outcome: "completed", basis: "该工作单元已按现有独立回执验收。", evidence: { file: "first.json", start: 1, end: 5 } }
+    : keep.has(item.id) || item.origin
+      ? { id: item.id, outcome: "keep", basis: "当前项目现状仍保留该事项。" }
+      : { id: item.id, outcome: "obsolete", basis: "当前项目放弃这条已失去业务前提的历史方案。" + "原因需要按原始证据留档。".repeat(12),
+        evidence: { file: "overview.md", start: 2, end: 2 } });
+}
+
+test("bounded ledger volumes survive real interruption, reopen incrementally and retain exact old decisions", async () => fixture(async (root, write) => {
+  const count = 330;
+  const f = await scenario(root, write, async h => {
+    for (let index = 0; index < count; index++) {
+      await h.ledger("root", "record", { id: "legacy-" + index, kind: "planned", title: "待核方案 " + index,
+        note: "过往材料中登记的单独任务，需要结合当前项目进度决定。".repeat(8) });
+    }
+  });
+  let h = f.h;
+  const keep = new Set(["legacy-19"]);
+  const first = await h.ledger("root", "read", { limit: 16 });
+  assert.equal(first.reviewPage.total, count + 1);
+  assert.equal(first.items.length, 16);
+  const history = await h.ledger("root", "read", { includeClosed: true, limit: 9 });
+  assert.equal(history.items.length, 9);
+  assert.equal((await h.ledger("root", "read", { includeClosed: true, limit: 9, cursor: history.nextCursor })).items.length, 9);
+  await assert.rejects(h.ledger("root", "review", { cursor: first.reviewPage.cursor, decisions: pageDecisions(first).slice(1) }), /本页的全部/);
+  assert.equal((await h.ledger("root", "review", { cursor: first.reviewPage.cursor, decisions: pageDecisions(first, keep) })).remaining, count + 1 - 16);
+  assert.equal((await h.ledger("root", "lookup", { id: "legacy-0" })).item.status, "pending", "staging a page does not apply dispositions");
+
+  // Another host's automatic request increments the ledger revision. Pending
+  // pages for unchanged items survive, while the stale cursor is rejected.
+  const stale = await h.ledger("root", "read");
+  await host(root).user("root", 940, "当前任务增量补充事项");
+  await assert.rejects(h.ledger("root", "review", { cursor: stale.reviewPage.cursor, decisions: pageDecisions(stale) }), /读取最新账本/);
+  await assert.rejects(h.ledger("root", "read", { includeClosed: true, cursor: history.nextCursor }), /版本或范围已变化/);
+  h = host(root);
+  let page = await h.ledger("root", "read");
+  assert.equal(page.reviewPage.reviewed, 16);
+  assert.ok(!page.items.some(item => item.id === "legacy-0"));
+  while (page.reviewPage.remaining > page.items.length) {
+    const stage = await h.ledger("root", "review", { cursor: page.reviewPage.cursor, decisions: pageDecisions(page, keep) });
+    assert.equal(stage.phase, "ledger-review");
+    page = await h.ledger("root", "read");
+  }
+  const final = { ...f, cursor: page.reviewPage.cursor, decisions: pageDecisions(page, keep) };
+  const before = fs.readFileSync(f.statePath);
+  const beforeBackup = fs.readFileSync(f.statePath + ".bak");
+  const beforeFiles = files.map(file => readBytes(root, file));
+  crashAt(root, final, f.statePath, "before");
+  const journal = JSON.parse(fs.readFileSync(f.statePath + ".ledger-txn", "utf8"));
+  assert.equal(journal.spec, "building-loop-ledger-transaction/2");
+  assert.ok(journal.volumes.length >= 2);
+  const restarted = host(root);
+  assert.equal((await restarted.flow("root", "status")).units[0].phase, "ledger-review");
+  assert.deepEqual(fs.readFileSync(f.statePath), before);
+  assert.deepEqual(fs.readFileSync(f.statePath + ".bak"), beforeBackup);
+  assert.deepEqual(files.map(file => readBytes(root, file)), beforeFiles);
+  assert.equal(fs.existsSync(f.statePath + ".ledger-txn"), false);
+  const closed = await restarted.ledger("root", "review", { cursor: final.cursor, decisions: final.decisions });
+  assert.equal(closed.phase, "closed");
+  assert.equal(closed.reviewed, count + 2);
+  assert.equal(closed.document.format, "building-loop-ledger/3");
+  const volumes = closed.document.volumes.map(volume => ({ ...volume, bytes: readBytes(root, volume.path) }));
+  assert.equal(volumes.reduce((sum, row) => sum + row.itemCount, 0), count + 2);
+  assert.ok(volumes.reduce((sum, row) => sum + row.bytes.length, 0) > 256 * 1024);
+  assert.ok(volumes.every(row => row.bytes.length <= 192 * 1024 && row.sha256 === digest(row.bytes)));
+  const old = await restarted.ledger("root", "lookup", { id: "legacy-0" });
+  assert.equal(old.item.status, "obsolete");
+  assert.equal(old.item.disposition.evidence.sha256, digest(readBytes(root, "overview.md")));
+  assert.match(readBytes(root, old.document.path).toString(), /^### legacy-0$/m);
+  await assert.rejects(restarted.file("root", "read", old.document.path), /宿主管理|授权/);
+  restarted.coordinator("other");
+  assert.deepEqual(await restarted.ledger("other", "lookup", { id: "legacy-0" }), { found: false });
+  assert.equal((await restarted.ledger("root", "review", { cursor: final.cursor, decisions: final.decisions })).replayed, true);
+  const unchanged = fs.statSync(path.join(root, old.document.path)).mtimeMs;
+
+  await restarted.user("root", 941, "关闭后到达的最后一条增量请求");
+  const reopened = await restarted.ledger("root", "read");
+  assert.equal(reopened.current.phase, "ledger-review");
+  assert.equal(reopened.reviewPage.reviewed, 2, "two retained decisions match the same accepted context");
+  assert.equal(reopened.reviewPage.total, 4);
+  assert.equal(reopened.items.length, 2, "only the reopened unit and the new request need model decisions");
+  await restarted.flow("root", "prepare");
+  const writtenBodies = [];
+  const rename = fs.renameSync;
+  fs.renameSync = (from, to) => {
+    if (path.resolve(to) === path.join(root, "ledger.md") || volumes.some(volume => path.resolve(to) === path.join(root, volume.path))) {
+      writtenBodies.push(path.basename(to));
+    }
+    return rename(from, to);
+  };
+  try {
+    assert.equal((await restarted.ledger("root", "review", { cursor: reopened.reviewPage.cursor, decisions: pageDecisions(reopened) })).phase, "closed");
+  } finally { fs.renameSync = rename; }
+  const after = await restarted.ledger("root", "lookup", { id: "legacy-0" });
+  assert.deepEqual(after.item, old.item);
+  assert.equal(after.document.path, old.document.path);
+  assert.equal(fs.statSync(path.join(root, old.document.path)).mtimeMs, unchanged, "an old volume with no changed rows was not rewritten");
+  assert.deepEqual(writtenBodies, ["part-2.md", "ledger.md"]);
+  console.log(JSON.stringify({ generatedItems: count + 2, projectionBytes: volumes.map(row => row.bytes.length), indexBytes: readBytes(root, "ledger.md").length,
+    oldLocator: { volume: path.basename(old.document.path), evidenceSha256: old.item.disposition.evidence.sha256 },
+    incremental: { total: 4, retained: 2, refetched: reopened.items.length, modelDecisions: 2, writtenBodies },
+    hardExitRecovered: true, lateEvent: { preservedValidatedDecisions: 16, staleReviewRejected: true } }));
+}));
+
+test("an incremental ledger page is invalidated when current project context changes", async () => fixture(async (root, write) => {
+  write("ledger-context.md", "初始现状保留测试和回收任务。\n");
+  const { h } = await scenario(root, write, host => host.ledger("root", "record", {
+    id: "legacy-plan", kind: "planned", title: "计划复核", note: "依据现状决定能否继续。",
+  }), config => {
+    config.goalContext = ["overview.md"];
+    config.ledgerContext.push("ledger-context.md");
+    config.coordinator.read.push("ledger-context.md");
+  });
+  await h.file("root", "read", "ledger-context.md");
+  const first = await h.ledger("root", "read", { limit: 1 });
+  const keep = new Set(["legacy-plan"]);
+  await h.ledger("root", "review", { cursor: first.reviewPage.cursor, decisions: pageDecisions(first, keep) });
+  const second = await h.ledger("root", "read", { limit: 1 });
+  assert.equal(second.reviewPage.reviewed, 1);
+  write("ledger-context.md", "现状变更，暂停该工作并逐项重新判断。\n");
+  await assert.rejects(h.ledger("root", "review", { cursor: second.reviewPage.cursor, decisions: pageDecisions(second) }), /读取最新项目现状/);
+  await h.file("root", "read", "ledger-context.md");
+  await assert.rejects(h.ledger("root", "review", { cursor: second.reviewPage.cursor, decisions: pageDecisions(second) }), /依据已变化/);
+  const reset = await h.ledger("root", "read", { limit: 1 });
+  assert.equal(reset.reviewPage.reviewed, 0);
+  assert.equal(reset.items[0].id, "legacy-plan");
+  assert.equal((await h.ledger("root", "lookup", { id: "legacy-plan" })).item.status, "pending");
+  const newer = await h.ledger("root", "review", { cursor: reset.reviewPage.cursor, decisions: [{
+    id: "legacy-plan", outcome: "defer", basis: "最新现状已暂停此工作。", evidence: { file: "ledger-context.md", start: 1, end: 1 },
+  }] });
+  assert.equal(newer.remaining, 1);
+  const final = await h.ledger("root", "read", { limit: 1 });
+  assert.equal((await h.ledger("root", "review", { cursor: final.reviewPage.cursor, decisions: pageDecisions(final) })).phase, "closed");
+  const delayed = await h.ledger("root", "lookup", { id: "legacy-plan" });
+  assert.equal(delayed.item.status, "deferred");
+  assert.equal(delayed.item.disposition.evidence.sha256, digest(readBytes(root, "ledger-context.md")));
+}));
 
 test("hard exit before state commit restores exact ledger and rolling backup bytes on restart", async () => fixture(async (root, write) => {
   const f = await scenario(root, write);

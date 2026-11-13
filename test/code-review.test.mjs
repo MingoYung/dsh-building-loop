@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
+import { once } from "node:events";
 import fs from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
@@ -16,7 +18,7 @@ const source = "def bounded(n):\n    # Reject negative batch sizes before enqueu
 const update = "def bounded(n):\n    # Clamp before enqueue to keep downstream memory bounded.\n    return min(5, max(0, n))\n";
 const goalText = "# Queue release\nBound each submitted batch between zero and five items.\n";
 
-function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false } = {}) {
+function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false, diagnostics, text = goalText } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = [entry, worker];
   const grant = { read: [...sources, "first.json", "final.json", ...(proseEdit ? ["notes.md"] : [])],
@@ -28,10 +30,10 @@ function prepareProject(root, write, { evidence = false, proseEdit = false, part
     requiredCases: ["batch-bound"], regression: { baselineFile: "baseline-proof.json", previousCases: ["old-negative"] } };
   write(entry, "from queue import bounded\n\nprint(bounded(9))\n");
   write(worker, source);
-  write(goal, goalText);
+  write(goal, text);
   if (proseEdit) write("notes.md", "# Existing release notes\n");
   write("BUILDING-LOOP.json", JSON.stringify({ spec: "building-loop/1", coordinator: { read: [goal, "first.json", "final.json"] },
-    goalContext: [goal], units: { K01: { candidate: entry, plainLast: false, codeTask: { sources, tests },
+    goalContext: [goal], units: { K01: { candidate: entry, plainLast: false, codeTask: { sources, tests, diagnostics },
       phases: { intake: grant, supplement: grant, "first-review": review("first.json"), "final-review": review("final.json") } } } }));
   const policy = authority(root);
   const saveProof = (file, body) => write(file, JSON.stringify({ ...body,
@@ -129,7 +131,7 @@ test("signed code review uses actual changed lines and an independent receipt be
   assert.deepEqual(bad.progress.missingFiles, []);
   assert.deepEqual(bad.progress.missingCases, []);
   assert.equal(bad.progress.ready, false);
-  const syntax = { ...badFinding, violation: { type: "syntax", expected: "Valid Python syntax", actual: "Unterminated string" } };
+  const syntax = { ...badFinding, kind: "behavior", violation: { type: "syntax", expected: "Valid Python syntax", actual: "Unterminated string" } };
   assert.match((await codeReview(harness, reviewer, "record", { findings: [syntax] })).errors[0].reason, /受信复现编号/);
   const unavailableSyntax = { ...syntax, violation: { ...syntax.violation, reproduction: "missing-probe" } };
   assert.match((await codeReview(harness, reviewer, "record", { findings: [unavailableSyntax] })).errors[0].reason, /复现证明不属于|尚未证明/);
@@ -192,7 +194,7 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   const finding = { ...ref(worker, 2), id: "cap-ownership", kind: "annotation",
     observation: "The comment gives the memory reason. The clamp on the next line hard-codes the cap.",
     issue: "The comment omits the ownership of the cap value", fix: "Explain why this queue owns the bound",
-    violation: { type: "annotation", expected: "Identify why this queue owns the fixed cap", actual: "The memory reason alone is documented" },
+    violation: { type: "annotation", obligation: "interface", expected: "Identify why this queue owns the fixed cap", actual: "The memory reason alone is documented" },
     evidence: [{ ...ref(worker, 3), relation: "supports" }], caseId: "batch-bound" };
   const fake = { ...finding, evidence: [{ ...finding.evidence[0], quote: "return n" }] };
   const invalid = await codeReview(harness, auditor, "record", { ...verified, findings: [fake], findingsDone: true });
@@ -221,6 +223,7 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   assert.ok(JSON.stringify(rejected).includes(finding.issue));
   const proof = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8")).independentAudit.codeReview;
   assert.equal(proof.findings[0].evidence[0].excerptSha256, digest(update.split("\n")[2]));
+  assert.equal(proof.findings[0].staticProof.annotationSha256, digest(verified.files[0].comment.quote));
   assert.deepEqual(proof.findings[0].signedCase, { id: "batch-bound", status: "passed" });
   await assert.rejects(qualify(executor, "same-source-new-test-run"), /退回|落实/);
   const originalEntry = fs.readFileSync(path.join(root, entry), "utf8");
@@ -236,6 +239,138 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   const stale = await codeReview(harness, second, "submit");
   assert.equal(stale.phase, "goal-review-ready");
   assert.equal((await harness.flow("root", "advance")).phase, "supplement");
+}));
+
+test("behavior rejection requires the current reviewer's exact clause and a real output mismatch", () => fixture(async (root, write) => {
+  const token = "only-test-review-requirement-token-1234";
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    assert.equal(request.headers.authorization, "Bearer " + token);
+    calls.push(input);
+    const { missing, overCap } = JSON.parse(input.probe.stdin);
+    const stdout = JSON.stringify(missing ? { error: "unknown-reference" } : { size: overCap ? 6 : 5 });
+    response.end(JSON.stringify({ spec: input.spec, requestId: input.requestId, snapshotSha256: input.snapshotSha256,
+      status: "passed", probe: { exitCode: 0, stdout } }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const env = { DSH_BUILDING_LOOP_DIAGNOSTICS_URL: "http://127.0.0.1:" + server.address().port + "/run",
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: token };
+  const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    const unknown = "Missing queue or missing worker both return `unknown-reference`.";
+    const diagnostics = { checkSet: "review-clause", protocol: 2, recipes: ["queue"], reviewRecipes: ["queue"] };
+    const { harness, qualify } = prepareProject(root, write, { diagnostics, text: goalText + unknown + "\n" });
+    const executor = (await harness.flow("root", "advance")).childId;
+    write(worker, update);
+    assert.equal((await qualify(executor)).phase, "review-ready");
+    const reviewer = (await harness.flow("root", "advance")).childId;
+    await prepareReview(harness, reviewer);
+    await codeReview(harness, reviewer, "record", { ...verified, findingsDone: true });
+    assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
+    const auditor = (await harness.flow("root", "advance")).childId;
+    const packet = await prepareReview(harness, auditor);
+    assert.match(packet.codeReview.reproduction.requirement, /quote/u);
+    const finding = { id: "reference-order", kind: "behavior", ...ref(worker, 3), caseId: "batch-bound",
+      observation: "Two invalid references take different code paths.", issue: "The implementation lacks priority for missing references.",
+      fix: "Give the missing queue priority over the missing worker.", evidence: [{ ...ref(worker, 3), relation: "supports" }],
+      violation: { type: "requirement", expected: "An explicit priority for the two checks.", actual: "No explicit priority.", requirement: ref(goal, 3) } };
+    const recordFinding = row => codeReview(harness, auditor, "record", { findings: [row], findingsDone: true });
+    const unsupported = await codeReview(harness, auditor, "record", { ...verified, findings: [finding], findingsDone: true });
+    assert.match(unsupported.errors[0].reason, /受信复现编号/);
+    assert.deepEqual(unsupported.progress.findingIds, []);
+    for (const kind of ["annotation", "maintenance"]) {
+      const aliases = await recordFinding({ ...finding, kind });
+      assert.match(aliases.errors[0].reason, /kind 与 violation.type 不一致/u);
+    }
+    const fakeMaintenance = await recordFinding({ ...finding, kind: "maintenance", violation: { ...finding.violation,
+      type: "maintainability", requirement: undefined } });
+    assert.match(fakeMaintenance.errors[0].reason, /实际要求原文/u);
+    const falseComment = await recordFinding({ ...finding, kind: "annotation", violation: { ...finding.violation,
+      type: "annotation", obligation: "invariant", requirement: undefined } });
+    assert.match(falseComment.errors[0].reason, /定位真实注释/u);
+    const falseMissing = await codeReview(harness, auditor, "record", { decisions: [{ id: "file:1", status: "missing",
+      basis: "Reinterprets an already documented choice as missing rationale.", refs: [ref(worker, 3)], obligation: "invariant" }] });
+    assert.match(falseMissing.errors[0].reason, /该范围有可定位注释/u);
+    await codeReview(harness, auditor, "record", { files: verified.files });
+    const probe = { assertion: "runtime", file: worker, recipe: "queue", stdin: '{"missing":["queue","worker"]}', expectedExitCode: 0 };
+    const unknownClause = { ...ref(goal, 3), quote: unknown };
+    await assert.rejects(codeReview(harness, auditor, "probe", { ...probe, requirement: { ...unknownClause, quote: "Returns another error." } }), /逐字引用/);
+    await assert.rejects(codeReview(harness, auditor, "probe", { ...probe, requirement: unknownClause,
+      expectedJson: '{"error":"unknown-reference","invented":true}', expectedPointer: "" }), /只提供该字段的标量或数组/u);
+    for (const code of ["queue-first", "QUEUE_FIRST"]) {
+      await assert.rejects(codeReview(harness, auditor, "probe", { ...probe, requirement: unknownClause,
+        expectedPointer: "/error", expectedJson: JSON.stringify(code) }), /须逐字见于对应条款/u);
+    }
+    assert.equal(calls.length, 0);
+    const matching = await codeReview(harness, auditor, "probe", { ...probe, requirement: unknownClause,
+      expectedPointer: "/error", expectedJson: '"unknown-reference"' });
+    assert.equal(matching.outcome, "match");
+    assert.match((await recordFinding({ ...finding, violation: { ...finding.violation, reproduction: matching.id } })).errors[0].reason, /符合预期/);
+    const inventedField = await codeReview(harness, auditor, "probe", { ...probe, requirement: unknownClause,
+      expectedPointer: "/diagnosticPriority", expectedJson: '"queue"' });
+    assert.equal(inventedField.outcome, "unavailable");
+    assert.equal(inventedField.reason, "missing-unstated-field");
+    const exploratory = await codeReview(harness, auditor, "probe", { ...probe, expectedJson: '{"error":"queue-first"}' });
+    assert.equal(exploratory.outcome, "mismatch");
+    assert.match((await recordFinding({ ...finding, violation: { ...finding.violation, reproduction: exploratory.id } })).errors[0].reason, /探索复现不能用于退回/);
+
+    const badDecision = { id: "test:1", status: "revise", basis: "The review has a concern about the ordering.", refs: [ref(goal, 2), ref(worker, 3)] };
+    const decision = await codeReview(harness, auditor, "record", { decisions: [badDecision], findingsDone: true });
+    assert.deepEqual(decision.progress.unsupportedCaseRevisions, ["batch-bound"]);
+    assert.equal((await codeReview(harness, auditor, "submit")).status, "needs-review");
+
+    const capClause = { ...ref(goal, 2), quote: goalText.split("\n")[1] };
+    const failed = await codeReview(harness, auditor, "probe", { ...probe, stdin: '{"overCap":true}', requirement: capClause,
+      expectedPointer: "/size", expectedOperator: "at-most", expectedJson: "5" });
+    assert.equal(failed.outcome, "mismatch");
+    assert.equal(failed.actual.json, 6);
+    assert.match((await recordFinding({ ...finding, violation: { ...finding.violation, reproduction: failed.id } })).errors[0].reason, /相同当前规格条款/);
+    const real = { ...finding, id: "over-cap", observation: "The signed reproduction observed six queued items.", issue: "The queue exceeds five items.",
+      fix: "Clamp the reproduced queue operation before downstream processing.", violation: { type: "runtime", expected: "The observed size is at most five.",
+        actual: "The observed size is six.", requirement: ref(goal, 2), reproduction: failed.id } };
+    assert.equal((await recordFinding(real)).progress.ready, true);
+    assert.equal((await codeReview(harness, auditor, "submit")).phase, "supplement-ready");
+    const proof = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8")).independentAudit.codeReview.findings[0].violation.reproduction;
+    assert.deepEqual(proof.replay, { input: { recipe: "queue", stdin: '{"overCap":true}' },
+      expected: { exitCode: 0, pointer: "/size", operator: "at-most", json: 5 } });
+    assert.equal(proof.actual.jsonSha256, digest("6"));
+    assert.equal(proof.requirement.quote, capClause.quote);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    server.close();
+    await once(server, "close");
+  }
+}));
+
+test("a required missing annotation can block on a named rule and observed changed range", () => fixture(async (root, write) => {
+  const { harness, qualify } = prepareProject(root, write);
+  const executor = (await harness.flow("root", "advance")).childId;
+  const uncommented = "def bounded(n):\n    return min(5, max(0, n))\n";
+  write(worker, uncommented);
+  assert.equal((await qualify(executor)).phase, "review-ready");
+  const reviewer = (await harness.flow("root", "advance")).childId;
+  await codeReview(harness, reviewer, "prepare");
+  const file = { id: "file:1", status: "missing", refs: [ref(worker, 2)],
+    basis: "Explain why downstream capacity makes both bounds necessary before handing off." };
+  const test = { id: "test:1", status: "pass", refs: [ref(goal, 2), ref(worker, 2)],
+    basis: "The signed batch test applies both bounds at this handoff." };
+  const invalid = await codeReview(harness, reviewer, "record", { decisions: [file, test], findingsDone: true });
+  assert.match(invalid.errors[0].reason, /须给出 obligation/u);
+  assert.equal(invalid.progress.ready, false);
+  const recorded = await codeReview(harness, reviewer, "record", { decisions: [{ ...file, obligation: "invariant" }] });
+  assert.equal(recorded.progress.ready, true);
+  assert.equal((await codeReview(harness, reviewer, "submit")).phase, "supplement-ready");
+  const proof = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8")).codeReview.files[0].comment.staticProof;
+  assert.deepEqual(proof, { rule: "necessary-comment", obligation: "invariant", check: "missing-adjacent-annotation",
+    start: 1, end: 2, sha256: digest(uncommented.trimEnd()) });
 }));
 
 test("prefilled review rows carry only current observed evidence and independently record compact decisions", () => fixture(async (root, write) => {

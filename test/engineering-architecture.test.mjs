@@ -128,7 +128,7 @@ async function approve(harness, actor, changed) {
       issue: "The plan does not cover replaying already submitted work.", fix: "Reproduce a replay against the reverted entrypoint.",
       violation: { type: "architecture", expected: "The rollback procedure checks a replayed request against the reverted entrypoint.",
         actual: "The rollback procedure only checks the original budget." },
-      evidence: [{ ...ref(architecture, 9), relation: "supports" }] }] } : {}) });
+      evidence: [{ ...ref(architecture, 9), relation: "supports" }, { ...ref(goal, 3), relation: "supports" }] }] } : {}) });
   assert.deepEqual(result.errors, []);
   return review("submit");
 }
@@ -265,6 +265,69 @@ test("Python call facts distinguish aliases from imports, conditional bindings, 
   ].join("\n");
   assert.deepEqual(inspectArchitectureProse(note, graph),
     [{ line: 3, from: "pkg/journal.py", to: "pkg/planner.py", relation: "import", actual: [] }]);
+}));
+
+test("architecture checks explicit import chains without interpreting unlabeled workflow arrows", () => fixture(async (root, write) => {
+  const sources = {
+    "main.py": "from engine import run\nrun()\n",
+    "engine.py": "from policy import LIMIT\ndef run(): return LIMIT\n",
+    "policy.py": "LIMIT = 7\n",
+    "a/shared.py": "X = 1\n",
+    "b/shared.py": "X = 2\n",
+  };
+  for (const dir of ["a", "b"]) fs.mkdirSync(path.join(root, dir));
+  for (const [file, content] of Object.entries(sources)) write(file, content);
+  const reads = Object.keys(sources);
+  const graph = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file, sha256: digest(sources[file]) })));
+  const note = ["# Modules", "", "导入方向固定：`main.py` → `policy.py` → `engine.py`。另有实施顺序。",
+    "Import direction: `main.py` -> `engine.py` -> `policy.py`.",
+    "实施顺序：`policy.py` → `engine.py` → `main.py`。",
+    "`main.py` → `policy.py` → `engine.py`。",
+    "未来导入方向：`main.py` → `policy.py`。",
+    "静态导入关系：`main.py` → `shared.py` → `engine.py`。",
+    "导入方向：`main.py` → `outside.py`。",
+    "", "> Import direction: `main.py` -> `policy.py`.", "", "~~~text",
+    "导入方向固定：`main.py` → `policy.py`。", "~~~"].join("\n");
+  assert.deepEqual(inspectArchitectureProse(note, graph), [
+    { line: 3, from: "main.py", to: "policy.py", relation: "import", actual: [{ file: "engine.py", line: 1 }] },
+    { line: 3, from: "policy.py", to: "engine.py", relation: "import", actual: [] },
+  ]);
+}));
+
+test("architecture attributes definite guards and definitions without accusing delegation or unknown ownership", () => fixture(async (root, write) => {
+  const sources = {
+    "processor.py": "from rules import quota as get_quota\n\ndef run(request):\n    return get_quota(request)\n",
+    "rules.py": "def quota(request):\n    count = request.get('amount')\n    if type(count) is not int:\n        raise ValueError('invalid-amount')\n    if request['currency'] not in ('USD', 'EUR'):\n        return {'error': 'invalid-currency'}\n    return count\n",
+    "uncertain.py": "from rules import quota\n\ndef run(quota, request):\n    return quota(request)\n",
+    "also.py": "from rules import quota\n\ndef run(request):\n    if request['amount'] == 0:\n        return {'allowed': False}\n    return quota(request)\n",
+    "parameter.py": "from rules import quota\n\ndef run(request, amount):\n    if type(amount) is not int:\n        raise ValueError('invalid-amount')\n    return quota(request)\n",
+  };
+  for (const [file, content] of Object.entries(sources)) write(file, content);
+  const reads = Object.keys(sources);
+  const graph = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file, sha256: digest(sources[file]) })),
+    { responsibilities: true });
+  const note = ["# Modules", "", "- `processor.py`: validates `amount` (otherwise `invalid-amount`).",
+    "- `processor.py`：实现 `quota()`。", "- `rules.py`：校验 `amount`（不合规时报 `invalid-amount`）。",
+    "- `processor.py`：委托规则模块校验 `amount`（错误 `invalid-amount`）。",
+    "- `processor.py`：校验 `currency`（`invalid-currency`）。",
+    "- `processor.py`：校验 `amount`（例如 `unknown-range`）。",
+    "- `processor.py`：将来校验 `amount`（错误 `invalid-amount`）。",
+    "- `processor.py`：读取 `amount` 后交给下游。",
+    "- `uncertain.py`：校验 `amount`（错误 `invalid-amount`）。",
+    "- `also.py`：校验 `amount`（错误 `invalid-amount`）。",
+    "- `parameter.py`：校验 `amount`（错误 `invalid-amount`）。",
+    "- `processor.py`：负责校验 `amount`（错误 `invalid-amount`），改为由规则层处理。",
+    "- `processor.py`：实现 `quota` 是后续方案。",
+    "- `processor.py`: validates `amount` (formerly `invalid-amount`).",
+    "", "> `processor.py`：校验 `amount`（错误 `invalid-amount`）。", ""].join("\n");
+  assert.deepEqual(inspectArchitectureProse(note, graph), [
+    { line: 3, from: "processor.py", relation: "validation", field: "amount", actual: [
+      { file: "rules.py", symbol: "quota", field: "amount", line: 4, code: "invalid-amount" }] },
+    { line: 4, from: "processor.py", relation: "definition", symbol: "quota", actual: [
+      { file: "rules.py", symbol: "quota", line: 1 }] },
+    { line: 7, from: "processor.py", relation: "validation", field: "currency", actual: [
+      { file: "rules.py", symbol: "quota", field: "currency", line: 6, code: "invalid-currency" }] },
+  ]);
 }));
 
 test("architecture registration pins one bounded fence of explicitly granted examples", () => fixture(async (root, write) => {

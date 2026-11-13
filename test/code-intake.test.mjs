@@ -293,7 +293,7 @@ async function startDiagnosticTask(root, write, diagnostics) {
       beforeSha256: sha256, oldText: "return value + " + from, newText: "return value + " + to, note: "try one edit",
     });
   };
-  return { harness, childId, edit, policy };
+  return { harness, childId, edit, policy, keys };
 }
 
 async function withDiagnosticRunner(handler, run, timeoutMs = 2000) {
@@ -337,6 +337,48 @@ async function withDiagnosticRunner(handler, run, timeoutMs = 2000) {
     await new Promise(resolve => server.close(resolve));
   }
 }
+
+test("a signed green submission still stops on registered malformed input and resumes on corrected bytes", () => fixture(async (root, write) => {
+  const recipe = "python-json";
+  const success = { status: "ok" };
+  const invalid = { status: "error", error: "invalid-settings" };
+  const inputContracts = [{ id: "settings-shape", recipe, seed: { settings: { active: true } }, expectedJson: success,
+    checks: [{ path: ["settings"], invalid: ["array", "null"], expectedJson: invalid }] }];
+  let seen = 0;
+  await withDiagnosticRunner((request, send) => {
+    if (request.operation !== "probe") {
+      send({ status: "passed", old: { status: "passed" }, required: [{ caseId: "new-case", status: "passed" }] });
+      return;
+    }
+    seen++;
+    const current = Buffer.from(request.artifacts.find(row => row.path === module).contentBase64, "base64").toString();
+    const { settings } = JSON.parse(request.probe.stdin);
+    const rejects = settings === null || Array.isArray(settings) && current.includes("value + 2");
+    send({ status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(rejects ? invalid : success), stderr: "" } });
+  }, async () => {
+    const { harness, childId, edit, keys } = await startDiagnosticTask(root, write, { checkSet: "shape-check",
+      protocol: 2, recipes: [recipe], reviewRecipes: [recipe], inputContracts });
+    const submitSigned = async () => {
+      const { file, previousCases, requiredCases, protectedCases, ...binding } =
+        (await harness.flow(childId, "prepare")).codeTask.regressionProof;
+      signedRegression(write, file, { ...binding, runId: "shape-candidate",
+        cases: caseRows({ "old-pass": "passed", "old-fail": "failed", "new-case": "passed" }) }, keys);
+      return harness.flow(childId, "submit");
+    };
+    const first = await submitSigned();
+    assert.equal(first.phase, "intake");
+    assert.equal(first.submission.status, "input-check");
+    assert.equal(first.submission.inputContracts.status, "failed");
+    assert.deepEqual(first.submission.inputContracts.failures.map(row => row.shape?.type), ["array"]);
+    assert.equal(seen, 3);
+    await edit(1, 2);
+    const repaired = await submitSigned();
+    assert.equal(repaired.phase, "review-ready");
+    assert.equal(seen, 6);
+    await harness.flow("root", "advance");
+    assert.equal(harness.activations.length, 2);
+  });
+}));
 
 test("a landed edit returns the runner's first real error directly, but cannot replace a signed proof", () => fixture(async (root, write) => {
   const requests = [];

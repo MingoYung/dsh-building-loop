@@ -7,6 +7,8 @@ import { parser as pythonParser } from "./vendor/python-parser.cjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
 
 export const CODE_COMMENT_RULE = "必要注释写在非显然的职责、调用方向、跨模块状态、权限、数据保护、回滚或重试边界旁，交代原因与成立条件。改动使旧说明失实时同步更新。核验对照实际控制流和测试证据。";
+export const CODE_REVIEW_REJECTION_RULE = "行为退回先用 runtime probe 绑定已读规格条款的原话、输入和可观察预期。实际结果符合规格、规格没有规定顺序、或仅建议优化时写 observations。必测 revise 要关联同一 caseId 和条款的已证实发现。";
+export const CODE_REVIEW_PROBE_RULE = "已签名的通过用例无需逐个重复运行。有具体可疑差异再用探针；已登记的必跑架构示例仍须核验。";
 const BASELINE_LINES = 16000;
 const RANGE_LIMIT = 48;
 const MAX_FINDINGS = 24;
@@ -17,6 +19,11 @@ const KEYS = ["files", "constraints", "findings", "observations", "architecture"
 const RECORD_KEYS = [...KEYS, "decisions", "removeFindings", "removeObservations", "findingsDone"];
 const FINDING_KINDS = ["behavior", "maintenance", "annotation", "architecture"];
 const VIOLATION_TYPES = ["requirement", "regression", "annotation", "architecture", "maintainability", "runtime", "syntax"];
+const TYPES_BY_KIND = {
+  behavior: ["requirement", "regression", "runtime", "syntax"], maintenance: ["maintainability"],
+  annotation: ["annotation"], architecture: ["architecture"],
+};
+const COMMENT_OBLIGATIONS = ["invariant", "interface", "state", "permission", "data-protection", "rollback", "retry"];
 const EVIDENCE_RELATIONS = ["supports", "contradicts", "reproduces"];
 const FINDING_ID = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/u;
 
@@ -32,7 +39,7 @@ const COMMENT_QUOTE_RULE = "status=verified 用 start–end 指向当前已读�
 const comment = {
   ...locator, properties: { start: locator.properties.start, end: locator.properties.end,
     status: { enum: ["verified", "missing", "not-needed"], description: COMMENT_QUOTE_RULE },
-    basis: brief, quote: { ...brief, description: COMMENT_QUOTE_RULE } },
+    basis: brief, quote: { ...brief, description: COMMENT_QUOTE_RULE }, obligation: { enum: COMMENT_OBLIGATIONS } },
   required: ["start", "end", "status", "basis"],
 };
 const rows = (maxItems, properties, required = Object.keys(properties)) => ({
@@ -52,15 +59,19 @@ const compactRef = { anyOf: [{ type: "string", pattern: "^[SG][1-9][0-9]*:[1-9][
 const compactDecisions = rows(RECORD_LIMIT, {
   id: { type: "string", pattern: "^(?:file|test|section):[1-9][0-9]*$" }, basis: brief,
   status: { enum: ["pass", "revise", "verified", "missing", "not-needed"] },
-  refs: { type: "array", maxItems: 6, items: compactRef },
+  refs: { type: "array", maxItems: 6, items: compactRef }, obligation: { enum: COMMENT_OBLIGATIONS },
 }, ["id", "basis", "status"]);
 const reasonEvidence = { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation };
+export const codeReviewProbeRequirement = { ...locator, properties: { ...locator.properties,
+  quote: { ...brief, description: "支持预期的当前目标原文，逐字引用。" },
+}, required: [...locator.required, "quote"], description: "绑定 runtime 探针的当前规格条款，必填原文；无条款的探针仅探索。" };
 const violation = { type: "object", properties: {
   type: { enum: VIOLATION_TYPES },
   expected: { ...brief, description: "必须满足的行为、规则或安全不变量。" },
   actual: { ...brief, description: "与该要求有实际差异的当前实现或实测结果。" },
-  requirement: { ...locator, description: "requirement、runtime 必填，定位到当前已读目标原文中的实际要求。" },
-  reproduction: { type: "string", minLength: 1, maxLength: 128, description: "runtime、syntax 必填：当前版本的受信检查编号。" },
+  requirement: { ...locator, description: "行为退回填 runtime probe 已绑定的相同条款位置。其他明确需求也可填实际条款。" },
+  reproduction: { type: "string", minLength: 1, maxLength: 128, description: "运行行为或语法退回填本角色当前版本的受信失败复现编号。" },
+  obligation: { enum: COMMENT_OBLIGATIONS, description: "annotation 退回须指出实际涉及的必要注释规则。" },
 }, required: ["type", "expected", "actual"], additionalProperties: false };
 export const codeReviewSchema = {
   type: "object", properties: {
@@ -250,7 +261,7 @@ export function inspectArchitectureImports(frame, spec, active) {
     }
     return { path: file, sha256 };
   });
-  const graph = pythonImportEvidence({ root: frame.root, reads: paths }, artifacts);
+  const graph = pythonImportEvidence({ root: frame.root, reads: paths }, artifacts, { responsibilities: true });
   if (graph.truncated || graph.unparsedFiles.length || graph.ambiguous.length || graph.checkedFiles.length !== paths.length) {
     throw new Error("无法完整生成已登记 Python 源码的静态依赖图，请核对语法、歧义和文件范围");
   }
@@ -302,17 +313,17 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     progress, pending, refs,
     ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {
-      decisions: "[{id,status,basis,refs?}]；id 用 pending 所列编号；只填未核或需更正的项。已读证据写 S1:12、G1:4-6，也可用实际 {file,start,end}。",
-      fileDecision: "status=verified|missing|not-needed。选相应源码注释或位置，唯一预填注释可省略 refs。需要另评不同注释时可追加对应范围。",
-      testDecision: "status=pass|revise。refs 填目标原文及实际源码，各一个。签名测试本身只证明行为通过。",
+      decisions: "[{id,status,basis,refs?,obligation?}]；id 用 pending 所列编号；只填未核或需更正的项。已读证据写 S1:12、G1:4-6，也可用实际 {file,start,end}。",
+      fileDecision: "status=verified|missing|not-needed。选相应源码注释或位置，唯一预填注释可省略 refs。missing 须指出缺少注释的变更代码位置和 obligation（" + COMMENT_OBLIGATIONS.join("、") + "）；已有但不准确时登记 annotation 发现。",
+      testDecision: "status=pass|revise。refs 填目标原文及实际源码，各一个。revise 须同 caseId 和条款的已证实 findings。",
       sectionDecision: "status=pass|revise。refs 填支持判断的已读目标或实际源码。宿主携带章节位置并生成架构总判定。revise 应另登记该节真实发现。",
       example: "{action:'record',decisions:[{id:'test:1',status:'pass',basis:'这里比较实际限制条件与原需求',refs:['G1:4','S1:12-13']}],findingsDone:true}；例中编号和行号须替换成实际 pending 与 refs。",
       commentQuote: COMMENT_QUOTE_RULE,
-      findings: "仅需修复的问题 [{id,kind,file,start,end,observation,issue,fix,violation:{type,expected,actual,requirement?,reproduction?},evidence:[{file,start,end,relation}]}]；用相同 id 修正，removeFindings 删除",
+      findings: "仅需修复的问题 [{id,kind,file,start,end,observation,issue,fix,violation:{type,expected,actual,requirement?,reproduction?,obligation?},evidence:[{file,start,end,relation}]}]；用相同 id 修正，removeFindings 删除。" + CODE_REVIEW_REJECTION_RULE,
       observations: "通过的核对、可选优化或无需修改的备注 [{id,kind,file,start,end,observation,suggestion?,evidence:[{file,start,end,relation}]}]；removeObservations 删除",
     } },
     next: (architectureProbe ? "先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 一次，宿主运行当前角色未完成的已登记示例。不要把示例逐个复制到 runtime。" : "") +
-      "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。仅把确须修改的缺陷填 findings；符合或可选优化填 observations。运行或语法失败须有受信复现。" +
+      "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。" + CODE_REVIEW_REJECTION_RULE + CODE_REVIEW_PROBE_RULE +
       (architecture ? "完整读架构稿，对照实际目标和源码判断各节。静态导入仅能证明静态依赖。" : "") +
       (architecture?.examples ? "登记示例实际有差异时，按原示例位置记录架构退回并链接复现编号。" : "") +
       "每批最多 32 项。发现记齐后填 findingsDone:true，无发现也如此。progress.ready 后空参数 submit。",
@@ -344,12 +355,41 @@ function observed(frame, active, row, paths, expected, extract) {
   return { file, start, end, sha256: seen.hash };
 }
 
+/** Resolve the clause before running an exploratory expectation. This binds
+ * the literal excerpt to the role's actual read and the current goal bytes. */
+export function codeReviewRequirement(frame, active, row) {
+  if (row === undefined) return;
+  if (!record(row, [...locatorKeys, "quote"])) throw new Error("复现条款须提供 file、start、end 和 quote");
+  const quote = rationale(row.quote, "requirement.quote");
+  const files = active.goal.files;
+  const ref = observed(frame, active, row, files.map(({ file }) => file), new Map(files.map(({ file, sha256 }) => [keyOf(file), sha256])), lines => {
+    if (!excerpt(lines, row).includes(quote)) throw new Error("requirement.quote 须逐字引用当前目标条款");
+  });
+  return { ...ref, quote };
+}
+
+function sameClause(left, right) {
+  return !!left && !!right && keyOf(left.file) === keyOf(right.file) && left.sha256 === right.sha256 &&
+    left.start === right.start && left.end === right.end;
+}
+
 /** Python review pins real lexer comments and docstrings, so a '#' inside a
  * string cannot become proof. For other languages the host pins actual source
  * and leaves annotation classification to the independent reviewers. */
-function codeAnnotation(file, lines, start, end) {
+function codeAnnotation(file, lines, start, end, knownOnly = false) {
   const span = lines.slice(start - 1, end).join("\n");
-  if (!/\.py$/iu.test(file)) return span;
+  if (!/\.py$/iu.test(file)) {
+    if (!knownOnly) return span;
+    if (/\.(?:js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|cs|c|cpp|h|hpp|swift)$/iu.test(file)) {
+      // Deliberately conservative: an uncertain comment prevents a missing
+      // claim from blocking; the reviewer can still cite the actual text.
+      return lines.slice(start - 1, end).filter(line => /(?:\/\/|\/\*|\*\/)|^\s*\*/u.test(line)).join("\n");
+    }
+    if (/\.(?:sh|ps1|rb|pl|r|ya?ml|toml)$/iu.test(file)) {
+      return lines.slice(start - 1, end).filter(line => /#/u.test(line)).join("\n");
+    }
+    throw new Error("当前源码格式没有受信注释检查，先记 observation 或引用已登记的可运行条款");
+  }
   const source = lines.join("\n");
   const from = start === 1 ? 0 : lines.slice(0, start - 1).join("\n").length + 1;
   const to = from + span.length;
@@ -485,12 +525,25 @@ function checkedFile(row, change, readers) {
   for (const { start, end } of ranges) readers.read({ file, start, end }, readers.sources);
   const positions = new Set();
   const comments = list.map((item, index) => {
-    if (!record(item, ["status", "basis", "start", "end", "quote"]) ||
+    if (!record(item, ["status", "basis", "start", "end", "quote", "obligation"]) ||
       !["verified", "missing", "not-needed"].includes(item.status)) throw new Error(file + " 的注释判断无效");
     const where = { file, start: item.start, end: item.end };
     const label = file + (row.comments ? ` 的 comments[${index}]` : " 的 comment");
-    let annotationSha256, quote;
+    let annotationSha256, quote, staticProof;
     const ref = readers.read(where, readers.sources, lines => {
+      if (item.status === "missing") {
+        if (!COMMENT_OBLIGATIONS.includes(item.obligation) || !ranges.some(({ start, end }) => start <= item.end && end >= item.start) ||
+            !excerpt(lines, where).trim() || item.end - item.start > 30) {
+          throw new Error(label + " 缺失注释须给出 obligation 和包含实际改动的源码位置（最多 31 行）");
+        }
+        const from = Math.max(1, item.start - 1);
+        if (codeAnnotation(file, lines, from, item.end, true).trim()) {
+          throw new Error(label + " 该范围有可定位注释。说明不足或错误时登记 annotation 发现，勿用 missing");
+        }
+        staticProof = { rule: "necessary-comment", obligation: item.obligation, check: "missing-adjacent-annotation",
+          start: from, end: item.end, sha256: digest(lines.slice(from - 1, item.end).join("\n")) };
+        return;
+      }
       if (item.status !== "verified") return;
       const raw = codeAnnotation(file, lines, item.start, item.end);
       if (!raw.trim()) throw new Error(label + " 选定范围没有可核对的注释，请定位实际注释，或按实情填 missing / not-needed");
@@ -503,11 +556,12 @@ function checkedFile(row, change, readers) {
       if (/\.py$/iu.test(file) && raw.length <= 400) quote = raw;
     });
     if (item.status !== "verified" && item.quote !== undefined) throw new Error(label + ".quote 须省略");
+    if (item.status !== "missing" && item.obligation !== undefined) throw new Error(label + ".obligation 仅用于缺失注释");
     const location = `${ref.start}:${ref.end}`;
     if (positions.has(location)) throw new Error(label + " 重复引用同一范围，请合并说明");
     positions.add(location);
     return { ...ref, status: item.status, basis: rationale(item.basis, label + ".basis"),
-      ...(annotationSha256 ? { annotationSha256 } : {}), ...(quote === undefined ? {} : { quote }) };
+      ...(annotationSha256 ? { annotationSha256 } : {}), ...(quote === undefined ? {} : { quote }), ...(staticProof ? { staticProof } : {}) };
   });
   return { file, basis: rationale(row.basis, file + " 的 files.basis"),
     ...(row.comments ? { comments } : { comment: comments[0] }) };
@@ -558,40 +612,47 @@ function reviewLocation(row, readers) {
 
 /** Compare the declared values, never guess the semantics of free-text rationale. */
 function checkedViolation(value, kind, id, readers, context) {
-  if (!record(value, ["type", "expected", "actual", "requirement", "reproduction"]) || !VIOLATION_TYPES.includes(value.type)) {
+  if (!record(value, ["type", "expected", "actual", "requirement", "reproduction", "obligation"]) || !VIOLATION_TYPES.includes(value.type)) {
     throw new Error("需要 violation 明确实际违反的要求。符合要求或无需修改的内容请填 observations");
   }
   const { type } = value;
   const expected = rationale(value.expected, id + ".violation.expected"), actual = rationale(value.actual, id + ".violation.actual");
   const compare = value => value.normalize("NFKC").replace(/\s+/gu, " ").trim();
   if (compare(expected) === compare(actual)) throw new Error("violation 的实际结果等于要求，无需修正的核对请填 observations");
-  if (type === "annotation" && kind !== "annotation" || type === "architecture" && kind !== "architecture" ||
-      type === "maintainability" && kind !== "maintenance" || type === "syntax" && !["behavior", "annotation"].includes(kind) ||
-      type === "runtime" && kind !== "behavior" || type === "regression" && kind !== "behavior") {
+  if (!TYPES_BY_KIND[kind].includes(type)) {
     throw new Error("发现 kind 与 violation.type 不一致，请选择实际违反的类型");
   }
+  const runtime = ["requirement", "runtime", "maintainability"].includes(type);
   let requirement, reproduction;
-  if (["requirement", "runtime"].includes(type) || value.requirement !== undefined) {
+  if (runtime || value.requirement !== undefined) {
     if (!record(value.requirement, locatorKeys)) throw new Error("requirement 须定位到已读的实际要求原文");
     requirement = readers.read(value.requirement, readers.goals);
   }
   if (type === "regression" && (context.caseResult?.status !== "failed" || context.baselineCase?.status !== "passed")) {
     throw new Error("回归退回须绑定基线通过、当前失败的同一签名用例。发现新的运行差异请用 runtime 复现");
   }
-  if (type === "runtime" || type === "syntax" || value.reproduction !== undefined) {
+  if (runtime || type === "syntax" || value.reproduction !== undefined) {
     if (typeof value.reproduction !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value.reproduction)) {
-      throw new Error("运行或语法问题需登记当前签名版本的受信复现编号");
+      throw new Error("运行或语法问题需登记当前签名版本的受信复现编号。规格未规定的顺序和建议写 observations");
     }
-    reproduction = context.resolveReproduction?.(value.reproduction, { type, ...context.ref, signed: context.signed,
+    const proofType = runtime ? "runtime" : type;
+    reproduction = context.resolveReproduction?.(value.reproduction, { type: proofType, ...context.ref, signed: context.signed,
       goal: context.goal, expected, actual, requirement });
-    if (reproduction?.id !== value.reproduction || reproduction.type !== type || reproduction.outcome !== "mismatch") {
+    if (reproduction?.id !== value.reproduction || reproduction.type !== proofType || reproduction.outcome !== "mismatch") {
       throw new Error("该复现尚未证明当前签名版本的实际不一致，先核对真实运行结果");
     }
+    if (runtime && !sameClause(requirement, reproduction.requirement)) {
+      throw new Error("退回须引用 runtime probe 已绑定的相同当前规格条款");
+    }
   }
-  return { type, expected, actual, ...(requirement ? { requirement } : {}), ...(reproduction ? { reproduction } : {}) };
+  if (type === "annotation" && !COMMENT_OBLIGATIONS.includes(value.obligation) || type !== "annotation" && value.obligation !== undefined) {
+    throw new Error("annotation 退回须选择必要注释规则 obligation；其他发现不得用注释规则代替证据");
+  }
+  return { type, expected, actual, ...(requirement ? { requirement } : {}), ...(reproduction ? { reproduction } : {}),
+    ...(value.obligation ? { obligation: value.obligation } : {}) };
 }
 
-function checkedFinding(row, id, readers, active, signed, resolveReproduction) {
+function checkedFinding(row, id, readers, active, current, signed, resolveReproduction) {
   if (!record(row, [...locatorKeys, "id", "kind", "observation", "issue", "fix", "evidence", "caseId", "violation"])) {
     throw new Error("代码审查问题须指向可核对的实际位置");
   }
@@ -606,12 +667,33 @@ function checkedFinding(row, id, readers, active, signed, resolveReproduction) {
   const baselineCase = row.caseId === undefined ? undefined : active.codeIntake.regression.cases?.find(item => item.id === row.caseId);
   const violation = checkedViolation(row.violation, row.kind, id, readers,
     { ref, signed, goal: active.goal, caseResult, baselineCase, resolveReproduction });
+  let staticProof;
+  if (violation.type === "annotation") {
+    readers.read(ref, readers.sources, lines => {
+      const annotation = codeAnnotation(ref.file, lines, ref.start, ref.end, true);
+      const source = evidence.find(item => item.relation !== "contradicts" && includes(readers.sources, item.file) &&
+        (keyOf(item.file) !== keyOf(ref.file) || item.start < ref.start || item.end > ref.end));
+      if (!annotation.trim() || !source) throw new Error("已有注释退回须定位真实注释，并引用另一处当前源码。注释完全缺失用 files.comment.status=missing");
+      staticProof = { rule: "necessary-comment", obligation: violation.obligation, check: "existing-annotation-against-source",
+        annotationSha256: digest(annotation), source };
+    });
+  }
+  if (violation.type === "architecture") {
+    const section = current.architecture?.sections.find(({ start, end }) => ref.start >= start && ref.end <= end);
+    const source = evidence.find(item => item.relation !== "contradicts" && includes([...readers.sources, ...readers.goals], item.file));
+    if (!section || !source && !violation.reproduction) {
+      throw new Error("架构退回须定位登记章节，并引用相关当前源码或目标，或关联该节受信示例差异");
+    }
+    staticProof = { rule: "registered-architecture-section", section: section.heading,
+      check: violation.reproduction ? "registered-example" : "architecture-against-current-source-or-goal", ...(source ? { source } : {}) };
+  }
   const examples = active.engineeringArchitecture?.examples;
   if (violation.reproduction?.exampleId && (owner !== "coordinator" || !examples?.cases.some(item => item.id === violation.reproduction.exampleId) ||
     ref.start < examples.start || ref.end > examples.end)) {
     throw new Error("该退回项须定位到架构稿中声明该示例的章节");
   }
   return { ...ref, id, owner, kind: row.kind, observation: rationale(row.observation, id + ".observation"), evidence, violation,
+    ...(staticProof ? { staticProof } : {}),
     issue: rationale(row.issue, id + ".issue"), fix: rationale(row.fix, id + ".fix"),
     ...(caseResult ? { signedCase: { id: caseResult.id, status: caseResult.status } } : {}) };
 }
@@ -649,7 +731,7 @@ function checkedArchitectureSection(row, section, current, readers) {
 /** Reuse the same evidence validators for legacy verbose rows and compact
  * decisions. A compact decision cannot cite an unobserved or stale alias. */
 function checkedDecision(row, descriptor, refs, frame, current, readers) {
-  if (!record(row, ["id", "basis", "status", "refs"]) || !descriptor ||
+  if (!record(row, ["id", "basis", "status", "refs", "obligation"]) || !descriptor ||
     row.refs !== undefined && (!Array.isArray(row.refs) || row.refs.length > 6)) {
     throw new Error("决策须使用 pending 中的编号、判断、依据和已读证据");
   }
@@ -671,10 +753,11 @@ function checkedDecision(row, descriptor, refs, frame, current, readers) {
         selected.push({ file: value.path, start, end });
       }
     }
-    const comments = selected.map(({ start, end }) => ({ start, end, status: row.status, basis: row.basis }));
+    const comments = selected.map(({ start, end }) => ({ start, end, status: row.status, basis: row.basis, obligation: row.obligation }));
     return checkedFile({ file: value.path, basis: row.basis,
       ...(comments.length === 1 ? { comment: comments[0] } : { comments }) }, value, readers);
   }
+  if (row.obligation !== undefined) throw new Error("obligation 只用于变更源码的注释缺失判断");
   if (kind === "test") {
     const goal = selected.filter(ref => includes(readers.goals, ref.file));
     const source = selected.filter(ref => includes(readers.sources, ref.file));
@@ -741,9 +824,24 @@ function reviewProgress(frame, active, current, draft) {
   const missingCases = current.requiredCases.filter(id => !recordedCases.has(id));
   const findingIds = draft.findings.map(row => row.id);
   const observationIds = draft.observations.map(row => row.id);
-  const pendingCorrections = [...draft.pendingCorrections, ...draft.findings.filter(row => !row.violation &&
-    !draft.pendingCorrections.some(item => item.field === "findings" && item.id === row.id))
-    .map(({ id }) => ({ field: "findings", id }))];
+  // Old stored drafts may lack the proof required by this version. A current
+  // pass remains readable, while an unsupported rejection needs correction.
+  const pendingCorrections = draft.pendingCorrections.slice();
+  const requireCorrection = (field, id) => {
+    if (!pendingCorrections.some(item => item.field === field && item.id === id)) pendingCorrections.push({ field, id });
+  };
+  for (const { id, kind, violation, staticProof } of draft.findings) {
+    if (!violation || !TYPES_BY_KIND[kind]?.includes(violation.type) ||
+      ["requirement", "runtime", "maintainability"].includes(violation.type) && !sameClause(violation.requirement, violation.reproduction?.requirement) ||
+      ["annotation", "architecture"].includes(violation.type) && !staticProof) requireCorrection("findings", id);
+  }
+  for (const { file, comment, comments } of draft.files) {
+    if ((comments ?? [comment]).some(item => item.status === "missing" && !item.staticProof)) requireCorrection("files", file);
+  }
+  const unsupportedCaseRevisions = draft.constraints.filter(row => row.status === "revise" && !draft.findings.some(finding =>
+    finding.kind === "behavior" && finding.signedCase?.id === row.caseId && sameClause(row.requirement, finding.violation?.requirement) &&
+    !pendingCorrections.some(item => item.field === "findings" && item.id === finding.id))).map(row => row.caseId);
+  for (const caseId of unsupportedCaseRevisions) requireCorrection("constraints", caseId);
   const sections = draft.architectureSections ?? [];
   const missingArchitectureSections = (current.architecture?.sections ?? []).filter(section =>
     !sections.some(row => row.heading === section.heading)).map(row => row.heading);
@@ -760,6 +858,7 @@ function reviewProgress(frame, active, current, draft) {
   const architecture = current.architecture ? architectureVerdict ? architectureIssue ? "inconsistent" : "recorded" : "missing" : "not-required";
   const examples = architectureProbeProgress(frame, active, current, draft, architectureVerdict);
   return { missingFiles, missingCases, findingIds, observationIds, findingsDone: draft.findingsDone, architecture, pendingCorrections,
+    ...(unsupportedCaseRevisions.length ? { unsupportedCaseRevisions } : {}),
     ...(current.architecture ? { missingArchitectureSections: unfinishedSections, architectureCodeEvidence,
       ...(sectionFindingsMissing.length ? { sectionFindingsMissing } : {}) } : {}),
     ...(examples ? { architectureExamples: examples } : {}),
@@ -887,7 +986,7 @@ function applyReviewRows(frame, active, current, input, signed, resolveReproduct
           if (draft[other].some(item => item.id === id) && !removals[other].has(id)) {
             throw new Error("同一编号已在另一类记录，调整分类时请同时删除原类别编号");
           }
-          const checked = field === "findings" ? checkedFinding(row, id, readers, active, signed, resolveReproduction) :
+          const checked = field === "findings" ? checkedFinding(row, id, readers, active, current, signed, resolveReproduction) :
             checkedObservation(row, id, readers);
           put(field, item => item.id === id, checked);
         }
@@ -948,6 +1047,8 @@ function applyReviewRows(frame, active, current, input, signed, resolveReproduct
       "revise 须有定位到实际架构稿的发现" : "pass 不能同时保留架构退回项" });
   if (progress.architectureExamples?.passWithMismatch) errors.push({ field: "architecture", id: current.architecture.file,
     reason: "已登记架构示例出现可复现差异，须核对并登记关联的架构退回项" });
+  for (const id of progress.unsupportedCaseRevisions ?? []) errors.push({ field: "constraints", id,
+    reason: "revise 须关联同一 caseId、同一目标条款的已证实行为退回。若实测符合要求，按原证据更正判断" });
   return { draft, progress, errors };
 }
 
@@ -991,6 +1092,7 @@ export function verifyCodeReview(frame, active, spec, signed) {
   if (!progress.ready) {
     const missing = [progress.missingFiles.length && "待记录文件 " + progress.missingFiles.join("、"),
       progress.missingCases.length && "待记录必测 " + progress.missingCases.join("、"),
+      progress.unsupportedCaseRevisions?.length && "必测 revise 尚未关联同条款的已证实发现 " + progress.unsupportedCaseRevisions.join("、"),
       progress.pendingCorrections.length && "待修正 " + progress.pendingCorrections.map(({field, id}) => id ?? field).join("、"),
       !progress.findingsDone && "发现尚未确认 findingsDone",
       progress.architecture === "missing" && "缺少架构核验",

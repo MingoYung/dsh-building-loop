@@ -2,12 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { AUTHORITY, digest, hierarchyBodyPath, historyPaths, keyOf, readBytes, replaceBytes, text } from "./policy.mjs";
+import { isLedgerVolume } from "./ledger-projection.mjs";
 
 export const STATE_LIMIT = 8 * 1024 * 1024;
 export const LEDGER_TURN_ENDS = Object.freeze(["error", "max-tokens", "blocked", "completed", "aborted", "interrupted"]);
 const JOURNAL_LIMIT = 2 * STATE_LIMIT;
 const FILE_LIMIT = 256 * 1024;
 const JOURNAL_SPEC = "building-loop-ledger-transaction/1";
+const VOLUME_JOURNAL_SPEC = "building-loop-ledger-transaction/2";
 const MODULE_JOURNAL_SPEC = "building-loop-module-transaction/1";
 const EVENT_SPEC = "building-loop-ledger-event/1";
 const EVENT_LIMIT = 4096;
@@ -223,6 +225,13 @@ export function recoverLedgerJournal(home, file, root, policy, managed = false) 
     optional = [policy.hierarchy.overview.path];
   } else if (journal.spec === JOURNAL_SPEC && typeof policy.ledgerDocument === "string" && journal.ledger === policy.ledgerDocument) {
     required = [journal.ledger];
+  } else if (journal.spec === VOLUME_JOURNAL_SPEC && typeof policy.ledgerDocument === "string" && journal.ledger === policy.ledgerDocument
+      && typeof journal.owner === "string" && Array.isArray(journal.volumes) && journal.volumes.length > 0
+      && new Set(journal.volumes).size === journal.volumes.length && journal.volumes.every(file => isLedgerVolume(journal.ledger, journal.owner, file))) {
+    // A listed volume must have both its body and history in the journal. The
+    // index may be unchanged when regenerating a missing or restored volume.
+    required = journal.volumes;
+    optional = [journal.ledger];
   } else throw new Error("未完成账本或模块事务的授权清单与日志不匹配，需维护者核对");
   const isDigest = value => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
   if (!isDigest(journal.after) || journal.before !== null && !isDigest(journal.before) ||
@@ -284,7 +293,9 @@ export function commitWorkspaceState(home, frame, next, warnCleanup) {
     return;
   }
   const name = journalName(file);
+  const volumes = !hierarchyWrites && writes.map(item => item.file).filter(name => isLedgerVolume(policy.ledgerDocument, frame.agent.id, name));
   const operation = hierarchyWrites ? { spec: MODULE_JOURNAL_SPEC, module: hierarchyWrites.module }
+    : volumes.length ? { spec: VOLUME_JOURNAL_SPEC, ledger: policy.ledgerDocument, owner: frame.agent.id, volumes }
     : { spec: JOURNAL_SPEC, ledger: policy.ledgerDocument };
   const raw = Buffer.from(JSON.stringify({ ...operation, policy: policy.hash,
     before: stateDigest(old), after: digest(next), backupBefore: recordBytes(backupBefore),
@@ -298,10 +309,10 @@ export function commitWorkspaceState(home, frame, next, warnCleanup) {
     }
     if (old) replaceBytes(home, backup, old, backupBefore, STATE_LIMIT);
     policyCurrent(root, policy.hash);
-    if (hierarchyWrites) {
+    if (hierarchyWrites || volumes.length) {
       // The workspace lock serializes host tools. Verify published targets again
       // because another editor can still change them before the state commit.
-      const expected = [{ file: policy.hierarchy.overview.path, sha256: hierarchyWrites.overviewSha256 },
+      const expected = [...(hierarchyWrites ? [{ file: policy.hierarchy.overview.path, sha256: hierarchyWrites.overviewSha256 }] : []),
         ...writes.map(item => ({ file: item.file, sha256: digest(item.after) }))];
       for (const item of expected) {
         if (stateDigest(readBytes(root, item.file, FILE_LIMIT)) !== item.sha256) {

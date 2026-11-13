@@ -7,8 +7,14 @@ const declaration = /^(?:[-+*]\s+|\d+[.)]\s+)?(?:\*\*)?\x60?([^\s`:：()（）]+
 const sentence = /[。！？!?；;]|\.(?=\s|$)/u;
 const notCurrent = /(?:不|未|无|禁止|避免|只能|否则|如果|若|计划|拟|将|应|需要|建议|可选|可能|目标|改为|待|示例|例如|比如|回退|反例|误写|旧版|原先|历史|通过|经由|间接|委托|(?:\b(?:does not|never|should|may|could|would|will|planned|previously|formerly|indirectly|via|if|example|incorrect)\b))/iu;
 const relation = /(?:直接\s*)?(调用|导入|\bcalls?\b|\bimports?\b)\s*/giu;
+const importDirection = /^\s*(?:导入方向(?:固定)?|(?:静态|直接)导入关系|(?:static |direct )?import (?:direction|chain))\s*[:：]\s*(\x60[^\x60]+\.py\x60(?:\s*(?:→|->)\s*\x60[^\x60]+\.py\x60)+)\s*$/iu;
 const name = /^(\x60)?([\p{ID_Start}_][\p{ID_Continue}./-]*)(?:\x60|(?=[\s、，,和及与。！？；;:(（]|$))/u;
 const list = /^(?:\s*(?:、|，|,|和|及|与|\band\b)\s*)/iu;
+const ownership = /^(?:(?:当前|实际|负责|直接)\s*)*(?:校验|验证|检查|判验|(?:(?:directly|currently)\s+)?(?:validates?|checks?))\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60(.*)$/iu;
+const implementation = /^(?:(?:当前|实际|负责|直接)\s*)*(?:定义|实现|(?:directly\s+)?(?:defines?|implements?))\s*\x60([\p{ID_Start}_][\p{ID_Continue}_]*)\s*(?:\(\))?\x60/u;
+const delegated = /(?:通过|经由|间接|委托|delegat\w*|indirectly|\bvia\b)/iu;
+const ownershipNotCurrent = /(?:计划|拟由|拟将|将来|后续|未来|改为|待改|迁移至|移交给|以前|此前|旧版|历史上|示例|反例|误写|尚未|不再|并不(?:负责|实际|直接)|\b(?:formerly|previously|planned|instead|future|would|will|should|example|no longer|used to)\b)/iu;
+const inlineLabel = /\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/gu;
 
 function moduleLookup(files) {
   const aliases = new Map();
@@ -43,18 +49,73 @@ function mentionedTargets(tail, locate) {
   return result;
 }
 
+/** An explicitly named import chain asserts each adjacent direct import.
+ * Arrows in execution steps, diagrams and unlabeled prose have no such meaning. */
+function importDirectionConflicts(row, line, locate, graph) {
+  const chain = importDirection.exec(row.split(sentence)[0]);
+  if (!chain) return [];
+  const files = [...chain[1].matchAll(/\x60([^\x60]+)\x60/gu)].map(match => locate(match[1]));
+  if (files.some(file => !file)) return [];
+  return files.slice(0, -1).flatMap((from, index) => {
+    const to = files[index + 1];
+    const actual = graph.edges.filter(edge => edge.file === from).flatMap(edge =>
+      edge.imports.map(file => ({ file, line: edge.line })));
+    if (from === to || actual.some(edge => edge.file === to)) return [];
+    return [{ line, from, to, relation: "import", actual }];
+  });
+}
+
+/** A definite alternate owner requires a source-backed symbol or the same
+ * guarded field and rejection code. Without a resolvable direct call, absence
+ * of a local witness says nothing about which module owns the behavior. */
+function responsibilityConflict(claim, line, from, graph) {
+  if (graph.responsibilitiesTruncated || delegated.test(claim) || ownershipNotCurrent.test(claim)) return;
+  const text = claim.trim();
+  const definition = implementation.exec(text);
+  const validation = ownership.exec(text);
+  if (!definition && !validation) return;
+  const calls = graph.calls.filter(row => row.file === from);
+  const uncertainty = graph.uncertainCalls.find(row => row.file === from);
+  if (uncertainty && !uncertainty.targets) return;
+  const isCalled = row => !uncertainty?.targets?.includes(row.file) &&
+    calls.some(call => call.target === row.file && call.symbol === row.symbol);
+  if (definition) {
+    const symbol = definition[1];
+    const candidates = graph.definitions?.filter(row => row.symbol === symbol) ?? [];
+    if (candidates.length !== 1 || candidates[0].file === from || !isCalled(candidates[0])) return;
+    return { line, from, relation: "definition", symbol, actual: candidates };
+  }
+  const [, field, description] = validation;
+  const codes = new Set([...description.matchAll(inlineLabel)].map(match => match[1]));
+  if (!codes.size || graph.localRejections?.some(row => row.file === from && row.codes.some(code => codes.has(code)))) return;
+  const sites = graph.validation?.filter(row => row.field === field) ?? [];
+  if (sites.some(row => row.file === from)) return;
+  const candidates = sites.filter(row => codes.has(row.code));
+  if (!candidates.length || new Set(candidates.map(row => row.file)).size !== 1 || !candidates.every(isCalled)) return;
+  return { line, from, relation: "validation", field, actual: candidates };
+}
+
 /** Validate only explicit current claims attached to a named module. Local
- * module identity, relation and line are data. Interpretations of a sentence,
- * uncertain call binding and future designs stay with independent review. */
+ * module identity, relation and line are data. Uncertain responsibility, call
+ * binding and future designs stay with independent review. */
 export function inspectArchitectureProse(source, graph) {
   const locate = moduleLookup(graph.checkedFiles);
   const conflicting = [];
   for (const [line, row] of architectureProseLines(source)) {
+    for (const conflict of importDirectionConflicts(row, line, locate, graph)) {
+      conflicting.push(conflict);
+      if (conflicting.length >= 12) return conflicting;
+    }
     const label = declaration.exec(row);
     const from = label && locate(label[1]);
     if (!from) continue;
     const body = row.slice(label[0].length);
     for (const claim of body.split(sentence)) {
+      const responsibility = responsibilityConflict(claim, line, from, graph);
+      if (responsibility) {
+        conflicting.push(responsibility);
+        if (conflicting.length >= 12) return conflicting;
+      }
       if (notCurrent.test(claim)) continue;
       for (const verb of claim.matchAll(relation)) {
         const kind = /导入|import/iu.test(verb[1]) ? "import" : "call";
@@ -85,7 +146,14 @@ export function inspectEngineeringArchitectureClaims(frame, spec, active, graph)
 }
 
 export function architectureClaimIssues(conflicts) {
-  return conflicts.map(({ line, from, to, relation, actual }) => {
+  return conflicts.map(({ line, from, to, relation, actual, field, symbol }) => {
+    if (relation === "definition" || relation === "validation") {
+      const claimed = relation === "definition" ? "实现 " + symbol : "校验字段 " + field;
+      const witnesses = [...new Set(actual.map(row => row.file + " 第 " + row.line + " 行 " + row.symbol +
+        (row.code ? "（" + row.code + "）" : "")))];
+      return "架构稿第 " + line + " 行将「" + claimed + "」归于 " + from + "。当前签名源码中，" +
+        from + " 调用实际实现 " + witnesses.join("、") + "。请区分调用协调与实际执行职责。";
+    }
     const verb = relation === "call" ? "调用" : "导入";
     const targets = [...new Set(actual.map(item => item.file + "（" + from + " 第 " + item.line + " 行）"))];
     return "架构稿第 " + line + " 行称 " + from + " 直接" + verb + " " + to +

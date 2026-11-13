@@ -1,0 +1,89 @@
+{
+  "description": "Read-only alias audit of the exact previously rejected signed source. Intentionally relabels the same behavioral prose under static finding kinds to test classification enforcement.",
+  "checks": [
+    {
+      "kind": "behavior",
+      "type": "regression",
+      "explicitGoalClause": false,
+      "runnableEvidence": false,
+      "accepted": false,
+      "errors": [
+        {
+          "field": "findings",
+          "id": "audit-behavior-regression",
+          "reason": "回归退回须绑定基线通过、当前失败的同一签名用例。发现新的运行差异请用 runtime 复现"
+        }
+      ]
+    },
+    {
+      "kind": "behavior",
+      "type": "maintainability",
+      "explicitGoalClause": false,
+      "runnableEvidence": false,
+      "accepted": false,
+      "errors": [
+        {
+          "field": "findings",
+          "id": "audit-behavior-maintainability",
+          "reason": "发现 kind 与 violation.type 不一致，请选择实际违反的类型"
+        }
+      ]
+    },
+    {
+      "kind": "maintenance",
+      "type": "maintainability",
+      "explicitGoalClause": false,
+      "runnableEvidence": false,
+      "accepted": false,
+      "errors": [
+        {
+          "field": "findings",
+          "id": "audit-maintenance-maintainability",
+          "reason": "requirement 须定位到已读的实际要求原文"
+        }
+      ]
+    },
+    {
+      "kind": "maintenance",
+      "type": "requirement",
+      "explicitGoalClause": true,
+      "runnableEvidence": false,
+      "accepted": false,
+      "errors": [
+        {
+          "field": "findings",
+          "id": "audit-maintenance-requirement",
+          "reason": "发现 kind 与 violation.type 不一致，请选择实际违反的类型"
+        }
+      ]
+    },
+    {
+      "kind": "annotation",
+      "type": "annotation",
+      "explicitGoalClause": false,
+      "runnableEvidence": false,
+      "accepted": false,
+      "errors": [
+        {
+          "field": "findings",
+          "id": "audit-annotation-annotation",
+          "reason": "annotation 退回须选择必要注释规则 obligation；其他发现不得用注释规则代替证据"
+        }
+      ]
+    },
+    {
+      "kind": "annotation",
+      "type": "requirement",
+      "explicitGoalClause": true,
+      "runnableEvidence": false,
+      "accepted": false,
+      "errors": [
+        {
+          "field": "findings",
+          "id": "audit-annotation-requirement",
+          "reason": "发现 kind 与 violation.type 不一致，请选择实际违反的类型"
+        }
+      ]
+    }
+  ]
+}

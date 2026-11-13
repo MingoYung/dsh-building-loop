@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { codeRegressionArtifacts } from "./code-intake.mjs";
 import { goalSnapshot } from "./goals.mjs";
+import { inputContractCases } from "./input-contracts.mjs";
+import { compareReviewProbe } from "./code-review-probes.mjs";
 import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
 
 const LEGACY_SPEC = "building-loop/diagnostics/1";
@@ -127,6 +129,44 @@ export function prepareCodeReproduction(frame, args, runner) {
     !["check", "probe"].includes(args.action) ||
     args.action === "check" && Object.keys(args).some(key => key !== "action")) throw new Error("复现动作或参数不符合契约");
   return prepare(frame, runner, { manual: args });
+}
+
+/** Capture authorized inputs and candidate bytes under the caller's lock.
+ * The registered checks consume no model-authored probe arguments. */
+export function prepareInputContractBatch(frame, spec, runner) {
+  const cases = inputContractCases(spec.codeTask?.diagnostics?.inputContracts);
+  if (!cases.length) return;
+  return cases.map(check => ({ check,
+    job: prepareCodeReproduction(frame, { action: "probe", ...check.input }, runner) }));
+}
+
+/** All rows must run against the same freshly signed artifact snapshot. Only
+ * failed/unknown rows need to be sent to the executor, with repro data. */
+export async function runInputContractBatch(batch, runner, signal) {
+  const results = [];
+  for (let index = 0; index < batch.length; index += 4) {
+    signal?.throwIfAborted();
+    results.push(...await Promise.all(batch.slice(index, index + 4).map(({ check, job }) =>
+      Promise.resolve(job.result ?? runCodeDiagnostics(job, runner, signal)).then(result => ({ check, result })))));
+  }
+  const failures = [];
+  for (const { check, result } of results) {
+    const compared = compareReviewProbe(check, result);
+    if (compared.outcome === "match") continue;
+    const { id, shape, input, expected } = check;
+    failures.push({ id, ...(shape ? { shape } : {}), ...compared,
+      ...(compared.outcome === "mismatch" ? { ...(failures.length < 4 ? { stdin: input.stdin, expected } : {}),
+        ...(result.probe.stack ? { stack: result.probe.stack } : {}) }
+        : { status: result.status, ...(result.reason ? { reason: result.reason } : {}) }) });
+  }
+  return { status: failures.some(row => row.outcome === "mismatch") ? "failed" : failures.length ? "unavailable" : "passed",
+    total: results.length, passed: results.length - failures.length, failures,
+    receipts: results.flatMap(({ check, result }) => result.snapshotSha256 ? [{ id: check.id, snapshotSha256: result.snapshotSha256 }] : []) };
+}
+
+/** Recheck the original batch while the caller holds the commit lock. */
+export function inputContractBatchCurrent(frame, batch) {
+  return batch.every(({ job }) => job.request && codeDiagnosticsCurrent(frame, job));
 }
 
 /** Review probes use the same isolation and read grants, but only explicitly
