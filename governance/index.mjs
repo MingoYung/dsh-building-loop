@@ -21,14 +21,17 @@ import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 import { conversationDiscussion, decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask, startedConversationProject } from "./conversation-start.mjs";
 import { existingConversationProject, initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable, requirePrivateDraft } from "./conversation-project.mjs";
 import { claimEngineeringCoordinator, EngineeringHandoffDenied, engineeringAccess, engineeringStatus, resolveBoundUnit } from "./engineering-handoff.mjs";
-import { captureCodeIntake, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake, verifySignedCodeSubmission } from "./code-intake.mjs";
+import { captureCodeIntake, codeRegressionArtifacts, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake, verifySignedCodeSubmission } from "./code-intake.mjs";
 import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./code-submission.mjs";
 import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
   currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview, verifyCodeReview } from "./code-review.mjs";
 import { codeDiagnosticsCurrent, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
   prepareInputContractBatch, prepareReviewReproduction, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
-import { requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, saveReviewProbe } from "./code-review-probes.mjs";
+import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
+import { compareReviewProbe, requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, runtimeExpectation, saveReviewProbe } from "./code-review-probes.mjs";
+import { createStallReproductionProof, DIAGNOSIS_WAIT, observeExecutionDiagnostic, requireStallReproductionProof,
+  requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
@@ -39,13 +42,15 @@ export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQ
 const WORKFLOW = "building_loop";
 const FILE = "building_loop_file";
 const REPRODUCE = "building_loop_reproduce";
+const DIAGNOSE = "building_loop_diagnose";
+const DIAGNOSTIC_PROBE = "building_loop_diagnosis_probe";
 const ASSESS = "building_loop_quality";
 const CODE_REVIEW = "building_loop_code_review";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
 const START = "building_loop_propose";
 const dedicatedCodeReview = Symbol("dedicated-code-review");
-const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, CODE_REVIEW, LEDGER, COVERAGE, START, REPRODUCE];
+const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, CODE_REVIEW, LEDGER, COVERAGE, START, REPRODUCE, DIAGNOSE, DIAGNOSTIC_PROBE];
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
@@ -120,6 +125,7 @@ const RULES = {
   "final-review": "终审。回到修订稿和原始证据，重新核对所有断言与改动。只有所有要求都支持才关单。",
   "first-audit": "独立反证复核。只看当前目标、正文和原始证据，重新逐块判断，不依赖第一核验者的回执。核完全文后用 building_loop audit 提交。",
   "final-audit": "修订稿独立反证复核。重新核全文与逐项推导，正确内容保留，证据不足写明确最小修正。核完用 building_loop audit 提交。",
+  diagnosis: "只读诊断。先 prepare 获取现行目标和源码。语法、参数、运行器用 building_loop_reproduce。行为用 building_loop_diagnosis_probe 比较一个可见字段，附已读条款。得到 proofId 后按 next 提交原因和定点修法。若实测落在另一层，用 reroute 交总控重新分层。",
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
 const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选编号行内实际有问题的逐字正文片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后按 prepare 的实际 claims 提交 review checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
@@ -149,6 +155,9 @@ const COORDINATOR = {
   "goal-review-ready": "目标已改变或旧验收版本失效。advance 续用核验会话验证当前交付，原事实记录保留。",
   "first-audit-ready": "首次核验暂通过，尚未验收。advance 启动独立反证子会话，不能提前关单。",
   "final-audit-ready": "修订核验暂通过，尚未验收。advance 续用独立反证子会话核全文与推导，之后才能复盘账本。",
+  "diagnosis-ready": "执行停滞。根据宿主提供的失败类别、版本和次数，判断是参数、运行器、语法或行为层。用 building_loop_diagnose triage 写明依据，再 advance 派只读诊断。",
+  "diagnosis-verify": "只读诊断已交回执。核对当前版本、源码定位、宿主最小复现回执和修复范围。用 building_loop_diagnose verify 确认或明确退回依据。",
+  "diagnosis-repair-ready": "诊断已核实。用 advance 将定点修复交回原执行会话，随后仍须通过签名回归、独立审核与复核。",
   blocked: "先确认解阻条件，再用 advance 恢复原阶段和原子会话。模型首次中断可以续派，反复中断则把实际阻塞记入台账。",
   "ledger-review": "本轮事实已验收。用 building_loop_ledger read 读当前待复盘事项，再读授权项目现状与本轮验收回执。结合现状，对本页事项决定 keep/resume/defer/completed/covered/obsolete。完成、被覆盖或失效须附当前原文行依据。分页时将 reviewPage.cursor 交给 review，之后用不带游标的 read 读下一页，直到关单。历史事项可按 ID lookup。"+LEDGER_BASIS_RULE,
   closed: "单元已验收关单。读通过回执、核对执行身份并更新授权台账。汇报先给结论，再按需展开出处、方法、备选和未证边界，最后一句大白话。",
@@ -277,15 +286,46 @@ function viewUnits(frame) {
       unit: id, phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions,
       ...(currentUnit ? { current: true } : {}),
       ...notice,
+      ...(unit.owner === frame.agent.id && unit.stallDiagnostic && !TERMINAL.has(phase)
+        ? { stallDiagnostic: diagnosisPacket(unit, "coordinator") } : {}),
       ...(frame.policy.units[id].cacheReadRotationThreshold ? {executorUsage:{session:executor,
         cacheReadTokens:unit.executorUsage?.[executor]?.cacheReadTokens??0,
         threshold:frame.policy.units[id].cacheReadRotationThreshold,rotations:unit.rotations??[]}} : {}),
-      next: ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase],
+      next: diagnosisNext(unit) ?? (["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
       goalStale: stale,
       owned: unit.owner === frame.agent.id,
       ...(architecture ? { architecture } : {}),
     };
   });
+}
+
+/** Read access for diagnosis is derived from the interrupted executor's
+ * existing grants. Diagnostic phase never inherits its write grant. */
+function diagnosisPaths(spec, record) {
+  const grant = spec.phases[record?.resumePhase];
+  const inputs = spec.codeTask?.tests?.regression?.inputs ?? [];
+  return [...new Set([spec.candidate, ...(spec.codeTask?.sources ?? []), ...inputs,
+    ...(grant?.write ?? [])])].filter(file => includes(grant?.read ?? [], file));
+}
+
+function diagnosisNext(active) {
+  if (active?.phase === "diagnosis-ready") return active.stallDiagnostic?.status === "triaged"
+    ? { tool: WORKFLOW, action: "advance" } : { tool: DIAGNOSE, action: "triage" };
+  if (active?.phase === "diagnosis-verify") return { tool: DIAGNOSE, action: "verify" };
+  if (active?.phase === "diagnosis-repair-ready") return { tool: WORKFLOW, action: "advance" };
+}
+
+/** The coordinator can see diagnostics and source locators, but never probe
+ * stdout, uploaded fixture bytes, or the source lines read by the investigator. */
+function diagnosisPacket(active, role) {
+  const row = active?.stallDiagnostic;
+  if (!row) return;
+  const { evidence, triageReason, retryReason, verificationReason } = row;
+  const summary = stallDiagnosticSummary(active);
+  if (!summary) return;
+  return { ...summary, ...(triageReason ? { triageReason } : {}), ...(retryReason ? { retryReason } : {}),
+    ...(verificationReason ? { verificationReason } : {}),
+    ...(evidence ? { evidence: { ...evidence, ...(role === "executor" && row.replay ? { replay: row.replay } : {}) } } : {}) };
 }
 
 /** 安装预设内的工具、强制注入和事件记录，普通模式独立运行。 */
@@ -469,8 +509,12 @@ export function apply(ctx, config = {}) {
       assignment = Object.entries(state.units).find(([, unit]) =>
         unit.owner === parent && unit.actor === agent.id && PHASES.includes(unit.phase));
     }
-    const role = child ? !assignment ? "idle" : isAudit(assignment[1].phase) ? "auditor" : isReview(assignment[1].phase) ? "reviewer" : "executor" : "coordinator";
-    const grant = assignment ? unitOf({ policy }, assignment[0]).phases[assignment[1].phase] : child ? EMPTY : policy.coordinator;
+    const phase = assignment?.[1].phase;
+    const role = child ? !assignment ? "idle" : phase === "diagnosis" ? "diagnostician"
+      : isAudit(phase) ? "auditor" : isReview(phase) ? "reviewer" : "executor" : "coordinator";
+    const spec = assignment && unitOf({ policy }, assignment[0]);
+    const grant = role === "diagnostician" ? { read: diagnosisPaths(spec, assignment[1].stallDiagnostic), write: [] }
+      : assignment ? spec.phases[phase] : child ? EMPTY : policy.coordinator;
     // goalContext explicitly grants read-only central context to working roles.
     const moduleReads = role === "coordinator" ? hierarchyReadPaths({ policy, state, managed: binding.managed }) : [];
     const reads = role === "idle" ? [] : [...new Set([...grant.read, ...policy.instructions, ...policy.goalContext, ...moduleReads])];
@@ -886,9 +930,12 @@ export function apply(ctx, config = {}) {
       if (codeReviewMode) {
         if (current.goal?.sha256 !== goalSnapshot(frame).sha256) throw new Error("项目目标已变，请总控 advance 重启当前代码的独立验收");
         codeReview = prepareCodeReview(frame, assignment[0], current, spec, args.codeReviewOffset);
-        const { reviewRecipes, syntaxRecipe } = spec.codeTask.diagnostics ?? {};
+        const diagnostics = spec.codeTask.diagnostics;
+        const { reviewRecipes, syntaxRecipe } = diagnostics ?? {};
+        const recipeInputs = visibleRecipeInputs(diagnostics, reviewRecipes);
         if (reviewRecipes?.length) codeReview.reproduction = { action: "probe",
           runtimeRecipes: reviewRecipes.filter(recipe => recipe !== syntaxRecipe), syntax: Boolean(syntaxRecipe),
+          ...(recipeInputs ? { recipeInputs } : {}),
           requirement: "阻塞退回的 runtime 探针带 {file,start,end,quote}，quote 逐字引用支持预期的当前规格。JSON 只核一个字段，例如 expectedPointer:'/error',expectedJson:'\"invalid-input\"'；数值界限可用 expectedOperator:'at-most' 或 'at-least'。",
           architectureExamples: (current.engineeringArchitecture?.examples?.cases ?? []).map(({ id }) => id) };
       } else if(spec&&["reviewer","auditor"].includes(frame.role)) {
@@ -901,8 +948,13 @@ export function apply(ctx, config = {}) {
           candidatePositions=candidatePositionSummary(spec.candidate,bytes);
         } catch(error) { coverage={pendingRead:true,reason:error.message}; }
       }
+      const diagnostic = frame.role === "diagnostician" && reproductionPolicy(frame);
+      const stallDiagnostic = ["executor", "diagnostician"].includes(frame.role) ||
+        frame.role === "coordinator" && current?.owner === frame.agent.id ? diagnosisPacket(current, frame.role) : undefined;
       const codeTask = frame.role === "executor" && assignment && current.codeIntake &&
         (phase === "intake" || current.codeIntake.regression) ? prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) : null;
+      const recipeInputs = codeTask && visibleRecipeInputs(reproductionPolicy(frame));
+      if (recipeInputs) codeTask.reproduction = { tool: REPRODUCE, recipeInputs };
       let submission;
       if (frame.role === "executor" && isCodeReviewUnit(frame, current, spec)) {
         try {
@@ -915,7 +967,9 @@ export function apply(ctx, config = {}) {
       }
       const checkpointAdvance = checkpoint?.advance && (["dispatch", "blocked"].includes(phase) || BEGIN[phase])
         ? { tool: WORKFLOW, ...checkpoint.advance } : undefined;
-      const next = codeReview ? codeReview.next : architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
+      const next = codeReview ? codeReview.next : diagnosisNext(current)
+        ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
+        ?? architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
         : submission?.status === "ready" ? "当前签名回归和读回已齐，直接 submit"
         : submission?.status === "read-back" ? "当前签名回归已通过，submit 会返回待读回的准确页"
@@ -930,6 +984,13 @@ export function apply(ctx, config = {}) {
         ...(instruction ? { instruction } : {}),
         ...(architecture ? { architecture } : {}),
         ...(codeTask ? { codeTask } : {}),
+        ...(stallDiagnostic ? { stallDiagnostic } : {}),
+        ...(diagnostic ? { reproduction: { recipes: diagnostic.recipes ?? [], syntaxRecipe: diagnostic.syntaxRecipe,
+          recipeInputs: visibleRecipeInputs(diagnostic),
+          behavior: { tool: DIAGNOSTIC_PROBE, action: "probe",
+            note: "用实际配方与最小输入。比较输出字段时给 expectedPointer 和该字段的标量或数组 JSON。退出码足以证伪时省略这两项。",
+            example: { expectedExitCode: 0, expectedPointer: "/items", expectedJson: "[]",
+              requirement: { file: "当前目标文件", start: 1, end: 1, quote: "支持预期的目标原句" } } } } } : {}),
         ...(submission ? { submission } : {}),
         ...(deliverableTable ? { deliverableTable } : {}),
         ...reconciliationNotice(frame,current),
@@ -1101,11 +1162,107 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  async function completeDiagnostics(job, exec) {
-    if (job.result) return job.result;
+  function diagnosticContext(frame) {
+    const [unit, active] = frame.assignment ?? [];
+    return { unit, active, spec: frame.policy.units[unit] };
+  }
+
+  function currentStallVersion(frame, spec) {
+    const artifacts = codeRegressionArtifacts(frame.root, spec);
+    return { artifacts, artifactSha256: stallArtifactSha256(artifacts), goalSha256: goalSnapshot(frame).sha256 };
+  }
+
+  function sameStallVersion(row, version) {
+    return row.artifactSha256 === version.artifactSha256 && row.goalSha256 === version.goalSha256;
+  }
+
+  /** Commit the gate and revoke the executor's phase before notifying anyone.
+   * Only authenticated current runner responses or typed host input errors
+   * count, never the model's own account of what it ran. */
+  function recordExecutionStall(frame, context, result, observation) {
+    const { unit, active, spec } = context;
+    if (spec.codeTask?.diagnostics?.protocol !== 2) return;
+    const previous = active.stallObservations, previousDiagnostic = active.stallDiagnostic;
+    const record = observeExecutionDiagnostic(active, { ...observation, result });
+    frame.changed ||= previous !== active.stallObservations || previousDiagnostic !== active.stallDiagnostic;
+    if (!record) return;
+    const diagnostics = spec.codeTask.diagnostics;
+    const unsupported = record.suggestedLayer === "syntax" && !diagnostics.syntaxRecipe ||
+      record.suggestedLayer === "behavior" && !diagnostics.recipes?.some(recipe => recipe !== diagnostics.syntaxRecipe);
+    if (unsupported || observation.artifacts.some(row => !includes(diagnosisPaths(spec, { resumePhase: active.phase }), row.path) &&
+      !includes(frame.policy.goalContext, row.path) && !includes(frame.policy.instructions, row.path))) {
+      delete active.stallDiagnostic;
+      delete active.stallObservations;
+      return;
+    }
+    Object.assign(record, { executor: active.executor, resumePhase: active.phase, goalSha256: observation.goalSha256 });
+    active.phase = "diagnosis-ready";
+    trackUnit(frame, unit, active);
+    return { parent: active.owner, unit, phase: active.phase, stallDiagnostic: diagnosisPacket(active, "coordinator") };
+  }
+
+  async function notifyPhase(exec, { parent, ...result }) {
+    try {
+      const notice = "building-loop 已落盘 " + JSON.stringify(result);
+      await ctx.subagents.sendMessage(exec.agent, parent, [{ type: "text", text: notice }], { signal: exec.signal });
+      exec.concludeTurn?.();
+      return { ...result, notified: true, turnConcluded: true };
+    } catch {
+      // A subsequent coordinator status/prepare still sees the committed stage.
+      return { ...result, notified: false };
+    }
+  }
+
+  function diagnosticObservation(job, version) {
+    const request = job.request;
+    return { ...version, requestId: request?.requestId ?? job.requestId,
+      operation: request?.operation ?? job.operation ?? "check", recipe: request?.probe?.recipe ?? job.recipe,
+      input: request?.probe, changed: request?.changed, sourceLineCounts: job.sourceLineCounts };
+  }
+
+  async function completeDiagnostics(job, exec, investigation) {
+    if (job.result && !job.binding && !job.localBinding) return job.result;
     // Test on the captured bytes only after committing the edit. Reacquire
     // the lock to check freshness, so slow tests never block workspace work.
-    const diagnostics = await runCodeDiagnostics(job, diagnosticRunner, exec.signal);
+    const diagnostics = job.result ?? await runCodeDiagnostics(job, diagnosticRunner, exec.signal);
+    if (exec.signal?.aborted) return { status: "cancelled" };
+    const agent = exec.agent;
+    if (!job.request && !job.localBinding) return diagnostics;
+    if (!job.request || job.role === "executor" || job.role === "diagnostician") {
+      const update = change(agent, frame => {
+        const context = diagnosticContext(frame);
+        if (!context.active || job.request && !codeDiagnosticsCurrent(frame, job)) return { stale: true };
+        const version = currentStallVersion(frame, context.spec);
+        if (job.localBinding && (context.active.serial !== job.localBinding.serial ||
+          context.active.actor !== job.localBinding.actor || !sameStallVersion(job.localBinding, version))) return { stale: true };
+        const observation = { ...diagnosticObservation(job, version), syntaxRecipe: context.spec.codeTask?.diagnostics?.syntaxRecipe };
+        if (frame.role === "executor") return { notice: recordExecutionStall(frame, context, diagnostics, observation) };
+        if (frame.role !== "diagnostician") return {};
+        const record = context.active.stallDiagnostic;
+        if (!sameStallVersion(record, version)) return { stale: true };
+        const comparison = investigation?.expected && compareReviewProbe({ type: "runtime",
+          expected: investigation.expected, requirement: investigation.requirement }, diagnostics);
+        const evidence = { ...observation, result: diagnostics, expected: investigation?.expected, comparison };
+        const layers = [record.layer, ...STALL_LAYERS.filter(layer => layer !== record.layer)];
+        const proof = layers.map(layer => createStallReproductionProof({ ...record, layer }, evidence)).find(Boolean);
+        if (!proof) return comparison ? { outcome: comparison.outcome, actual: comparison.actual } : {};
+        // Replay arguments stay available to the repairing executor; the
+        // coordinator receives hashes and locators, never candidate stdout.
+        const replay = { ...(observation.input ? { input: observation.input } : {}),
+          ...(investigation ? { expected: investigation.expected, requirement: investigation.requirement } : {}) };
+        const entry = { proof, replay };
+        record.probes = [...(record.probes ?? []).filter(item => item.proof.id !== proof.id).slice(-7), entry];
+        frame.changed = true;
+        return { proofId: proof.id, provenLayer: proof.layer,
+          next: { tool: DIAGNOSE, action: proof.layer === record.layer ? "submit" : "reroute", proofId: proof.id,
+            required: ["cause", ...(proof.layer === record.layer ? ["fix"] : []),
+              ...(!proof.recovery && ["syntax", "behavior"].includes(proof.layer) ? ["file", "start", "end"] : [])] },
+          ...(comparison ? { outcome: comparison.outcome, actual: comparison.actual } : {}) };
+      }, { claim: false });
+      if (update.stale) return { status: "superseded" };
+      if (update.notice) return { ...diagnostics, ...await notifyPhase(exec, update.notice) };
+      return { ...diagnostics, ...update };
+    }
     try {
       const { file } = coordinates(exec.agent);
       if (withWorkspaceLock(stateHome, file, () =>
@@ -1118,30 +1275,154 @@ export function apply(ctx, config = {}) {
 
   function reproductionPolicy(frame) {
     const [unit, active] = frame.assignment ?? [];
-    if (frame.role !== "executor" || !active?.codeIntake?.regression) return;
+    if (!["executor", "diagnostician"].includes(frame.role) || !active?.codeIntake?.regression) return;
     const diagnostics = frame.policy.units[unit].codeTask?.diagnostics;
     if (diagnostics?.protocol === 2) return diagnostics;
   }
 
-  /** Capture the active executor's bytes under lock, then run on a copy. */
-  async function reproduce(args, exec) {
+  /** Capture the active assignment's bytes under lock, then run on a copy. */
+  async function reproduce(args, exec, behavior = false) {
     const { agent, signal } = exec;
     signal?.throwIfAborted();
     const { file } = coordinates(agent);
-    const { job, recipes } = withWorkspaceLock(stateHome, file, () => {
+    const { job, recipes, recipeInputs, investigation } = withWorkspaceLock(stateHome, file, () => {
       const frame = scope(agent, { lockedFile: file, inspection: true });
       const policy = reproductionPolicy(frame);
-      if (!policy) throw new Error("仅已登记复现的当前代码任务执行方可以运行");
-      return { job: prepareCodeReproduction(frame, args, diagnosticRunner), recipes: policy.recipes ?? [] };
+      if (!policy) throw new Error("仅已登记复现的当前代码执行方或只读诊断方可以运行");
+      const { expectedExitCode, expectedJson, expectedPointer, expectedOperator, requirement: clause, ...probe } = args;
+      const { active, spec } = diagnosticContext(frame);
+      let investigation;
+      if ([expectedExitCode, expectedJson, expectedPointer, expectedOperator, clause].some(value => value !== undefined)) {
+        if (!behavior || frame.role !== "diagnostician" || args.action !== "probe" || args.recipe === policy.syntaxRecipe ||
+          !Number.isSafeInteger(expectedExitCode) || expectedExitCode < 0 || expectedExitCode > 0xffffffff || !clause) {
+          throw new Error("行为诊断预期仅供只读诊断方在 probe 中使用，须给退出码与当前目标条款");
+        }
+        requireGoalRead(frame, active);
+        const requirement = codeReviewRequirement(frame, active, clause);
+        investigation = { expected: runtimeExpectation(args, requirement), requirement };
+      }
+      if (behavior && !investigation) throw new Error("行为诊断必须提供预期退出码和当前目标条款");
+      const job = prepareCodeReproduction(frame, probe, diagnosticRunner);
+      // Typed host rejection has no network request. Give that actual tool
+      // invocation a distinct ID and pin it to the same current version.
+      if (job.result && ["invalid-input", "unavailable"].includes(job.result.status)) {
+        Object.assign(job, { requestId: randomUUID(), operation: probe.action, recipe: probe.recipe,
+          localBinding: { ...currentStallVersion(frame, spec), serial: active.serial, actor: active.actor } });
+      }
+      return { job, recipes: policy.recipes ?? [], recipeInputs: visibleRecipeInputs(policy), investigation };
     }, warnCleanup);
     if (reproductions.has(agent)) return { status: "busy" };
     reproductions.add(agent);
     try {
-      const result = await completeDiagnostics(job, exec);
-      return args.action === "check" && result.status !== "superseded" ? { ...result, recipes } : result;
+      const result = await completeDiagnostics(job, exec, investigation);
+      return args.action === "check" && result.status !== "superseded"
+        ? { ...result, recipes, ...(recipeInputs ? { recipeInputs } : {}) } : result;
     } finally {
       reproductions.delete(agent);
     }
+  }
+
+  /** A parked executor cannot unblock itself. Only its owner can classify,
+   * verify and reassign the persisted current-version diagnostic. */
+  async function diagnose(args, exec) {
+    const result = change(exec.agent, frame => {
+      const assigned = frame.assignment;
+      const id = assigned?.[0] ?? resolveBoundUnit(frame, args.unit);
+      if (args.unit !== undefined && args.unit !== id) throw new Error("诊断须使用当前授权单元");
+      const active = frame.state.units[id];
+      const record = active?.stallDiagnostic;
+      const investigator = frame.role === "diagnostician";
+      if (!record || (!investigator && (frame.role !== "coordinator" || active.owner !== frame.agent.id))) {
+        throw new Error("当前会话无该诊断授权");
+      }
+      const spec = unitOf(frame, id), version = currentStallVersion(frame, spec);
+      const current = sameStallVersion(record, version);
+      if (args.action === "triage" && !investigator) {
+        const staleStage = DIAGNOSIS_WAIT.has(active.phase) || active.phase === "blocked" && active.resumePhase === "diagnosis";
+        if (!staleStage || current && active.phase !== "diagnosis-ready") throw new Error("当前阶段不能重新分层");
+        if (!current) {
+          // A maintainer may update the goal or source while paused. Old
+          // locators and repros cannot authorize repair of those new bytes.
+          active.stallDiagnostic = { id: randomUUID(), status: "needs-triage", executor: record.executor,
+            resumePhase: record.resumePhase, artifactSha256: version.artifactSha256, goalSha256: version.goalSha256,
+            suggestedLayer: record.suggestedLayer, failureKind: "version-changed", repeatCount: 0 };
+          active.phase = "diagnosis-ready";
+          delete active.blocked;
+          delete active.resumePhase;
+        }
+        const triage = requireStallTriage(active, args.layer);
+        Object.assign(triage, { status: "triaged", layer: args.layer,
+          triageReason: requireText(args.reason, "分层判断依据", 500) });
+      } else if (investigator && ["submit", "reroute"].includes(args.action)) {
+        if (!current || record.status !== "investigating") throw new Error("诊断版本或阶段已变化，请总控重新分层");
+        if (frame.started?.proposal.instruction && active.instructionReadSerial !== active.serial) {
+          throw new Error("先用 prepare 读取本阶段完整的用户开工指令");
+        }
+        requireGoalRead(frame, active);
+        const entry = record.probes?.find(item => item.proof.id === args.proofId);
+        const layer = args.action === "reroute" ? entry?.proof.layer : record.layer;
+        const proof = requireStallReproductionProof({ ...record, layer }, entry?.proof,
+          { artifacts: version.artifacts, proofId: args.proofId, layer });
+        if (args.action === "reroute" && layer === record.layer) throw new Error("同一层的复现须用 submit");
+        const cause = requireText(args.cause, "可核实的具体原因", 600);
+        const fix = args.action === "submit" ? requireText(args.fix, "原执行方的定点修法或解阻条件", 600) : undefined;
+        let source;
+        if (["syntax", "behavior"].includes(layer) && !proof.recovery) {
+          const file = relativeName(args.file);
+          const artifact = version.artifacts.find(item => keyOf(item.path) === keyOf(file));
+          const seen = active.seen?.[keyOf(file)], { start, end } = args;
+          if (!artifact?.sha256 || !includes(spec.codeTask.sources, file) || !includes(frame.reads, file) ||
+            seen?.hash !== artifact.sha256 || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) ||
+            start < 1 || end < start || end - start > 64 || !seen.ranges.some(([a, b]) => a <= start && end <= b) ||
+            proof.path && keyOf(proof.path) !== keyOf(file)) {
+            throw new Error("诊断须定位本会话实际读过的当前授权源码行；编译报错行和原因行可不同，但必须在同一文件");
+          }
+          source = { file, start, end, sha256: artifact.sha256 };
+        } else if ([args.file, args.start, args.end].some(value => value !== undefined)) {
+          throw new Error("参数、运行器或恢复回执用实际宿主结果定位");
+        }
+        const evidence = { id: randomUUID(), proof, cause, ...(fix ? { fix } : {}), ...(source ? { source } : {}),
+          ...(entry.replay.requirement ? { requirement: entry.replay.requirement } : {}) };
+        delete record.probes;
+        if (args.action === "reroute") {
+          record.suggestedLayer = layer;
+          record.status = "needs-triage";
+          record.evidence = evidence;
+          delete record.layer;
+          active.phase = "diagnosis-ready";
+        } else {
+          record.status = "needs-verification";
+          record.evidence = evidence;
+          record.replay = entry.replay;
+          active.phase = "diagnosis-verify";
+        }
+      } else if (args.action === "verify" && !investigator) {
+        if (!current || active.phase !== "diagnosis-verify" || record.status !== "needs-verification" ||
+          !record.evidence || args.evidenceId !== record.evidence.id) {
+          throw new Error("须核对当前版本的有效诊断回执，版本变化后用 triage 重新分层");
+        }
+        const { proof } = record.evidence;
+        requireStallReproductionProof(record, proof, { artifacts: version.artifacts, proofId: proof.id, layer: record.layer });
+        const reason = requireText(args.reason, "核实结论与理由", 500);
+        if (args.decision === "confirmed") {
+          record.status = "verified";
+          record.verificationReason = reason;
+          active.phase = "diagnosis-repair-ready";
+        } else if (args.decision === "retry") {
+          record.status = "needs-triage";
+          record.retryReason = reason;
+          delete record.layer;
+          delete record.evidence;
+          delete record.replay;
+          active.phase = "diagnosis-ready";
+        } else throw new Error("核实决定须为 confirmed 或 retry");
+      } else throw new Error("该角色或阶段不能调用此诊断动作");
+      trackUnit(frame, id, active);
+      frame.changed = true;
+      return { unit: id, phase: active.phase, stallDiagnostic: diagnosisPacket(active, "coordinator"),
+        ...(investigator ? { parent: active.owner } : {}) };
+    }, { requestedUnit: args.unit });
+    return result.parent ? notifyPhase(exec, result) : result;
   }
 
   /** 只允许拥有该单元的总控推进，阻塞单元可保留待后续处理。 */
@@ -1150,8 +1431,26 @@ export function apply(ctx, config = {}) {
     const spec = unitOf(frame, id);
     const prior = Object.hasOwn(frame.state.units, id) ? frame.state.units[id] : null;
     if (prior && prior.owner !== frame.agent.id) throw new Error("此工作单元由其他总控持有");
+    if (prior?.phase === "diagnosis") throw new Error("只读诊断进行中，请等候回执");
     if (Object.entries(frame.state.units).some(([key, unit]) => key !== id && !TERMINAL.has(unit.phase) && unit.phase !== "blocked")) {
       throw new Error("当前工作区另有未结单的单元");
+    }
+    const stall = prior?.stallDiagnostic;
+    if (DIAGNOSIS_WAIT.has(prior?.phase) || prior?.phase === "blocked" && prior.resumePhase === "diagnosis") {
+      const version = currentStallVersion(frame, spec);
+      if (!stall || !sameStallVersion(stall, version)) throw new Error("诊断的源码或目标版本已变化，请重新 triage");
+      if (prior.phase === "diagnosis-verify") throw new Error("须由总控核实诊断回执后才可恢复执行");
+      const repair = prior.phase === "diagnosis-repair-ready";
+      const interrupted = prior.phase === "blocked";
+      if (stall.status !== (repair ? "verified" : interrupted ? "investigating" : "triaged")) {
+        throw new Error("须由总控先完成诊断分层或核实");
+      }
+      if (repair && (!stall.executor || stall.executor !== prior.executor || !["intake", "supplement"].includes(stall.resumePhase))) {
+        throw new Error("无法确认原执行身份，不能改派修复");
+      }
+      return { prior, phase: repair ? stall.resumePhase : "diagnosis", role: repair ? "executor" : "diagnostician",
+        reusable: repair ? stall.executor : interrupted ? prior.actor : prior.diagnostician,
+        serial: prior.serial + 1, stallId: stall.id, repair };
     }
     const revalidating = needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted;
     const planned = revalidating ? "final-review"
@@ -1196,7 +1495,7 @@ export function apply(ctx, config = {}) {
     const next = change(agent, frame => {
       const plan = prepare(frame, id);
       if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable ||
-        plan.regressionRetry !== prepared.regressionRetry) {
+        plan.regressionRetry !== prepared.regressionRetry || plan.stallId !== prepared.stallId) {
         throw new Error("工作单元已经由其他调用推进");
       }
       const spec = unitOf(frame, id),binding=checkpointBinding(frame,spec);
@@ -1209,7 +1508,9 @@ export function apply(ctx, config = {}) {
         // Current hashes are rechecked by every evidence/goal/candidate consumer.
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
       };
-      if (spec.architecture) record.engineeringArchitecture = requireEngineeringArchitecture(frame, id, spec, plan.prior);
+      // A stalled implementation may not parse. Reconcile the architecture
+      // against repaired code at ordinary submission, never during diagnosis.
+      if (spec.architecture && !plan.stallId) record.engineeringArchitecture = requireEngineeringArchitecture(frame, id, spec, plan.prior);
       if (plan.phase === "intake" && !plan.prior) {
         const codeIntake = captureCodeIntake(frame, spec, id);
         if (codeIntake) {
@@ -1218,7 +1519,9 @@ export function apply(ctx, config = {}) {
           if (baseline) record.codeReviewBaseline = baseline;
         }
       }
-      if (plan.role !== "executor") requireCodeRegressionCurrent(frame, id, record, spec, record.goal);
+      if (["reviewer", "auditor"].includes(plan.role)) requireCodeRegressionCurrent(frame, id, record, spec, record.goal);
+      if (plan.stallId) record.stallDiagnostic = { ...record.stallDiagnostic,
+        status: plan.repair ? "resolved" : "investigating" };
       // A new activation cannot consume an earlier turn/end from the same
       // native session, even if that event is delivered again after the resume.
       if (Number.isSafeInteger(resident?.session.seq)) record.activationStartSeq = resident.session.seq;
@@ -1284,13 +1587,16 @@ export function apply(ctx, config = {}) {
       frame.changed = true;
       const ownerTableIntake = plan.phase === "intake" && frame.managed && privateProjectUsesOwnerTable(frame.root);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
+        + (plan.repair ? "。原执行会话继续定点修复。prepare 会返回总控核实的诊断、修法和可重跑输入。" : "")
         + (plan.regressionRetry ? "。当前代码或目标需要重新取得受信回归回执并提交，改前通过的用例集合保持固定。" : "")
         + (record.receipt && plan.phase === "supplement" ? "。请读取退回回执 " + record.receipt : "")
         + "。执行前依据已注入的阶段规则与授权范围。"
         // Reviewer/auditor activation never consumes the coordinator's free-text
         // note, which can contain previous verdicts or proposed answers. Required
         // user changes belong in authorized project files, read at the new stage.
-        + (plan.role!=="executor"?"独立依据当前授权目标、候选和原始材料核验，不预设结论。"
+        + (plan.role==="diagnostician" ? "本次只读诊断分层为 " + record.stallDiagnostic.layer + "。用 prepare 查看当前授权和可用复现配方。"
+          : plan.role!=="executor"?"独立依据当前授权目标、候选和原始材料核验，不预设结论。"
+          : plan.repair ? ""
           : ownerTableIntake ? "先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。"
           : args.note===undefined?"":"\n本次任务要求 "+requireText(args.note,"任务说明"))
         + (plan.role === "executor" && record.codeIntake ? "\n" + CODE_COMMENT_RULE : "")
@@ -1730,6 +2036,7 @@ export function apply(ctx, config = {}) {
     return change(exec.agent, frame => {
       if (!frame.assignment) throw new Error("当前会话没有可交付阶段");
       const [id, active] = frame.assignment;
+      if (frame.role === "diagnostician" && args.action !== "block") throw new Error("只读诊断方仅可提交诊断回执");
       if (args.unit !== undefined && args.unit !== id) throw new Error("unit 与本会话授权不匹配，当前单元为 " + id);
       if (args.action !== "block" && frame.started?.proposal.instruction && active.instructionReadSerial !== active.serial) {
         throw new Error("请先用 prepare 获取本阶段完整的用户开工指令原文");
@@ -1988,17 +2295,7 @@ export function apply(ctx, config = {}) {
     exec.signal?.throwIfAborted();
     const { parent, ...result } = report(args, exec, inputCheck);
     if (result.submission) return result;
-    try {
-      const notice = "building-loop 已落盘 " + JSON.stringify(result);
-      await ctx.subagents.sendMessage(exec.agent, parent, [{ type: "text", text: notice }], { signal: exec.signal });
-      // Signal DSH to finish after this persisted result, avoiding a paid idle tail.
-      exec.concludeTurn?.();
-      return { ...result, notified: true, turnConcluded: true };
-    } catch {
-      // A failed parent notification is not a completed handoff. Keep the normal
-      // loop/final-delivery path available; never conclude this case prematurely.
-      return { ...result, notified: false };
-    }
+    return notifyPhase(exec, { ...result, parent });
   }
 
   /** Each code reviewer gets the same evidence contract. The host chooses the
@@ -2048,7 +2345,8 @@ export function apply(ctx, config = {}) {
         const result = await completeDiagnostics(job, exec);
         if (!result.probe) {
           if (!batch || result.status === "superseded") return result;
-          rows.push({ exampleId: check.exampleId, id, outcome: "unavailable", status: result.status, reason: result.reason });
+          rows.push({ exampleId: check.exampleId, id, outcome: "unavailable", status: result.status, reason: result.reason,
+            ...(result.status === "invalid-input" ? { field: result.field, message: result.message } : {}) });
           continue;
         }
         const row = change(agent, frame => {
@@ -2203,17 +2501,35 @@ export function apply(ctx, config = {}) {
     module: { ...string, description: "add-module：所有者明确指定的小写模块编号" },
     title: { ...string, description: "add-module：所有者明确指定的模块标题" },
     heading: { ...string, description: "write 修改受管中央文件时填写实际修改的已有章节标题" },
-  }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor"])});
+  }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor","diagnostician"])});
 
-  register(tool(REPRODUCE, "在当前实现的隔离副本上复现。check 返回旧回归首错、各新增必测及可用配方。probe 选已登记配方，用参数、标准输入或小型相对路径文件构造最小用例，返回退出码、输出和候选源码堆栈。", ["check", "probe"], {
-    recipe: { ...string, maxLength: 128, description: "probe 的配方编号，见 check 返回的 recipes" },
+  const reproductionInput = {
+    recipe: { ...string, maxLength: 128, description: "probe 的配方编号和参数形状，见 prepare 或 check 返回的 recipeInputs，旧授权见 recipes" },
     args: { type: "array", maxItems: 24, items: { ...string, maxLength: 512 }, description: "作为数据传给配方的参数数组" },
     stdin: { ...string, maxLength: 8192, description: "可选的小型标准输入文本" },
     files: { type: "array", maxItems: 12, items: {
       type: "object", properties: { path: { ...string, maxLength: 160 }, content: { ...string, maxLength: 16384 } },
       required: ["path", "content"], additionalProperties: false,
     }, description: "在临时目录生成的用例文件，相对路径以 / 分隔" },
-  }, reproduce), { when: visible(["executor"], reproductionPolicy) });
+  };
+  register(tool(REPRODUCE, "在当前实现的隔离副本上复现。check 只填 action，返回旧回归首错、新增必测及可用配方。probe 用已登记配方及最小数据，返回实际退出码、输出和堆栈。", ["check", "probe"],
+    reproductionInput, reproduce), { when: visible(["executor", "diagnostician"], reproductionPolicy) });
+  register(tool(DIAGNOSTIC_PROBE, "只读行为诊断。在当前隔离副本上执行最小用例，用已读目标条款固定预期。要比较 JSON 时，同时填 expectedPointer 和该字段的标量或数组 JSON。只有实测差异才生成 proofId。", ["probe"], {
+    ...reproductionInput,
+    expectedExitCode: { ...number, minimum: 0, maximum: 4294967295 },
+    expectedJson: { ...string, maxLength: 2048, description: "只填选中字段的预期标量或数组 JSON，例如 []" },
+    expectedPointer: { ...string, maxLength: 256, description: "例如 /items；根值用空串" },
+    requirement: codeReviewProbeRequirement,
+  }, (args, exec) => reproduce(args, exec, true), ["recipe", "expectedExitCode", "requirement"]),
+  { when: visible(["diagnostician"], reproductionPolicy) });
+
+  register(tool(DIAGNOSE, "执行停滞诊断。总控 triage 给 layer 和 reason，然后 advance。只读诊断方用真实复现 proofId、已读源码行、cause 和 fix 提交 submit。发现另一层用 reroute 带该层 proofId 和 cause。总控 verify 给 evidenceId、decision 和 reason。确认后 advance 回原执行会话。", ["triage", "submit", "reroute", "verify"], {
+    unit: string, layer: { enum: STALL_LAYERS }, reason: { ...string, maxLength: 500 },
+    evidenceId: string, proofId: string, decision: { enum: ["confirmed", "retry"] },
+    file: string, start: number, end: number, cause: { ...string, maxLength: 600 }, fix: { ...string, maxLength: 600 },
+  }, diagnose), { when: visible(["coordinator", "diagnostician"], frame =>
+    frame.role === "diagnostician" || Object.values(frame.state.units).some(row => row.owner === frame.agent.id &&
+      (DIAGNOSIS_WAIT.has(row.phase) || row.phase === "blocked" && row.resumePhase === "diagnosis"))) });
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
   const proseReview = frame => !isCodeReviewUnit(frame, frame.assignment[1], unitOf(frame, frame.assignment[0]));
@@ -2277,7 +2593,7 @@ export function apply(ctx, config = {}) {
       }, required: ["id", "status", "basis"], additionalProperties: false,
     } },
     quality: { type: "object", properties: qualityFields, required: qualityNames, additionalProperties: false },
-  }, workflow), {when:visible(["coordinator","executor","reviewer","auditor"], frame => !codeReviewRole(frame))});
+  }, workflow), {when:visible(["coordinator","executor","reviewer","auditor","diagnostician"], frame => !codeReviewRole(frame))});
 
   ctx.systemPrompt.context({
     name: "building-loop.phase", order: 130, required: true, interpolate: false,
@@ -2297,7 +2613,8 @@ export function apply(ctx, config = {}) {
         const phase = assignment?.[1].phase ?? (units ? current?.phase ?? (closed ? "closed" : "dispatch") : "idle");
         const codeReview = codeReviewRole(frame);
         const rule = frame.role === "coordinator"
-          ? (current?.reason==="classification-reconciliation-unresolved"?current.reasonNote:current?.goalStale ? COORDINATOR["goal-review-ready"] : COORDINATOR[phase] ?? "等待当前阶段交付或核验回执。") + " 总控只读写白名单内的中央文件和回执。"
+          ? (DIAGNOSIS_WAIT.has(phase) ? COORDINATOR[phase] :
+            current?.reason==="classification-reconciliation-unresolved"?current.reasonNote:current?.goalStale ? COORDINATOR["goal-review-ready"] : COORDINATOR[phase] ?? "等待当前阶段交付或核验回执。") + " 总控只读写白名单内的中央文件和回执。"
           : frame.managed && phase === "intake"
             ? "接单。按已确认总纲和索引撰写第一版交付稿，只写 DELIVERY.md。会话原文是用户提供的材料，不能证明外部事实。材料不足时注明待核事项。完整读回目标和新正文后 submit。"
             : codeReview

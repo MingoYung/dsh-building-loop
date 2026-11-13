@@ -164,6 +164,7 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     detachChild: id => live.delete(id),
     concluded,
     invoke,
+    schema: tool => tools.get(tool)?.parameters,
     prompt:id=>prompt.text({agent:live.get(id)}),
     preStep:(id,messages=[])=>listeners.get("agent/pre-step")({agent:live.get(id)},async()=>({kind:"enter",messages})),
     visible:id=>[...tools.keys()].filter(name=>!admissions.get(name)||admissions.get(name)({agent:live.get(id)})),

@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { test } from "node:test";
 import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeReproduction, runCodeDiagnostics } from "../governance/code-diagnostics.mjs";
+import { parseRecipeInputs, visibleRecipeInputs } from "../governance/diagnostic-recipe-inputs.mjs";
 import { digest } from "../governance/policy.mjs";
 import { fixture } from "./helpers.mjs";
 
@@ -10,6 +11,24 @@ const source = "entry.py";
 const input = "schema.json";
 const token = "test-token-that-must-never-appear-in-tool-output";
 const invalidReply = { status: "unavailable", reason: "invalid-runner-reply" };
+
+test("recipe shapes only constrain authorized protocols and existing review and input contract call forms", () => {
+  const transport = { args: { min: 0, types: [] }, stdin: "required", files: { min: 0, max: 0 } };
+  const compile = { args: { min: 1, types: ["source"] }, stdin: "forbidden", files: { min: 0, max: 0 } };
+  const recipes = ["transport", "compile"];
+  const parsed = parseRecipeInputs({ transport, compile }, recipes, recipes, "compile", [{ recipe: "transport" }]);
+  assert.deepEqual(visibleRecipeInputs({ recipeInputs: parsed }, ["compile"]), { compile });
+  assert.equal(visibleRecipeInputs({ recipeInputs: parsed }, ["unrelated"]), undefined);
+  assert.equal(parseRecipeInputs(undefined), undefined);
+  for (const rows of [
+    { unauthorized: transport },
+    { transport: { ...transport, files: { min: 0, max: 13 } } },
+    { transport: { ...transport, stdin: "forbidden" } },
+    { transport: { ...transport, args: { min: 1, types: ["text"] } } },
+    { compile: { ...compile, args: { min: 1, types: ["text"] } } },
+    { compile: { ...compile, stdin: "optional" } },
+  ]) assert.throws(() => parseRecipeInputs(rows, recipes, recipes, "compile", [{ recipe: "transport" }]), /recipeInputs/u);
+});
 
 function executor(root, write) {
   write(source, "def parse(value):\n    raise ValueError(value)\n");
@@ -106,6 +125,11 @@ test("V2 feedback requires exact case inventory and bounded authorized frames an
     }
     next = { status: "failed", probe: { exitCode: 1, stderr: "ValueError: local fixture", stack, truncated: false } };
     assert.deepEqual((await runCodeDiagnostics(probe, runner)).probe, next.probe);
+    next = { status: "invalid-input", inputError: "files" };
+    assert.equal((await runCodeDiagnostics(probe, runner)).reason, "runner-rejected-input");
+    assert.deepEqual(await runCodeDiagnostics(check, runner), invalidReply);
+    next = { ...next, message: "hidden payload" };
+    assert.deepEqual(await runCodeDiagnostics(probe, runner), invalidReply);
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

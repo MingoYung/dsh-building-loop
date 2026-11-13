@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { codeRegressionArtifacts } from "./code-intake.mjs";
 import { goalSnapshot } from "./goals.mjs";
+import { DiagnosticRecipeInputError, validateRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
 import { inputContractCases } from "./input-contracts.mjs";
 import { compareReviewProbe } from "./code-review-probes.mjs";
 import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
@@ -123,7 +124,7 @@ export function prepareCodeDiagnostics(frame, file, fileSha256, runner) {
   return prepare(frame, runner, { file, fileSha256 });
 }
 
-/** Only the assigned executor can request a manual check or isolated probe. */
+/** Only the assigned executor or read-only diagnostician can reproduce. */
 export function prepareCodeReproduction(frame, args, runner) {
   if (!hasOnly(args, ["action", "recipe", "args", "files", "stdin"]) ||
     !["check", "probe"].includes(args.action) ||
@@ -182,17 +183,18 @@ export function prepareReviewReproduction(frame, args, runner) {
 function prepare(frame, runner, { file, fileSha256, manual, review = false }) {
   const [unit, active] = frame.assignment ?? [];
   const spec = frame.policy.units[unit];
-  if ((!review && frame.role !== "executor") || !active?.codeIntake?.regression || !spec?.codeTask?.tests?.regression) {
+  if ((!review && !["executor", "diagnostician"].includes(frame.role)) || !active?.codeIntake?.regression || !spec?.codeTask?.tests?.regression) {
     if (manual) throw new Error("仅当前已授权的代码执行方可以复现");
     return;
   }
-  const { checkSet, protocol, recipes } = spec.codeTask.diagnostics ?? {};
+  const { checkSet, protocol, recipes, recipeInputs } = spec.codeTask.diagnostics ?? {};
   if (!checkSet) return { result: { status: "skipped", reason: "check-set-not-configured" } };
   if (manual && protocol !== 2) return { result: { status: "skipped", reason: "protocol-upgrade-required" } };
-  if (runner.reason) return { result: { status: "skipped", reason: runner.reason } };
   // Validate model input outside the snapshot catch so invalid arguments are
   // explicit tool errors. Probe bytes may not disclose other phases' grants.
   const requestedProbe = manual?.action === "probe";
+  const inputShape = requestedProbe && recipeInputs && Object.hasOwn(recipeInputs, manual.recipe) ? recipeInputs[manual.recipe] : undefined;
+  if (runner.reason && !inputShape) return { result: { status: "skipped", reason: runner.reason } };
   const probe = requestedProbe ? probeInput(manual, recipes) : undefined;
   let versions;
   try { versions = codeRegressionArtifacts(frame.root, spec); }
@@ -200,6 +202,16 @@ function prepare(frame, runner, { file, fileSha256, manual, review = false }) {
   if (probe?.files?.some(row => versions.some(file => sameTree(file.path, row.path)))) {
     throw new Error("复现样例路径与交付工件冲突");
   }
+  if (inputShape) {
+    const authorizedSources = versions.filter(row => row.sha256 && spec.codeTask.sources.includes(row.path) &&
+      includes(frame.reads, row.path)).map(row => row.path);
+    try { validateRecipeInputs(probe, inputShape, authorizedSources); }
+    catch (error) {
+      if (!(error instanceof DiagnosticRecipeInputError)) throw error;
+      return { result: error.result };
+    }
+  }
+  if (runner.reason) return { result: { status: "skipped", reason: runner.reason } };
   try {
     const binding = { checkSet, unit, phase: active.phase, policySha256: frame.policy.hash, goalSha256: goalSnapshot(frame).sha256 };
     const changed = file === undefined ? undefined : versions.find(artifact => keyOf(artifact.path) === keyOf(file));
@@ -350,6 +362,13 @@ function checkFeedback(reply, job) {
 }
 
 function probeFeedback(reply, job) {
+  // Older adapters still return unavailable. New adapters may reject a
+  // parameter without sending exception text or echoing the hidden input.
+  if (reply.status === "invalid-input") {
+    if (!hasOnly(reply, [...replyEnvelope, "inputError"]) || !["args", "stdin", "files"].includes(reply.inputError)) return invalidReply();
+    return { status: "invalid-input", reason: "runner-rejected-input", recipe: job.request.probe.recipe,
+      field: reply.inputError, message: "运行器拒绝该字段，请按已授权配方形状更正。" };
+  }
   if (!hasOnly(reply, [...replyEnvelope, "probe"])) return invalidReply();
   const { status, snapshotSha256, probe } = reply;
   if (status === "unavailable" && probe === undefined) return runnerUnavailable();

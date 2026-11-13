@@ -513,6 +513,59 @@ test("the assigned executor can check both groups and run a bounded reproduction
   });
 }));
 
+test("declared probe shapes are discoverable and reject bad runner arguments before a request", () => fixture(async (root, write) => {
+  const compiler = { args: { min: 1, types: ["source"] }, stdin: "forbidden", files: { min: 0, max: 0 } };
+  const transport = { args: { min: 0, types: [] }, stdin: "optional", files: { min: 0, max: 0 } };
+  const recipeInputs = { "compile-python": compiler, "parse-json": transport };
+  const requests = [];
+  await withDiagnosticRunner((body, send) => {
+    requests.push(body);
+    if (body.operation === "check") {
+      return send({ status: "passed", old: { status: "passed" }, required: [{ caseId: "new-case", status: "passed" }] });
+    }
+    if (body.probe.recipe === "parse-json") return send({ status: "invalid-input", inputError: "stdin" });
+    return send({ status: "passed", probe: { exitCode: 0, stdout: '{"status":"parsed"}' } });
+  }, async () => {
+    const { harness, childId } = await startDiagnosticTask(root, write, {
+      checkSet: "typed-cli", protocol: 2, recipes: Object.keys(recipeInputs),
+      reviewRecipes: ["compile-python"], syntaxRecipe: "compile-python", recipeInputs,
+    });
+    const invoke = args => harness.invoke(childId, "building_loop_reproduce", args);
+    const packet = await harness.flow(childId, "prepare");
+    assert.deepEqual(packet.codeTask.reproduction, { tool: "building_loop_reproduce", recipeInputs });
+    const invalidProbes = [
+      ["compile-python", {}, "args"],
+      ["compile-python", { args: ["missing.py"] }, "args"],
+      ["compile-python", { args: [module, "extra"] }, "args"],
+      ["compile-python", { args: ["settings.json"] }, "args"],
+      ["compile-python", { args: [module], stdin: "surplus" }, "stdin"],
+      ["parse-json", { args: ["sample"] }, "args"],
+      ["parse-json", { files: [{ path: "input.json", content: "[]" }] }, "files"],
+    ];
+    for (const [index, [recipe, fields, field]] of invalidProbes.entries()) {
+      const previous = requests.length;
+      const result = await invoke({ action: "probe", recipe, ...fields });
+      assert.equal(result.status, "invalid-input");
+      assert.equal(result.reason, "recipe-input-invalid");
+      assert.equal(result.field, field);
+      assert.deepEqual(result.expected, recipeInputs[recipe]);
+      assert.equal(requests.length, previous);
+      // Establish a fresh passing control between negative probe batches. A
+      // dedicated workflow test covers escalation for consecutive mistakes.
+      if (index === 1 || index === invalidProbes.length - 1) {
+        assert.deepEqual((await invoke({ action: "check" })).recipeInputs, recipeInputs);
+        assert.equal(requests.length, previous + 1);
+      }
+    }
+    assert.equal((await invoke({ action: "probe", recipe: "compile-python", args: [module] })).status, "passed");
+    const remoteRejected = await invoke({ action: "probe", recipe: "parse-json", stdin: "test" });
+    assert.equal(remoteRejected.status, "invalid-input");
+    assert.equal(remoteRejected.reason, "runner-rejected-input");
+    assert.equal(remoteRejected.field, "stdin");
+    assert.deepEqual(requests.map(row => row.probe?.recipe ?? row.operation), ["check", "check", "compile-python", "parse-json"]);
+  });
+}));
+
 test("manual reproduction serializes per executor and drops obsolete and out-of-scope feedback", () => fixture(async (root, write) => {
   const waiting = Promise.withResolvers();
   let complete;

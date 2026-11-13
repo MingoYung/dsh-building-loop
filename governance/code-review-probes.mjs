@@ -10,7 +10,7 @@ function expectedOutput(value) {
 
 // Restrict a grounded comparison to the behavior actually asserted. Bare
 // exploratory probes retain their full-JSON comparison for older callers.
-function runtimeExpectation({ expectedExitCode, expectedJson, expectedPointer, expectedOperator }, requirement) {
+export function runtimeExpectation({ expectedExitCode, expectedJson, expectedPointer, expectedOperator }, requirement) {
   const expected = { exitCode: expectedExitCode, ...expectedOutput(expectedJson) };
   if (expectedPointer !== undefined && (!Object.hasOwn(expected, "json") || typeof expectedPointer !== "string" ||
       expectedPointer.length > 256 || !/^(?:\/(?:[^~/]|~[01])*)*$/u.test(expectedPointer))) {

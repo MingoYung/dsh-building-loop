@@ -2,11 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, createPublicKey, randomUUID } from "node:crypto";
 import { parseInputContracts } from "./input-contracts.mjs";
+import { parseRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
 
 export const AUTHORITY = "BUILDING-LOOP.json";
 export const MANAGED = ".building-loop";
 const BASE_PHASES = ["intake", "first-review", "supplement", "final-review"];
-export const PHASES = [...BASE_PHASES, "first-audit", "final-audit"];
+export const PHASES = [...BASE_PHASES, "first-audit", "final-audit", "diagnosis"];
 const LIMIT = 256 * 1024;
 
 /** The workspace has no authority to grant any Building-loop project access. */
@@ -223,8 +224,8 @@ function codeTaskPolicy(value, phases) {
   object(value, "代码任务契约", ["sources", "tests", "diagnostics"]);
   let diagnostics;
   if (value.diagnostics !== undefined) {
-    const { checkSet, protocol, recipes, reviewRecipes, syntaxRecipe, inputContracts } = object(value.diagnostics, "快速诊断授权",
-      ["checkSet", "protocol", "recipes", "reviewRecipes", "syntaxRecipe", "inputContracts"]);
+    const { checkSet, protocol, recipes, reviewRecipes, syntaxRecipe, inputContracts, recipeInputs } = object(value.diagnostics, "快速诊断授权",
+      ["checkSet", "protocol", "recipes", "reviewRecipes", "syntaxRecipe", "inputContracts", "recipeInputs"]);
     const runnerId = id => typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(id);
     if (!value.tests?.regression || !runnerId(checkSet) || protocol !== undefined && protocol !== 1 && protocol !== 2) {
       throw new Error("快速诊断须在签名回归契约中登记受信检查集编号");
@@ -242,9 +243,11 @@ function codeTaskPolicy(value, phases) {
       throw new Error("语法配方须单独指定一个已授权的代码核验配方");
     }
     const input = parseInputContracts(inputContracts, reviewRecipes, syntaxRecipe);
+    const inputShapes = parseRecipeInputs(recipeInputs, recipes, reviewRecipes, syntaxRecipe, input);
     diagnostics = { checkSet, ...(protocol === 2 ? { protocol, recipes: recipes ?? [],
       ...(reviewRecipes ? { reviewRecipes } : {}), ...(syntaxRecipe ? { syntaxRecipe } : {}) } : {}) };
     if (input) diagnostics.inputContracts = input;
+    if (inputShapes) diagnostics.recipeInputs = inputShapes;
   }
   const sources = pathList(value.sources);
   const grants = value.tests?.regression ? [phases.intake, phases.supplement] : [phases.intake];

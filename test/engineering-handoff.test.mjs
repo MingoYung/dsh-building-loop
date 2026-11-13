@@ -162,8 +162,8 @@ test("explicit new owner goal can retire a blocked old writer without lending it
   write(projectGoal, "# G2\n\nPublish the actual replacement goal.\n");
   start("replacement", opening("K02") + replace);
   start("competitor", opening("K03") + replace);
-  assert.match((await native.flow("replacement", "status")).checkpoint.blocked, /仍未退出可写阶段/);
-  await assert.rejects(native.file("replacement", "write", "DESIGN.md", { content: "premature", note: "unsafe" }), /仍未退出可写阶段/);
+  assert.match((await native.flow("replacement", "status")).checkpoint.blocked, /仍未退出活动阶段/);
+  await assert.rejects(native.file("replacement", "write", "DESIGN.md", { content: "premature", note: "unsafe" }), /仍未退出活动阶段/);
   assert.equal((await native.flow(childId, "block", { note: "The owner published a newer goal." })).phase, "blocked");
   const before = state();
   const target = await native.flow("replacement", "status");

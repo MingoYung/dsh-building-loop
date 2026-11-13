@@ -4,6 +4,7 @@ import { TERMINAL } from "./ledger.mjs";
 import { isImplementationPath, keyOf, readBytes, text } from "./policy.mjs";
 import { workspaceStateFile } from "./session-mode.mjs";
 import { STATE_LIMIT } from "./transactions.mjs";
+import { DIAGNOSIS_WAIT } from "./stall-diagnostics.mjs";
 
 const UNIT = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -142,7 +143,11 @@ function assessClaim(frame) {
     const previous = state.units[checkpoint.replaceUnit];
     if (lease?.unit !== checkpoint.replaceUnit || previous?.owner !== lease.session) return blocked("替换对象与当前工程总控记录不一致");
     if (!SHA256.test(previous.goal?.sha256 ?? "") || previous.goal.sha256 === checkpoint.goalSha256) return blocked("须先发布与原单元不同的新目标版本才能替换");
-    if (previous.phase !== "blocked") return blocked("原工作单元仍未退出可写阶段或已关单；只有已阻塞的未完成单元可以替换");
+    // A parked diagnosis has already revoked every child grant. An explicit
+    // replacement may retire it under the same rule as an interrupted unit.
+    if (previous.phase !== "blocked" && !DIAGNOSIS_WAIT.has(previous.phase)) {
+      return blocked("原工作单元仍未退出活动阶段或已关单；只有已挂起的未完成单元可以替换");
+    }
     if (Object.entries(state.units).some(([id, unit]) => id !== checkpoint.replaceUnit && !TERMINAL.has(unit.phase))) {
       return blocked("工作区仍有其他未关单单元，当前替换不能接管其权限");
     }
