@@ -59,4 +59,6 @@
 
 用量记录无缺失。Building-loop 在这两轮少于首个候选的 10,368,920 Token，两批是否触发诊断、关单进度和延时均不同，无法把差值全部归因于拆分工具。 [阶段和用量](observations-0.7.26-short-followup-compact-summary.json) · [用量明细](observations-0.7.26-short-followup-measures.json)
 
+验收后独立核对了四份架构稿中的具体陈述。三份共发现八处差异，包括已有基线文件被写成缺失、把间接依赖写成直接导入、把职责归给错误模块。其余一份的已抽查条款与源码一致。功能门槛通过，架构放行仍待处理。 [第二批架构逐条核证](observations-0.7.26-short-followup-architecture-semantic.json)
+
 同一候选的 G3/G4 盲测已经启动。隔离 Windows DSH 预跑通过，正式 DSH 同步与 ClearAI 实测以完整验收为前提。 [原生预跑](observations-0.7.26-native-preflights.json)
