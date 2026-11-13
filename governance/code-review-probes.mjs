@@ -43,6 +43,7 @@ export function runtimeExpectation({ expectedExitCode, expectedJson, expectedPoi
 const clauseLiterals = requirement => new Set(requirement.quote.match(/[\p{L}\p{N}_]+(?:[-.][\p{L}\p{N}_]+)*/gu));
 const pointerSegments = pointer => pointer.split("/").slice(1).map(token => token.replace(/~1/gu, "/").replace(/~0/gu, "~"));
 const regexLiteral = value => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+const conditionalClause = /(?:\b(?:if|when|whenever|provided\s+that|assuming|unless)\b|\b(?:in|for)\s+(?:the\s+)?case\s+(?:of|that)\b|如果|若|倘若|仅当|一旦|除非|前提(?:是|为)|(?:^|[。！？；，\s])当|[\p{L}\p{N}）)]\s*时(?=[，,。\s]|则|返回|输出|应|须))/iu;
 
 function projectedOutput(value, pointer) {
   for (const field of pointerSegments(pointer)) {
@@ -75,6 +76,9 @@ function namesExitCode(quote, exitCode) {
 function clauseGrounding(requirement, expected) {
   if (!requirement) return;
   const { quote } = requirement;
+  // Literal input and output snippets are data. Conditions in the prose
+  // still require an owner example that fixes the applicable input.
+  if (conditionalClause.test(quote.replace(/\x60[^\x60\r\n]+\x60/gu, " "))) return;
   if (/(?:不得|不能|不会|禁止|除非|例如|比如|示例|反例|否则|或者|\b(?:not|never|unless|example|e\.g\.|otherwise|or)\b)/iu.test(quote)) return;
   const exit = namesExitCode(quote, expected.exitCode);
   if (!Object.hasOwn(expected, "json")) return exit ? { kind: "clause", exit: true } : undefined;

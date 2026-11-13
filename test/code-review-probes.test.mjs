@@ -74,7 +74,8 @@ test("exploratory probe quota cannot consume mandatory registered example slots"
 
 test("a registered reviewer example binds exact input, owner clause, response and execution status", () => {
   const { frame, active } = fixture();
-  const requirement = { file: "SPEC.md", start: 8, end: 8, quote: "The designated sample returns ordered entries." };
+  const requirement = { file: "SPEC.md", start: 8, end: 8,
+    quote: "When the key is list, output field `order` equals [\"a\",\"b\"]." };
   const expected = { order: ["a", "b"], count: 2 };
   const input = { key: "list", data: ["b", "a"] };
   const withCases = { codeTask: { ...spec.codeTask, diagnostics: { ...spec.codeTask.diagnostics,
@@ -99,6 +100,13 @@ test("a registered reviewer example binds exact input, owner clause, response an
   const otherInput = prepare({ exampleId: undefined, recipe: "app-json", expectedExitCode: 0,
     expectedPointer: "/count", expectedJson: "0", stdin: JSON.stringify(input) });
   assert.equal(otherInput.grounding, undefined);
+  const otherBranch = prepare({ exampleId: undefined, recipe: "app-json", expectedExitCode: 0,
+    expectedPointer: "/order", expectedJson: '["a","b"]', stdin: '{"key":"count","data":["b","a"]}' });
+  assert.equal(otherBranch.grounding, undefined);
+  const otherBranchProbe = saveReviewProbe(frame, active, "current", reviewProbeId("current", otherBranch), otherBranch,
+    result(0, '{"order":["b","a"]}'));
+  assert.equal(otherBranchProbe.outcome, "mismatch");
+  assert.equal(otherBranchProbe.blocking, false);
 
   const proofId = reviewProbeId("current", check);
   const location = { type: "runtime", file: signedFile, start: 2, end: 3 };
@@ -126,6 +134,11 @@ test("output clauses reject branch alternatives, examples and negated assertions
     "For example, it returns `{\"size\":5}`.",
     "Input field `size` equals 5. The command prints one result.",
     "The command takes `{\"size\":5}` and returns a record.",
+    "When the input contains no entries, output field `size` equals 5.",
+    "Output field `size` equals 5 provided that the input is empty.",
+    "当输入为空时，输出字段 `size` 等于 5。",
+    "输入为空时输出 `{\"size\":5}`。",
+    "如果输入为空，返回 `{\"size\":5}`。",
   ]) {
     const check = prepare(quote);
     assert.equal(check.grounding, undefined, quote);

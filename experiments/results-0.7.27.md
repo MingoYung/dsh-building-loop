@@ -16,4 +16,6 @@
 
 ## 原生对照
 
-测试环境与正式 Profile 隔离。使用同一 DeepSeek Flash、原短提示和 G3/G4 隐藏评分契约。公开组合样例登记在宿主，线上和冻结后盲评种子单独生成和保管。本轮冻结包 SHA-256 为 `b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5`。Windows DSH 无模型预跑通过，短题基线 8/8，难题基线 21/21。真实沙箱超时等输入控制 4/4、5/5。 [测试输入版本](observations-0.7.27-native-setup.json) · [候选预跑](observations-0.7.27-native-preflights.json)
+测试环境与正式 Profile 隔离。使用同一 DeepSeek Flash、原短提示和 G3/G4 隐藏评分契约。公开组合样例登记在宿主，线上和冻结后盲评种子单独生成和保管。
+
+第一包 SHA-256 为 `b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5`。Windows DSH 无模型预跑通过，短题基线 8/8，难题基线 21/21。真实沙箱超时等输入控制 4/4、5/5。独立验证又发现，条件条款可被用在条件不成立的输入上。修订包 `5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7` 对可识别的条件句要求登记的相符输入。无条件的明确条款仍可据实核对。 [测试输入版本](observations-0.7.27-native-setup.json) · [候选预跑](observations-0.7.27-native-preflights.json)
