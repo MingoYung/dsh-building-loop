@@ -2,6 +2,7 @@ import { requireCodeRegressionCurrent } from "./code-intake.mjs";
 import { architectureProseInventory, checkArchitectureProseReceipt, PROSE_REVIEW_STATUSES } from "./architecture-prose-coverage.mjs";
 import { hasConditionalContext, isGroundedRuntimeProof } from "./code-review-probes.mjs";
 import { expectedClaims } from "./evidence.mjs";
+import { inputContractCases } from "./input-contracts.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
 import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { lineList } from "./preflight.mjs";
@@ -367,6 +368,13 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
   const refs = reviewRefs(frame, active, current);
   const pending = pendingReviewRows(frame, current, progress, page, refs);
   const proseReview = proseSummary(current, progress);
+  const rollback = architecture?.rollbackRehearsal?.status === "passed" && {
+    heading: spec.architecture.rollback.heading,
+    checks: inputContractCases(spec.architecture.rollback.contracts).map(({ id, requirement, expected }) => ({
+      id, requirement, expected, snapshotSha256: architecture.rollbackRehearsal.receipts.find(row => row.id === id)?.snapshotSha256,
+    })),
+    rule: "逐项把回退正文承诺与实跑范围对照。只有这些检查得到回退实证；检查登记的保留行为是否被文字误写为撤销。",
+  };
   // Start with the registered examples so the model need not copy each input
   // into an ad hoc runtime request before discovering the required checks.
   const architectureProbe = progress.architectureExamples?.missing.length
@@ -377,6 +385,7 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     ...(architecture ? { architecture, imports: pythonImportEvidence(frame, current.artifacts) } : {}),
     ...(signed.architectureResponsibilities ? { architectureResponsibilities: signed.architectureResponsibilities.rows } : {}),
     ...(proseReview ? { proseReview } : {}),
+    ...(rollback ? { rollback } : {}),
     progress: visibleReviewProgress(progress), pending, refs,
     ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {

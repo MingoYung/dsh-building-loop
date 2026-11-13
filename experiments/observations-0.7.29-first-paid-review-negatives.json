@@ -1,0 +1,433 @@
+{
+  "scope": "Exact captured first-review bytes and separate independent-audit results, with matching source locators. Any repair is scored from the final frozen stage separately.",
+  "observations": [
+    {
+      "run": "r-MqopHI",
+      "stage": "g1",
+      "claim": {
+        "file": "architecture.md",
+        "sha256": "7ddb0824dd71c7c09ff281ea090bb69fb163926fa5fdd3b46114ce72ed66ebe5",
+        "lines": [
+          {
+            "line": 17,
+            "text": "   - `journal.py`：请求结构校验（环境、action、budget、changes、布尔排除）、变更记录字段校验（`id`/`component` 非空字符串、`units` 正整数、`depends_on`/`applied` 默认空数组且必须是字符串数组）、重复记录折叠与冲突判定（`conflicting-change`）、`applied` 中未知 ID 判定（`unknown-dependency`）。"
+          }
+        ]
+      },
+      "actualSources": [
+        {
+          "file": "planner.py",
+          "sha256": "e2ce54f917383ca9946130e94ee68fd70cee368f0e369ea1e0b186b27b1cd6b7",
+          "lines": [
+            {
+              "line": 72,
+              "text": "def plan(request):"
+            },
+            {
+              "line": 73,
+              "text": "    if not isinstance(request, dict):"
+            },
+            {
+              "line": 74,
+              "text": "        return failure(\"invalid-request\")"
+            },
+            {
+              "line": 76,
+              "text": "        # Policy runs before the change list so unsupported environments and"
+            },
+            {
+              "line": 77,
+              "text": "        # actions shadow record errors, matching the transport-first ordering."
+            },
+            {
+              "line": 79,
+              "text": "        changes = read_changes(request.get(\"changes\"))"
+            },
+            {
+              "line": 80,
+              "text": "        applied = read_applied(request)"
+            }
+          ]
+        },
+        {
+          "file": "policy.py",
+          "sha256": "3d63b48520cacef3561b3b9fdecf2c98e904797b3f06d49cc30b77237258c7de",
+          "lines": [
+            {
+              "line": 20,
+              "text": "def limit_for(request):"
+            },
+            {
+              "line": 26,
+              "text": "    if not isinstance(environment, str) or environment not in ENVIRONMENTS:"
+            },
+            {
+              "line": 27,
+              "text": "        raise PolicyError(\"invalid-environment\")"
+            },
+            {
+              "line": 29,
+              "text": "    if not isinstance(action, str) or action not in ACTIONS:"
+            },
+            {
+              "line": 30,
+              "text": "        raise PolicyError(\"unsupported-action\")"
+            },
+            {
+              "line": 33,
+              "text": "    if type(budget) is not int or budget < 0:"
+            },
+            {
+              "line": 34,
+              "text": "        raise PolicyError(\"invalid-budget\")"
+            }
+          ]
+        },
+        {
+          "file": "journal.py",
+          "sha256": "550d164a9341e3d2361f46685fee6cdbc233c2555e8355dc3e19bb4c472d26ba",
+          "lines": [
+            {
+              "line": 43,
+              "text": "def read_changes(records):"
+            },
+            {
+              "line": 50,
+              "text": "    \"\"\""
+            },
+            {
+              "line": 53,
+              "text": "    changes = []"
+            },
+            {
+              "line": 77,
+              "text": "    return changes"
+            },
+            {
+              "line": 80,
+              "text": "def read_applied(request):"
+            }
+          ]
+        }
+      ],
+      "independentFinding": "Architecture credits journal with environment, action, and budget validation. Planner delegates those checks to policy before journal sees change or applied records.",
+      "firstReview": {
+        "sha256": "491e011c28e8fb833d9d38061b2f33dd529e0b1b6664789be2b4948827f92dfb",
+        "decision": "accept",
+        "status": "pass",
+        "block": {
+          "id": "p-a56ff16931bc231f7a-1",
+          "sha256": "79f303aa0730d1e89dbc51c30efbe2662eb64d57e86aec801a96df36639ae068",
+          "status": "consistent",
+          "facts": [
+            "nonobject-request"
+          ],
+          "source": {
+            "file": "modules/architecture.md",
+            "start": 17,
+            "end": 17,
+            "sha256": "7ddb0824dd71c7c09ff281ea090bb69fb163926fa5fdd3b46114ce72ed66ebe5"
+          },
+          "basis": "计划步骤：journal 负责的校验、折叠与 applied 读取均已实现（read_changes/read_applied）。",
+          "proof": [
+            {
+              "id": "nonobject-request",
+              "clause": {
+                "file": "SPEC.md",
+                "start": 5,
+                "end": 5,
+                "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d"
+              },
+              "decision": {
+                "file": "planner.py",
+                "start": 74,
+                "end": 74,
+                "sha256": "e2ce54f917383ca9946130e94ee68fd70cee368f0e369ea1e0b186b27b1cd6b7"
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "file": "journal.py",
+              "start": 43,
+              "end": 77,
+              "sha256": "550d164a9341e3d2361f46685fee6cdbc233c2555e8355dc3e19bb4c472d26ba"
+            }
+          ]
+        },
+        "sectionFactRows": [
+          {
+            "section": "s1",
+            "id": "nonobject-request",
+            "blocks": [
+              "p-a56ff16931bc231f7a-1"
+            ]
+          },
+          {
+            "section": "s2",
+            "id": "nonobject-request",
+            "blocks": []
+          },
+          {
+            "section": "s3",
+            "id": "nonobject-request",
+            "blocks": []
+          }
+        ]
+      },
+      "independentAudit": {
+        "receiptSha256": "491e011c28e8fb833d9d38061b2f33dd529e0b1b6664789be2b4948827f92dfb",
+        "decision": "accept",
+        "status": "pass",
+        "block": {
+          "id": "p-a56ff16931bc231f7a-1",
+          "sha256": "79f303aa0730d1e89dbc51c30efbe2662eb64d57e86aec801a96df36639ae068",
+          "status": "consistent",
+          "facts": [
+            "nonobject-request"
+          ],
+          "source": {
+            "file": "modules/architecture.md",
+            "start": 17,
+            "end": 17,
+            "sha256": "7ddb0824dd71c7c09ff281ea090bb69fb163926fa5fdd3b46114ce72ed66ebe5"
+          },
+          "basis": "journal 职责描述与实际实现一致：结构校验、布尔排除、折叠与冲突、applied 未知 ID。",
+          "proof": [
+            {
+              "id": "nonobject-request",
+              "clause": {
+                "file": "SPEC.md",
+                "start": 5,
+                "end": 5,
+                "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d"
+              },
+              "decision": {
+                "file": "planner.py",
+                "start": 74,
+                "end": 74,
+                "sha256": "e2ce54f917383ca9946130e94ee68fd70cee368f0e369ea1e0b186b27b1cd6b7"
+              }
+            }
+          ]
+        },
+        "findings": []
+      }
+    },
+    {
+      "run": "r-zA6W9m",
+      "stage": "g1",
+      "claim": {
+        "file": "architecture.md",
+        "sha256": "21a108150c35be3e25ce08a1a3036e0579e48b7c2b499dffac9e52b06a4d0fde",
+        "lines": [
+          {
+            "line": 17,
+            "text": "1. **transport（release.py）**：只做 stdin 读取与 JSON 往返。空输入或解析失败返回 `invalid-json`；顶层不是对象返回 `invalid-request`；结果序列化为单个 JSON 对象写到 stdout；所有业务错误也以正常退出码返回。请求对象的非对象形态（含数组、null、标量）在此处拦截，对应 [请求对象判定](#bl-fact-nonobject-request)。"
+          }
+        ]
+      },
+      "actualSources": [
+        {
+          "file": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+          "lines": [
+            {
+              "line": 8,
+              "text": "def main():"
+            },
+            {
+              "line": 10,
+              "text": "        request = json.load(sys.stdin)"
+            },
+            {
+              "line": 11,
+              "text": "    except (ValueError, TypeError):"
+            },
+            {
+              "line": 12,
+              "text": "        result = {\"status\": \"error\", \"error\": \"invalid-json\", \"actions\": [], \"units\": 0}"
+            },
+            {
+              "line": 13,
+              "text": "    else:"
+            },
+            {
+              "line": 14,
+              "text": "        result = plan(request)"
+            },
+            {
+              "line": 15,
+              "text": "    print(json.dumps(result, separators=(\",\", \":\")))"
+            }
+          ]
+        },
+        {
+          "file": "planner.py",
+          "sha256": "bea096d37399b24a810f52c7553ca9f5abab6be2a97ea7a645a7725c85880f9c",
+          "lines": [
+            {
+              "line": 58,
+              "text": "def plan(request):"
+            },
+            {
+              "line": 59,
+              "text": "    if not isinstance(request, dict):"
+            },
+            {
+              "line": 60,
+              "text": "        # Checked before any field access: arrays/null/scalars have no .get."
+            },
+            {
+              "line": 61,
+              "text": "        return failure(\"invalid-request\")"
+            }
+          ]
+        }
+      ],
+      "independentFinding": "The ordinary paragraph says release intercepts non-object requests and links the registered fact. It forwards any successful decode. The decision is planner.py:61.",
+      "firstReview": {
+        "sha256": "37c8e1892441bdf014201dd2721fb40deb1744feba835273f074f5601167877a",
+        "decision": "pending-audit",
+        "status": "pass",
+        "block": {
+          "id": "p-3624e51f2273652d43-1",
+          "sha256": "ef50f7b4124487440172ea22b2d8d93338c04421397c80df7d65f790e118b588",
+          "status": "consistent",
+          "facts": [
+            "nonobject-request"
+          ],
+          "source": {
+            "file": "modules/architecture.md",
+            "start": 17,
+            "end": 17,
+            "sha256": "21a108150c35be3e25ce08a1a3036e0579e48b7c2b499dffac9e52b06a4d0fde"
+          },
+          "basis": "release.py 只做 stdin/JSON 往返与错误信封；非对象请求在 planner 拦截返回 invalid-request，实测 null 顶层匹配。",
+          "proof": [
+            {
+              "id": "nonobject-request",
+              "clause": {
+                "file": "SPEC.md",
+                "start": 5,
+                "end": 5,
+                "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d"
+              },
+              "decision": {
+                "file": "planner.py",
+                "start": 61,
+                "end": 61,
+                "sha256": "bea096d37399b24a810f52c7553ca9f5abab6be2a97ea7a645a7725c85880f9c"
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "file": "release.py",
+              "start": 8,
+              "end": 15,
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            },
+            {
+              "file": "planner.py",
+              "start": 59,
+              "end": 61,
+              "sha256": "bea096d37399b24a810f52c7553ca9f5abab6be2a97ea7a645a7725c85880f9c"
+            }
+          ]
+        },
+        "sectionFactRows": [
+          {
+            "section": "s1",
+            "id": "nonobject-request",
+            "blocks": [
+              "p-3624e51f2273652d43-1"
+            ]
+          },
+          {
+            "section": "s2",
+            "id": "nonobject-request",
+            "blocks": []
+          },
+          {
+            "section": "s3",
+            "id": "nonobject-request",
+            "blocks": []
+          }
+        ]
+      },
+      "independentAudit": {
+        "receiptSha256": "14bb69719c7e4ad6f8c31b7d3e64137d980274ec741276778d76f8f21f9acef9",
+        "decision": "reject",
+        "status": "revise",
+        "block": {
+          "id": "p-3624e51f2273652d43-1",
+          "sha256": "ef50f7b4124487440172ea22b2d8d93338c04421397c80df7d65f790e118b588",
+          "status": "contradiction",
+          "facts": [
+            "nonobject-request"
+          ],
+          "source": {
+            "file": "modules/architecture.md",
+            "start": 17,
+            "end": 17,
+            "sha256": "21a108150c35be3e25ce08a1a3036e0579e48b7c2b499dffac9e52b06a4d0fde"
+          },
+          "basis": "实际非对象请求由 planner 兜住，release 没有此判定；但与职责非object-request的反面判断一致。",
+          "line": 17,
+          "proof": [
+            {
+              "id": "nonobject-request",
+              "clause": {
+                "file": "SPEC.md",
+                "start": 5,
+                "end": 5,
+                "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d"
+              },
+              "decision": {
+                "file": "planner.py",
+                "start": 61,
+                "end": 61,
+                "sha256": "bea096d37399b24a810f52c7553ca9f5abab6be2a97ea7a645a7725c85880f9c"
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "file": "release.py",
+              "start": 8,
+              "end": 14,
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            },
+            {
+              "file": "planner.py",
+              "start": 59,
+              "end": 61,
+              "sha256": "bea096d37399b24a810f52c7553ca9f5abab6be2a97ea7a645a7725c85880f9c"
+            }
+          ]
+        },
+        "findings": [
+          {
+            "id": "p-3624e51f2273652d43-1",
+            "section": "s1",
+            "heading": "实施顺序",
+            "line": 17,
+            "status": "contradiction",
+            "facts": [
+              "nonobject-request"
+            ]
+          },
+          {
+            "id": "p-dc4426f5da01dbd87f-1",
+            "section": "s2",
+            "heading": "回退顺序",
+            "line": 28,
+            "status": "contradiction",
+            "facts": []
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -102,7 +102,7 @@ test("signed rollback runs off-worktree and returns a failed proposal to the sam
     const { codeTask } = await harness.flow(executor, "prepare");
     const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
     save(file, { ...challenge, runId: "signed-rollback-candidate", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
-    const proposal = (actor, newText) => harness.invoke(actor, "building_loop", { action: "rollback-proposal", rollbackEdits: [{
+    const proposal = (actor, newText) => harness.invoke(actor, "building_loop", { action: "rollback-proposal", note: "Explain the scoped rollback", rollbackEdits: [{
       file: candidate, replacements: [{ oldText: "return min(value, 5)", newText }],
     }] });
     await assert.rejects(proposal("root", "return value"), /执行方/u);
@@ -125,6 +125,9 @@ test("signed rollback runs off-worktree and returns a failed proposal to the sam
     await assert.rejects(harness.file(executor, "write", candidate, { content: "", note: "Attempt source edit" }), /白名单/u);
     await assert.rejects(harness.flow(executor, "submit"), /只读阶段/u);
     await assert.rejects(proposal(executor, "return min(value, 4)"), /修改失败提议/u);
+    await assert.rejects(harness.invoke(executor, "building_loop", { action: "rollback-proposal", rollbackEdits: [{
+      file: candidate, replacements: [{ oldText: "value, 5)", newText: "value, 4)" }],
+    }] }), /修改失败提议/u);
     const corrected = await proposal(executor, "return value");
     assert.equal(corrected.phase, "architecture-sync");
     await setPlan(reference(corrected));
@@ -594,6 +597,12 @@ test("architecture locates grouped guards, a literal rejection decision, and a w
   ]);
   assert.ok(problems[2].actual.some(row => row.file === "rules.py" && row.line === 5 && row.code === "invalid-owner"));
   assert.deepEqual(problems[3].actual, [{ file: "calculation.py", line: 5, symbol: "compute", code: "over-quota" }]);
+  const ownership = ["- `data.py`：请求结构校验（请求形态、quantity、owner、布尔排除）。",
+    "- `rules.py`：请求结构校验（请求形态、quantity、owner、布尔排除）。",
+    "- `data.py`：委托规则模块校验（quantity、owner）。",
+    "- `data.py`：计划校验（quantity、owner）。"].join("\n");
+  assert.deepEqual(inspectArchitectureProse(ownership, graph).map(({ line, field }) => [line, field]),
+    [[1, "quantity"], [1, "owner"]]);
   write("entry.py", sources["entry.py"].replace("request = codec.load(stream)", "codec = stream\n    request = codec.load(stream)"));
   const rebound = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file,
     sha256: digest(fs.readFileSync(path.join(root, file))) })), { responsibilities: true });

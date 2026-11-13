@@ -1,8 +1,10 @@
 import { goalSnapshot } from "./goals.mjs";
 import { inspectArchitectureImports } from "./code-review.mjs";
 import { architectureResponsibilitiesCurrent, responsibilityClause } from "./architecture-responsibilities.mjs";
+import { linkedResponsibilityConflicts } from "./architecture-prose-coverage.mjs";
 import { prepareRollbackRehearsal, rollbackRehearsalCurrent } from "./architecture-rollback.mjs";
 import { requireCodeRegressionCurrent } from "./code-intake.mjs";
+import { inputContractCases } from "./input-contracts.mjs";
 import { digest, includes, keyOf, readBytes, replaceWithHistory, text } from "./policy.mjs";
 import { architectureDocument, architectureProseLines, generatedArchitectureSection } from "./project-hierarchy.mjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
@@ -21,7 +23,8 @@ const implementation = /^(?:(?:当前|实际|负责|直接)\s*)*(?:定义|实现
 const delegated = /(?:通过|经由|间接|委托|delegat\w*|indirectly|\bvia\b)/iu;
 const ownershipNotCurrent = /(?:计划|拟由|拟将|将来|后续|未来|改为|待改|迁移至|移交给|以前|此前|旧版|历史上|示例|反例|误写|尚未|不再|并不(?:负责|实际|直接)|\b(?:formerly|previously|planned|instead|future|would|will|should|example|no longer|used to)\b)/iu;
 const inlineLabel = /\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/gu;
-const groupGuard = /(?:校验|验证|检查|\bvalidates?\b|\bchecks?\b)\s*[（(]\s*(\x60[\p{ID_Start}_][\p{ID_Continue}_-]*\x60(?:\s*[/、,，]\s*\x60[\p{ID_Start}_][\p{ID_Continue}_-]*\x60){1,7})\s*(?:(?:各自)?(?:字段|类型(?:面|检查)?))?[）)]/iu;
+const groupGuard = /(?:校验|验证|检查|\bvalidates?\b|\bchecks?\b)\s*[（(]\s*([^（()）]{1,160})[）)]/giu;
+const guardField = /^(?:\x60([a-z_][a-z0-9_-]*)\x60|([a-z_][a-z0-9_-]*))(?:\s*(?:各自)?(?:字段|类型(?:面|检查)?))?$/iu;
 const rejectionDecision = /(?:做|作|给出|执行)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*(?:判定|判断)|\b(?:decides?|determines?)\s+\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const conditionalRejection = /(?:超出|超过|不符(?:合)?|失败|缺失|无效|畸形|否则|对照)[^，,。！？；;\x60]{0,16}(?:给出|返回|抛出|报出)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const shapeRejection = /^(?:(?:当前|实际|负责|直接)\s*)*(?:校验|验证|检查)\s*[\p{L}\p{N}_ -]{1,24}(?:形态|形状|结构|格式|类型)\s*[（(]\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*[）)]/iu;
@@ -183,12 +186,21 @@ function sourceResponsibilityConflicts(claim, line, from, locate, graph) {
   const hasIdentifier = (file, identifier) => graph.sourceIdentifiers?.find(row => row.file === file)?.identifiers.includes(identifier);
   const hasRejection = (file, code) => graph.localRejections?.some(row => row.file === file && row.codes.includes(code));
   if (uncertain(from)) return result;
-  const group = groupGuard.exec(claim)?.[1];
-  if (group && !delegated.test(claim)) {
-    for (const [, field] of group.matchAll(inlineLabel)) {
-      const guards = graph.validation?.filter(row => row.field === field) ?? [];
-      if (!hasIdentifier(from, field) && isUnique(guards) && guards.every(row => row.file !== from) && guards.some(row => row.code)) {
-        result.push({ line, from, relation: "validation", field, actual: guards });
+  if (!delegated.test(claim)) {
+    for (const [, group] of claim.matchAll(groupGuard)) {
+      // Match exact source identifiers in a bounded enumeration. Other list
+      // entries can be prose, so do not infer translations or alternate names.
+      const entries = group.split(/[/、,，]/u);
+      if (entries.length < 2 || entries.length > 8) continue;
+      const fields = new Set(entries.flatMap(entry => {
+        const match = guardField.exec(entry.trim());
+        return match ? [match[1] ?? match[2]] : [];
+      }));
+      for (const field of fields) {
+        const guards = graph.validation?.filter(row => row.field === field) ?? [];
+        if (!hasIdentifier(from, field) && isUnique(guards) && guards.every(row => row.file !== from) && guards.some(row => row.code)) {
+          result.push({ line, from, relation: "validation", field, actual: guards });
+        }
       }
     }
   }
@@ -305,11 +317,15 @@ export function inspectArchitectureProse(source, graph) {
 /** Signed bytes supersede the planning-time graph. The coordinator receives
  * only registered module names and line positions, never source contents. */
 export function inspectEngineeringArchitectureClaims(frame, spec, active, graph) {
-  if (!spec.architecture?.importsHeading || !active?.codeIntake?.qualification) return { conflicts: [], calls: [] };
-  const current = graph ?? inspectArchitectureImports(frame, spec, active);
+  const qualification = active?.codeIntake?.qualification;
+  if (!qualification || !(spec.architecture?.importsHeading || spec.architecture?.proseReview)) return { conflicts: [], calls: [] };
+  const current = spec.architecture.importsHeading ? graph ?? inspectArchitectureImports(frame, spec, active) : undefined;
   const source = readBytes(frame.root, spec.architecture.file);
-  if (!source || digest(source) !== current.sha256) throw new Error("检查架构调用关系时架构稿已变化");
-  return { conflicts: inspectArchitectureProse(source.toString("utf8"), current.graph), calls: current.graph.calls };
+  if (!source || current && digest(source) !== current.sha256) throw new Error("检查架构调用关系时架构稿已变化");
+  const prose = source.toString("utf8");
+  const linked = spec.architecture.proseReview && architectureResponsibilitiesCurrent(frame, spec, qualification,
+    digest(JSON.stringify(qualification.artifacts))) ? linkedResponsibilityConflicts(prose, qualification.architectureResponsibilities.rows) : [];
+  return { conflicts: [...linked, ...(current ? inspectArchitectureProse(prose, current.graph) : [])], calls: current?.graph.calls ?? [] };
 }
 
 /** Preserve a small metadata-only view of explicitly registered files. A
@@ -386,7 +402,12 @@ export function engineeringArchitectureSourceFacts(frame, unit) {
 }
 
 export function architectureClaimIssues(conflicts) {
-  return conflicts.map(({ line, from, to, relation, actual, field, symbol, code, check, claimedBefore }) => {
+  return conflicts.map(({ line, from, to, relation, actual, field, symbol, code, check, claimedBefore, id }) => {
+    if (relation === "linked-responsibility") {
+      const [decision] = actual;
+      return "架构稿第 " + line + " 行把「" + id + "」的实际判定写在 " + from + "。同版实证在 " + decision.file +
+        " 第 " + decision.line + " 行 " + decision.symbol + "。请按实际角色修改原句。";
+    }
     if (relation === "source-presence") {
       return "架构稿第 " + line + " 行称当前源码缺失。宿主已确认这些登记源码存在：" +
         actual.map(row => row.file).join("、") + "。请按当前项目状态描述。";
@@ -527,7 +548,7 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
         snapshot.rollbackRehearsal, active.codeIntake.regression.artifacts, active.rollbackProposal)) return false;
     }
     if (spec.architecture.responsibilities && !inspectArchitectureResponsibilitiesSection(frame, spec, active).match) return false;
-    if (!spec.architecture.importsHeading) return true;
+    if (!spec.architecture.importsHeading) return !inspectEngineeringArchitectureClaims(frame, spec, active).conflicts.length;
     const imports = inspectArchitectureImports(frame, spec, active);
     return imports.match && !inspectEngineeringArchitectureClaims(frame, spec, active, imports).conflicts.length;
   }
@@ -555,14 +576,21 @@ export function engineeringArchitectureStatus(frame, unit) {
       (spec.architecture.proseReview ? "引用用 [显示文字](#bl-fact-职责编号)。" : "不要另写一份当前判定位置。"),
       responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id) } : {}) };
   if (spec.architecture.rollback) {
-    const { heading, files, restore } = spec.architecture.rollback;
+    const { heading, files, restore, contracts } = spec.architecture.rollback;
     const proposal = active?.rollbackProposal;
+    const signed = active?.codeIntake?.qualification;
     contract.rollback = { heading, files, ...(restore ? { restore: restore.map(({ file }) => file) } : {}),
-      rule: "派单前说明回退意图。候选签名后，回退章节放一个 json building-loop-rollback 围栏。宿主在隔离副本上执行围栏中的回退，再运行维护者登记的回退后检查。",
-      ...(proposal?.binding.policySha256 === frame.policy.hash && proposal?.binding.goalSha256 === goalSnapshot(frame).sha256 &&
-        proposal?.binding.originalArtifactsSha256 === digest(JSON.stringify(active.codeIntake?.qualification?.artifacts ?? [])) ?
-        { proposal: { id: proposal.id, files: proposal.files }, example: { proposal: proposal.id } } :
-        { example: { edits: [{ file: files[0], replacements: [{ oldText: "当前版唯一原文", newText: "回退后原文" }] }] } }) };
+      checks: inputContractCases(contracts).map(({ id, expected, requirement }) => ({ id, expected, requirement })) };
+    if (!signed) {
+      contract.rollback.rule = "派单前本节只写要恢复与保留的行为。执行方签名送审后，宿主会给出可引用的实跑提议和准确围栏。";
+    } else if (proposal?.binding.policySha256 === frame.policy.hash && proposal.binding.goalSha256 === goalSnapshot(frame).sha256 &&
+      proposal.binding.originalArtifactsSha256 === digest(JSON.stringify(signed.artifacts))) {
+      contract.rollback.rule = "核对提议对应的回退意图，将给出的围栏加入当前回退章节，再用 architecture 实跑。";
+      contract.rollback.proposal = { id: proposal.id, files: proposal.files };
+      contract.rollback.fence = "```json building-loop-rollback\n" + JSON.stringify({ proposal: proposal.id }) + "\n```";
+    } else {
+      contract.rollback.rule = "检查当前回退章节的已授权实跑步骤，再用 architecture 在隔离副本上演练。";
+    }
   }
   if (active?.phase === "architecture-repair") {
     return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };

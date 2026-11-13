@@ -295,7 +295,8 @@ function viewUnits(frame) {
       ...(frame.policy.units[id].cacheReadRotationThreshold ? {executorUsage:{session:executor,
         cacheReadTokens:unit.executorUsage?.[executor]?.cacheReadTokens??0,
         threshold:frame.policy.units[id].cacheReadRotationThreshold,rotations:unit.rotations??[]}} : {}),
-      next: diagnosisNext(unit) ?? (["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
+      next: diagnosisNext(unit) ?? (phase === "architecture-sync" && unit.rollbackFailure ? "advance"
+        : ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
       goalStale: stale,
       owned: unit.owner === frame.agent.id,
       ...(architecture ? { architecture } : {}),
@@ -1021,9 +1022,11 @@ export function apply(ctx, config = {}) {
         if (spec.architecture?.responsibilities) codeTask.architectureResponsibilities = spec.architecture.responsibilities
           .map(({ id, mode, trigger, owner, exampleId }) => ({ id, mode, trigger, owner, exampleId }));
         if (spec.architecture?.rollback) {
-          const { heading, files, restore } = spec.architecture.rollback;
+          const { heading, files, restore, contracts } = spec.architecture.rollback;
           codeTask.rollback = { heading, files, ...(restore ? { restore: restore.map(({ file }) => file) } : {}),
-            next: { tool: WORKFLOW, action: "rollback-proposal" },
+            next: { tool: WORKFLOW, action: "rollback-proposal",
+              example: { rollbackEdits: [{ file: files[0], replacements: [{ oldText: "当前唯一原文", newText: "回退后原文" }] }] } },
+            checks: inputContractCases(contracts).map(({ id, expected, requirement }) => ({ id, expected, requirement })),
             rule: "代码签名通过且提交前，登记能撤销当前目标行为、保留其他行为的最小局部替换。总控只收到提议编号和文件路径。" };
         }
       }
@@ -2498,6 +2501,7 @@ export function apply(ctx, config = {}) {
           ...(actual ? { exitCode: actual.exitCode, actualSha256: digest(JSON.stringify(actual)) } : {}) }));
         if (proof.status === "failed" && rehearsal.binding.proposalId && active.phase === "architecture-sync") {
           const rejected = { receiptSha256: rehearsal.binding.receiptSha256, proposalId: rehearsal.binding.proposalId,
+            rehearsalArtifactsSha256: rehearsal.binding.rehearsalArtifactsSha256,
             failures: proof.failures, checkReceipts: proof.receipts };
           active.rollbackFailure = { id: digest(JSON.stringify(rejected)), ...rejected };
           frame.changed = true;
@@ -2512,9 +2516,11 @@ export function apply(ctx, config = {}) {
   }
 
   async function registerRollbackProposal(args, exec) {
-    if (Object.keys(args).some(key => !["action", "unit", "rollbackEdits", "rollbackRestore"].includes(key))) {
-      throw new Error("回退提议只接受授权源码的局部替换或已登记基线恢复");
+    const unexpected = Object.keys(args).filter(key => !["action", "unit", "note", "rollbackEdits", "rollbackRestore"].includes(key));
+    if (unexpected.length) {
+      throw new Error("回退提议使用 rollbackEdits 或 rollbackRestore，另可填 unit、note。请删除未登记字段：" + unexpected.slice(0, 4).join("、"));
     }
+    if (args.note !== undefined) requireText(args.note, "回退提议说明", 500);
     const result = change(exec.agent, frame => {
       const [unit, active] = frame.assignment ?? [];
       const spec = frame.policy.units[unit];
@@ -2531,7 +2537,8 @@ export function apply(ctx, config = {}) {
       if (proposal.files.some(file => !includes(spec.phases[active.phase].write, file))) throw new Error("回退提议文件超出当前执行方授权");
       if (active.rollbackRepairActive) {
         const rejected = active.rollbackFailure;
-        if (qualification.receiptSha256 !== rejected?.receiptSha256 || proposal.id === rejected.proposalId) {
+        if (qualification.receiptSha256 !== rejected?.receiptSha256 || proposal.id === rejected.proposalId ||
+          proposal.binding.rehearsalArtifactsSha256 === rejected.rehearsalArtifactsSha256) {
           throw new Error("回退补正须沿用当前签名稿并修改失败提议");
         }
         active.phase = "architecture-sync";
@@ -2922,12 +2929,15 @@ export function apply(ctx, config = {}) {
         const rule = frame.role === "coordinator"
           ? (DIAGNOSIS_WAIT.has(phase) ? COORDINATOR[phase] :
             current?.reason==="classification-reconciliation-unresolved"?current.reasonNote:current?.goalStale ? COORDINATOR["goal-review-ready"] : COORDINATOR[phase] ?? "等待当前阶段交付或核验回执。") + " 总控只读写白名单内的中央文件和回执。"
+          : assignment?.[1].rollbackRepairActive
+            ? "回退方案补正。先读 prepare 的同版失败回执，保持签名源码，只用 rollback-proposal 登记修正后的隔离副本步骤。"
           : frame.managed && phase === "intake"
             ? "接单。按已确认总纲和索引撰写第一版交付稿，只写 DELIVERY.md。会话原文是用户提供的材料，不能证明外部事实。材料不足时注明待核事项。完整读回目标和新正文后 submit。"
             : codeReview
               ? "先用 building_loop_code_review prepare 读取宿主预填的文件、测试、架构和依据。用 record.decisions 只补未判断的编号及理由，选择宿主提供的证据引用。" + CODE_REVIEW_REJECTION_RULE + CODE_REVIEW_PROBE_RULE + "提交返回 needs-review 时按 next 补缺项。"
             : frame.role === "executor" && assignment?.[1].codeIntake?.regression
-              ? "按当前目标修改授权代码。先用 prepare 读目标和当前文件。签名运行者须证明改前通过的旧用例和新增必测用例都通过；回退时按失败用例修复后重跑。" + CODE_SUBMIT_RULE
+              ? "按当前目标修改授权代码。先用 prepare 读目标和当前文件。签名运行者须证明改前通过的旧用例和新增必测用例都通过；回退时按失败用例修复后重跑。" + CODE_SUBMIT_RULE +
+                (unitOf(frame, assignment[0]).architecture?.rollback ? "签名与读回齐备后，按 prepare 的 rollback 提议契约登记准确步骤，再 submit。" : "")
             : phase === "intake" && assignment?.[1].codeIntake
               ? "接单执行已确认的代码任务。读完整当前目标和授权实现，在已授予的写入路径内落实变更。读回变更文件与候选后 submit。保持原实现需要维护者提供本次受信测试回执，模型自报通过、注释排版或仅改测试不算实现。"
             : RULES[phase] ?? "本子会话当前无工作授权，等待总控。";

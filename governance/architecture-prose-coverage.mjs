@@ -12,6 +12,14 @@ const factAnchor = "#bl-fact-";
 const MAX_BLOCKS = 128;
 const MAX_FACTS = 8;
 const MAX_SOURCE_BYTES = 256 * 1024;
+const sourceName = String.raw`(?:[\p{L}\p{N}_.-]+/)*[\p{L}\p{N}_.-]+\.py`;
+const roleTitle = new RegExp(String.raw`^(?:(${sourceName})|[^()（）:：\n]{1,80}[（(](${sourceName})[）)])$`, "u");
+const bareRole = new RegExp(String.raw`^(${sourceName})\s*[:：]`, "u");
+const clauseBreak = /[。！？!?；;]|\.(?=\s|$)/u;
+const nonCurrent = /(?:计划|拟由|拟将|将来|未来|待改|建议|如果|假设|示例|举例|例如|比如|反例|原先|旧版|历史|误写|不在此|并非|不由本|不负责|不(?:会)?(?:拦截|拒绝|校验|判定)|可能|回退|兜底|透传|转发|下游|经由|间接|委托|\b(?:plans?|planned|proposals?|examples?|formerly|previously|instead|would|will|should|might|could|if|never|not|fallback|pass[- ]?through|forward\w*|delegat\w*|via)\b)/iu;
+const nonCurrentHeading = /(?:计划|规划示例|举例|示例|反例|草案|提案|\b(?:plans?|planned|examples?|proposals?|draft)\b)/iu;
+const localDecision = /(?:(?:在此(?:处)?|由(?:该|本|此)(?:模块|文件|层))\s*(?:直接)?\s*(?:拦截|拒绝|校验|判定)(?:该(?:请求|输入))?\s*[，,]\s*(?:对应|详见|参见)|(?:\b(?:rejected|validated|decided)\s+here|\bthis\s+(?:module|file|layer)\s+(?:rejects|validates|decides)\s+(?:it|the\s+(?:request|input)))\s*,\s*(?:per|see|as\s+specified\s+by))\s*$/iu;
+const emission = /(?:返回|抛出|给出|\b(?:returns?|raises?|emits?))\s*$/iu;
 
 function headingTitle(node) {
   const leaves = [...node.children];
@@ -37,14 +45,16 @@ function references(node) {
 
 function authoredRows(tree, visibleParagraphs, rootHeadings) {
   const rows = [];
-  let heading;
+  const ancestors = [];
   const pending = tree.children.map(node => ({ node, item: false })).reverse();
   while (pending.length) {
     const { node, item } = pending.pop();
     if (ignored.has(node.type)) continue;
     const line = node.position.start.line;
     if (node.type === "heading" && rootHeadings.has(line)) {
-      heading = rootHeadings.get(line);
+      const heading = rootHeadings.get(line);
+      while (ancestors.length && ancestors.at(-1).depth >= heading.depth) ancestors.pop();
+      ancestors.push(heading);
       // Registered headings have owner-specified labels and identify sections.
       // An added visible subheading can itself make an assertion.
       rows.push({ node, kind: "heading", heading });
@@ -53,7 +63,8 @@ function authoredRows(tree, visibleParagraphs, rootHeadings) {
     if (node.type === "paragraph") {
       const { start, end } = node.position;
       if (visibleParagraphs.has(start.offset + ":" + end.offset)) {
-        rows.push({ node, kind: item ? "list-item" : "paragraph", heading });
+        rows.push({ node, kind: item ? "list-item" : "paragraph", heading: ancestors.at(-1),
+          nonCurrentContext: ancestors.some(item => nonCurrentHeading.test(item.title)) });
       }
       continue;
     }
@@ -64,24 +75,90 @@ function authoredRows(tree, visibleParagraphs, rootHeadings) {
   return rows;
 }
 
-/** Keep author prose separate from protected host sections without parsing
- * claims. Visible paragraphs and each list item's own paragraph retain exact
- * physical lines. Added headings outside declared sections remain reviewable. */
-export function architectureProseInventory({ source, sections, facts, protectedHeadings = [] }) {
-  if (typeof source !== "string" || Buffer.byteLength(source) > MAX_SOURCE_BYTES || !Array.isArray(sections) ||
-    !Array.isArray(facts) || !facts.length || facts.length > MAX_FACTS ||
-    facts.some(item => typeof item?.id !== "string" || !factId.test(item.id)) ||
-    new Set(facts.map(item => item.id)).size !== facts.length) throw new Error("Invalid architecture coverage inputs");
+function parseAuthoredMarkdown(source) {
   const lines = source.split(/\r\n|\n|\r/u);
   const normalized = lines.join("\n");
   const tree = fromMarkdown(normalized, options);
   const markdown = markdownStructure(lines, { collectParagraphs: true });
   const visibleParagraphs = new Set(markdown.paragraphs.map(({ start, end }) => start.offset + ":" + end.offset));
-  const known = new Map(facts.map(fact => [fact.id, { id: fact.id, sha256: digest(JSON.stringify(fact)),
-    ...(fact.clause ? { clause: fact.clause } : {}), ...((fact.actual ?? fact.decision) ? { decision: fact.actual ?? fact.decision } : {}) }]));
   const rootHeadings = new Map(tree.children.filter(node => node.type === "heading" &&
     markdown.visible[node.position.start.line - 1]?.trim()).map(node =>
     [node.position.start.line, { title: headingTitle(node), depth: node.depth, line: node.position.start.line }]));
+  return { lines, normalized, rootHeadings, rows: authoredRows(tree, visibleParagraphs, rootHeadings) };
+}
+
+function roleFile([first, second]) {
+  if (first?.type === "text") return bareRole.exec(first.value)?.[1];
+  if (!/^(?:strong|inlineCode)$/u.test(first?.type ?? "") || second?.type !== "text" || !/^\s*[:：]/u.test(second.value)) return;
+  const title = roleTitle.exec(first.type === "strong" ? headingTitle(first) : first.value);
+  return title?.[1] ?? title?.[2];
+}
+
+function sameFile(from, file) {
+  return from === file || (!from.includes("/") || !file.includes("/")) && from.split("/").at(-1) === file.split("/").at(-1);
+}
+
+/** A protected link can identify a fact, but can also cite delegated work.
+ * Require a concrete module prefix, a repeated response code and a direct
+ * assertion that this module makes the linked decision. The narrower grammar
+ * leaves plans, examples, fallbacks and indirect descriptions with reviewers. */
+function linkedRowConflicts({ node, kind, nonCurrentContext }, facts) {
+  if (kind === "heading" || nonCurrentContext) return [];
+  const from = roleFile(node.children);
+  if (!from) return [];
+  const conflicts = [];
+  const codes = new Set();
+  let prose = "";
+  for (const child of node.children) {
+    if (child.type === "inlineCode") {
+      const claim = prose.split(clauseBreak).at(-1);
+      if (emission.test(claim) && !nonCurrent.test(claim)) codes.add(child.value);
+      // Inline code is a literal and cannot add planning qualifiers or sentence boundaries.
+      prose += "\u0000";
+    } else if (child.type === "link" && child.url.startsWith(factAnchor)) {
+      const id = child.url.slice(factAnchor.length);
+      const fact = facts.get(id);
+      const decision = fact?.actual ?? fact?.decision;
+      const clauses = prose.split(clauseBreak);
+      const claim = clauses.at(-1);
+      const direct = localDecision.exec(claim);
+      if ((fact?.mode ?? decision?.mode) === "business" && typeof decision?.file === "string" &&
+          Number.isSafeInteger(decision.line) && decision.line > 0 && typeof decision.symbol === "string" &&
+          typeof decision.code === "string" && codes.has(decision.code) && !sameFile(from, decision.file) &&
+          direct && !nonCurrent.test(claim) && !nonCurrentHeading.test(clauses[0])) {
+        const line = child.position.start.line - (direct[0].match(/\n/gu)?.length ?? 0);
+        conflicts.push({ line, from, actual: [{ file: decision.file, line: decision.line, symbol: decision.symbol }],
+          id, relation: "linked-responsibility" });
+      }
+      prose += "\u0000";
+    } else {
+      prose += child.type === "text" ? child.value : headingTitle({ children: [child] });
+    }
+  }
+  return conflicts;
+}
+
+/** Standalone preflight for current host-verified facts, even when architecture
+ * prose receipts or the import graph are disabled. */
+export function linkedResponsibilityConflicts(source, facts) {
+  if (typeof source !== "string" || Buffer.byteLength(source) > MAX_SOURCE_BYTES || !Array.isArray(facts) ||
+      !facts.length || facts.length > MAX_FACTS) return [];
+  const known = new Map(facts.map(fact => [fact.id, fact]));
+  return parseAuthoredMarkdown(source).rows.flatMap(row => linkedRowConflicts(row, known));
+}
+
+/** Keep author prose separate from protected host sections. Visible paragraphs
+ * and each list item's own paragraph retain exact physical lines. Added
+ * headings outside declared sections remain reviewable. */
+export function architectureProseInventory({ source, sections, facts, protectedHeadings = [] }) {
+  if (typeof source !== "string" || Buffer.byteLength(source) > MAX_SOURCE_BYTES || !Array.isArray(sections) ||
+    !Array.isArray(facts) || !facts.length || facts.length > MAX_FACTS ||
+    facts.some(item => typeof item?.id !== "string" || !factId.test(item.id)) ||
+    new Set(facts.map(item => item.id)).size !== facts.length) throw new Error("Invalid architecture coverage inputs");
+  const { lines, normalized, rootHeadings, rows } = parseAuthoredMarkdown(source);
+  const currentFacts = new Map(facts.map(fact => [fact.id, fact]));
+  const known = new Map(facts.map(fact => [fact.id, { id: fact.id, sha256: digest(JSON.stringify(fact)),
+    ...(fact.clause ? { clause: fact.clause } : {}), ...((fact.actual ?? fact.decision) ? { decision: fact.actual ?? fact.decision } : {}) }]));
   const allHeadings = [...rootHeadings.values()];
   const declared = new Map();
   for (const section of sections) {
@@ -107,7 +184,8 @@ export function architectureProseInventory({ source, sections, facts, protectedH
   for (const section of declared.values()) coverageGroup(section.heading, section.start);
   const occurrences = new Map();
   const titleLine = allHeadings[0]?.depth === 1 ? allHeadings[0].line : undefined;
-  for (const { node, kind, heading } of authoredRows(tree, visibleParagraphs, rootHeadings)) {
+  for (const row of rows) {
+    const { node, kind, heading } = row;
     const { start, end } = node.position;
     if (protectedRanges.some(([first, last]) => first <= start.line && last >= start.line)) continue;
     if (kind === "heading" && (declared.has(start.line) || start.line === titleLine)) continue;
@@ -124,6 +202,8 @@ export function architectureProseInventory({ source, sections, facts, protectedH
     const id = "p-" + basis.slice(0, 18) + "-" + occurrence;
     const block = { id, section: group.id, heading: groupHeading, kind, start: start.line, end: end.line, sha256, refs };
     if (refs.some(ref => !known.has(ref))) block.unknownRefs = refs.filter(ref => !known.has(ref));
+    const hostConflicts = linkedRowConflicts(row, currentFacts);
+    if (hostConflicts.length) block.hostConflicts = hostConflicts;
     blocks.push(block);
     group.blocks.push(id);
     if (blocks.length > MAX_BLOCKS) throw new Error("Architecture coverage exceeds its block limit");
@@ -138,8 +218,7 @@ export function architectureProseInventory({ source, sections, facts, protectedH
 }
 
 /** Each reviewer makes their own semantic decisions. The host checks
- * completeness and binding, and associates any contradiction with the
- * current document line and immutable fact IDs. */
+ * completeness, binding and explicit conflicts with protected facts. */
 export function checkArchitectureProseReceipt(inventory, receipt) {
   const invalidBinding = receipt?.binding?.sourceSha256 !== inventory.binding.sourceSha256 ||
     receipt?.binding?.factsSha256 !== inventory.binding.factsSha256;
@@ -150,7 +229,10 @@ export function checkArchitectureProseReceipt(inventory, receipt) {
   if (!Array.isArray(receipt.blocks) || receipt.blocks.length > MAX_BLOCKS || !Array.isArray(receipt.facts) ||
     receipt.facts.length > knownSections.size * facts.size) return { status: "pending", reason: "invalid-prose-coverage-shape" };
   const submitted = new Map();
-  const findings = [];
+  const findings = inventory.blocks.flatMap(block => (block.hostConflicts ?? []).map(hostConflict => ({
+    id: block.id, section: block.section, heading: block.heading, line: hostConflict.line,
+    status: "contradiction", facts: [hostConflict.id], hostConflict,
+  })));
   const errors = [];
   for (const row of receipt.blocks) {
     const block = expected.get(row?.id);
@@ -164,7 +246,9 @@ export function checkArchitectureProseReceipt(inventory, receipt) {
       continue;
     }
     submitted.set(row.id, row);
-    if (["contradiction", "insufficient"].includes(row.status)) {
+    if (["contradiction", "insufficient"].includes(row.status) &&
+        !findings.some(item => item.id === row.id && item.line === row.line && item.status === row.status &&
+          row.facts.length === 1 && item.facts[0] === row.facts[0])) {
       findings.push({ id: row.id, section: block.section, heading: block.heading, line: row.line, status: row.status, facts: row.facts });
     }
   }

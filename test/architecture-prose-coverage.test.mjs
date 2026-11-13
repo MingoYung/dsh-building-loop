@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
-import { architectureProseInventory, checkArchitectureProseReceipt } from "../governance/architecture-prose-coverage.mjs";
+import { architectureProseInventory, checkArchitectureProseReceipt, linkedResponsibilityConflicts } from "../governance/architecture-prose-coverage.mjs";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { authority, digest } from "../governance/policy.mjs";
@@ -104,6 +104,52 @@ test("unrecognized fact links remain visible and block a completed review", () =
   const inventory = build({ source: base.replace("[shape rule](#bl-fact-request-shape)", "[shape rule](#bl-fact-wrong)") });
   assert.deepEqual(inventory.blocks[1].unknownRefs, ["wrong"]);
   assert.equal(checkArchitectureProseReceipt(inventory, reviewed(inventory)).status, "pending");
+});
+
+test("an explicit business fact linked to the wrong local decision overrides a consistent receipt", () => {
+  // This is the authored G1 checkpoint line that the first live reviewer marked consistent.
+  const wrong = "1. **transport（release.py）**：只做 stdin 读取与 JSON 往返。空输入或解析失败返回 `invalid-json`；顶层不是对象返回 `invalid-request`；结果序列化为单个 JSON 对象写到 stdout；所有业务错误也以正常退出码返回。请求对象的非对象形态（含数组、null、标量）在此处拦截，对应 [请求对象判定](#bl-fact-nonobject-request)。";
+  const decision = { file: "planner.py", line: 61, symbol: "plan", mode: "business", code: "invalid-request" };
+  const hostFact = { id: "nonobject-request", mode: "business", actual: decision };
+  const source = "# 发布规划与维护\n\n## 实施顺序\n\n" + wrong;
+  const expected = { line: 5, from: "release.py", actual: [{ file: "planner.py", line: 61, symbol: "plan" }],
+    id: hostFact.id, relation: "linked-responsibility" };
+  assert.deepEqual(linkedResponsibilityConflicts(source, [hostFact]), [expected]);
+  const inventory = architectureProseInventory({ source, sections: [{ heading: "实施顺序", start: 3, end: 5 }], facts: [hostFact] });
+  const [block] = inventory.blocks;
+  assert.deepEqual(block.hostConflicts, [expected]);
+  const checked = checkArchitectureProseReceipt(inventory, reviewed(inventory));
+  assert.equal(checked.status, "revise");
+  assert.deepEqual(checked.findings, [{ id: block.id, section: block.section, heading: "实施顺序", line: 5,
+    status: "contradiction", facts: [hostFact.id], hostConflict: expected }]);
+
+  const controls = [
+    source.replace("transport（release.py）", "planner（planner.py）"),
+    source.replace("在此处拦截，对应", "由下游拦截，本层仅透传，详见"),
+    source.replace("在此处拦截，对应", "在此处兜底，对应"),
+    source.replace("在此处拦截，对应", "计划在此处拦截，对应"),
+    source.replace("在此处拦截，对应", "例如在此处拦截，对应"),
+    source.replace("## 实施顺序", "## 反例\n\n### 实施顺序"),
+    source.replace("`invalid-request`", "`wrong-envelope`"),
+    source.replace("顶层不是对象返回", "旧版入口兜底返回"),
+    source.replace("顶层不是对象返回", "示例使用"),
+    source.replace("\n1. ", "\n> 1. "),
+    source.replace("\n1. ", "\n```md\n1. ") + "\n```",
+  ];
+  for (const control of controls) assert.deepEqual(linkedResponsibilityConflicts(control, [hostFact]), [], control);
+  assert.deepEqual(linkedResponsibilityConflicts(source, [{ ...hostFact, mode: "fallback" }]), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source, [{ ...hostFact, actual: undefined, planned: decision }]), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source, []), []);
+});
+
+test("the same grammar binds an arbitrary response and module to the protected fact's exact source line", () => {
+  const audit = { id: "blocked-action", decision: { mode: "business", file: "core/actions.py", symbol: "authorize", line: 18, code: "action-denied" } };
+  const source = "## Current wiring\n\n- `adapter.py`: Returns `action-denied` on restriction. The request is rejected here, see\n" +
+    "  [action rule](#bl-fact-blocked-action).\n";
+  assert.deepEqual(linkedResponsibilityConflicts(source, [audit]), [{ line: 3, from: "adapter.py",
+    actual: [{ file: "core/actions.py", line: 18, symbol: "authorize" }], id: audit.id, relation: "linked-responsibility" }]);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("`adapter.py`", "`actions.py`"), [audit]), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("rejected here", "forwarded here"), [audit]), []);
 });
 
 test("the real code-review path requires two independent block receipts and routes exact contradictions to the coordinator", () =>
