@@ -51,3 +51,5 @@
 ### 宿主管理回退范围的候选包
 
 `33d62ae0` 版本通过本地 414 项回归和三套 Windows 零模型安装预跑。签名副本演练仍保留 2/4 的旧负例和 4/4 的正例，公开回滚顺序的当前签名正反复现仍使用受信运行器。 [Windows 预跑](observations-0.7.29-locked-preflight.json) · [签名副本](observations-0.7.29-locked-host-rehearsal.json) · [诊断](observations-0.7.29-locked-host-diagnosis.json)
+
+用两个真实冻结稿验证宿主替换错误回退小节。原始签名先逐份核验，源码字节和未涉及正文保留。隔离重放按新授权摘要给原工件和原用例重新签名，真实 Windows 到 WSL 回执各 4/4，伪签名拒绝。`r-h4cllo` 另有一个解码器名错误，宿主先拦住该错项，回放按原位置修正后继续验证回退小节。 [真实冻结稿的安装包正反回放](observations-0.7.29-locked-actual-scope.json)
