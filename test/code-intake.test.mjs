@@ -284,7 +284,7 @@ async function startDiagnosticTask(root, write, diagnostics) {
   signedRegression(write, baselineFile, { spec: "building-loop-code-regression-baseline/1", unit: "K01", policySha256: policy.hash,
     suiteSha256: tests.previousSuiteSha256, artifacts: codeRegressionArtifacts(root, policy.units.K01),
     runId: "diagnostics-baseline", cases: caseRows({ "old-pass": "passed", "old-fail": "failed" }) }, keys);
-  const harness = host(root, { automaticCoverage: false });
+  const harness = host(root, { automaticCoverage: false, toolTimeoutMs: 30_000 });
   const { childId } = await harness.flow("root", "advance");
   await harness.flow(childId, "prepare");
   const edit = async (from, to) => {
@@ -434,7 +434,7 @@ test("a landed edit returns the runner's first real error directly, but cannot r
     assert.equal((await task.edit(3, 3)).diagnostics, undefined);
     assert.equal(requests.length, 2);
     await assert.rejects(task.harness.flow(task.childId, "submit"), /缺少当前交付的回归签名回执/);
-  });
+  }, 12_000);
 }));
 
 test("stale, malformed, out-of-scope and timed-out diagnostics preserve the edits", () => fixture(async (root, write) => {

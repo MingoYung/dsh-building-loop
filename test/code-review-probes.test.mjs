@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compareReviewProbe, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction,
+import { compareReviewProbe, diagnosticRuntimeExpectation, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction,
   saveReviewProbe } from "../governance/code-review-probes.mjs";
 
 const signedFile = "app.py";
@@ -148,4 +148,29 @@ test("output clauses reject branch alternatives, examples and negated assertions
   }
   assert.deepEqual(prepare("The command returns `{\"size\":5}`.").grounding,
     { kind: "clause", version: 2, field: true, exit: false });
+});
+
+test("a named conditional error can be absent in a wrong success reply without proving its trigger", () => {
+  const requirement = { file: "SPEC.md", start: 7, end: 7, visibleClause: true, clauseComplete: true,
+    conditionalContext: true, quote: "新请求与停用区间相交时，由 windows 判定 `window-closed`，它优先于目标预约重叠。" };
+  const args = { expectedExitCode: 0, expectedPointer: "/error", expectedJson: '"window-closed"' };
+  const check = { type: "runtime", requirement, ...diagnosticRuntimeExpectation(args, requirement) };
+  assert.equal(check.grounding.kind, "diagnostic-error-outcome");
+  assert.deepEqual(compareReviewProbe(check, result(0, '{"status":"ok","results":[{}]}')),
+    { outcome: "mismatch", actual: { exitCode: 0, output: "missing-field", responseStatus: "ok" } });
+  assert.deepEqual(compareReviewProbe(check, result(0, '{"status":"error","error":"window-closed"}')),
+    { outcome: "match", actual: { exitCode: 0, json: "window-closed" } });
+  for (const stdout of ['{"status":"error"}', '{"other":"ok"}', '[]', 'null']) {
+    assert.deepEqual(compareReviewProbe(check, result(0, stdout)), { outcome: "unavailable", reason: "missing-unstated-field" });
+  }
+  const invented = { ...args, expectedPointer: "/nested/error" };
+  assert.equal(diagnosticRuntimeExpectation(invented, requirement).grounding, undefined);
+  assert.deepEqual(compareReviewProbe({ ...check, ...diagnosticRuntimeExpectation(invented, requirement), grounding: undefined },
+    result(0, '{"status":"ok"}')), { outcome: "unavailable", reason: "missing-unstated-field" });
+  assert.equal(diagnosticRuntimeExpectation(args, { ...requirement,
+    quote: "输入不得返回 `window-closed`。" }).grounding, undefined);
+  const { frame, active } = fixture();
+  const saved = saveReviewProbe(frame, active, "current", "conditional-error", { ...check, input: { recipe: "app-json" } },
+    result(0, '{"status":"ok"}'));
+  assert.equal(saved.blocking, false, "diagnostic comparator does not make an unverified trigger a review finding");
 });

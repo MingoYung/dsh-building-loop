@@ -1,7 +1,8 @@
 import { goalSnapshot } from "./goals.mjs";
 import { inspectArchitectureImports } from "./code-review.mjs";
 import { architectureResponsibilitiesCurrent, responsibilityClause } from "./architecture-responsibilities.mjs";
-import { linkedResponsibilityConflicts } from "./architecture-prose-coverage.mjs";
+import { architectureBrokenFactLinks, architectureHeadingSpans, architectureLineOffsets, architectureLinkReplacementOnly,
+  linkedResponsibilityConflicts } from "./architecture-prose-coverage.mjs";
 import { prepareRollbackRehearsal, rollbackRehearsalCurrent, rollbackScopeBody } from "./architecture-rollback.mjs";
 import { requireCodeRegressionCurrent } from "./code-intake.mjs";
 import { inputContractCases } from "./input-contracts.mjs";
@@ -359,6 +360,12 @@ function inspectLockedRollbackScope(frame, spec, active, proposed) {
       (section.bodyEnd < section.source.length ? eol + eol : eol) + section.source.slice(section.bodyEnd) };
 }
 
+function generatedArchitectureHeadings(architecture, active) {
+  const { importsHeading, responsibilitiesHeading, rollback } = architecture;
+  return [importsHeading, responsibilitiesHeading,
+    rollback?.lockedScope && active?.codeIntake?.qualification && active.rollbackProposal && rollback.heading].filter(Boolean);
+}
+
 /** Generate a separate factual section; plans and historical claims stay in
  * normal review sections. Do not transfer raw source or trace events. */
 export function inspectArchitectureResponsibilitiesSection(frame, spec, active, proposed) {
@@ -464,6 +471,27 @@ export function architectureClaimIssues(conflicts) {
       "。请按实际路径改写，间接关系写清中间模块。";
   });
 }
+/** Resolve broken references against the responsibility IDs authorized for this unit. */
+export function engineeringArchitectureLinkIssues(frame, spec, source, active) {
+  const architecture = spec?.architecture;
+  if (!architecture?.proseReview) return [];
+  if (source === undefined) {
+    const bytes = readBytes(frame.root, architecture.file);
+    if (!bytes) return [];
+    source = text(bytes);
+  }
+  return architectureBrokenFactLinks(source, architecture.responsibilities.map(({ id }) => id), {
+    protectedHeadings: generatedArchitectureHeadings(architecture, active),
+    authoredHeadings: architecture.headings,
+  });
+}
+
+/** A broken link outside a unique authored section has a line-scoped splice. */
+export function architectureLinkRepairAction(file, issue) {
+  return { action: "edit", path: file, ...(issue.lineScoped ? {} : { heading: issue.heading }),
+    required: ["beforeSha256", "note", "edits"], lines: issue.editLines ?? [issue.line, issue.end] };
+}
+
 /** A plan is published by the coordinator under the same lock as dispatch. */
 export function registerEngineeringArchitecture(frame, unit, spec, tag, rollbackProof) {
   const active = frame.state.units[unit];
@@ -478,8 +506,15 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   // stale draft fence cannot prevent replacing it with the current proposal.
   const bytes = readBytes(frame.root, spec.architecture.file);
   const source = bytes && text(bytes);
+  const linkIssues = source ? engineeringArchitectureLinkIssues(frame, spec, source, active) : [];
+  if (linkIssues.length) {
+    return { unit, phase: active?.phase ?? "dispatch", status: "architecture-broken-links", issues: linkIssues,
+      responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id), next: { action: "architecture", unit } };
+  }
+  const linkResume = active?.phase === "architecture-repair" && active.architectureLinkResume;
+  const resumeExecution = linkResume && ["intake", "supplement"].includes(linkResume.phase);
   const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
-    active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase);
+    active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase) || resumeExecution;
   const locked = source && !pendingCodeRepair && inspectLockedRollbackScope(frame, spec, active, source);
   const draftSpec = locked && !locked.match ? { ...spec.architecture, rollback: undefined } : spec.architecture;
   let plan = architectureDocument(frame, draftSpec, diagnostics);
@@ -488,7 +523,7 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   if (previous?.goalSha256 !== goal.sha256 && previous?.contentsSha256 === plan.contentsSha256) {
     throw new Error("目标已变化，请把受影响的架构、回退与验证计划实际更新到 " + plan.file);
   }
-  if (active?.phase === "architecture-repair" && active.engineeringArchitecture?.contentsSha256 === plan.contentsSha256) {
+  if (active?.phase === "architecture-repair" && !linkResume && active.engineeringArchitecture?.contentsSha256 === plan.contentsSha256) {
     throw new Error("架构已退回，请实际修改对应内容后再登记");
   }
   // Verified diagnosis may point at code that still cannot parse. Pin only
@@ -543,7 +578,19 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
       active.phase = active.architectureSyncResume;
       delete active.architectureSyncResume;
     } else if (active.phase === "architecture-repair") {
-      active.phase = active.codeReviewRejection ? "supplement-ready" : "final-review-ready";
+      if (linkResume) {
+        if (resumeExecution) {
+          active.phase = "blocked";
+          active.resumePhase = linkResume.phase;
+          active.actor = linkResume.actor;
+          active.blocked = "架构引用已修复，请续派原执行会话，按现稿完成签名与送审";
+        } else {
+          active.phase = linkResume.phase;
+        }
+        delete active.architectureLinkResume;
+      } else {
+        active.phase = active.codeReviewRejection ? "supplement-ready" : "final-review-ready";
+      }
     } else if (active.phase === "ledger-review" && previous?.sha256 !== snapshot.sha256) {
       active.phase = "final-review-ready";
     } else if (active.phase === "blocked" && ["first-review", "first-audit", "final-review", "final-audit"].includes(active.resumePhase) &&
@@ -599,8 +646,10 @@ export function engineeringArchitectureStatus(frame, unit) {
   const spec = frame.policy.units[unit];
   if (!spec?.architecture || frame.role !== "coordinator") return;
   const active = frame.state.units[unit];
-  const { file, headings, examplesHeading, responsibilitiesHeading } = spec.architecture;
-  const contract = { file, headings, ...(examplesHeading ? { examplesHeading } : {}),
+  const { file, headings, examplesHeading, importsHeading, responsibilitiesHeading } = spec.architecture;
+  const generatedHeadings = generatedArchitectureHeadings(spec.architecture, active);
+  const contract = { file, headings, editableHeadings: headings.filter(heading => !generatedHeadings.includes(heading)),
+    generatedHeadings, ...(examplesHeading ? { examplesHeading } : {}), ...(importsHeading ? { importsHeading } : {}),
     ...(responsibilitiesHeading ? { responsibilitiesHeading, generated: "关键职责由宿主生成，请保留该章节及原文。其他章节用职责编号引用，说明计划和验证方式。" +
       (spec.architecture.proseReview ? "引用用 [显示文字](#bl-fact-职责编号)。" : "不要另写一份当前判定位置。"),
       responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id) } : {}) };
@@ -620,6 +669,16 @@ export function engineeringArchitectureStatus(frame, unit) {
     } else {
       contract.rollback.rule = "检查当前回退章节的已授权实跑步骤，再用 architecture 在隔离副本上演练。";
     }
+  }
+  let issues;
+  try {
+    issues = engineeringArchitectureLinkIssues(frame, spec, undefined, active);
+  } catch (error) {
+    return { ...contract, status: "required", reason: error.message, next: { action: "architecture", unit } };
+  }
+  if (issues.length) {
+    return { ...contract, status: "broken-links", issues, edit: architectureLinkRepairAction(file, issues[0]),
+      ...(active?.phase === "architecture-repair" ? { receipt: active.receipt } : {}), next: { action: "architecture", unit } };
   }
   if (active?.phase === "architecture-repair") {
     return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };
@@ -645,6 +704,66 @@ export function engineeringArchitectureStatus(frame, unit) {
   } catch (error) {
     return { ...contract, status: "required", reason: error.message, next: { action: "architecture", unit } };
   }
+}
+
+/** Restrict an already hash-checked splice to the bound coordinator's named authored section. */
+export function validateCoordinatorArchitectureEdit(frame, unit, file, before, proposed, heading) {
+  const spec = frame.policy.units[unit];
+  const active = frame.state.units[unit];
+  const architecture = spec?.architecture;
+  if (frame.role !== "coordinator" || !architecture || !includes([architecture.file], file) ||
+      !includes(frame.reads, file) || !includes(frame.writes, file) || active && active.owner !== frame.agent.id) {
+    throw new Error("总控只能局部编辑当前单元已授权读写的架构稿");
+  }
+  // Retain the BOM and exact line endings for the bytes around the authorized body.
+  const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(before);
+  const original = architectureHeadingSpans(source);
+  const edited = architectureHeadingSpans(proposed);
+  const protectedTitles = generatedArchitectureHeadings(architecture, active);
+  if (heading === undefined) {
+    const issues = engineeringArchitectureLinkIssues(frame, spec, source, active);
+    const offsets = architectureLineOffsets(source);
+    const previous = issues.filter(issue => issue.lineScoped).find(issue => {
+      const [first, last] = issue.editLines ?? [issue.line, issue.end];
+      const start = offsets[first - 1], end = offsets[last];
+      const prefix = source.slice(0, start), suffix = source.slice(end);
+      return proposed.length >= prefix.length + suffix.length && proposed.startsWith(prefix) && proposed.endsWith(suffix) &&
+        architectureLinkReplacementOnly(source.slice(start, end), proposed.slice(start, proposed.length - suffix.length),
+          issue.unknownRefs, architecture.responsibilities.map(({ id }) => id));
+    });
+    const after = engineeringArchitectureLinkIssues(frame, spec, proposed, active);
+    const count = rows => rows.reduce((total, row) => total + row.unknownRefs.length, 0);
+    if (!previous || count(after) >= count(issues) || original.length !== edited.length ||
+        original.some((row, index) => row.depth !== edited[index].depth || row.title !== edited[index].title)) {
+      throw new Error("省略标题只可在宿主定位的单处失效引用范围内修正链接，须保留其他原始字节和标题结构");
+    }
+    return proposed;
+  }
+  if (typeof heading !== "string" || !heading.trim()) throw new Error("架构稿局部编辑须指定一个人工正文标题");
+  const positions = original.flatMap((row, index) => row.title === heading ? [index] : []);
+  if (positions.length !== 1) throw new Error("架构稿局部编辑须指定一个唯一可见的正文标题");
+  const [position] = positions;
+  const section = original[position];
+  const next = edited[position];
+  if (section.depth === 1 && !architecture.headings.includes(section.title)) {
+    throw new Error("架构稿局部编辑须指定正文小节，文件标题和导言须保留");
+  }
+  if (original.some((row, index) => {
+    if (!protectedTitles.includes(row.title)) return false;
+    const after = original.slice(index + 1).find(other => other.depth <= row.depth)?.start ?? source.length;
+    return section.start < after && row.start < section.stop;
+  })) {
+    throw new Error("架构稿局部编辑须避开宿主生成章节");
+  }
+  if (original.length !== edited.length || original.some((row, index) => {
+    const replacement = edited[index];
+    return row.depth !== replacement.depth ||
+      source.slice(row.start, row.bodyStart) !== proposed.slice(replacement.start, replacement.bodyStart);
+  }) || source.slice(0, section.bodyStart) !== proposed.slice(0, next.bodyStart) ||
+      source.slice(section.stop) !== proposed.slice(next.stop)) {
+    throw new Error("架构稿局部编辑只能修改指定正文，须保留其他章节、标题和原始字节");
+  }
+  return proposed;
 }
 
 function rollbackScopeRule(locked, signed) {

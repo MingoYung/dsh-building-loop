@@ -58,7 +58,7 @@ async function fixture(run) {
 }
 
 /** Exercise the registered production handlers with real files and host identities. */
-function host(root, { automaticCoverage = true, failNotifications = false } = {}) {
+function host(root, { automaticCoverage = true, failNotifications = false, toolTimeoutMs = 3000, nativeOpening = false, activate } = {}) {
   const live = new Map();
   const tools = new Map();
   const admissions = new Map(), restrictions = new Map(), concluded = [];
@@ -67,9 +67,11 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
   const listeners = new Map();
   const notifications = [];
   const activations = [];
+  const ownerEvents = new Map(), followups = [];
   const warnings = [];
   function agent(id, parentSession) {
     live.set(id, { id, session: { header: { cwd: root, parentSession } },
+      followup: message => followups.push({ id, message }),
       whenIdle: async () => {}, model: { current: () => null }, ctx: {tools:{
         view:()=>{
           const names = ["read", "pwsh", ...tools.keys()];
@@ -82,8 +84,10 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
   agent("root");
   apply({
     agents: { get: id => live.get(id) },
+    ...(nativeOpening ? { sessionQuery: { observeSession: async id => ({ events: ownerEvents.get(id) ?? [],
+      inheritedEventCount: 0, [Symbol.dispose]() {} }) } } : {}),
     subagents: {
-      startActivation: async args => {activations.push(args);agent(args.childId, args.request.parent.id);},
+      startActivation: async args => { await activate?.(args); activations.push(args);agent(args.childId, args.request.parent.id); },
       sendMessage: async (sender, target, content) => {
         if(failNotifications)throw new Error("synthetic parent delivery failure");
         return notifications.push({ sender: sender.id, target, content });
@@ -93,7 +97,7 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     systemPrompt: { context: value => {prompt=value;} }, on: (name, listener) => listeners.set(name, listener),
     logger:{warn:message=>warnings.push(message)},
   });
-  const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(3000),
+  const invoke = (id, tool, args) => tools.get(tool).execute(args, { agent: live.get(id), signal: AbortSignal.timeout(toolTimeoutMs),
     concludeTurn:()=>concluded.push(id) });
   // Older tests isolate arithmetic/ledger behavior. Supply explicit scripted
   // reviewer and independent-auditor decisions through the production tools;
@@ -158,6 +162,9 @@ function host(root, { automaticCoverage = true, failNotifications = false } = {}
     }),
     notifications,
     activations,
+    followups,
+    setOwner: (id, seq, text) => ownerEvents.set(id, [{ type: "user/message", seq,
+      data: { source: { kind: "user" }, content: [{ type: "text", text }] } }]),
     warnings,
     coordinator: id => agent(id),
     restoreChild: (id, parent) => agent(id, parent),

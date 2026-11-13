@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
-import { inspectArchitectureImports, isCodeReviewUnit } from "../governance/code-review.mjs";
+import { inspectArchitectureImports, isCodeReviewUnit, signedAnnotationIssues } from "../governance/code-review.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import { fixture, host } from "./helpers.mjs";
@@ -17,6 +17,22 @@ const goal = "SPEC.md";
 const source = "def bounded(n):\n    # Reject negative batch sizes before enqueue.\n    return max(0, n)\n";
 const update = "def bounded(n):\n    # Clamp before enqueue to keep downstream memory bounded.\n    return min(5, max(0, n))\n";
 const goalText = "# Queue release\nBound each submitted batch between zero and five items. Output field `size` is at most 5.\n";
+
+test("signed list insertion cost claims account for moving elements; searches and other inserts are unaffected", () => fixture(async (root, write) => {
+  const check = (source, current = true) => {
+    write(worker, source);
+    return signedAnnotationIssues({ root }, { codeTask: { sources: [worker] } },
+      { artifacts: [{ path: worker, sha256: digest(current ? source : "old bytes") }] });
+  };
+  const code = `from bisect import insort\ndef build(items):\n    \"\"\"Each insertion is O(log n).\"\"\"\n    rows = [item for item in items]\n    insort(rows, 0)\n    return rows\n`;
+  const [issue] = check(code);
+  assert.deepEqual([issue.file, issue.start, issue.operationLine], [worker, 3, 5]);
+  assert.deepEqual(check(code.replace("Each insertion is O(log n).", "Find insertion position in O(log n); moving the suffix costs O(n).")), []);
+  assert.deepEqual(check(code.replace("from bisect import insort", "from custom import insort")), []);
+  assert.deepEqual(check(code.replace("    insort(rows, 0)", "    if items:\n        rows = make_custom_index()\n    insort(rows, 0)")), []);
+  assert.deepEqual(check(code.replace("[item for item in items]", "[]")), []);
+  assert.deepEqual(check(code, false), []);
+}));
 
 function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false,
   receiptReads = true, diagnostics, text = goalText } = {}) {

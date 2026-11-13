@@ -1,7 +1,8 @@
 import { inspectArchitectureClaimWitness } from "./architecture-claim-witness.mjs";
 import { inputContractCases } from "./input-contracts.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
-import { digest, readBytes } from "./policy.mjs";
+import { digest, readBytes, text } from "./policy.mjs";
+import { pythonImportEvidence } from "./python-dependencies.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
 const SYMBOL = /^[A-Za-z_][A-Za-z0-9_]{0,119}$/u;
@@ -136,4 +137,95 @@ export function architectureResponsibilitiesCurrent(frame, spec, qualification, 
       return clause && row?.id === claim.id && row.status === "passed" && row.exampleId === claim.exampleId &&
         JSON.stringify(row.clause) === JSON.stringify(clause);
     });
+}
+
+const outcome = "`([A-Za-z][A-Za-z0-9_-]{0,63})`";
+const outcomeList = "(?:`[A-Za-z][A-Za-z0-9_-]{0,63}`(?:\\s*(?:、|,|，|和|及|and|or|或)\\s*`[A-Za-z][A-Za-z0-9_-]{0,63}`)*)";
+const ownerName = "(?:`([\\p{L}_][\\p{L}\\p{N}_.\\/-]*)`|([\\p{L}_][\\p{L}\\p{N}_.\\/-]*))";
+const ownerReturns = new RegExp("由\\s*" + ownerName + "\\s*(?:直接\\s*)?(?:负责\\s*(?:返回|给出|判定)?|返回|给出|判定)\\s*(" + outcomeList + ")", "gu");
+const ownerDecides = new RegExp("(" + outcomeList + ")\\s*(?:两项|均)?\\s*(?:可以|可能|可)?由\\s*" + ownerName + "\\s*(?:直接\\s*)?(?:判定|判断|负责|返回)", "gu");
+const englishOwner = new RegExp("^(?:" + ownerName + ")\\s+(?:directly\\s+)?(?:returns?|rejects?\\s+with|emits?|produces?)\\s+(" +
+  outcomeList + ")\\s*[.!]?$", "giu");
+const uncertainOwnership = /(?:不得|不能|不会|计划|示例|例如|比如|反例|原先|历史|未来|建议|兜底|解码|透传|原样|转发|交由|委托|经由|间接|可(?:以|能)?由|或由|不(?:应|是|由|负责)|\b(?:examples?|e\.g\.|forward\w*|pass[- ]?through|fallback|delegate\w*|plans?|can|may|might|should|shouldn't|never|not|previously)\b)/iu;
+const ownerClauses = /`[^`\r\n]+`|[。！？；;]|[.!?](?=\s|$)/gu;
+
+function responsibilitySentences(line) {
+  const clauses = [];
+  let from = 0;
+  for (const match of line.matchAll(ownerClauses)) {
+    if (match[0].startsWith("`")) continue;
+    clauses.push(line.slice(from, match.index));
+    from = match.index + match[0].length;
+  }
+  return [...clauses, line.slice(from)];
+}
+
+function visibleOutcomeAssignments(frame, files, sources) {
+  const owners = new Map();
+  for (const source of sources) {
+    const basename = source.split("/").at(-1);
+    for (const name of new Set([source, basename, basename.slice(0, -3)])) {
+      owners.set(name, owners.has(name) ? null : source);
+    }
+  }
+  const assignments = new Map();
+  for (const { file, sha256 } of files) {
+    const bytes = readBytes(frame.root, file);
+    if (!bytes || digest(bytes) !== sha256) return;
+    const lines = text(bytes).split(/\r\n|\n|\r/u);
+    const { paragraphs } = markdownStructure(lines, { collectParagraphs: true });
+    for (const { start, end } of paragraphs) {
+      // Restrict the gate to one visible line and one explicit clause; headings,
+      // quoted examples and fragments split by Markdown remain review material.
+      if (start.line !== end.line) continue;
+      const line = lines[start.line - 1].slice(start.column - 1, end.column - 1);
+      for (const clause of responsibilitySentences(line)) {
+        const prose = clause.replace(/`[^`]+`/gu, "");
+        const uncertain = uncertainOwnership.test(prose) || /[“”‘’「」『』"]/u.test(prose);
+        const hits = [
+          ...[...clause.matchAll(ownerReturns)].map(([, quoted, bare, codes]) => ({ owner: quoted ?? bare, codes })),
+          ...[...clause.matchAll(ownerDecides)].map(([, codes, quoted, bare]) => ({ owner: quoted ?? bare, codes })),
+          ...[...clause.trim().matchAll(englishOwner)].map(([, quoted, bare, codes]) => ({ owner: quoted ?? bare, codes })),
+        ];
+        for (const { owner, codes } of hits) {
+          for (const [, code] of codes.matchAll(new RegExp(outcome, "gu"))) {
+            const assigned = uncertain ? null : owners.get(owner);
+            if (!assignments.has(code)) assignments.set(code, new Map());
+            assignments.get(code).set(assigned ?? null, { file, start: start.line, end: end.line, sha256 });
+          }
+        }
+      }
+    }
+  }
+  return assignments;
+}
+
+/** Gate only a signed, unambiguous positive owner clause that is contradicted
+ * by concrete decision sites. Formats and indirect calls remain independent review. */
+export function signedExplicitResponsibilityIssues(frame, spec, signed, goal) {
+  const sources = spec?.codeTask?.sources;
+  if (!sources?.length || sources.some(source => !/\.py$/iu.test(source)) || !goal?.files?.length || !signed?.artifacts) return [];
+  const artifacts = signed.artifacts.filter(({ path, sha256 }) => sha256 && sources.includes(path));
+  if (artifacts.length !== sources.length || new Set(artifacts.map(({ path }) => path)).size !== sources.length) return [];
+  const assignments = visibleOutcomeAssignments(frame, goal.files, sources);
+  if (!assignments?.size) return [];
+  const graph = pythonImportEvidence({ root: frame.root, reads: sources }, artifacts, { responsibilities: true });
+  if (graph.truncated || graph.responsibilitiesTruncated || graph.decisionSitesTruncated ||
+      graph.unparsedFiles.length || graph.checkedFiles.length !== sources.length) return [];
+  return [...assignments].flatMap(([code, owners]) => {
+    if (owners.size !== 1) return [];
+    const [[expected, requirement]] = owners;
+    if (!expected) return [];
+    const sites = graph.decisionSites.filter(row => row.code === code);
+    const actualOwners = new Set(sites.map(row => row.guardOwner ?? row.file));
+    if (actualOwners.size !== 1 || actualOwners.has(expected)) return [];
+    const [actualOwner] = actualOwners;
+    const unlocatedOwner = graph.sourceIdentifiers.find(row => row.file === expected)?.identifiers.includes(code);
+    if (graph.localRejections.some(row => row.file === expected && row.codes.includes(code)) ||
+        unlocatedOwner ||
+        graph.uncertainCalls.some(row => [expected, actualOwner].includes(row.file))) return [];
+    return [{ code, expected: { file: expected, requirement },
+      actual: sites.map(({ file, symbol, line, guardOwner }) => ({ file, symbol, line, ...(guardOwner ? { guardOwner } : {}) })),
+      reason: "wrong-responsibility" }];
+  });
 }

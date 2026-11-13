@@ -117,6 +117,23 @@ function clauseGrounding(requirement, expected) {
   if (namedValue.test(quote.slice(index + mention.length))) return { kind: "clause", version: GROUNDING_VERSION, field: true, exit };
 }
 
+/** A conditional business outcome needs an independently checked trigger.
+ * For diagnosis only, a literal error outcome still makes a valid success
+ * response comparable when the omitted field is the error itself. */
+export function diagnosticRuntimeExpectation(args, requirement) {
+  const expected = runtimeExpectation(args, requirement);
+  const direct = clauseGrounding(requirement, expected);
+  if (direct) return { expected, grounding: direct };
+  const { pointer, json, operator } = expected;
+  const quote = requirement?.quote;
+  if (!requirement?.visibleClause || pointer !== "/error" || operator || typeof json !== "string" ||
+    /(?:不得|不能|不会|禁止|例如|比如|示例|反例|\b(?:not|never|example|e\.g\.)\b)/iu.test(quote)) return { expected };
+  const named = [...quote.matchAll(/(?:\breturns?\s+|\brejects?\s+with\s+|返回\s*|判定\s*|报(?:错|出)?\s*)\x60([a-z0-9]+(?:[-_][a-z0-9]+)+)\x60/giu)];
+  return { expected, ...(named.some(([, code]) => code === json) ? {
+    grounding: { kind: "diagnostic-error-outcome", version: GROUNDING_VERSION },
+  } : {}) };
+}
+
 function sameRegisteredClause(requirement, registered) {
   return !!requirement && !!registered && keyOf(requirement.file) === keyOf(registered.file) &&
     requirement.start === registered.start && requirement.end === registered.end && requirement.quote === registered.quote;
@@ -243,11 +260,13 @@ export function compareReviewProbe(check, result) {
       const output = JSON.parse(stdout);
       const projected = pointer === undefined ? output : projectedOutput(output, pointer);
       if (projected === undefined) {
-        const field = pointer === undefined ? undefined : pointerSegments(pointer).at(-1);
-        if (check.requirement && !check.grounding?.field && !clauseLiterals(check.requirement).has(field)) {
+        const alternateSuccess = check.grounding?.kind === "diagnostic-error-outcome" &&
+          output && typeof output === "object" && !Array.isArray(output) && output.status === "ok";
+        if (check.requirement && !check.grounding?.field && !alternateSuccess) {
           return { outcome: "unavailable", reason: "missing-unstated-field" };
         }
         actual.output = "missing-field";
+        if (alternateSuccess) actual.responseStatus = "ok";
       } else actual.json = projected;
     } catch { actual.output = "invalid-json"; }
     match = Object.hasOwn(actual, "json") && matchesValue(actual.json, { json, operator });

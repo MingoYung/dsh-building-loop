@@ -8,6 +8,7 @@ const UNPRODUCTIVE_PROBES = 4;
 const OSCILLATION_LENGTH = 5;
 const MAX_OBSERVATIONS = 64;
 const MAX_SIGNATURES = 16;
+const MAX_REPAIR_PROOFS = 8;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const SAFE_ID = /^[a-z0-9][a-z0-9_.:/-]{0,119}$/iu;
 const SYNTAX_ERRORS = new Set(["SyntaxError", "IndentationError", "TabError", "ParseError"]);
@@ -109,11 +110,14 @@ function observeOscillation(window, artifactSha256, key) {
 
 function freezeDiagnostic(active, artifactSha256, failure, repeatCount, trigger) {
   const { layer, kind, caseId, path, fallbackPath, recipe } = failure;
+  const { priorRepair } = active.stallObservations;
+  const failedRepairs = caseId && priorRepair?.caseId === caseId ? priorRepair.proofs : undefined;
   active.stallDiagnostic = {
     id: randomUUID(), status: "needs-triage", artifactSha256,
     suggestedLayer: layer, failureKind: kind, repeatCount, trigger,
     ...(caseId ? { caseId } : {}), ...(path ?? fallbackPath ? { suspectedPath: path ?? fallbackPath } : {}),
     ...(recipe ? { stalledRecipe: recipe } : {}),
+    ...(failedRepairs?.length ? { failedRepairs } : {}),
   };
   return active.stallDiagnostic;
 }
@@ -137,7 +141,14 @@ export function observeExecutionDiagnostic(active, observation) {
   if (!classified && !executed) return undefined;
   // Resuming the original executor gets a fresh observation window. The same
   // artifact can stall again if that repair attempt also makes no progress.
+  let resumedRepair;
   if (active.stallDiagnostic?.status === "resolved") {
+    const { caseId, goalSha256: priorGoal, evidence, failedRepairs = [] } = active.stallDiagnostic;
+    const proof = evidence?.proof;
+    if (caseId && priorGoal === goalSha256 && proof?.scope === "independent") {
+      const identity = diagnosisProofIdentity(proof);
+      resumedRepair = { caseId, proofs: [...failedRepairs.filter(key => key !== identity), identity].slice(-MAX_REPAIR_PROOFS) };
+    }
     delete active.stallDiagnostic;
     delete active.stallObservations;
   }
@@ -149,14 +160,17 @@ export function observeExecutionDiagnostic(active, observation) {
     // A nonqualifying observation on different bytes breaks the source trail.
     const attempts = sameAssignment ? window.attempts : [];
     const failedRevisions = sameAssignment && trustedSourceFailure ? window.failedRevisions : undefined;
+    const priorRepair = sameAssignment ? window.priorRepair : resumedRepair;
     window = { artifactSha256, goalSha256, phase: active.phase, serial: active.serial,
-      attempts, failures: [], probes: 0, ...(failedRevisions?.length ? { failedRevisions } : {}) };
-    if (active.stallObservations) delete active.stallObservations;
+      attempts, failures: [], probes: 0, ...(failedRevisions?.length ? { failedRevisions } : {}),
+      ...(priorRepair ? { priorRepair } : {}) };
+    if (resumedRepair) active.stallObservations = window;
+    else if (active.stallObservations) delete active.stallObservations;
   }
   // An exploratory nonzero exit can be correct for intentionally invalid
   // input. Treat it as evidence of a stall only with a full failing check.
   const failure = classified?.kind === "probe-failed" && !window.pendingCheck?.eligible ? undefined : classified;
-  if (!failure && (operation === "check" ? !window.failures.length && !window.failedRevisions?.length :
+  if (!failure && (operation === "check" ? !window.failures.length && !window.failedRevisions?.length && !window.priorRepair :
     !window.pendingCheck?.eligible)) return undefined;
   // A replaced window is the signal for the host to persist an observation.
   // Ignore no-op probes and checks instead of rewriting the workspace backup.
@@ -171,6 +185,7 @@ export function observeExecutionDiagnostic(active, observation) {
     window.probes = 0;
     delete window.pendingCheck;
     delete window.failedRevisions;
+    delete window.priorRepair;
     return undefined;
   }
   if (failure) {
@@ -214,9 +229,11 @@ export function observeExecutionDiagnostic(active, observation) {
 export function stallDiagnosticSummary(active) {
   const record = active?.stallDiagnostic;
   if (!record) return undefined;
-  const { id, status, artifactSha256, suggestedLayer, failureKind, repeatCount, trigger, layer, stalledRecipe } = record;
+  const { id, status, artifactSha256, suggestedLayer, failureKind, repeatCount, trigger, layer, stalledRecipe,
+    caseId, failedRepairs } = record;
   return { id, status, artifactSha256, suggestedLayer, failureKind, repeatCount, trigger,
-    ...(layer ? { layer } : {}), ...(stalledRecipe ? { recipe: stalledRecipe } : {}) };
+    ...(layer ? { layer } : {}), ...(stalledRecipe ? { recipe: stalledRecipe } : {}),
+    ...(caseId ? { signedFailure: { id: caseId, unchangedIndependentRepairs: failedRepairs?.length ?? 0 } } : {}) };
 }
 
 /** The host's classification is a routing hint. The coordinator must choose
@@ -243,9 +260,14 @@ function syntaxProof({ artifacts, recipe, syntaxRecipe, input, result, sourceLin
   return { kind: status, path, line, fileSha256: source.sha256, exitCode: result.probe.exitCode };
 }
 
-function behaviorProof({ expected, exampleId, comparison, result }) {
+function behaviorProof({ expected, exampleId, comparison, result, requirement, grounding }, signedCaseId) {
+  const scope = signedCaseId ? "signed-case" : "independent";
+  const { file, start, end, quote, sha256 } = requirement ?? {};
+  const authority = { scope, ...(signedCaseId ? { signedCaseId } : {}),
+    ...(requirement ? { requirementSha256: digest(JSON.stringify([file, start, end, quote, sha256])) } : {}),
+    ...(grounding?.kind ? { grounding: grounding.kind } : {}) };
   if (expected && safeId(exampleId) && comparison?.outcome === "mismatch" && result.status === "execution-timeout") {
-    return { kind: "execution-timeout", exampleId, expectedExitCode: expected.exitCode };
+    return { kind: "execution-timeout", exampleId, expectedExitCode: expected.exitCode, ...authority };
   }
   if (!expected || comparison?.outcome !== "mismatch" || !["passed", "failed"].includes(result.status) ||
     !result.probe || !Number.isSafeInteger(result.probe.exitCode) || result.probe.truncated ||
@@ -256,8 +278,53 @@ function behaviorProof({ expected, exampleId, comparison, result }) {
   return {
     kind: "runtime-mismatch", expectedExitCode: expected.exitCode, exitCode: actual.exitCode,
     ...(safeId(exampleId) ? { exampleId } : {}),
+    ...(actual.output === "missing-field" ? { output: "missing-field", ...(actual.responseStatus === "ok" ? { responseStatus: "ok" } : {}) } : {}),
     expectedSha256: digest(JSON.stringify(expected)), actualSha256: digest(JSON.stringify(actual)),
+    ...authority,
   };
+}
+
+/** Proof IDs include the individual runner request. This separate key lets
+ * retries reuse the same observed symptom without publishing fixture bytes. */
+export function diagnosisProofIdentity(proof) {
+  return digest(JSON.stringify([proof.layer, proof.kind, proof.scope, proof.signedCaseId, proof.recipe,
+    proof.exampleId, proof.inputSha256, proof.expectedSha256, proof.actualSha256,
+    proof.requirementSha256, proof.expectedExitCode, proof.path, proof.line]));
+}
+
+function proofScopeProblem(record, proof, targeted) {
+  if (proof.layer !== "behavior" || proof.recovery) return;
+  if (targeted?.pending) return "先复现失败签名用例关联的公开示例";
+  if (targeted?.mismatch && !targeted.examples.some(({ id }) => targeted.attempts[id]?.proofId === proof.id)) {
+    return "已复现不符，诊断须使用失败签名用例关联示例的真实回执";
+  }
+  if (proof.scope === "signed-case" && (proof.signedCaseId !== record.caseId ||
+    !targeted?.examples.some(({ id }) => id === proof.exampleId))) return "该公开示例未关联当前失败签名用例";
+  if (proof.scope === "independent" && record.failedRepairs?.includes(diagnosisProofIdentity(proof))) {
+    return "这条独立复现已转修，签名用例仍失败。请复现另一处具体差异或使用与当前签名用例关联的公开示例";
+  }
+}
+
+export function requireDiagnosisProofScope(record, proof, targeted) {
+  const problem = proofScopeProblem(record, proof, targeted);
+  if (problem) throw new Error(problem);
+  return proof;
+}
+
+/** Recovery and reroute have different arguments from source diagnosis.
+ * Emit the admissible next action rather than inviting repeated invalid calls. */
+export function diagnosisProofNext(record, proof, targeted) {
+  const problem = proofScopeProblem(record, proof, targeted);
+  if (problem && targeted?.mismatch) return diagnosisProofNext(record, {
+    id: targeted.mismatch.proofId, layer: "behavior",
+  });
+  if (problem && targeted?.pending) return { action: "example", exampleId: targeted.pending.id };
+  if (problem) return { action: "probe", reason: problem };
+  const submit = proof.layer === record.layer;
+  return { action: submit ? "submit" : "reroute", proofId: proof.id,
+    required: ["cause", ...(submit ? ["fix"] : []),
+      ...(!proof.recovery && ["syntax", "behavior"].includes(proof.layer) ? ["file", "start", "end"] : [])],
+    ...(submit && proof.scope === "independent" ? { scope: "independent" } : {}) };
 }
 
 /** Store a receipt only after the host authenticated this diagnostic result
@@ -287,7 +354,10 @@ export function createStallReproductionProof(record, observation) {
   } else if (record.layer === "syntax" && operation === "probe") {
     details = syntaxProof(observation);
   } else if (record.layer === "behavior" && operation === "probe") {
-    details = behaviorProof(observation);
+    const signedCaseId = safeId(observation.signedCaseId);
+    if (observation.signedCaseId !== undefined && (!signedCaseId || signedCaseId !== record.caseId ||
+      !safeId(observation.exampleId))) return undefined;
+    details = behaviorProof(observation, signedCaseId);
   } else if (["runner", "parameters"].includes(record.layer)) {
     const failure = failureOf(observation);
     if (failure?.layer === record.layer) details = { kind: failure.kind };
@@ -309,9 +379,13 @@ export function createStallReproductionProof(record, observation) {
  */
 export function requireStallReproductionProof(record, receipt, { artifacts, proofId, layer }) {
   const artifactSha256 = stallArtifactSha256(artifacts);
-  if (!artifactSha256 || !record || !receipt || !STALL_LAYERS.includes(layer) || record.layer !== layer ||
+  if (typeof proofId !== "string" || !/^stall-proof-[0-9a-f]{64}$/u.test(proofId)) {
+    throw new Error("proofId 须使用本次复现工具返回的 stall-proof-…，请勿填快照或源码摘要");
+  }
+  if (!receipt) throw new Error("本次诊断没有这个复现编号。先用 prepare 查看可用回执或继续复现");
+  if (!artifactSha256 || !record || !STALL_LAYERS.includes(layer) || record.layer !== layer ||
     record.artifactSha256 !== artifactSha256 || receipt.stallId !== record.id ||
-    receipt.artifactSha256 !== artifactSha256 || receipt.layer !== layer || !proofId || receipt.id !== proofId) {
+    receipt.artifactSha256 !== artifactSha256 || receipt.layer !== layer || receipt.id !== proofId) {
     throw new Error("最小复现回执须属于当前诊断、选定层和当前源码版本");
   }
   const { id, ...payload } = receipt;

@@ -248,7 +248,7 @@ export function startedConversationProject(hostHome, sessionId) {
   catch (error) { if (error.code === "ENOENT") return undefined; throw error; }
   const { record } = load(root, file, sessionId);
   if (record?.phase !== "started") return undefined;
-  return { proposal: record.proposal, binding: activation(record.binding), source: source(record.source), method: record.approval.method, wake: record.wake };
+  return { proposal: record.proposal, binding: activation(record.binding), source: source(record.source), approval: source(record.approval), method: record.approval.method, wake: record.wake };
 }
 
 /** Retain a declined task for conversational context after restart without exposing any source material. */

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
+import { signedExplicitResponsibilityIssues } from "../governance/architecture-responsibilities.mjs";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { inspectArchitectureProse } from "../governance/engineering-architecture.mjs";
@@ -20,6 +21,43 @@ const template = "# 架构\n\n## 职责\n\n待填写。\n\n## 回退\n\n待填�
 const plan = "# 架构\n\n## 职责\n\n入口限制请求预算。\n\n## 回退\n\n回退入口到原算法并验证旧预算。\n";
 const revised = plan.replace("验证旧预算", "重放已发请求并验证旧预算");
 const ref = (file, start, end = start) => ({ file, start, end });
+
+test("signed explicit outcome ownership distinguishes a local guard from imported decisions and response forwarding", () =>
+  fixture(async (root, write) => {
+    const sources = ["transport.py", "service.py", "checks.py"];
+    const spec = { codeTask: { sources } };
+    const clauses = "# Contract\n\n输入格式错误由 checks 返回 `invalid-shape`。冲突由 `checks.py` 判定 `duplicate-key`。" +
+      " `invalid-time` 和 `stale-time` 由 checks 判定。\n\ntransport.py forwards `invalid-shape` from service.py.\n";
+    write(goal, clauses);
+    write("transport.py", "from service import evaluate\ndef receive(data):\n    return evaluate(data)\n");
+    write("checks.py", "def canonical(data):\n    return tuple(data)\n\nclass Clock:\n    def invalid(self, data):\n        return not data\n" +
+      "\ndef malformed(data):\n    if not data:\n        return None, 'invalid-shape'\n    return data, None\n");
+    const service = "from checks import canonical, Clock\n\ndef evaluate(data, seen):\n    token = canonical(data)\n" +
+      "    clock = Clock()\n    if clock.invalid(data):\n        return {'error': 'invalid-time'}\n" +
+      "    if data[0] < 0:\n        return {'error': 'stale-time'}\n" +
+      "    if token in seen:\n        return {'error': 'duplicate-key'}\n    return {'status': 'ok'}\n";
+    write("service.py", service);
+    const pin = file => digest(fs.readFileSync(path.join(root, file)));
+    const manifest = () => ({ artifacts: sources.map(path => ({ path, sha256: pin(path) })) });
+    const binding = () => ({ files: [{ file: goal, sha256: pin(goal) }] });
+    const check = (signed = manifest(), target = binding()) => signedExplicitResponsibilityIssues({ root }, spec, signed, target);
+    assert.deepEqual(check().map(({ code, expected, actual }) =>
+      [code, expected.file, expected.requirement.start, actual.map(({ file, line }) => [file, line])]), [
+      ["duplicate-key", "checks.py", 3, [["service.py", 11]]],
+      ["stale-time", "checks.py", 3, [["service.py", 9]]],
+    ]);
+
+    write("service.py", service.replace("canonical, Clock", "canonical, Clock, malformed")
+      .replace("    if data[0] < 0:", "    rejected = malformed(data)\n    if rejected:"));
+    assert.deepEqual(check().map(row => row.code), ["duplicate-key"]);
+    write("service.py", service);
+
+    const before = binding();
+    write(goal, clauses + "\n`duplicate-key` 由 service 判定。\n\n" +
+      "例如，`stale-time` 可以由 service 判定。\n\n> `invalid-time` 由 service 判定。\n");
+    assert.deepEqual(check(), []);
+    assert.deepEqual(check(manifest(), before), []);
+  }));
 
 function project(root, write, { importsHeading, examplesHeading, diagnostics, allowedLocalImports,
   responsibilitiesHeading, responsibilities, rollback, goalClause = "预算最多五项。" } = {}) {

@@ -9,6 +9,7 @@ import { lineList } from "./preflight.mjs";
 import { architectureImportsSection } from "./project-hierarchy.mjs";
 import { parser as pythonParser } from "./vendor/python-parser.cjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
+import { signedExplicitResponsibilityIssues } from "./architecture-responsibilities.mjs";
 
 export const CODE_COMMENT_RULE = "必要注释写在非显然的职责、调用方向、跨模块状态、权限、数据保护、回滚或重试边界旁，交代原因与成立条件。改动使旧说明失实时同步更新。核验对照实际控制流和测试证据。";
 export const CODE_REVIEW_REJECTION_RULE = "行为退回须使用当前角色的 runtime 复现，且 outcome=mismatch、blocking=true。逐字引用完整句子中明确规定的输出字段和值，或使用绑定该条款的已登记示例。字段只在实际结果出现、当前条款不能确定预期，或仅建议优化时写 observations。退回中的实测预期和结果由宿主填入。必测 revise 要关联同一 caseId 和条款的已证实发现。";
@@ -528,6 +529,83 @@ function hasEarlierStatement(node) {
     if (sibling.name !== ":" && sibling.name !== "Comment") return true;
   }
   return false;
+}
+
+function syntaxNodes(node) {
+  const children = [];
+  for (let child = node?.firstChild; child; child = child.nextSibling) children.push(child);
+  return children;
+}
+
+/** Reject one provable class of stale performance annotations. `bisect`
+ * searches in logarithmic time, but its insertion into a built-in list can
+ * move all later elements. Uncertain receiver types or bounds stay for
+ * independent review. Only the current signed bytes supply evidence. */
+export function signedAnnotationIssues(frame, spec, qualification) {
+  const issues = [];
+  for (const { path: file, sha256 } of qualification.artifacts) {
+    if (!sha256 || !/\.py$/iu.test(file) || !includes(spec.codeTask.sources, file)) continue;
+    const bytes = readBytes(frame.root, file);
+    if (!bytes || digest(bytes) !== sha256) continue;
+    const source = bytes.toString("utf8");
+    const tree = pythonParser.parse(source);
+    const part = node => source.slice(node.from, node.to);
+    const line = offset => 1 + (source.slice(0, offset).match(/\n/gu)?.length ?? 0);
+    let broken = false;
+    tree.iterate({ enter(node) { broken ||= node.type.isError; } });
+    if (broken) continue;
+    const imports = syntaxNodes(tree.topNode).filter(node => node.name === "ImportStatement");
+    const names = new Set(imports.flatMap(node => {
+      const match = /^from\s+bisect\s+import\s+([\w, \t]+)$/u.exec(part(node));
+      return match ? match[1].split(",").map(name => name.trim()).filter(name => /^insort(?:_left|_right)?$/u.test(name)) : [];
+    }));
+    if (!names.size) continue;
+    // Skip shadowed names, including parameters, aliases and assignments.
+    tree.iterate({ enter(node) {
+      if (node.name !== "VariableName") return;
+      const parent = node.node.parent;
+      if (!["ImportStatement", "CallExpression"].includes(parent?.name) || parent?.name === "CallExpression" && parent.firstChild.from !== node.from) {
+        names.delete(part(node));
+      }
+    } });
+    if (!names.size) continue;
+    tree.iterate({ enter(node) {
+      if (!["FunctionDefinition", "ClassDefinition"].includes(node.name)) return;
+      const owner = node.node;
+      const body = owner.getChild("Body");
+      const first = syntaxNodes(body).find(child => ![":", "Comment"].includes(child.name));
+      const annotation = first?.name === "ExpressionStatement" && first.getChild("String");
+      if (!annotation || /^[bf]/iu.test(part(annotation))) return;
+      // Match an explicit bound on insertion itself, excluding search-only,
+      // qualified, negated and amortized descriptions.
+      const claim = part(annotation).match(/[^.!?。！？\n]*(?:\binsert(?:ion|ions|s)?\b|插入)[^.!?。！？]{0,190}?O\(\s*(?:log\s*\w+|1)(?:\s*\+[^)]*)?\)/iu);
+      if (!claim || /(?:\b(?:not|except|without|find\w*|search\w*|locat\w*|position|amortized|if|may|would)\b|不是|查找|定位|摊还|假设|可能)/iu.test(claim[0])) return;
+      const methods = owner.name === "ClassDefinition" ? syntaxNodes(body).filter(child => child.name === "FunctionDefinition") : [owner];
+      const assignments = methods.flatMap(method => syntaxNodes(method.getChild("Body")).filter(child => child.name === "AssignStatement"));
+      for (const method of methods) for (const statement of syntaxNodes(method.getChild("Body"))) {
+        const call = statement.name === "ExpressionStatement" && statement.getChild("CallExpression");
+        const callee = call?.firstChild;
+        if (!callee || !names.has(part(callee))) continue;
+        const argument = syntaxNodes(call.getChild("ArgList")).find(child => child.name !== "(");
+        const expression = argument && part(argument);
+        const local = expression && /^[A-Za-z_]\w*$/u.test(expression) && assignments.filter(row => part(row.firstChild) === expression);
+        const mapping = expression && /^(self\.\w+)\.setdefault\([^(),]+,\s*\[\s*\]\s*\)$/u.exec(expression)?.[1];
+        const mapped = mapping && assignments.filter(row => part(row.firstChild) === mapping);
+        const definiteLocal = owner.name === "FunctionDefinition" && local?.length === 1 && local[0].from < statement.from &&
+          local[0].lastChild.name === "ArrayComprehensionExpression" &&
+          !new RegExp("(?:\\b" + expression + "\\s*[:+*\\-/|&^]?=(?!=)|\\bdel\\s+" + expression + "\\b)", "u")
+            .test(source.slice(local[0].to, statement.from));
+        const definiteBucket = mapped?.length === 1 && part(mapped[0].lastChild).replace(/\s/gu, "") === "{}" &&
+          !new RegExp(mapping.replace(".", "\\.") + "\\s*\\[[^\\]\\n]+\\]\\s*=(?!=)", "u").test(part(owner));
+        if (!definiteLocal && !definiteBucket) continue;
+        const at = annotation.from + claim.index;
+        issues.push({ file, sha256, start: line(at), end: line(at + claim[0].length - 1),
+          operationLine: line(callee.from), reason: "有序查找和插入是两步：bisect 定位后，内置 list 插入最坏须移动 O(n) 个元素。请修正源码注释或实际实现。" });
+        return;
+      }
+    } });
+  }
+  return issues;
 }
 
 function excerpt(lines, ref) {
@@ -1436,7 +1514,9 @@ export function currentCodeReview(frame, id, active, spec, receipt, independent 
     if (!isCodeReviewUnit(frame, active, spec) || !receipt?.codeReview) return false;
     const signed = requireCodeRegressionCurrent(frame, id, active, spec, active.goal);
     const architecture = reviewArchitecture(frame, active, false);
-    if (signedLocalImportBoundary(frame, spec, active.codeIntake.qualification)) return false;
+    const qualification = active.codeIntake.qualification;
+    if (signedLocalImportBoundary(frame, spec, qualification) || signedAnnotationIssues(frame, spec, qualification).length ||
+      signedExplicitResponsibilityIssues(frame, spec, qualification, active.goal).length) return false;
     if (spec.architecture?.importsHeading && !inspectArchitectureImports(frame, spec, active).match) return false;
     const binding = proofBinding(signed, active.goal, architecture);
     const proseReview = proseReviewInventory(frame, spec, architecture, signed);

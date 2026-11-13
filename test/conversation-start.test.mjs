@@ -63,7 +63,8 @@ test("ordinary conversation writes nothing and model proposal never activates pr
   assert.equal(accepted.changed, true);
   assert.equal(accepted.status, "started");
   assert.deepEqual(startedConversationProject(home, "chat-a"), {
-    proposal: pending.proposal, binding: privateBinding(), source: { seq: current.seq, sha256: current.sha256 }, method: "owner-button", wake: true,
+    proposal: pending.proposal, binding: privateBinding(), source: { seq: current.seq, sha256: current.sha256 },
+    approval: { seq: current.seq, sha256: current.sha256 }, method: "owner-button", wake: true,
   });
   const after = latestConversationUser([human(10, "想查清故障，并做成报告"), human(12, "先问一下另外的问题")]);
   assert.equal(decideConversationStart(home, "chat-a", after, pending.proposal.id, "start", start).changed, false);
@@ -197,7 +198,8 @@ test("an interrupted initialization retries the same confirmed proposal and beco
     return privateBinding();
   }).changed, true);
   assert.deepEqual(startedConversationProject(home, "chat"), {
-    proposal: pending, binding: privateBinding(), source: { seq: initial.seq, sha256: initial.sha256 }, method: "owner-button", wake: true,
+    proposal: pending, binding: privateBinding(), source: { seq: initial.seq, sha256: initial.sha256 },
+    approval: { seq: initial.seq, sha256: initial.sha256 }, method: "owner-button", wake: true,
   });
 });
 

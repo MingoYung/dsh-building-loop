@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { compareReviewProbe } from "../governance/code-review-probes.mjs";
 import { digest } from "../governance/policy.mjs";
 import {
-  createStallReproductionProof, observeExecutionDiagnostic, requireStallReproductionProof, requireStallTriage,
+  createStallReproductionProof, diagnosisProofIdentity, diagnosisProofNext, observeExecutionDiagnostic,
+  requireDiagnosisProofScope, requireStallReproductionProof, requireStallTriage,
   stallArtifactSha256, stallDiagnosticSummary,
 } from "../governance/stall-diagnostics.mjs";
 
@@ -282,4 +283,66 @@ test("recovery needs a current authenticated full check or the corrected failed 
   const recovered = createStallReproductionProof(newVersion, { ...check, artifacts: changed });
   assert.equal(recovered.kind, "current-version-passed");
   assert.equal(recovered.recovery, true);
+});
+
+test("owner mapping alone lets a public mismatch represent the signed case", () => {
+  const artifactSha256 = stallArtifactSha256(versions);
+  const record = { id: "stall-2", layer: "behavior", caseId: "required-1", artifactSha256 };
+  const expected = { exitCode: 0, json: "blocked", pointer: "/status" };
+  const result = { status: "passed", snapshotSha256, probe: { exitCode: 0, stdout: '{"status":"ok","private":"data"}' } };
+  const exampleId = "public:example:real";
+  const observation = { artifacts: versions, requestId: "mapped-repro", recipe: "public-json", operation: "probe",
+    input: { stdin: "private input" }, expected, exampleId,
+    comparison: compareReviewProbe({ type: "runtime", expected }, result), result };
+  const independent = createStallReproductionProof(record, observation);
+  const signed = createStallReproductionProof(record, { ...observation, signedCaseId: record.caseId });
+  assert.equal(independent.scope, "independent");
+  assert.equal(signed.scope, "signed-case");
+  assert.equal(signed.signedCaseId, record.caseId);
+  assert.doesNotMatch(JSON.stringify(signed), /private|"stdout"/u);
+  assert.equal(createStallReproductionProof(record, { ...observation, signedCaseId: "different-case" }), undefined);
+  assert.equal(createStallReproductionProof(record, { ...observation, signedCaseId: record.caseId, exampleId: undefined }), undefined);
+  const registered = { examples: [{ id: exampleId }], attempts: {} };
+  const pending = { ...registered, pending: { id: exampleId } };
+  assert.throws(() => requireDiagnosisProofScope(record, independent, pending), /关联的公开示例/u);
+  assert.deepEqual(diagnosisProofNext(record, independent, pending), { action: "example", exampleId });
+  const mismatch = { ...registered, mismatch: { proofId: signed.id }, attempts: { [exampleId]: { proofId: signed.id } } };
+  assert.throws(() => requireDiagnosisProofScope(record, independent, mismatch), /真实回执/u);
+  assert.equal(diagnosisProofNext(record, independent, mismatch).proofId, signed.id);
+  assert.equal(requireDiagnosisProofScope(record, signed, mismatch), signed);
+  assert.throws(() => requireDiagnosisProofScope(record, signed), /未关联/u);
+  assert.throws(() => requireStallReproductionProof(record, undefined, { artifacts: versions,
+    proofId: snapshotSha256, layer: "behavior" }), /请勿填快照/u);
+  assert.throws(() => requireStallReproductionProof(record, undefined, { artifacts: versions,
+    proofId: "stall-proof-" + "0".repeat(64), layer: "behavior" }), /没有这个复现编号/u);
+});
+
+test("the same independent symptom cannot masquerade as a new repair for an unchanged signed failure", () => {
+  const goalSha256 = digest("original goal");
+  const failure = suiteFailure("opaque failure text");
+  const active = { phase: "intake", serial: 1 };
+  for (let index = 0; index < 3; index++) observe(active, index, failure, { goalSha256 });
+  const prior = active.stallDiagnostic;
+  const expected = { exitCode: 0, json: "blocked", pointer: "/status" };
+  const result = { status: "passed", snapshotSha256, probe: { exitCode: 0, stdout: '{"status":"ok"}' } };
+  const observation = { artifacts: versions, requestId: "old-repro", recipe: "public-json", operation: "probe",
+    input: { stdin: '{"scope":"other-branch"}' }, expected,
+    comparison: compareReviewProbe({ type: "runtime", expected }, result), result };
+  const proof = createStallReproductionProof({ ...prior, layer: "behavior" }, observation);
+  active.stallDiagnostic = { ...prior, goalSha256, status: "resolved", evidence: { proof } };
+  active.serial++;
+  // A genuine narrow run can be the first operation after resuming. It does
+  // not erase the prior repair before the full signed check runs again.
+  observe(active, "first-probe", { status: "passed", snapshotSha256 }, { goalSha256, operation: "probe" });
+  for (let index = 0; index < 3; index++) observe(active, "current-" + index, failure, { goalSha256, artifacts: changed });
+  const current = { ...active.stallDiagnostic, layer: "behavior" };
+  const repeated = createStallReproductionProof(current, { ...observation, artifacts: changed, requestId: "new-repro" });
+  assert.notEqual(repeated.id, proof.id);
+  assert.equal(diagnosisProofIdentity(repeated), diagnosisProofIdentity(proof));
+  assert.deepEqual(stallDiagnosticSummary(active).signedFailure, { id: "required-1", unchangedIndependentRepairs: 1 });
+  assert.throws(() => requireDiagnosisProofScope(current, repeated), /签名用例仍失败/u);
+  assert.equal(diagnosisProofNext(current, repeated).action, "probe");
+  const different = createStallReproductionProof(current, { ...observation, artifacts: changed,
+    input: { stdin: '{"scope":"other-trigger"}' }, requestId: "another-repro" });
+  assert.equal(requireDiagnosisProofScope(current, different), different);
 });

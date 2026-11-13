@@ -44,15 +44,38 @@ function headingTitle(node) {
   return title.trim();
 }
 
-function references(node) {
-  const pending = [...node.children];
+function responsibilityReference(node, definitions) {
+  const url = node.type === "link" ? node.url :
+    node.type === "linkReference" ? definitions.get(node.identifier)?.url : undefined;
+  return url?.startsWith(factAnchor) ? url.slice(factAnchor.length) : undefined;
+}
+
+function references(node, definitions, referencedDefinitions) {
+  const pending = [...(node.children ?? [])];
   const refs = new Set();
   while (pending.length) {
     const child = pending.pop();
-    if (child.type === "link" && child.url.startsWith(factAnchor)) refs.add(child.url.slice(factAnchor.length));
+    const id = responsibilityReference(child, definitions);
+    if (id !== undefined) {
+      refs.add(id);
+      const definition = child.type === "linkReference" && definitions.get(child.identifier);
+      if (definition) referencedDefinitions?.add(definition);
+    }
     if (child.children) pending.push(...child.children);
   }
   return [...refs].sort();
+}
+
+/** Repair an exceptional line-scoped link without altering surrounding text
+ * or a declared heading's rendered title. */
+export function architectureLinkReplacementOnly(before, after, unknownIds, knownIds) {
+  const marker = /(#bl-fact-)([^\s<>()\]]+)/gu;
+  const unknown = new Set(unknownIds);
+  const known = new Set(knownIds);
+  const original = [...before.matchAll(marker)].map(match => match[2]);
+  const proposed = [...after.matchAll(marker)].map(match => match[2]);
+  return original.length === proposed.length && before.replace(marker, "$1") === after.replace(marker, "$1") &&
+    original.every((id, i) => id === proposed[i] || unknown.has(id) && known.has(proposed[i]));
 }
 
 function authoredRows(tree, visibleParagraphs, rootHeadings) {
@@ -95,8 +118,73 @@ function parseAuthoredMarkdown(source) {
   const visibleParagraphs = new Set(markdown.paragraphs.map(({ start, end }) => start.offset + ":" + end.offset));
   const rootHeadings = new Map(tree.children.filter(node => node.type === "heading" &&
     markdown.visible[node.position.start.line - 1]?.trim()).map(node =>
-    [node.position.start.line, { title: headingTitle(node), depth: node.depth, line: node.position.start.line }]));
-  return { lines, normalized, rootHeadings, rows: authoredRows(tree, visibleParagraphs, rootHeadings) };
+    [node.position.start.line, { title: headingTitle(node), depth: node.depth,
+      line: node.position.start.line, endLine: node.position.end.line }]));
+  const definitions = new Map();
+  for (const node of tree.children) {
+    if (node.type === "definition" && !definitions.has(node.identifier)) definitions.set(node.identifier, node);
+  }
+  return { lines, normalized, rootHeadings, definitions, rows: authoredRows(tree, visibleParagraphs, rootHeadings) };
+}
+
+function protectedHeadingRanges(headings, titles, lineCount, strict = true) {
+  return titles.flatMap(title => {
+    const matches = headings.filter(heading => heading.title === title);
+    if (!strict && !matches.length) return [];
+    if (matches.length !== 1) throw new Error("Invalid protected architecture heading");
+    const [heading] = matches;
+    const next = headings.find(item => item.line > heading.line && item.depth <= heading.depth);
+    return [[heading.line, next?.line - 1 || lineCount]];
+  });
+}
+
+/** Diagnose reserved responsibility links with the same visible Markdown rules as review. */
+export function architectureBrokenFactLinks(source, responsibilityIds, { protectedHeadings = [], authoredHeadings = [] } = {}) {
+  if (Buffer.byteLength(source) > MAX_SOURCE_BYTES) throw new Error("架构稿超过正文核验大小上限");
+  const { lines, rootHeadings, definitions, rows } = parseAuthoredMarkdown(source);
+  const headings = [...rootHeadings.values()];
+  const generated = protectedHeadingRanges(headings, protectedHeadings, lines.length, false);
+  const ids = new Set(responsibilityIds);
+  return rows.flatMap(({ node, heading, kind }) => {
+    const { start, end } = node.position;
+    if (generated.some(([first, last]) => first <= start.line && start.line <= last)) return [];
+    const usedDefinitions = new Set();
+    const unknownRefs = references(node, definitions, usedDefinitions).filter(id => !ids.has(id));
+    if (!unknownRefs.length) return [];
+    const definition = [...usedDefinitions].find(candidate =>
+      candidate.url.startsWith(factAnchor) && unknownRefs.includes(candidate.url.slice(factAnchor.length)) &&
+      !generated.some(([first, last]) => first <= candidate.position.start.line && candidate.position.start.line <= last));
+    if (definition) {
+      const { start: from, end: to } = definition.position;
+      return [{ line: start.line, end: end.line, heading: heading?.title ?? null, unknownRefs,
+        lineScoped: true, editLines: [from.line, to.line] }];
+    }
+    const editable = kind !== "heading" && heading && (heading.depth !== 1 || authoredHeadings.includes(heading.title)) &&
+      headings.filter(row => row.title === heading.title).length === 1;
+    return [{ line: start.line, end: end.line, heading: heading?.title ?? null, unknownRefs,
+      ...(editable ? {} : { lineScoped: true }) }];
+  });
+}
+
+/** Locate original offsets before Markdown normalizes mixed line endings. */
+export function architectureLineOffsets(source) {
+  const lines = source.split(/\r\n|\n|\r/u);
+  const eol = source.match(/\r\n|\n|\r/gu) ?? [];
+  const offsets = [0];
+  for (let i = 0; i < lines.length; i++) offsets.push(offsets[i] + lines[i].length + (eol[i]?.length ?? 0));
+  return offsets;
+}
+
+/** Locate the exact body span in the original line endings for a scoped edit. */
+export function architectureHeadingSpans(source) {
+  const { rootHeadings } = parseAuthoredMarkdown(source);
+  const offsets = architectureLineOffsets(source);
+  const headings = [...rootHeadings.values()];
+  return headings.map((heading, i) => {
+    const next = headings[i + 1];
+    return { ...heading, start: offsets[heading.line - 1], bodyStart: offsets[heading.endLine],
+      stop: next ? offsets[next.line - 1] : source.length };
+  });
 }
 
 function roleFile([first, second]) {
@@ -159,7 +247,7 @@ function sameTrigger(left, right) {
 /** A parenthesized protected reference immediately following a conditional
  * literal is scoped to that clause. The condition, code and signed module
  * must all be identified before calling the ownership false. */
-function typedDirectConflicts(row, facts, modules) {
+function typedDirectConflicts(row, facts, modules, definitions) {
   if (!modules) return [];
   const role = signedRole(row.node.children, modules);
   if (!role) return [];
@@ -175,12 +263,12 @@ function typedDirectConflicts(row, facts, modules) {
       const trigger = clause === null || quotes.length ? undefined : typedCondition(clause.trim());
       emission = trigger && { trigger, code: node.value, index, line: node.position.start.line };
     }
-    if (node.type === "link" && emission?.index === index - 2 && node.url.startsWith(factAnchor)) {
+    const id = responsibilityReference(node, definitions);
+    if (id !== undefined && emission?.index === index - 2) {
       const open = nodes[index - 1];
       const close = nodes[index + 1];
       const opener = open.type === "text" && /^\s*([（(])\s*$/u.exec(open.value)?.[1];
       const closer = close?.type === "text" && /^\s*([）)])(?=\s*(?:[。！？!?；;]|\.(?:\s|$)|$))/u.exec(close.value)?.[1];
-      const id = node.url.slice(factAnchor.length);
       const fact = facts.get(id);
       const decision = fact?.actual ?? fact?.decision;
       if ((opener === "（" && closer === "）" || opener === "(" && closer === ")") &&
@@ -213,23 +301,23 @@ function typedDirectConflicts(row, facts, modules) {
  * Require a concrete module prefix, a repeated response code and a direct
  * assertion that this module makes the linked decision. The narrower grammar
  * leaves plans, examples, fallbacks and indirect descriptions with reviewers. */
-function linkedRowConflicts(row, facts, modules) {
+function linkedRowConflicts(row, facts, modules, definitions) {
   const { node, kind, nonCurrentContext } = row;
   if (kind === "heading" || nonCurrentContext) return [];
-  const conflicts = typedDirectConflicts(row, facts, modules);
+  const conflicts = typedDirectConflicts(row, facts, modules, definitions);
   const role = roleFile(node.children);
   const from = modules && role ? modules.resolve(role) : role;
   if (!from) return conflicts;
   const codes = new Set();
   let prose = "";
   for (const child of node.children) {
+    const id = responsibilityReference(child, definitions);
     if (child.type === "inlineCode") {
       const claim = prose.split(clauseBreak).at(-1);
       if (emission.test(claim) && !nonCurrent.test(claim)) codes.add(child.value);
       // Inline code is a literal and cannot add planning qualifiers or sentence boundaries.
       prose += "\u0000";
-    } else if (child.type === "link" && child.url.startsWith(factAnchor)) {
-      const id = child.url.slice(factAnchor.length);
+    } else if (id !== undefined) {
       const fact = facts.get(id);
       const decision = fact?.actual ?? fact?.decision;
       const clauses = prose.split(clauseBreak);
@@ -261,7 +349,8 @@ export function linkedResponsibilityConflicts(source, facts, { sources } = {}) {
       !facts.length || facts.length > MAX_FACTS) return [];
   const known = new Map(facts.map(fact => [fact.id, fact]));
   const modules = signedModules(sources);
-  return parseAuthoredMarkdown(source).rows.flatMap(row => linkedRowConflicts(row, known, modules));
+  const { rows, definitions } = parseAuthoredMarkdown(source);
+  return rows.flatMap(row => linkedRowConflicts(row, known, modules, definitions));
 }
 
 /** Keep author prose separate from protected host sections. Visible paragraphs
@@ -272,7 +361,7 @@ export function architectureProseInventory({ source, sections, facts, protectedH
     !Array.isArray(facts) || !facts.length || facts.length > MAX_FACTS ||
     facts.some(item => typeof item?.id !== "string" || !factId.test(item.id)) ||
     new Set(facts.map(item => item.id)).size !== facts.length) throw new Error("Invalid architecture coverage inputs");
-  const { lines, normalized, rootHeadings, rows } = parseAuthoredMarkdown(source);
+  const { lines, normalized, rootHeadings, definitions, rows } = parseAuthoredMarkdown(source);
   const modules = signedModules(sources);
   const currentFacts = new Map(facts.map(fact => [fact.id, fact]));
   const known = new Map(facts.map(fact => [fact.id, { id: fact.id, sha256: digest(JSON.stringify(fact)),
@@ -285,13 +374,7 @@ export function architectureProseInventory({ source, sections, facts, protectedH
       section.end > lines.length || declared.has(section.start)) throw new Error("Invalid registered architecture heading");
     declared.set(section.start, section);
   }
-  const protectedRanges = protectedHeadings.map(title => {
-    const matches = allHeadings.filter(heading => heading.title === title);
-    if (matches.length !== 1) throw new Error("Invalid protected architecture heading");
-    const [heading] = matches;
-    const next = allHeadings.find(item => item.line > heading.line && item.depth <= heading.depth);
-    return [heading.line, next?.line - 1 || lines.length];
-  });
+  const protectedRanges = protectedHeadingRanges(allHeadings, protectedHeadings, lines.length);
   const blocks = [];
   const groups = new Map();
   const coverageGroup = (heading, start) => {
@@ -312,7 +395,7 @@ export function architectureProseInventory({ source, sections, facts, protectedH
     const groupHeading = section?.heading ?? heading?.title ?? "";
     const groupStart = section?.start ?? heading?.line ?? 0;
     const group = coverageGroup(groupHeading, groupStart);
-    const refs = references(node);
+    const refs = references(node, definitions);
     const sha256 = digest(normalized.slice(start.offset, end.offset));
     const basis = digest(JSON.stringify([groupHeading, kind, sha256]));
     const occurrence = (occurrences.get(basis) ?? 0) + 1;
@@ -320,7 +403,7 @@ export function architectureProseInventory({ source, sections, facts, protectedH
     const id = "p-" + basis.slice(0, 18) + "-" + occurrence;
     const block = { id, section: group.id, heading: groupHeading, kind, start: start.line, end: end.line, sha256, refs };
     if (refs.some(ref => !known.has(ref))) block.unknownRefs = refs.filter(ref => !known.has(ref));
-    const hostConflicts = linkedRowConflicts(row, currentFacts, modules);
+    const hostConflicts = linkedRowConflicts(row, currentFacts, modules, definitions);
     if (hostConflicts.length) block.hostConflicts = hostConflicts;
     blocks.push(block);
     group.blocks.push(id);

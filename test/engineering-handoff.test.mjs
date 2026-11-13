@@ -18,7 +18,7 @@ const opening = unit => `开始建设：请按当前工作区目标改进程序�
 const nativeUser = (text, seq = 12) => latestConversationUser([{ type: "user/message", seq,
   data: { source: { kind: "user" }, content: [{ type: "text", text }] } }]);
 
-function setup(root, write) {
+function setup(root, write, nativeOptions = {}) {
   const keys = generateKeyPairSync("ed25519");
   const grant = { read: [source], write: [source] };
   const receipts = id => [`${id}-first.json`, `${id}-final.json`];
@@ -37,10 +37,11 @@ function setup(root, write) {
   write("DESIGN.md", "# Design\n");
   const stateDir = path.join(process.env.DSH_HOME, "building-loop-state");
   const statePath = path.join(stateDir, workspaceStateFile(root));
-  const native = host(root, { automaticCoverage: false });
+  const native = host(root, { automaticCoverage: false, ...nativeOptions });
   const state = () => JSON.parse(fs.readFileSync(statePath, "utf8"));
   const saveState = value => fs.writeFileSync(statePath, JSON.stringify(value));
   const start = (id, text, { seq = 12, typed = true } = {}) => {
+    if (nativeOptions.nativeOpening) native.setOwner(id, seq, text);
     const current = nativeUser(text, seq);
     // A hostile/wrong model summary is deliberately independent of the owner unit.
     const { proposal } = proposeConversationTask(process.env.DSH_HOME, id, current,
@@ -61,6 +62,39 @@ function setup(root, write) {
   };
   return { native, state, saveState, start, baseline, manifest };
 }
+
+test("confirmed opening activates exactly one executor when the coordinator turn ends without dispatch", () => fixture(async (root, write) => {
+  const { native, state, start, baseline } = setup(root, write, { nativeOpening: true });
+  start("root", opening("K02"));
+  baseline("K02");
+  assert.equal(native.activations.length, 0);
+  await Promise.all([native.finish("root"), native.finish("root")]);
+  assert.equal(native.activations.length, 1);
+  const activation = native.activations[0];
+  assert.equal(activation.request.parent.id, "root");
+  assert.equal(state().units.K02.executor, activation.childId);
+  assert.equal(state().units.K02.phase, "intake");
+  assert.equal(native.followups.length, 0);
+}));
+
+test("failed native activation has one recovery; a new owner message cancels further automatic dispatch", () => fixture(async (root, write) => {
+  let attempts = 0;
+  const { native, state, start, baseline } = setup(root, write, { nativeOpening: true,
+    activate: async () => { attempts++; throw new Error("native spawn unavailable"); } });
+  start("root", opening("K02"));
+  baseline("K02");
+  await native.finish("root");
+  assert.equal(native.activations.length, 0);
+  assert.equal(state().dispatchRecovery.status, "retry");
+  assert.equal(native.followups.length, 1);
+  await native.finish("root");
+  assert.equal(state().dispatchRecovery.status, "blocked");
+  assert.equal(native.followups.length, 1);
+  assert.equal(attempts, 2);
+  native.setOwner("root", 13, "先暂停这个项目。");
+  await native.finish("root");
+  assert.equal(attempts, 2);
+}));
 
 test("engineering unit is parsed from owner clauses, excluding code fences, quotes, negation and model summaries", () => {
   assert.equal(ownerEngineeringUnit(opening("K02")), "K02");

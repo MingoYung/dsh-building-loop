@@ -5,10 +5,12 @@ import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
-import { architectureProseInventory, checkArchitectureProseReceipt, linkedResponsibilityConflicts } from "../governance/architecture-prose-coverage.mjs";
+import { architectureBrokenFactLinks, architectureProseInventory, checkArchitectureProseReceipt, linkedResponsibilityConflicts } from "../governance/architecture-prose-coverage.mjs";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
-import { authority, digest } from "../governance/policy.mjs";
+import { engineeringArchitectureLinkIssues, engineeringArchitectureStatus, registerEngineeringArchitecture,
+  validateCoordinatorArchitectureEdit } from "../governance/engineering-architecture.mjs";
+import { authority, digest, scopedEditContent } from "../governance/policy.mjs";
 import { fixture, host } from "./helpers.mjs";
 
 const fact = { id: "request-shape", decision: { file: "worker.py", line: 21 }, response: { error: "invalid-request" } };
@@ -104,6 +106,80 @@ test("unrecognized fact links remain visible and block a completed review", () =
   const inventory = build({ source: base.replace("[shape rule](#bl-fact-request-shape)", "[shape rule](#bl-fact-wrong)") });
   assert.deepEqual(inventory.blocks[1].unknownRefs, ["wrong"]);
   assert.equal(checkArchitectureProseReceipt(inventory, reviewed(inventory)).status, "pending");
+});
+
+test("registration locates unknown responsibility links before dispatch without consuming hidden or generated text", () => fixture(async (root, write) => {
+  const file = "modules/architecture.md";
+  const source = base.replace("A host-only block [proof](#bl-fact-request-shape).",
+    "A host-only block [proof](#bl-fact-host-placeholder).")
+    .replace("[shape rule](#bl-fact-request-shape)", "[shape rule][reference]")
+    .replace("Re-check rollover after launch.", "Re-check [another decision](#bl-fact-不存在).")
+    + "\n\n[reference]: #bl-fact-not-registered\n";
+  const expected = [
+    { line: 7, end: 8, heading: "Implementation", unknownRefs: ["not-registered"], lineScoped: true, editLines: [28, 28] },
+    { line: 26, end: 26, heading: "Further notes", unknownRefs: ["不存在"] },
+  ];
+  assert.deepEqual(architectureBrokenFactLinks(source, [fact.id], { protectedHeadings: ["Verified"] }), expected);
+  const inventory = build({ source });
+  assert.deepEqual(inventory.blocks.filter(row => row.unknownRefs).map(({ start, unknownRefs }) => [start, unknownRefs]),
+    [[7, ["not-registered"]], [26, ["不存在"]]]);
+  fs.mkdirSync(path.join(root, "modules"));
+  write(file, source);
+  write("PROJECT-GOAL.md", "# Goal\n\nComplete implementation.\n");
+  const spec = { architecture: { file, headings: ["Implementation"], importsHeading: "Verified imports",
+    responsibilitiesHeading: "Verified", responsibilities: [{ id: fact.id }], proseReview: true }, codeTask: {} };
+  const frame = { root, role: "coordinator", agent: { id: "owner" }, reads: [file], writes: [file],
+    policy: { units: { K01: spec }, goalContext: ["PROJECT-GOAL.md"] }, state: { units: {} } };
+  assert.deepEqual(engineeringArchitectureLinkIssues(frame, spec), expected);
+  const status = engineeringArchitectureStatus(frame, "K01");
+  assert.equal(status.status, "broken-links");
+  assert.deepEqual(status.generatedHeadings, ["Verified imports", "Verified"]);
+  assert.deepEqual(status.edit, { action: "edit", path: file,
+    required: ["beforeSha256", "note", "edits"], lines: [28, 28] });
+  const registration = registerEngineeringArchitecture(frame, "K01", spec, "owner");
+  assert.deepEqual(registration, { unit: "K01", phase: "dispatch", status: "architecture-broken-links",
+    issues: expected, responsibilityIds: [fact.id], next: { action: "architecture", unit: "K01" } });
+  assert.equal(fs.readFileSync(path.join(root, file), "utf8"), source);
+  assert.equal(frame.state.engineeringArchitecture, undefined);
+  const repaired = source.replace("[reference]: #bl-fact-not-registered", "[reference]: #bl-fact-request-shape");
+  assert.equal(validateCoordinatorArchitectureEdit(frame, "K01", file, Buffer.from(source), repaired), repaired);
+}));
+
+test("scoped coordinator edit retains original headings, BOM, mixed line endings and generated section bytes", () => {
+  const file = "modules/architecture.md";
+  const original = "\uFEFF# Architecture\r\n\r\n## Verified\r\n\r\nHost facts  \r\n\r\n" +
+    "## Implementation\n\nRead [decision](#bl-fact-localized).\r\n\r\n### Extra\n\nExtra draft.\n\n" +
+    "## Imports\r\n\r\nHost imports.\r\n\r\n## Rollback\n\nHost rollback.\n";
+  const before = Buffer.from(original);
+  const architecture = { file, headings: ["Implementation", "Rollback"], importsHeading: "Imports",
+    responsibilitiesHeading: "Verified", responsibilities: [{ id: "request-shape" }], proseReview: true,
+    rollback: { lockedScope: true, heading: "Rollback" } };
+  const active = { owner: "owner", codeIntake: { qualification: {} }, rollbackProposal: {} };
+  const frame = { role: "coordinator", agent: { id: "owner" }, reads: [file], writes: [file],
+    policy: { units: { K01: { architecture } } }, state: { units: { K01: active } } };
+  const edit = (oldText, newText) => scopedEditContent(before, { beforeSha256: digest(before), oldText, newText });
+  const validate = (next, heading, scope = frame) => validateCoordinatorArchitectureEdit(scope, "K01", file, before, next, heading);
+  const fixed = edit("#bl-fact-localized", "#bl-fact-request-shape");
+  assert.equal(validate(fixed, "Implementation"), original.replace("#bl-fact-localized", "#bl-fact-request-shape"));
+  assert.equal(validate(edit("Extra draft.", "Extra factual text."), "Extra"), original.replace("Extra draft.", "Extra factual text."));
+  assert.throws(() => validate(edit("Extra draft.", "Extra factual text."), "Implementation"), /指定正文/u);
+  assert.throws(() => validate(edit("Host facts  ", "Host facts"), "Verified"), /宿主生成章节/u);
+  assert.throws(() => validate(edit("Host rollback.", "Changed rollback."), "Rollback"), /宿主生成章节/u);
+  assert.throws(() => validate(edit("Host imports.", "Changed imports."), "Implementation"), /指定正文/u);
+  assert.throws(() => validate(edit("### Extra", "### Renamed"), "Implementation"), /指定正文/u);
+  assert.throws(() => validate(fixed.replace(/^\uFEFF/u, ""), "Implementation"), /指定正文/u);
+  assert.throws(() => validate(fixed.replaceAll("\r\n", "\n"), "Implementation"), /指定正文/u);
+  assert.throws(() => validate(fixed, "Implementation", { ...frame, agent: { id: "other" } }), /当前单元已授权/u);
+  assert.throws(() => validate(fixed, "Implementation", { ...frame, reads: [] }), /当前单元已授权/u);
+
+  const preamble = original.replace("# Architecture", "# Architecture\r\n\r\nRead [decision](#bl-fact-missing).");
+  const preambleBefore = Buffer.from(preamble);
+  const preambleFixed = preamble.replace("#bl-fact-missing", "#bl-fact-request-shape");
+  const repairPreamble = value => validateCoordinatorArchitectureEdit(frame, "K01", file, preambleBefore, value);
+  assert.equal(repairPreamble(preambleFixed), preambleFixed);
+  assert.throws(() => repairPreamble(preambleFixed.replace("Read [decision]", "Use [decision]")), /单处失效引用/u);
+  assert.throws(() => repairPreamble(preambleFixed.replace("Host facts  ", "Host facts")), /单处失效引用/u);
+  assert.throws(() => repairPreamble(preamble.replace("#bl-fact-missing", "#bl-fact-other-unknown")), /单处失效引用/u);
 });
 
 test("an explicit business fact linked to the wrong local decision overrides a consistent receipt", () => {
@@ -273,9 +349,30 @@ test("the real code-review path requires two independent block receipts and rout
         { goal: "校验输入形状", deliverable: "代码及架构回执", scope: "已授权源码" });
       decideConversationStart(process.env.DSH_HOME, "root", user, proposal.id, "start", () => ({ kind: "workspace", root }), { typed: true });
       const harness = host(root, { automaticCoverage: false });
+      const broken = "[Non-object rejection](#bl-fact-unregistered). " + wrong;
+      write(architecture, doc.replace(wrong, broken));
+      const preflight = await harness.flow("root", "architecture");
+      assert.equal(preflight.status, "architecture-broken-links");
+      assert.deepEqual(preflight.issues, [{ line: 6, end: 6, heading: "Implementation", unknownRefs: ["unregistered"] }]);
+      const initialDoc = fs.readFileSync(path.join(root, architecture));
+      await harness.file("root", "edit", architecture, { beforeSha256: digest(initialDoc), heading: "Implementation",
+        oldText: broken, newText: wrong, note: "Remove the unknown reference from the initial draft." });
+      assert.equal(fs.readFileSync(path.join(root, architecture), "utf8"), doc);
       await harness.flow("root", "architecture");
       const executor = (await harness.flow("root", "advance")).childId;
       write(worker, 'def validate(value):\n    # Keep the transport free of domain-specific errors.\n    if not isinstance(value, dict):\n        return {"error": "invalid-request"}\n    return value\n');
+      await harness.flow(executor, "prepare");
+      const draft = fs.readFileSync(path.join(root, architecture), "utf8");
+      write(architecture, draft.replace(wrong, broken));
+      assert.equal((await harness.flow(executor, "submit")).phase, "architecture-repair");
+      const brokenDoc = fs.readFileSync(path.join(root, architecture));
+      await harness.file("root", "edit", architecture, { beforeSha256: digest(brokenDoc), heading: "Implementation",
+        oldText: broken, newText: wrong, note: "Repair the bad link while preserving the generated section." });
+      assert.equal(fs.readFileSync(path.join(root, architecture), "utf8"), draft);
+      assert.equal((await harness.flow("root", "architecture")).phase, "blocked");
+      const resumed = await harness.flow("root", "advance");
+      assert.equal(resumed.childId, executor);
+      assert.equal(resumed.reused, true);
       const { codeTask } = await harness.flow(executor, "prepare");
       const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
       save(file, { ...challenge, runId: "current", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
@@ -333,8 +430,10 @@ test("the real code-review path requires two independent block receipts and rout
       assert.deepEqual(firstReceipt.codeReview.architecture.proseReview.findings.map(({ id, line, facts }) => ({ id, line, facts })),
         [{ id: conflict.id, line: 6, facts: ["request-shape"] }]);
 
-      const verifiedDoc = fs.readFileSync(path.join(root, architecture), "utf8");
-      await harness.file("root", "write", architecture, { content: verifiedDoc.replace(wrong, fixed), note: "Correct only the disputed item" });
+      const verifiedDoc = fs.readFileSync(path.join(root, architecture));
+      await harness.file("root", "edit", architecture, { beforeSha256: digest(verifiedDoc), heading: "Implementation",
+        oldText: wrong, newText: fixed, note: "Correct only the disputed item" });
+      assert.equal(fs.readFileSync(path.join(root, architecture), "utf8"), verifiedDoc.toString("utf8").replace(wrong, fixed));
       assert.equal((await harness.flow("root", "architecture")).phase, "final-review-ready");
       const reviewer = (await harness.flow("root", "advance")).childId;
       const current = await prepare(reviewer);

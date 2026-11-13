@@ -14,6 +14,9 @@ import { fixture, host } from "./helpers.mjs";
 const reproduction = "building_loop_reproduce";
 const diagnosis = "building_loop_diagnose";
 const behaviorProbe = "building_loop_diagnosis_probe";
+// The suite exercises guarded writes before the local runner request begins.
+// Keep the simulated turn alive through filesystem work under Windows load.
+const diagnosticHost = root => host(root, { automaticCoverage: false, toolTimeoutMs: 30_000 });
 const unit = "K01";
 const entry = "release.py";
 const specFile = "SPEC.md";
@@ -28,6 +31,7 @@ const syntaxPath = "journal.py";
 const behaviorPath = "planner.py";
 const architectureFile = "modules/architecture.md";
 const architecturePlan = "# Architecture\n\n## Responsibility\n\nThe input boundary normalizes requests.\n";
+const windowClause = "新请求与停用区间相交时，由 windows 判定 `window-closed`，它优先于目标预约重叠。";
 const compilerSource = '"""Normalize records."""\n\nA boundary owner records identities.\n"""\n\ndef parse(data):\n    return data\n';
 const closureSource = [
   "def retained_closure(by_id, applied, retained):",
@@ -47,6 +51,7 @@ const publicRequest = { action: "rollback-many", requests: [{
     { id: "c", component: "db", units: 1, depends_on: ["b"] },
   ], applied: ["a", "c"], retain: ["c"],
 }] };
+const windowRequest = { action: "reserve", window: [50, 60], closed: [[0, 100], [5, 10]] };
 
 const stallCases = {
   syntax: {
@@ -94,7 +99,8 @@ function configure(root, write, kind, { architecture = false, registered = false
     compilerSource.replace(stallCases.syntax.oldText, stallCases.syntax.newText) : compilerSource);
   else write(behaviorPath, closureSource);
   write(privateFile, "separate private artifact\n");
-  write(specFile, "# Release planner\nKeep transitive installed dependencies through unapplied intermediaries; omit kept IDs from rollback actions.\n" +
+  write(specFile, "# Release planner\nKeep transitive installed dependencies through unapplied intermediaries; omit kept IDs from rollback actions.\n\n" +
+    windowClause + "\n" +
     (architecture ? "\n## Navigation\n\n- [Index](INDEX.md)\n" : ""));
   if (architecture) {
     write("INDEX.md", "# Index\n\n## Modules\n\n- [Architecture](modules/architecture.md)\n");
@@ -176,11 +182,13 @@ async function runWithRunner(kind, run) {
       } else {
         assert.equal(body.operation, "probe");
         const { action, ...expected } = scenario.probe;
-        assert.deepEqual(body.probe, expected);
+        const windowProbe = kind === "behavior" && body.probe.stdin === JSON.stringify(windowRequest);
+        assert.deepEqual(body.probe, windowProbe ? { recipe: behaviorRecipe, stdin: JSON.stringify(windowRequest) } : expected);
         if (kind === "syntax") Object.assign(reply, { status: fixed ? "passed" : "failed", probe: fixed
           ? { exitCode: 0, stdout: '{"status":"parsed"}' }
           : { exitCode: 1, stdout: JSON.stringify({ status: "syntax-error", line: scenario.reportedLine }),
               stderr: "SyntaxError: stray triple-quote" } });
+        else if (windowProbe) Object.assign(reply, { status: "passed", probe: { exitCode: 0, stdout: '{"status":"ok"}' } });
         else Object.assign(reply, { status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(fixed
           ? { status: "ok", results: [{ actions: [], units: 0 }], units: 0 }
           : { status: "ok", results: [{ actions: ["a"], units: 2 }], units: 2 }) } });
@@ -196,7 +204,7 @@ async function runWithRunner(kind, run) {
   const env = {
     DSH_BUILDING_LOOP_DIAGNOSTICS_URL: "http://127.0.0.1:" + server.address().port + "/stall-check",
     DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: secret,
-    DSH_BUILDING_LOOP_DIAGNOSTICS_TIMEOUT_MS: "2000",
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TIMEOUT_MS: "12000",
   };
   const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
@@ -321,7 +329,7 @@ async function signCurrent(harness, executor, write, keys, oldStatus = "passed")
 test("signed failure selects its public behavior replay and only that mismatch can route the repair", () =>
   fixture(async (root, write) => runWithRunner("behavior", async ({ requests }) => {
     configure(root, write, "behavior", { registered: true });
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     await harness.flow(executor, "prepare");
     await forceStall("behavior", harness, executor, requests);
@@ -334,15 +342,23 @@ test("signed failure selects its public behavior replay and only that mismatch c
     const finding = submission("behavior");
     await harness.file(investigator, "read", finding.file, { start: finding.start, count: finding.end - finding.start + 1 });
     const exploratory = await reproduceFinding("behavior", harness, investigator);
+    assert.deepEqual(exploratory.next, { tool: behaviorProbe, ...replay });
     await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: exploratory.proofId }), /关联的公开示例/u);
     const proof = await harness.invoke(investigator, behaviorProbe, replay);
     assert.equal(proof.outcome, "mismatch");
+    const count = requests.length;
+    const cached = await harness.invoke(investigator, behaviorProbe, replay);
+    assert.equal(cached.proofId, proof.proofId);
+    assert.equal(cached.reused, true);
+    assert.equal(requests.length, count);
     const prepared = await harness.flow(investigator, "prepare");
     assert.equal(prepared.next.proofId, proof.proofId);
     await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: exploratory.proofId }), /真实回执/u);
     const submitted = await harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.proofId });
     const { evidence } = submitted.stallDiagnostic;
     assert.equal(evidence.proof.exampleId, exampleId);
+    assert.equal(evidence.proof.scope, "signed-case");
+    assert.equal(evidence.proof.signedCaseId, newCase);
     assert.ok(!JSON.stringify(submitted).includes(JSON.stringify(publicRequest)));
     await harness.invoke("root", diagnosis, { action: "verify", unit, evidenceId: evidence.id,
       decision: "confirmed", reason: "The registered case and exact source location identify the dependency traversal defect." });
@@ -351,13 +367,51 @@ test("signed failure selects its public behavior replay and only that mismatch c
     assert.equal(repair.reused, true);
   })));
 
+test("alternate success gives a usable independent proof and a bad proof ID returns specific guidance", () =>
+  fixture(async (root, write) => runWithRunner("behavior", async ({ requests }) => {
+    configure(root, write, "behavior");
+    const harness = diagnosticHost(root);
+    const { childId: executor } = await harness.flow("root", "advance");
+    await harness.flow(executor, "prepare");
+    await forceStall("behavior", harness, executor, requests);
+    const investigator = await startInvestigation("behavior", harness, executor);
+    await harness.flow(investigator, "prepare");
+    await harness.file(investigator, "read", specFile, { start: 1, count: 4 });
+    const finding = submission("behavior");
+    await harness.file(investigator, "read", finding.file, { start: finding.start, count: finding.end - finding.start + 1 });
+    const args = { action: "probe", recipe: behaviorRecipe, stdin: JSON.stringify(windowRequest), expectedExitCode: 0, expectedPointer: "/error",
+      expectedJson: '"window-closed"', requirement: { file: specFile, start: 4, end: 4, quote: windowClause } };
+    const unknown = await harness.invoke(investigator, behaviorProbe, { ...args, expectedPointer: "/nested/error" });
+    assert.equal(unknown.proofId, undefined);
+    assert.equal(unknown.reason, "missing-unstated-field");
+    const proof = await harness.invoke(investigator, behaviorProbe, args);
+    assert.equal(proof.actual.output, "missing-field");
+    assert.equal(proof.actual.responseStatus, "ok");
+    assert.equal(proof.next.scope, "independent");
+    assert.equal(proof.next.proofId, proof.proofId);
+    await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.snapshotSha256 }), /请勿填快照/u);
+    await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: "stall-proof-" + "0".repeat(64) }), /没有这个复现编号/u);
+    const count = requests.length;
+    const cached = await harness.invoke(investigator, behaviorProbe, args);
+    assert.equal(cached.proofId, proof.proofId);
+    assert.equal(cached.reused, true);
+    assert.equal(requests.length, count);
+    assert.equal((await harness.flow(investigator, "prepare")).next.proofId, proof.proofId);
+    const submitted = await harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.proofId });
+    const { evidence } = submitted.stallDiagnostic;
+    assert.equal(evidence.proof.scope, "independent");
+    assert.equal(evidence.proof.signedCaseId, undefined);
+    assert.equal(evidence.proof.responseStatus, "ok");
+    assert.ok(!JSON.stringify(submitted).includes(JSON.stringify(windowRequest)));
+  })));
+
 for (const kind of ["syntax", "behavior"]) {
   test("registered host escalates " + kind + " stalls, verifies bounded proof and resumes the same executor",
     () => fixture(async (root, write) => runWithRunner(kind, async ({ requests }) => {
       const scenario = stallCases[kind];
       const withArchitecture = kind === "syntax";
       const keys = configure(root, write, kind, { architecture: withArchitecture });
-      const harness = host(root, { automaticCoverage: false });
+      const harness = diagnosticHost(root);
       if (withArchitecture) await harness.flow("root", "architecture");
       const { childId: executor } = await harness.flow("root", "advance");
       assert.ok(harness.visible(executor).includes(reproduction));
@@ -453,7 +507,7 @@ for (const kind of ["syntax", "behavior"]) {
 test("registered host retires a diagnostic receipt when source advances before coordinator verification",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     await harness.flow(executor, "prepare");
     await forceStall("syntax", harness, executor, requests);
@@ -482,7 +536,7 @@ test("registered host retires a diagnostic receipt when source advances before c
 test("different source revisions and an intervening complete pass reset repeated-failure counters",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ forceCheckPass }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     const check = () => harness.invoke(executor, reproduction, { action: "check" });
     assert.equal((await check()).status, "failed");
@@ -503,7 +557,7 @@ test("different source revisions and an intervening complete pass reset repeated
 test("a changed goal retires a verified repair even when the source bytes are unchanged",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     await forceStall("syntax", harness, executor, requests);
     const investigator = await startInvestigation("syntax", harness, executor);
@@ -537,7 +591,7 @@ test("a changed goal retires a verified repair even when the source bytes are un
 test("a second stall uses a new investigator and returns both repairs to the original executor",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     const finishInvestigation = async (investigator, proof, prepared) => {
       const finding = submission("syntax");
@@ -587,7 +641,7 @@ test("a second stall uses a new investigator and returns both repairs to the ori
 test("interrupted investigation and rejected evidence stay gated and resume the correct identity",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     await harness.flow(executor, "prepare");
     await forceStall("syntax", harness, executor, requests);
@@ -628,7 +682,7 @@ test("interrupted investigation and rejected evidence stay gated and resume the 
 test("two receiptless completions in one diagnosis require re-triage and a different read-only actor",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     await forceStall("syntax", harness, executor, requests);
     const investigator = await startInvestigation("syntax", harness, executor);
@@ -665,7 +719,7 @@ test("two receiptless completions in one diagnosis require re-triage and a diffe
 test("repeated invalid parameters require actual corrected execution of the same recipe",
   () => fixture(async (root, write) => runWithRunner("syntax", async ({ requests }) => {
     configure(root, write, "syntax");
-    const harness = host(root, { automaticCoverage: false });
+    const harness = diagnosticHost(root);
     const { childId: executor } = await harness.flow("root", "advance");
     await harness.flow(executor, "prepare");
     const invalid = { action: "probe", recipe: syntaxRecipe };

@@ -107,6 +107,37 @@ function rejectionCode(node, source) {
   }
 }
 
+/** A helper may return the business code to a separate response formatter. */
+function directRejectionCode(node, source) {
+  const code = rejectionCode(node, source);
+  if (code || node.name !== "ReturnStatement") return code;
+  const value = node.lastChild;
+  if (value?.name === "String") return literalString(value, source);
+  if (value?.name === "TupleExpression" || value?.name === "ParenthesizedExpression") {
+    const values = children(value).filter(child => !["(", ")", ","].includes(child.name));
+    if (values.length === 2 && source.slice(values[0].from, values[0].to) === "None") return literalString(values[1], source);
+  }
+}
+
+/** Resolve the imported function in the guard, including a uniquely assigned
+ * receiver constructed by an imported class. Ambiguous aliases stay unknown. */
+function rejectionGuardOwner(condition, source, calls, uncertain, bindings, objectBindings) {
+  const value = condition.name === "UnaryExpression" && condition.firstChild?.name === "not"
+    ? condition.lastChild : condition;
+  if (value?.name === "VariableName") {
+    const binding = bindings.get(source.slice(value.from, value.to));
+    if (binding && binding.offset < value.from && !uncertain(binding.target)) return binding.target;
+  }
+  if (value?.name !== "CallExpression") return;
+  const direct = calls.find(call => call.offset === value.from);
+  if (direct && !uncertain(direct.target)) return direct.target;
+  const [receiver, method, ...rest] = nameParts(value.firstChild, source).split(".");
+  if (!method || rest.length) return;
+  const binding = objectBindings.get(receiver);
+  if (!binding || binding.offset >= value.from || uncertain(binding.target)) return;
+  return binding.target;
+}
+
 /** Only sibling if guards whose sole body statement exits can prove the order
  * of local checks. Conditional dispatch, loops and cross-function calls do
  * not become ordered guards just because their lines happen to be ordered. */
@@ -142,8 +173,8 @@ function fieldDefault(assignment, source) {
  * A field read is never proof of validation by itself. Require an explicit
  * conditional branch with a literal rejection, and keep weaker field guards
  * so a plausible local validation is not falsely attributed elsewhere. */
-function functionResponsibilities(file, source, functions, lineOf) {
-  const definitions = [], validation = [], rejectionSites = [], orderedGuards = [], rejections = new Set();
+function functionResponsibilities(file, source, functions, lineOf, resolved) {
+  const definitions = [], validation = [], rejectionSites = [], decisionSites = [], orderedGuards = [], rejections = new Set();
   for (const node of functions) {
     const parts = children(node);
     const named = parts.find(item => item.name === "VariableName");
@@ -157,6 +188,8 @@ function functionResponsibilities(file, source, functions, lineOf) {
     // The field relation survives a conditional default assignment. A second
     // direct assignment to the name makes its relationship uncertain.
     const directFields = new Map();
+    const guardBindings = new Map();
+    const objectBindings = new Map();
     const nestedWrites = new Map();
     const conditionals = [];
     walk(body, item => {
@@ -167,6 +200,12 @@ function functionResponsibilities(file, source, functions, lineOf) {
       }
       if (!["AssignStatement", "UpdateStatement"].includes(item.name) || item.firstChild?.name !== "VariableName") return;
       const name = source.slice(item.firstChild.from, item.firstChild.to);
+      const construction = item.name === "AssignStatement" && item.lastChild?.name === "CallExpression" &&
+        resolved.calls.find(call => call.offset === item.lastChild.from);
+      guardBindings.set(name, guardBindings.has(name) || !construction || !direct.has(item.from)
+        ? null : construction);
+      objectBindings.set(name, objectBindings.has(name) || !construction || !direct.has(item.from)
+        || !/^[A-Z]/u.test(construction.symbol) ? null : construction);
       const field = item.name === "AssignStatement" && item.firstChild.nextSibling?.name === "AssignOp" &&
         item.firstChild.nextSibling.nextSibling?.to === item.lastChild?.to && fieldRead(item.lastChild, source);
       const top = direct.has(item.from);
@@ -225,13 +264,19 @@ function functionResponsibilities(file, source, functions, lineOf) {
         for (const exit of exits) {
           const code = rejectionCode(exit, source);
           if (code) rejectionSites.push({ file, symbol, code, line: lineOf(exit.from) });
+          const explicitCode = directRejectionCode(exit, source);
+          if (explicitCode) {
+            const owner = rejectionGuardOwner(condition, source, resolved.calls,
+              target => resolved.uncertainAll || resolved.uncertainTargets.includes(target), guardBindings, objectBindings);
+            decisionSites.push({ file, symbol, code: explicitCode, line: lineOf(exit.from), ...(owner ? { guardOwner: owner } : {}) });
+          }
           for (const field of fields) validation.push({ file, symbol, field, line: lineOf(exit.from),
             ...(code && (fields.size === 1 || directFields.has(field)) ? { code } : {}) });
         }
       }
     }
   }
-  return { definitions, validation, rejectionSites, orderedGuards, rejections: [...rejections] };
+  return { definitions, validation, rejectionSites, decisionSites, orderedGuards, rejections: [...rejections] };
 }
 
 /** Only prove directly resolvable syntactic calls. An alias that is rebound
@@ -283,7 +328,7 @@ function localCalls(file, source, imports, callNodes, names, lineOf) {
     const symbol = resolved.member ?? syntax.slice(resolved.prefix.length + 1);
     if (resolved.jsonCodec) {
       if (!uncertainCodec && ["load", "loads"].includes(symbol)) jsonDecoders.push({ file, line: lineOf(call.from), symbol: "json." + symbol });
-    } else calls.push({ file, line: lineOf(call.from), target: resolved.to, symbol });
+    } else calls.push({ file, line: lineOf(call.from), target: resolved.to, symbol, offset: call.from });
   }
   return { calls, jsonDecoders, uncertainAll, uncertainTargets: [...uncertainTargets] };
 }
@@ -294,8 +339,10 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
   const files = artifacts.filter(row => row.sha256 && /\.py$/iu.test(row.path) && includes(frame.reads, row.path));
   const local = new Map(files.map(({ path }) => [keyOf(path), path]));
   const checkedFiles = [], unparsedFiles = [], edges = [], ambiguous = [], calls = [], uncertainCalls = [];
-  const definitions = [], validation = [], rejectionSites = [], orderedGuards = [], jsonDecoders = [], localRejections = [], sourceIdentifiers = [];
+  const definitions = [], validation = [], rejectionSites = [], decisionSites = [], orderedGuards = [],
+    jsonDecoders = [], localRejections = [], sourceIdentifiers = [];
   let responsibilitiesTruncated = false;
+  let decisionSitesTruncated = false;
   let truncated = false;
   for (const { path: file, sha256 } of files) {
     if (checkedFiles.length + unparsedFiles.length >= 64) { truncated = true; break; }
@@ -346,7 +393,7 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
     });
     const resolved = localCalls(file, source, bindings, callNodes, names, lineOf);
     if (responsibilities) {
-      const current = functionResponsibilities(file, source, functions, lineOf);
+      const current = functionResponsibilities(file, source, functions, lineOf, resolved);
       if (definitions.length + current.definitions.length > 128 || validation.length + current.validation.length > 128 ||
         rejectionSites.length + current.rejectionSites.length > 128 || orderedGuards.length + current.orderedGuards.length > 128 ||
         jsonDecoders.length + resolved.jsonDecoders.length > 64 ||
@@ -356,6 +403,8 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
       definitions.push(...current.definitions.slice(0, 128 - definitions.length));
       validation.push(...current.validation.slice(0, 128 - validation.length));
       rejectionSites.push(...current.rejectionSites.slice(0, 128 - rejectionSites.length));
+      if (decisionSites.length + current.decisionSites.length > 128) decisionSitesTruncated = true;
+      decisionSites.push(...current.decisionSites.slice(0, 128 - decisionSites.length));
       orderedGuards.push(...current.orderedGuards.slice(0, 128 - orderedGuards.length));
       jsonDecoders.push(...resolved.jsonDecoders.slice(0, 64 - jsonDecoders.length));
       if (current.rejections.length && !responsibilitiesTruncated) localRejections.push({ file, codes: current.rejections });
@@ -364,7 +413,7 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
     // Deduplicate repeated calls to one symbol. A large call inventory must
     // not invalidate the pre-existing bounded static import inventory.
     const unique = new Map();
-    for (const call of resolved.calls) {
+    for (const { offset, ...call } of resolved.calls) {
       const key = JSON.stringify([call.target, call.symbol]);
       if (!unique.has(key)) unique.set(key, call);
     }
@@ -374,6 +423,6 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
   }
   return { kind: "python-static-local", checkedFiles, unparsedFiles, edges, ambiguous, truncated, calls,
     uncertainCalls, ...(responsibilities ? { definitions, validation, rejectionSites, orderedGuards, jsonDecoders, localRejections, sourceIdentifiers,
-      responsibilitiesTruncated } : {}),
+      responsibilitiesTruncated, decisionSites, decisionSitesTruncated } : {}),
     scope: "仅登记当前可读取的 Python 本地静态导入和可定位的直接调用语法。别名传播、动态调用、间接调用和实际运行路径需另行验证。" };
 }
