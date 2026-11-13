@@ -18,4 +18,8 @@
 
 先冻结 `5a1f0aa8e140f65d4e04f8c79528ad560c491eb1a6c41fe1b2dc6d6b6cb9ea57` 做先导。Windows 无模型预跑短题基线 8/8 加 6 个适配器控制，难题 21/21 加 7 个控制；两个隔离宿主已退出。随后冻结 `ae3152d06ed4740b6da3ba6e89f20fc87bf7d948444071507bc7884bafa3df8a`，加强 Python 名字重绑和输出路径判定，并提示普通章节引用生成职责。 [先导预跑](observations-0.7.28-preflight.json) · [提示与评分器字节](observations-0.7.28-fixture-pins.json) · [原生 trace 正反](observations-0.7.28-owner-trace-controls.json)
 
+最终包短题、原难题和仓库预留新题的 Windows 无模型预跑分别通过 8/8＋6、21/21＋7、18/18＋7。仓库预留新题另用已安装的 54 个运行文件重放三类职责，三条正确输入通过；功能 104/104 的错误归属仍被宿主定位为入口判定与业主要求不符。 [旧题最终包预跑](observations-0.7.28-final-preflight.json) · [新题最终包预跑](observations-0.7.28-reservation-final-preflight.json) · [安装后证据通路回放](observations-0.7.28-reservation-host-replay.json)
+
+本地串行套件 399/399；最终归档后对应架构、代码复核和输入契约定向测试 35/35。
+
 正式 DSH 放行依赖最终冻结包的真实短回归、两组盲测和独立质量证据。正式版本未变，ClearAI 真实对比在放行后执行。

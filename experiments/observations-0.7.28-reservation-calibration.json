@@ -512,7 +512,7 @@
     "misplacedDecisionH2": {
       "stage": "g2",
       "sourcePins": {
-        "entry.py": "d379e99c837d1dd16e9089b1b28547e6eb1d22b1f90b766a8b8b3dacd579bb09",
+        "entry.py": "9b7397a2769f1861d3e11ba9b46df8d1e7ead5676acb410b7d942afc33167bd9",
         "events.py": "f066520b637d4c4d0cf3c98530873ba03f05fba35cf5e9ca7672bd110eb781f8",
         "ledger.py": "b4111b2989f1623be2ad65b2b3e8a9336151813fcd89b983ecb4a57ec03b98d1",
         "windows.py": "10dfe6f78d05eee7b6d559eacfd2727848fdc2b53d89f1897b8a482bf1056d85"
@@ -529,9 +529,10 @@
           "boundaryOk": true,
           "transportOnlyIO": true,
           "functions": [
-            "main"
+            "main",
+            "process_decoded"
           ],
-          "lineCount": 24
+          "lineCount": 27
         },
         "events": {
           "parse": true,
@@ -596,10 +597,15 @@
     "forward": {
       "path": "entry.py",
       "line": 15
+    },
+    "misplacedBusiness": {
+      "path": "entry.py",
+      "line": 10
     }
   },
   "traceControls": {
     "business": {
+      "stdinSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
       "stdout": {
         "status": "error",
         "error": "invalid-request",
@@ -795,6 +801,7 @@
       ]
     },
     "fallback": {
+      "stdinSha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96",
       "stdout": {
         "status": "error",
         "error": "invalid-request",
@@ -986,9 +993,19 @@
       ]
     },
     "forward": {
+      "stdinSha256": "671157c5802aa3206774431d7e987b088d13ceaaabe0434218ac593ab64aadf2",
       "stdout": {
         "status": "ok",
-        "active": [],
+        "active": [
+          {
+            "id": "inspection",
+            "resource": "dock",
+            "owner": "dispatch",
+            "start": 0,
+            "end": 10,
+            "revision": 1
+          }
+        ],
         "results": []
       },
       "executed": [
@@ -1198,6 +1215,34 @@
         },
         {
           "path": "events.py",
+          "line": 31
+        },
+        {
+          "path": "events.py",
+          "line": 32
+        },
+        {
+          "path": "events.py",
+          "line": 22
+        },
+        {
+          "path": "events.py",
+          "line": 13
+        },
+        {
+          "path": "events.py",
+          "line": 23
+        },
+        {
+          "path": "events.py",
+          "line": 18
+        },
+        {
+          "path": "events.py",
+          "line": 34
+        },
+        {
+          "path": "events.py",
           "line": 35
         },
         {
@@ -1221,8 +1266,28 @@
           "line": 66
         },
         {
+          "path": "ledger.py",
+          "line": 13
+        },
+        {
           "path": "windows.py",
           "line": 16
+        },
+        {
+          "path": "windows.py",
+          "line": 17
+        },
+        {
+          "path": "windows.py",
+          "line": 18
+        },
+        {
+          "path": "windows.py",
+          "line": 20
+        },
+        {
+          "path": "windows.py",
+          "line": 6
         },
         {
           "path": "windows.py",
@@ -1251,6 +1316,7 @@
       ]
     },
     "misplacedBusiness": {
+      "stdinSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
       "stdout": {
         "status": "error",
         "error": "invalid-request",
@@ -1409,23 +1475,15 @@
         },
         {
           "path": "entry.py",
-          "line": 23
-        },
-        {
-          "path": "entry.py",
-          "line": 24
-        },
-        {
-          "path": "entry.py",
-          "line": 9
-        },
-        {
-          "path": "entry.py",
-          "line": 10
-        },
-        {
-          "path": "entry.py",
           "line": 15
+        },
+        {
+          "path": "entry.py",
+          "line": 26
+        },
+        {
+          "path": "entry.py",
+          "line": 27
         },
         {
           "path": "entry.py",
@@ -1437,7 +1495,23 @@
         },
         {
           "path": "entry.py",
-          "line": 20
+          "line": 22
+        },
+        {
+          "path": "entry.py",
+          "line": 9
+        },
+        {
+          "path": "entry.py",
+          "line": 10
+        },
+        {
+          "path": "entry.py",
+          "line": 11
+        },
+        {
+          "path": "entry.py",
+          "line": 23
         }
       ]
     }
@@ -1445,19 +1519,19 @@
   "performance": [
     {
       "control": "fast-h1",
-      "elapsedMs": 134.556,
+      "elapsedMs": 146.072,
       "id": "performance-hot-resource",
       "status": "passed"
     },
     {
       "control": "fast-h2",
-      "elapsedMs": 164.387,
+      "elapsedMs": 164.155,
       "id": "performance-hot-resource-closed",
       "status": "passed"
     },
     {
       "control": "slow-h1",
-      "elapsedMs": 1010.233,
+      "elapsedMs": 1010.168,
       "id": "performance-hot-resource",
       "status": "error",
       "failure": "case timeout"
