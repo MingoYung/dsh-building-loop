@@ -1,0 +1,74 @@
+{
+  "spec": "building-loop-frozen-diagnostic-pointer-control/1",
+  "archiveSha256": "aceea1bde63ce45d825b9df027b6a5f13a4381668323ccb25d22410f6a85a996",
+  "scope": "Read-only WSL bubblewrap replay of both .29 checkpoints on one new public synthetic input, compared by current exact .30 host source. No private evaluator input or live native receipt.",
+  "fixture": "nested-closed-window-reserve",
+  "expected": {
+    "exitCode": 0,
+    "json": "window-closed",
+    "pointer": "/error"
+  },
+  "modelCalls": 0,
+  "rows": [
+    {
+      "arm": "wrong",
+      "artifacts": [
+        {
+          "path": "entry.py",
+          "sha256": "c7619f0bf745136bdb0b296f5b623e123689f6a4efc8bf80f96cdc162c5fe063"
+        },
+        {
+          "path": "events.py",
+          "sha256": "bbc018ac95df28867d5c61b67d14b16d1f71712c88cb44dc021d8f8c950559a2"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "0aada2bf4686b33b2ffd160ccc510639f0fe37ece639d282c391a9ad683161b1"
+        }
+      ],
+      "comparison": {
+        "outcome": "mismatch",
+        "actual": {
+          "exitCode": 0,
+          "output": "missing-field",
+          "responseStatus": "ok"
+        }
+      },
+      "receiptMinted": true,
+      "receiptScope": "independent"
+    },
+    {
+      "arm": "fixed",
+      "artifacts": [
+        {
+          "path": "entry.py",
+          "sha256": "c7619f0bf745136bdb0b296f5b623e123689f6a4efc8bf80f96cdc162c5fe063"
+        },
+        {
+          "path": "events.py",
+          "sha256": "bbc018ac95df28867d5c61b67d14b16d1f71712c88cb44dc021d8f8c950559a2"
+        },
+        {
+          "path": "ledger.py",
+          "sha256": "77e29150e5a94394fce0cae37d08583c66d08f92e46e3536591dc5724de12870"
+        },
+        {
+          "path": "windows.py",
+          "sha256": "e86e6c8bb42baab7b8c4b1b33f092dc8643a6dd27e028054a8510c8a7edf3e79"
+        }
+      ],
+      "comparison": {
+        "outcome": "match",
+        "actual": {
+          "exitCode": 0,
+          "json": "window-closed"
+        }
+      },
+      "receiptMinted": false
+    }
+  ]
+}
