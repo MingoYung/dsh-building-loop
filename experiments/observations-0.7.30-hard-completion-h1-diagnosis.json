@@ -1,0 +1,121 @@
+{
+  "archiveSha256": "aceea1bde63ce45d825b9df027b6a5f13a4381668323ccb25d22410f6a85a996",
+  "scope": "Completed stage records, compact native event journal, frozen source and no-model public control",
+  "h1": {
+    "run": "r-B93uuY",
+    "passed": 57,
+    "total": 60,
+    "terminal": "blocked",
+    "source": {
+      "file": "events.py",
+      "line": 71,
+      "sha256": "07ea328fc9a3f3c498e356240b082e4b687e7ae9fa76df84621876695c6d54fe"
+    },
+    "publicSignedFailures": [
+      "apply-bounds-empty",
+      "apply-bounds-over-limit",
+      "apply-reject-bad-event-list"
+    ],
+    "scorerLocator": {
+      "file": "hard_assess.py",
+      "lines": [
+        82,
+        83,
+        85
+      ],
+      "expects": "invalid-request"
+    },
+    "ownerSpecLocator": {
+      "file": "SPEC.md",
+      "line": 7,
+      "shapeBoundPresent": true,
+      "literalExpectedEnvelopeCodePresent": false
+    },
+    "ownerMappedReplayForSignedTarget": false,
+    "diagnosticRounds": [
+      {
+        "artifactSha256": "3eef94a965638b28569ceabf01fcc6d8000f51364b57e8475a3501958188b968",
+        "signedTarget": "apply-bounds-empty",
+        "independentProof": {
+          "id": "stall-proof-7faa87a11e060e7b6bb9689a5dd960579adf87761ff12d0405e7bf03e9809fad",
+          "nativeResultSeq": 61,
+          "role": "diagnostician",
+          "elapsedMs": 128686
+        },
+        "investigatorSubmitted": 67,
+        "coordinatorVerified": 167
+      },
+      {
+        "artifactSha256": "1906df4e6577654c32550cf518535658489ee76f35d8f33c4286375d4b9ad3d5",
+        "signedTarget": "apply-bounds-empty",
+        "independentProof": {
+          "id": "stall-proof-fddfb6c52ab8db163fd0500b27883c61438353780220460664d72bc6b202b8a8",
+          "nativeResultSeq": 65,
+          "role": "diagnostician",
+          "elapsedMs": 185594
+        },
+        "investigatorSubmitted": 71,
+        "coordinatorVerified": 244
+      },
+      {
+        "artifactSha256": "d1479aa5f12f4c2b557a42a7fb0568f1cc901e2a48e19bc217cbddd5ae0f1cbe",
+        "signedTarget": "apply-bounds-empty",
+        "investigatorBlocks": [
+          47,
+          138
+        ],
+        "independentProof": {
+          "id": "stall-proof-f0bb0548068555207772c3ef478f6577310d4128edd7f6b56c5bdb9abf68ebbb",
+          "nativeResultSeq": 96,
+          "role": "diagnostician",
+          "elapsedMs": 371632
+        }
+      }
+    ],
+    "lastInvestigator": {
+      "checkedSignedFailuresAtResultSeq": 78,
+      "unrelatedPublicReplayResultSeq": 66,
+      "literalErrorDeniedResultSeq": 90,
+      "independentMissingFieldProofResultSeq": 96,
+      "terminalBlockResultSeq": 138
+    },
+    "finding": "The selected public envelope cases remained wrong. Two earlier independent symptoms passed coordinator verification but did not settle the signed target. The final missing-field proof was independent and remained unsubmitted. SPEC names the list bound and invalid-event for malformed individual events without assigning the signed code to malformed apply envelopes."
+  },
+  "h2": {
+    "run": "r-RSlZOO",
+    "passed": 103,
+    "total": 104,
+    "terminal": "blocked",
+    "source": {
+      "file": "events.py",
+      "lines": [
+        54,
+        55
+      ],
+      "sha256": "ca0be03ad078be60b7df1fdec559d928ba7e2ffe1afdb82c91ac65a98f9ae253"
+    },
+    "publicSignedFailures": [
+      "revision-invalid-window-count"
+    ],
+    "scorerLocator": {
+      "file": "hard_assess.py",
+      "line": 143,
+      "expects": "invalid-window"
+    },
+    "ownerSpecLocator": {
+      "file": "CHANGE-G2.md",
+      "line": 3,
+      "rowCeilingPresent": true,
+      "literalExpectedCeilingCodePresent": false
+    },
+    "executorBlockResultSeqs": [
+      210,
+      271
+    ],
+    "reviewReached": false,
+    "rawStdinMaximumBytes": 8192,
+    "publicBoundaryExampleBytes": 912234,
+    "pairedReplaySha256": "d0dc68ee54350a3b436121da2786653aaf739ff436c9e6932071310a75d19b91",
+    "finding": "The frozen executor returned invalid-request at 24,001 rows and explicitly reported that the raw recipe could not exercise the upper-bound case. The correction changes that one branch on a separate copy and keeps the 24,000-row control passing."
+  }
+}
