@@ -12,7 +12,8 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag) {
     throw new Error("只在派单前、代码待审或架构退回时登记架构稿；正在工作的子会话须先结束阶段");
   }
   const goal = goalSnapshot(frame);
-  let plan = architectureDocument(frame, spec.architecture);
+  const diagnostics = spec.codeTask.diagnostics;
+  let plan = architectureDocument(frame, spec.architecture, diagnostics);
   const previous = frame.state.engineeringArchitecture?.[keyOf(plan.file)];
   if (previous?.goalSha256 !== goal.sha256 && previous?.contentsSha256 === plan.contentsSha256) {
     throw new Error("目标已变化，请把受影响的架构、回退与验证计划实际更新到 " + plan.file);
@@ -26,7 +27,7 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag) {
       if (!before || digest(before) !== imports.sha256) throw new Error("静态导入生成时架构正文已变化，请重新登记");
       return imports.proposed;
     }, "宿主根据当前代码更新实际本地静态导入", tag, frame.state.markers);
-    plan = architectureDocument(frame, spec.architecture);
+    plan = architectureDocument(frame, spec.architecture, diagnostics);
   }
   const snapshot = { ...plan, goalSha256: goal.sha256, unit, owner: frame.agent.id };
   frame.state.engineeringArchitecture = { ...frame.state.engineeringArchitecture, [keyOf(plan.file)]: snapshot };
@@ -56,8 +57,13 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
   const bytes = readBytes(frame.root, file);
   if (snapshot?.file !== file || !bytes || snapshot.sha256 !== digest(bytes) ||
     snapshot.goalSha256 !== goalSnapshot(frame).sha256) return false;
-  try { return architectureDocument(frame, spec.architecture).sha256 === snapshot.sha256 &&
-    (!checkImports || !spec.architecture.importsHeading || inspectArchitectureImports(frame, spec, active).match); }
+  try {
+    const plan = architectureDocument(frame, spec.architecture, spec.codeTask.diagnostics);
+    // Rebuild the typed data from the exact document before any runner uses the
+    // stored examples. The validated data must still be that revision's data.
+    return plan.sha256 === snapshot.sha256 && JSON.stringify(plan.examples) === JSON.stringify(snapshot.examples) &&
+      (!checkImports || !spec.architecture.importsHeading || inspectArchitectureImports(frame, spec, active).match);
+  }
   catch { return false; }
 }
 
@@ -76,18 +82,19 @@ export function engineeringArchitectureStatus(frame, unit) {
   const spec = frame.policy.units[unit];
   if (!spec?.architecture || frame.role !== "coordinator") return;
   const active = frame.state.units[unit];
-  const { file, headings } = spec.architecture;
+  const { file, headings, examplesHeading } = spec.architecture;
+  const contract = { file, headings, ...(examplesHeading ? { examplesHeading } : {}) };
   if (active?.phase === "architecture-repair") {
-    return { file, headings, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };
+    return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };
   }
   if (active?.phase === "architecture-sync") {
-    return { file, headings, status: "sync", next: { action: "architecture", unit } };
+    return { ...contract, status: "sync", next: { action: "architecture", unit } };
   }
   try {
     const snapshot = requireEngineeringArchitecture(frame, unit, spec, active);
-    return { file, headings, status: "registered", sha256: snapshot.sha256 };
+    return { ...contract, status: "registered", sha256: snapshot.sha256 };
   } catch (error) {
-    return { file, headings, status: "required", reason: error.message, next: { action: "architecture", unit } };
+    return { ...contract, status: "required", reason: error.message, next: { action: "architecture", unit } };
   }
 }
 

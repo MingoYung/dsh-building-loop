@@ -111,10 +111,58 @@ function readableModuleBody(source) {
     fromMarkdown(source, options).children.some(node => !["html", "definition", "footnoteDefinition"].includes(node.type));
 }
 
+const exampleKeys = new Set(["id", "recipe", "stdin", "expectedExitCode", "expectedJson"]);
+const exampleBytes = 16 * 1024;
+
+/** Parse the exact visible Markdown fence as data. The runner, its executable,
+ * arguments and mounts come from the maintainer's recipe, never this file. */
+function architectureExamples(nodes, content, heading, firstLine, diagnostics) {
+  const fence = nodes[0];
+  const invalid = message => new Error("架构示例「" + heading + "」" + message);
+  if (nodes.length !== 1 || fence.type !== "code" || fence.lang !== "json" || fence.meta !== null) {
+    throw invalid("须仅包含一个 json 围栏，说明文字请写在其他章节");
+  }
+  const lines = content.slice(fence.position.start.offset, fence.position.end.offset).split(/\r\n|\n|\r/u);
+  const opener = /^(\x60{3,}|~{3,})[ \t]*json[ \t]*$/u.exec(lines[0])?.[1];
+  const closer = /^[ \t]{0,3}(\x60{3,}|~{3,})[ \t]*$/u.exec(lines.at(-1))?.[1];
+  if (!opener || !closer || opener[0] !== closer[0] || closer.length < opener.length ||
+    Buffer.byteLength(fence.value) > exampleBytes) throw invalid("须完整闭合且 JSON 正文最多 16 KiB");
+  let cases;
+  try {
+    cases = JSON.parse(fence.value, (key, value) => {
+      if (!key.isWellFormed() || typeof value === "string" && !value.isWellFormed() ||
+        typeof value === "number" && !Number.isFinite(value)) throw invalid("包含无法验证的 JSON 值");
+      return value;
+    });
+  } catch {
+    throw invalid("须提供有效且有界的 JSON 数据");
+  }
+  if (!Array.isArray(cases) || !cases.length || cases.length > 8) throw invalid("须包含 1 至 8 条自包含输入与预期结果");
+  const ids = new Set();
+  for (const row of cases) {
+    if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).some(key => !exampleKeys.has(key)) ||
+      typeof row.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u.test(row.id) || ids.has(row.id) ||
+      !Number.isSafeInteger(row.expectedExitCode) || row.expectedExitCode < 0 || row.expectedExitCode > 0xffffffff) {
+      throw invalid("须使用唯一 ID 和明确退出码，且不得包含未登记字段");
+    }
+    if (typeof row.recipe !== "string" || row.recipe === diagnostics?.syntaxRecipe ||
+      !diagnostics?.reviewRecipes?.includes(row.recipe)) throw invalid("引用未授权的运行配方");
+    if (row.stdin !== undefined && (typeof row.stdin !== "string" || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(row.stdin) ||
+      Buffer.byteLength(row.stdin) > 8 * 1024)) throw invalid("stdin 须为不超过 8 KiB 的受限 UTF-8 文本");
+    if (Object.hasOwn(row, "expectedJson") && Buffer.byteLength(JSON.stringify(row.expectedJson)) > 2048) {
+      throw invalid("预期 JSON 最多 2 KiB");
+    }
+    ids.add(row.id);
+  }
+  const result = { heading, start: firstLine + fence.position.start.line - 1, end: firstLine + fence.position.end.line - 1, cases };
+  if (Buffer.byteLength(JSON.stringify(result)) > exampleBytes) throw invalid("登记结果最多 16 KiB");
+  return result;
+}
+
 /** An architecture checkpoint uses the two visible, unique navigation links and
  * substantive Markdown beneath each maintainer-declared heading. */
-export function architectureDocument(frame, spec) {
-  const { file, headings } = spec;
+export function architectureDocument(frame, spec, diagnostics) {
+  const { file, headings, examplesHeading } = spec;
   const { overview, index } = frame.policy.hierarchy;
   const top = requiredDocument(frame.root, overview.path);
   const middle = requiredDocument(frame.root, index.path);
@@ -127,10 +175,15 @@ export function architectureDocument(frame, spec) {
   const source = decoder.decode(bytes);
   const doc = document(file, source);
   const sections = [];
+  let examples;
   const bodies = headings.map(title => {
     const anchor = section(doc, title);
     const content = source.slice(anchor.end, anchor.stop);
-    const substantive = fromMarkdown(content, options).children.filter(node =>
+    const nodes = fromMarkdown(content, options).children;
+    if (title === examplesHeading) {
+      examples = architectureExamples(nodes, content, title, source.slice(0, anchor.end).split(/\r\n|\n|\r/u).length, diagnostics);
+    }
+    const substantive = nodes.filter(node =>
       ["paragraph", "list", "table", "code"].includes(node.type));
     const normalized = substantive.map(node => content.slice(node.position.start.offset, node.position.end.offset).trim().replace(/\s+/gu, " "));
     if (!normalized.length || normalized.every(value => /^(?:[-*+>]\s*)?(?:待填写|待补充|暂无|未填写|TODO|TBD|placeholder|…|\.{3})[。.!！\s]*$/iu.test(value))) {
@@ -139,9 +192,12 @@ export function architectureDocument(frame, spec) {
     const next = doc.headings.find(item => item.start === anchor.stop);
     const end = next ? next.line - 1 : source.trimEnd().split(/\r\n|\n|\r/u).length;
     sections.push({ heading: title, start: anchor.line, end });
-    return normalized;
+    // Preserve whitespace inside stdin strings in the meaningful-content
+    // digest. Else a goal change could treat different executable inputs as equal.
+    return title === examplesHeading ? examples.cases : normalized;
   });
-  return { file, sha256: digest(bytes), headings, sections, contentsSha256: digest(JSON.stringify(bodies)) };
+  return { file, sha256: digest(bytes), headings, sections, contentsSha256: digest(JSON.stringify(bodies)),
+    ...(examples ? { examples } : {}) };
 }
 
 /** Locate the designated generated section through the same visible-heading parser. */

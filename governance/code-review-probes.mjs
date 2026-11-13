@@ -1,0 +1,124 @@
+import { isDeepStrictEqual } from "node:util";
+import { digest, includes, keyOf, relativeName } from "./policy.mjs";
+
+function expectedOutput(value) {
+  if (value === undefined) return {};
+  if (typeof value !== "string" || Buffer.byteLength(value) > 2048) throw new Error("expectedJson 须为不超过 2 KiB 的 JSON 文本");
+  try { return { json: JSON.parse(value) }; }
+  catch { throw new Error("expectedJson 不是有效 JSON"); }
+}
+
+/** The maintainer approves recipes. Models only supply data, and the
+ * compiler recipe receives the exact signed filename as its only argument. */
+export function reviewProbeRequest(args, frame, active, spec, architecture) {
+  const { reviewRecipes, syntaxRecipe } = spec.codeTask.diagnostics ?? {};
+  const { assertion, exampleId, file, recipe, stdin, expectedExitCode, expectedJson } = args;
+  if (assertion === "architecture") {
+    if ([file, recipe, stdin, expectedExitCode, expectedJson].some(value => value !== undefined)) {
+      throw new Error("架构示例只填写 exampleId，输入和预期由已登记的架构稿提供");
+    }
+    const example = architecture?.examples?.cases.find(row => row.id === exampleId);
+    if (!example) throw new Error("当前架构稿没有该可执行示例");
+    return { type: assertion, exampleId, file: architecture.file, start: architecture.examples.start, end: architecture.examples.end,
+      input: { recipe: example.recipe, ...(example.stdin === undefined ? {} : { stdin: example.stdin }) },
+      expected: { exitCode: example.expectedExitCode,
+        ...(Object.hasOwn(example, "expectedJson") ? { json: example.expectedJson } : {}) } };
+  }
+  if (!["runtime", "syntax"].includes(assertion) || exampleId !== undefined) throw new Error("复核断言类型无效");
+  const source = relativeName(file);
+  if (!includes(frame.reads, source) || !spec.codeTask.sources.includes(source) ||
+    !active.codeIntake.qualification?.artifacts.some(row => row.path === source && row.sha256)) {
+    throw new Error("复现须定位到当前签名且可读取的源码");
+  }
+  if (assertion === "syntax") {
+    if (!syntaxRecipe || [recipe, stdin, expectedExitCode, expectedJson].some(value => value !== undefined)) {
+      throw new Error("语法复核需要维护者登记编译配方，只填写当前源码 file");
+    }
+    return { type: assertion, file: source, input: { recipe: syntaxRecipe, args: [source] }, expected: { exitCode: 0 } };
+  }
+  if (!reviewRecipes?.includes(recipe) || recipe === syntaxRecipe) throw new Error("该行为复核配方未获授权");
+  if (!Number.isSafeInteger(expectedExitCode) || expectedExitCode < 0 || expectedExitCode > 0xffffffff) {
+    throw new Error("行为复核须先提供预期退出码 expectedExitCode");
+  }
+  return { type: assertion, file: source, input: { recipe, ...(stdin === undefined ? {} : { stdin }) },
+    expected: { exitCode: expectedExitCode, ...expectedOutput(expectedJson) } };
+}
+
+export function reviewProbeId(binding, check) {
+  return "probe-" + digest(JSON.stringify({ binding, check })).slice(0, 36);
+}
+
+/** An unavailable runner or clipped relevant output provides no verdict. */
+export function compareReviewProbe(check, result) {
+  if (!["passed", "failed"].includes(result.status) || !result.probe) return { outcome: "unavailable" };
+  const { exitCode, stdout, truncated } = result.probe;
+  const actual = { exitCode };
+  if (check.type === "syntax") {
+    if (truncated || stdout === undefined) return { outcome: "unavailable" };
+    let output;
+    try { output = JSON.parse(stdout); }
+    catch { return { outcome: "unavailable" }; }
+    if (exitCode === 0 && output?.status === "parsed") return { outcome: "match", actual };
+    if (exitCode === 1 && output?.status === "syntax-error" && Number.isSafeInteger(output.line) && output.line > 0) {
+      return { outcome: "mismatch", actual: { ...actual, line: output.line } };
+    }
+    return { outcome: "unavailable" };
+  }
+  let match = exitCode === check.expected.exitCode;
+  if (Object.hasOwn(check.expected, "json") && match) {
+    if (truncated || stdout === undefined) return { outcome: "unavailable" };
+    try { actual.json = JSON.parse(stdout); }
+    catch { actual.output = "invalid-json"; }
+    match = Object.hasOwn(actual, "json") && isDeepStrictEqual(actual.json, check.expected.json);
+  }
+  return { outcome: match ? "match" : "mismatch", actual };
+}
+
+export function reviewProbeRows(frame, active, binding) {
+  const saved = active.codeReviewProbes;
+  return saved?.actor === frame.agent.id && saved.serial === active.serial && saved.binding === binding ? saved.rows : [];
+}
+
+export function requireReviewProbeCapacity(rows, id, type) {
+  // Required registered examples have their own slots. A reviewer can
+  // exhaust exploratory runs without making a correct review impossible.
+  if (type !== "architecture" && !rows.some(row => row.id === id) &&
+    rows.filter(row => row.type !== "architecture").length >= 16) {
+    throw new Error("当前核验已使用 16 次探索复现。已登记的架构示例仍可运行");
+  }
+}
+
+export function saveReviewProbe(frame, active, binding, id, check, result) {
+  const resultRow = compareReviewProbe(check, result);
+  if (resultRow.outcome === "unavailable") return { id, ...resultRow };
+  const rows = reviewProbeRows(frame, active, binding);
+  const { input, expected, ...location } = check;
+  const { outcome, actual } = resultRow;
+  const pin = value => ({ exitCode: value.exitCode,
+    ...(value.line ? { line: value.line } : {}),
+    ...(Object.hasOwn(value, "json") ? { jsonSha256: digest(JSON.stringify(value.json)) } : {}),
+    ...(value.output ? { output: value.output } : {}) });
+  // Keep potentially sensitive candidate stdout inside the current role's
+  // tool response. The coordinator-visible receipt stores only its pin.
+  const entry = { id, ...location, recipe: input.recipe, expected: pin(expected), outcome, actual: pin(actual),
+    snapshotSha256: result.snapshotSha256, inputSha256: digest(JSON.stringify(input)) };
+  requireReviewProbeCapacity(rows, id, check.type);
+  active.codeReviewProbes = { actor: frame.agent.id, serial: active.serial, binding,
+    rows: [...rows.filter(row => row.id !== id), entry] };
+  frame.changed = true;
+  return { ...entry, actual };
+}
+
+/** A proof can only support a finding by this actor for the bound bytes. */
+export function reviewReproduction(frame, active, binding, id, location) {
+  const proof = reviewProbeRows(frame, active, binding).find(row => row.id === id);
+  if (!proof || proof.type !== location.type || keyOf(proof.file) !== keyOf(location.file)) {
+    throw new Error("复现证明不属于当前角色、签名版本或发现位置");
+  }
+  if (proof.outcome !== "mismatch") throw new Error("实际运行符合预期，不能将该复现作为退回理由");
+  if (proof.actual.line && (location.start > proof.actual.line || location.end < proof.actual.line) ||
+    proof.exampleId && (location.end < proof.start || location.start > proof.end)) {
+    throw new Error("发现位置未覆盖实际出错行或已登记示例");
+  }
+  return proof;
+}

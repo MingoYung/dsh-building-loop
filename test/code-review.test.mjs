@@ -113,6 +113,24 @@ test("signed code review uses actual changed lines and an independent receipt be
   assert.deepEqual(invalidReplacement.progress.pendingCorrections, [{ field: "constraints", id: "batch-bound" }]);
   await assert.rejects(codeReview(harness, reviewer, "submit"), /待修正 batch-bound/);
   assert.equal((await codeReview(harness, reviewer, "record", { constraints: verified.constraints })).progress.ready, true);
+  const note = { ...ref(worker, 2), id: "cap-note", kind: "annotation", observation: "The memory rationale is sufficient.",
+    suggestion: "Consider documenting the value at its configuration source later.",
+    evidence: [{ ...ref(worker, 3), relation: "supports" }] };
+  const { suggestion, ...sameResult } = note;
+  const badFinding = { ...sameResult, issue: "No defect observed", fix: "No change needed",
+    violation: { type: "annotation", expected: "The rationale is present.", actual: "  The rationale  is present. " } };
+  const bad = await codeReview(harness, reviewer, "record", { findings: [badFinding], findingsDone: true });
+  assert.match(bad.errors[0].reason, /实际结果等于要求.*observations/);
+  assert.deepEqual(bad.progress.missingFiles, []);
+  assert.deepEqual(bad.progress.missingCases, []);
+  assert.equal(bad.progress.ready, false);
+  const syntax = { ...badFinding, violation: { type: "syntax", expected: "Valid Python syntax", actual: "Unterminated string" } };
+  assert.match((await codeReview(harness, reviewer, "record", { findings: [syntax] })).errors[0].reason, /受信复现编号/);
+  const unavailableSyntax = { ...syntax, violation: { ...syntax.violation, reproduction: "missing-probe" } };
+  assert.match((await codeReview(harness, reviewer, "record", { findings: [unavailableSyntax] })).errors[0].reason, /复现证明不属于|尚未证明/);
+  const valid = await codeReview(harness, reviewer, "record", { observations: [{ ...note, suggestion }], findingsDone: true });
+  assert.deepEqual(valid.progress.observationIds, [note.id]);
+  assert.equal(valid.progress.ready, true);
   assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
   await assert.rejects(harness.ledger("root", "review", { decisions: [] }), /复核阶段/);
   const auditor = (await harness.flow("root", "advance")).childId;
@@ -121,6 +139,8 @@ test("signed code review uses actual changed lines and an independent receipt be
   const blind = await prepareReview(harness, auditor);
   assert.equal(blind.codeReview.binding, packet.codeReview.binding);
   assert.ok(!JSON.stringify(blind).includes(verified.files[0].basis));
+  assert.ok(!JSON.stringify(blind).includes(note.observation));
+  assert.deepEqual(blind.codeReview.progress.observationIds, []);
   assert.deepEqual(blind.codeReview.progress.missingFiles, [worker]);
   assert.deepEqual(blind.codeReview.progress.missingCases, ["batch-bound"]);
   await assert.rejects(harness.file(auditor, "read", "first.json"), /授权|白名单/);
@@ -135,6 +155,9 @@ test("signed code review uses actual changed lines and an independent receipt be
   assert.equal(receipt.codeReview.binding, receipt.independentAudit.codeReview.binding);
   assert.equal(receipt.codeReview.files[0].comment.quote, verified.files[0].comment.quote);
   assert.equal(receipt.codeReview.files[0].comment.annotationSha256, digest(verified.files[0].comment.quote));
+  assert.deepEqual(receipt.codeReview.findings, []);
+  assert.equal(receipt.codeReview.observations[0].suggestion, suggestion);
+  assert.equal(receipt.independentAudit.codeReview.observations, undefined);
   assert.equal(receipt.coverage, undefined);
   const book = await harness.ledger("root", "read");
   await harness.file("root", "read", goal);
@@ -164,6 +187,7 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   const finding = { ...ref(worker, 2), id: "cap-ownership", kind: "annotation",
     observation: "The comment gives the memory reason. The clamp on the next line hard-codes the cap.",
     issue: "The comment omits the ownership of the cap value", fix: "Explain why this queue owns the bound",
+    violation: { type: "annotation", expected: "Identify why this queue owns the fixed cap", actual: "The memory reason alone is documented" },
     evidence: [{ ...ref(worker, 3), relation: "supports" }], caseId: "batch-bound" };
   const fake = { ...finding, evidence: [{ ...finding.evidence[0], quote: "return n" }] };
   const invalid = await codeReview(harness, auditor, "record", { ...verified, findings: [fake], findingsDone: true });
@@ -172,6 +196,19 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   assert.deepEqual(invalid.progress.missingCases, []);
   assert.equal(invalid.progress.findingsDone, false);
   assert.equal((await codeReview(harness, auditor, "record", { findings: [finding], findingsDone: true })).progress.ready, true);
+  const observation = { ...ref(worker, 2), id: finding.id, kind: "annotation", observation: finding.observation, evidence: finding.evidence };
+  const failedMove = await codeReview(harness, auditor, "record", { removeFindings: [finding.id],
+    observations: [{ ...observation, evidence: [] }] });
+  assert.deepEqual(failedMove.progress.findingIds, [finding.id]);
+  assert.deepEqual(failedMove.progress.observationIds, []);
+  const move = await codeReview(harness, auditor, "record", { removeFindings: [finding.id], observations: [observation] });
+  assert.deepEqual(move.progress.findingIds, []);
+  assert.deepEqual(move.progress.observationIds, [finding.id]);
+  assert.equal(move.progress.ready, true);
+  const reverse = await codeReview(harness, auditor, "record", { removeObservations: [finding.id], findings: [finding], findingsDone: true });
+  assert.deepEqual(reverse.progress.findingIds, [finding.id]);
+  assert.deepEqual(reverse.progress.observationIds, []);
+  assert.equal(reverse.progress.ready, true);
   assert.equal((await codeReview(harness, auditor, "submit")).phase, "supplement-ready");
   const active = await harness.flow("root", "advance");
   assert.equal(active.childId, executor);

@@ -25,7 +25,8 @@ import { captureCodeIntake, prepareCodeIntake, requireCodeRegressionCurrent, ver
 import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./code-submission.mjs";
 import { CODE_COMMENT_RULE, captureCodeReviewBaseline, codeReviewSchema, currentCodeReview, isCodeReviewUnit,
   inspectArchitectureImports, prepareCodeReview, recordCodeReview, verifyCodeReview } from "./code-review.mjs";
-import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeDiagnostics, prepareCodeReproduction, runCodeDiagnostics } from "./code-diagnostics.mjs";
+import { codeDiagnosticsCurrent, diagnosticRunnerConfig, prepareCodeDiagnostics, prepareCodeReproduction, prepareReviewReproduction, runCodeDiagnostics } from "./code-diagnostics.mjs";
+import { requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, saveReviewProbe } from "./code-review-probes.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
@@ -246,7 +247,8 @@ function architectureNext(frame, unit) {
   const previous = frame.state.units[unit]?.engineeringArchitecture ?? frame.state.engineeringArchitecture?.[keyOf(status.file)];
   let needsWrite = true;
   try {
-    const plan = architectureDocument(frame, frame.policy.units[unit].architecture);
+    const spec = frame.policy.units[unit];
+    const plan = architectureDocument(frame, spec.architecture, spec.codeTask?.diagnostics);
     const sameContents = plan.contentsSha256 === previous?.contentsSha256;
     needsWrite = sameContents && (status.status === "repair" || previous.goalSha256 !== goalSnapshot(frame).sha256);
   } catch { /* Missing or incomplete plans need a concrete write first. */ }
@@ -473,7 +475,8 @@ export function apply(ctx, config = {}) {
     // The authority grants the host permission to generate this projection;
     // model file writes cannot replace a complete state-derived snapshot.
     const writes=grant.write.filter(file=>!policy.ledgerDocument||keyOf(file)!==keyOf(policy.ledgerDocument));
-    return { agent, root, policy, file, old, state, role, assignment, reads, writes, managed: binding.managed, started: binding.started };
+    return { agent, root, policy, file, old, state, role, assignment, reads, writes, managed: binding.managed,
+      started: binding.started, startedProject: owner => startedConversationProject(hostHome, owner) };
   }
 
   /** Mutations and recovery share one per-workspace lock and commit point. */
@@ -877,6 +880,10 @@ export function apply(ctx, config = {}) {
       if (codeReviewMode) {
         if (current.goal?.sha256 !== goalSnapshot(frame).sha256) throw new Error("项目目标已变，请总控 advance 重启当前代码的独立验收");
         codeReview = prepareCodeReview(frame, assignment[0], current, spec, args.codeReviewOffset);
+        const { reviewRecipes, syntaxRecipe } = spec.codeTask.diagnostics ?? {};
+        if (reviewRecipes?.length) codeReview.reproduction = { action: "probe",
+          runtimeRecipes: reviewRecipes.filter(recipe => recipe !== syntaxRecipe), syntax: Boolean(syntaxRecipe),
+          architectureExamples: (current.engineeringArchitecture?.examples?.cases ?? []).map(({ id }) => id) };
       } else if(spec&&["reviewer","auditor"].includes(frame.role)) {
         try {
           requireGoalRead(frame,current);
@@ -1226,6 +1233,9 @@ export function apply(ctx, config = {}) {
       if (resumeSame && record.codeReviewDraft?.serial === plan.prior.serial) {
         record.codeReviewDraft = { ...record.codeReviewDraft, serial: record.serial };
       } else delete record.codeReviewDraft;
+      if (resumeSame && record.codeReviewProbes?.serial === plan.prior.serial) {
+        record.codeReviewProbes = { ...record.codeReviewProbes, serial: record.serial };
+      } else delete record.codeReviewProbes;
       if (!resumeSame) delete record.interruptions;
       if (!resumeSame) delete record.restoredCheckpointBinding;
       if (!resumeSame) delete record.reusedProofMaterials;
@@ -1567,6 +1577,7 @@ export function apply(ctx, config = {}) {
     const proof = verifyCodeReview(frame, active, spec, signed);
     requireEngineeringArchitecture(frame, id, spec, active);
     delete active.codeReviewDraft;
+    delete active.codeReviewProbes;
     const rejected = proof.decision === "reject";
     const decision = rejected ? "reject" : auditing ? "accept" : "pending-audit";
     const candidateSha256 = active.codeIntake.qualification.artifacts.find(row => keyOf(row.path) === keyOf(spec.candidate)).sha256;
@@ -1925,10 +1936,80 @@ export function apply(ctx, config = {}) {
 
   /** Each code reviewer gets the same evidence contract. The host chooses the
    * review or audit transition from the assigned role and checks it again at submit. */
+  function currentReviewProbe(frame, unit) {
+    const [id, active] = frame.assignment ?? [];
+    if (!codeReviewRole(frame) || unit !== undefined && unit !== id) throw new Error("复核须使用当前子会话的授权单元");
+    const spec = unitOf(frame, id);
+    const goal = requireGoalRead(frame, active);
+    const signed = requireCodeRegressionCurrent(frame, id, active, spec, goal);
+    const architecture = requireEngineeringArchitecture(frame, id, spec, active);
+    if (frame.role === "auditor" && !currentCodeReview(frame, id, active, spec, active.pendingReceipt)) {
+      throw new Error("待复核代码、架构、目标或签名结果已经变化，须重新核验");
+    }
+    const { binding } = prepareCodeReview(frame, id, active, spec);
+    return { active, spec, signed, architecture, binding };
+  }
+
+  async function probeCodeReview(args, exec) {
+    const { agent, signal } = exec;
+    if (reproductions.has(agent)) return { status: "busy" };
+    signal?.throwIfAborted();
+    const { file } = coordinates(agent);
+    const batch = args.assertion === "architecture" && args.exampleId === undefined;
+    const { jobs, binding } = withWorkspaceLock(stateHome, file, () => {
+      const frame = scope(agent, { lockedFile: file, inspection: true });
+      const { active, spec, architecture, binding } = currentReviewProbe(frame, args.unit);
+      const examples = batch ? architecture?.examples?.cases : undefined;
+      if (batch && !examples?.length) throw new Error("当前架构稿未登记可执行示例");
+      const rows = reviewProbeRows(frame, active, binding);
+      const jobs = (examples ? examples.map(({ id }) => ({ ...args, exampleId: id })) : [args]).map(input => {
+        const check = reviewProbeRequest(input, frame, active, spec, architecture);
+        const id = reviewProbeId(binding, check);
+        const cached = rows.find(row => row.id === id);
+        requireReviewProbeCapacity(rows, id, check.type);
+        return { check, id, cached, job: cached ? null : prepareReviewReproduction(frame, check.input, diagnosticRunner) };
+      });
+      return { jobs, binding };
+    }, warnCleanup);
+    reproductions.add(agent);
+    try {
+      const rows = [];
+      for (const { check, id, cached, job } of jobs) {
+        signal?.throwIfAborted();
+        if (cached) { rows.push(cached); continue; }
+        const result = await completeDiagnostics(job, exec);
+        if (!result.probe) {
+          if (!batch || result.status === "superseded") return result;
+          rows.push({ exampleId: check.exampleId, id, outcome: "unavailable", status: result.status, reason: result.reason });
+          continue;
+        }
+        const row = change(agent, frame => {
+          const current = currentReviewProbe(frame, args.unit);
+          if (current.binding !== binding || !codeDiagnosticsCurrent(frame, job) || signal?.aborted) return { status: "superseded" };
+          return saveReviewProbe(frame, current.active, binding, id, check, result);
+        }, { claim: false });
+        if (row.status === "superseded") return row;
+        rows.push({ ...(batch ? { exampleId: check.exampleId } : {}), ...row });
+      }
+      return batch ? { examples: rows } : rows[0];
+    } finally {
+      reproductions.delete(agent);
+    }
+  }
+
   function codeReviewAction(args, exec) {
     const frame = scope(exec.agent);
     if (!codeReviewRole(frame)) throw new Error("当前会话没有纯代码核验授权");
-    const { files, constraints, findings, architecture, findingsDone, removeFindings, unit } = args;
+    const { files, constraints, findings, observations, architecture, findingsDone, removeFindings, removeObservations, unit } = args;
+    const fields = { files, constraints, findings, observations, architecture, findingsDone, removeFindings, removeObservations };
+    const { assertion, file, exampleId, recipe, stdin, expectedExitCode, expectedJson } = args;
+    if (args.action === "probe") {
+      if (Object.values(fields).some(value => value !== undefined)) throw new Error("复现动作与回执登记分开调用");
+      return probeCodeReview(args, exec);
+    }
+    if ([assertion, file, exampleId, recipe, stdin, expectedExitCode, expectedJson].some(value => value !== undefined)) {
+      throw new Error("复现参数仅用于 probe");
+    }
     if (args.action === "record") return change(exec.agent, current => {
       const [id, active] = current.assignment ?? [];
       if (!codeReviewRole(current) || unit !== undefined && unit !== id) throw new Error("代码核验记录须使用本会话当前授权单元");
@@ -1939,11 +2020,13 @@ export function apply(ctx, config = {}) {
       if (current.role === "auditor" && !currentCodeReview(current, id, active, spec, active.pendingReceipt)) {
         throw new Error("待复核代码、架构、目标或签名结果已经变化，须重新核验");
       }
-      const fields = { files, constraints, findings, architecture, findingsDone, removeFindings };
-      return recordCodeReview(current, active, spec, Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)), signed);
+      const { binding } = prepareCodeReview(current, id, active, spec);
+      return recordCodeReview(current, active, spec, Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)), signed, {
+        resolveReproduction: (proof, location) => reviewReproduction(current, active, binding, proof, location),
+      });
     });
     if (args.action !== "submit") return workflow(args, exec);
-    if ([files, constraints, findings, architecture, findingsDone, removeFindings].some(value => value !== undefined)) {
+    if (Object.values(fields).some(value => value !== undefined)) {
       throw new Error("submit 使用已登记的条目，不需要重发。先用 record 逐项登记或补正，再调用不带条目的 submit");
     }
     return workflow({ action: frame.role === "auditor" ? "audit" : "review", unit,
@@ -2080,11 +2163,18 @@ export function apply(ctx, config = {}) {
   }, assess, [...qualityNames, "revise", "sourceRefs", "unverifiedSources", "unlisted", "goalFit"]), {when:visible(["reviewer"], proseReview)});
   // Keep the prose schema out of the code reviewer's tool catalog. Both code
   // roles still submit through the same signed version and independence checks.
-  register(tool(CODE_REVIEW, "已授权的纯代码核验。prepare 获取改动、签名必测和未核条目。读实际源码与目标后用 record 分批提交 files、constraints、findings 及要求的 architecture。保留已通过的条目，只补错误或缺失条目。确认找完问题填 findingsDone:true，最后仅传 action=submit。", ["prepare", "record", "submit", "status", "block"], {
+  register(tool(CODE_REVIEW, "已授权的纯代码核验。prepare 获取改动、签名必测和未核条目。用 record 分批登记。只有待修缺陷写 findings，符合规则或无需修改的观察写 observations。probe 用已授权配方复现当前签名代码。核验完成后填 findingsDone:true，最后仅传 action=submit。", ["prepare", "probe", "record", "submit", "status", "block"], {
     ...codeReviewSchema.properties,
     unit: { ...string, description: "可省略，沿用宿主分配的当前单元。" },
     note: { ...string, description: "仅 block 填写可核实的阻塞原因。" },
     codeReviewOffset: { type: "integer", minimum: 0, description: "prepare 的变更源码分页位置，默认 0" },
+    assertion: { enum: ["architecture", "runtime", "syntax"], description: "probe 的断言类型" },
+    exampleId: { ...string, description: "architecture 可省略，一次复现全部已登记示例，已核实的用缓存" },
+    file: { ...string, description: "runtime/syntax 定位当前已授权源码" },
+    recipe: { ...string, maxLength: 128, description: "runtime 使用当前授权的数据输入配方" },
+    stdin: { ...string, maxLength: 8192, description: "runtime 的复现输入" },
+    expectedExitCode: { type: "integer", minimum: 0, maximum: 4294967295, description: "runtime 在运行前明确退出码预期" },
+    expectedJson: { ...string, maxLength: 2048, description: "runtime 可选的完整标准输出 JSON 预期" },
   }, codeReviewAction), {when:visible(["reviewer","auditor"], codeReviewRole)});
   register(tool(LEDGER, "总控登记后续计划、临时需求和搁置事项。每轮事实验收后read最新账本和项目现状，再逐项review。配置ledgerDocument时，review成功会由宿主生成完整当前账本；export也可生成阻塞时的当前快照，不改变验收状态。不要手写该文件。"+LEDGER_BASIS_RULE, ["read", "record", "review", "export"], {
     unit: { ...string, description: "复盘时指定单元；record(kind=interrupted) 指明已有宿主中断的单元时，返回原 unit-账项，勿重复登记。独立搁置任务可省略。" }, id: string, kind: { type: "string", enum: ["planned", "temporary", "interrupted"] },

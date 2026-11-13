@@ -13,9 +13,10 @@ const MAX_FINDINGS = 24;
 const PLAN_PAGE_BYTES = 16 * 1024;
 const PROOF_BYTES = 96 * 1024;
 const RECORD_LIMIT = 32;
-const KEYS = ["files", "constraints", "findings", "architecture"];
-const RECORD_KEYS = [...KEYS, "removeFindings", "findingsDone"];
+const KEYS = ["files", "constraints", "findings", "observations", "architecture"];
+const RECORD_KEYS = [...KEYS, "removeFindings", "removeObservations", "findingsDone"];
 const FINDING_KINDS = ["behavior", "maintenance", "annotation", "architecture"];
+const VIOLATION_TYPES = ["requirement", "regression", "annotation", "architecture", "maintainability", "runtime", "syntax"];
 const EVIDENCE_RELATIONS = ["supports", "contradicts", "reproduces"];
 const FINDING_ID = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/u;
 
@@ -40,23 +41,35 @@ const rows = (maxItems, properties, required = Object.keys(properties)) => ({
 const judgment = { enum: ["pass", "revise"] };
 const findingId = { type: "string", pattern: FINDING_ID.source };
 const evidenceLocation = { ...locator, properties: { ...locator.properties,
-  relation: { enum: EVIDENCE_RELATIONS, description: "相对 issue 的关系。证据支持、指出反例或可复现该问题。" },
+  relation: { enum: EVIDENCE_RELATIONS, description: "相对于该发现或观察的关系：支持、反证或复现。" },
   quote: { ...brief, description: "可省略。填写时逐字定位到该范围。" },
 }, required: [...locator.required, "relation"] };
 const architectureSections = rows(12, { heading: { type: "string" }, basis: brief,
   evidence: { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation } });
 const architecture = { type: "object", properties: { status: judgment, basis: brief, source: locator, sections: architectureSections },
   additionalProperties: false };
+const reasonEvidence = { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation };
+const violation = { type: "object", properties: {
+  type: { enum: VIOLATION_TYPES },
+  expected: { ...brief, description: "必须满足的行为、规则或安全不变量。" },
+  actual: { ...brief, description: "与该要求有实际差异的当前实现或实测结果。" },
+  requirement: { ...locator, description: "requirement、runtime 必填，定位到当前已读目标原文中的实际要求。" },
+  reproduction: { type: "string", minLength: 1, maxLength: 128, description: "runtime、syntax 必填：当前版本的受信检查编号。" },
+}, required: ["type", "expected", "actual"], additionalProperties: false };
 export const codeReviewSchema = {
   type: "object", properties: {
     files: rows(256, { file: locator.properties.file, basis: brief, comment, comments: { type: "array", maxItems: 6, items: comment } }, ["file", "basis"]),
     constraints: rows(80, { caseId: { type: "string" }, requirement: locator, code: locator, basis: brief, status: judgment }),
     findings: rows(MAX_FINDINGS, { ...locator.properties, id: findingId, kind: { enum: FINDING_KINDS },
       observation: brief, issue: brief, fix: brief, caseId: { type: "string", description: "可选，引用当前签名回归中的具体用例。" },
-      evidence: { type: "array", minItems: 1, maxItems: 4, items: evidenceLocation },
-    }, ["file", "start", "end", "kind", "observation", "issue", "fix", "evidence"]),
+      evidence: reasonEvidence, violation,
+    }, ["file", "start", "end", "kind", "observation", "issue", "fix", "evidence", "violation"]),
+    observations: rows(MAX_FINDINGS, { ...locator.properties, id: findingId, kind: { enum: FINDING_KINDS },
+      observation: brief, suggestion: brief, evidence: reasonEvidence,
+    }, ["file", "start", "end", "kind", "observation", "evidence"]),
     architecture,
     removeFindings: { type: "array", maxItems: MAX_FINDINGS, items: findingId },
+    removeObservations: { type: "array", maxItems: MAX_FINDINGS, items: findingId },
     findingsDone: { type: "boolean", description: "已记录所有发现，或核验后无发现时填 true。单独提交即可。" },
   }, additionalProperties: false,
 };
@@ -156,7 +169,8 @@ function changedRanges(before, current) {
 function proofBinding(regression, goal, architecture) {
   return digest(JSON.stringify([goal.sha256, regression.suiteSha256, regression.artifactsSha256,
     regression.receiptSha256, regression.baselineReceiptSha256,
-    ...(architecture ? [[architecture.file, architecture.sha256, architecture.headings]] : [])]));
+    ...(architecture ? [[architecture.file, architecture.sha256, architecture.headings,
+      ...(architecture.examples ? [architecture.examples] : [])]] : [])]));
 }
 
 function reviewArchitecture(frame, active, requireReadGrant) {
@@ -305,20 +319,28 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     used += size;
   }
   const nextOffset = offset + page.length;
+  const progress = reviewProgress(frame, active, current, reviewDraft(frame, active, binding));
+  // Start with the registered examples so the model need not copy each input
+  // into an ad hoc runtime request before discovering the required checks.
+  const architectureProbe = progress.architectureExamples?.missing.length
+    ? { tool: "building_loop_code_review", action: "probe", assertion: "architecture" } : undefined;
   return { binding, changes: page, changeTotal: changes.length, changeOffset: offset,
     ...(nextOffset < changes.length ? { nextChangePage: { action: "prepare", codeReviewOffset: nextOffset } } : {}),
     requiredCases, signed, goalFiles: active.goal.files.map(({ file }) => file),
     ...(architecture ? { architecture, imports: pythonImportEvidence(frame, current.artifacts) } : {}),
-    progress: reviewProgress(current, reviewDraft(frame, active, binding)),
+    progress, ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {
       files: "[{file,basis,comment:{status,basis,start,end}}]；同一文件有多个注释用 comments 数组替代 comment",
       commentQuote: COMMENT_QUOTE_RULE,
       constraints: "[{caseId,requirement:{file,start,end},code:{file,start,end},basis,status}]",
-      findings: "[{id,kind,file,start,end,observation,issue,fix,evidence:[{file,start,end,relation}]}]；relation=supports|contradicts|reproduces；用相同 id 修正，removeFindings 删除",
+      findings: "仅需修复的问题 [{id,kind,file,start,end,observation,issue,fix,violation:{type,expected,actual,requirement?,reproduction?},evidence:[{file,start,end,relation}]}]；用相同 id 修正，removeFindings 删除",
+      observations: "通过的核对、可选优化或无需修改的备注 [{id,kind,file,start,end,observation,suggestion?,evidence:[{file,start,end,relation}]}]；removeObservations 删除",
       ...(architecture ? { architecture: "{status,basis,source:{file,start,end},sections:[{heading,basis,evidence:[{file,start,end,relation}]}]}；逐标题分批补，保留其他已登记段" } : {}),
     } },
-    next: "用 record 分批记改动文件、签名必测和发现，只补错项或缺项。发现先写实际观察，沿控制流核对调用、使用和边界。查找与该判断相反的源码，发现反证时先缩小或撤销主张。evidence 定位已读佐证及反证。" +
+    next: (architectureProbe ? "先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 一次，宿主运行当前角色未完成的已登记示例。不要把示例逐个复制到 runtime。" : "") +
+      "用 record 分批记改动、必测和发现，只补错项或缺项。仅把明确违反的要求和必须落实的修法写入 findings；结果已符合、无需改、可选建议写 observations。把通过或无需修复的核对写成 issue/fix 会造成错误退回。先沿控制流找反证，再写实际差异。运行或语法失败用受信复现，不能以推测要求改作者稿。" +
       (architecture ? "完整读架构稿，按 architecture.sections 逐节登记判断，对照当前要求和实际代码，涉及依赖时用 imports 提示查源码。" : "") +
+      (architecture?.examples ? "登记示例实际有差异时，按原示例位置记录架构退回并链接复现编号。" : "") +
       "每批最多 32 项。发现记齐后填 findingsDone:true，无发现也如此。progress.ready 后空参数 submit。",
     commentRule: CODE_COMMENT_RULE };
 }
@@ -472,16 +494,55 @@ function checkedEvidence(items, readers, paths) {
   });
 }
 
-function checkedFinding(row, id, readers, active) {
-  if (!record(row, [...locatorKeys, "id", "kind", "observation", "issue", "fix", "evidence", "caseId"])) {
-    throw new Error("代码审查问题须指向可核对的实际位置");
-  }
+function reviewLocation(row, readers) {
   const ref = readers.read(row, readers.all);
   const owner = includes(readers.architecturePaths, ref.file) ? "coordinator" : "executor";
-  const answer = { ...ref, id, owner, issue: rationale(row.issue, id + ".issue"), fix: rationale(row.fix, id + ".fix") };
   if (!FINDING_KINDS.includes(row.kind) || (row.kind === "architecture") !== (owner === "coordinator")) {
     throw new Error("架构发现须以已授权架构稿为位置；其余发现用 behavior、maintenance 或 annotation");
   }
+  return { ref, owner };
+}
+
+/** Compare the declared values, never guess the semantics of free-text rationale. */
+function checkedViolation(value, kind, id, readers, context) {
+  if (!record(value, ["type", "expected", "actual", "requirement", "reproduction"]) || !VIOLATION_TYPES.includes(value.type)) {
+    throw new Error("需要 violation 明确实际违反的要求。符合要求或无需修改的内容请填 observations");
+  }
+  const { type } = value;
+  const expected = rationale(value.expected, id + ".violation.expected"), actual = rationale(value.actual, id + ".violation.actual");
+  const compare = value => value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+  if (compare(expected) === compare(actual)) throw new Error("violation 的实际结果等于要求，无需修正的核对请填 observations");
+  if (type === "annotation" && kind !== "annotation" || type === "architecture" && kind !== "architecture" ||
+      type === "maintainability" && kind !== "maintenance" || type === "syntax" && !["behavior", "annotation"].includes(kind) ||
+      type === "runtime" && kind !== "behavior" || type === "regression" && kind !== "behavior") {
+    throw new Error("发现 kind 与 violation.type 不一致，请选择实际违反的类型");
+  }
+  let requirement, reproduction;
+  if (["requirement", "runtime"].includes(type) || value.requirement !== undefined) {
+    if (!record(value.requirement, locatorKeys)) throw new Error("requirement 须定位到已读的实际要求原文");
+    requirement = readers.read(value.requirement, readers.goals);
+  }
+  if (type === "regression" && (context.caseResult?.status !== "failed" || context.baselineCase?.status !== "passed")) {
+    throw new Error("回归退回须绑定基线通过、当前失败的同一签名用例。发现新的运行差异请用 runtime 复现");
+  }
+  if (type === "runtime" || type === "syntax" || value.reproduction !== undefined) {
+    if (typeof value.reproduction !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value.reproduction)) {
+      throw new Error("运行或语法问题需登记当前签名版本的受信复现编号");
+    }
+    reproduction = context.resolveReproduction?.(value.reproduction, { type, ...context.ref, signed: context.signed,
+      goal: context.goal, expected, actual, requirement });
+    if (reproduction?.id !== value.reproduction || reproduction.type !== type || reproduction.outcome !== "mismatch") {
+      throw new Error("该复现尚未证明当前签名版本的实际不一致，先核对真实运行结果");
+    }
+  }
+  return { type, expected, actual, ...(requirement ? { requirement } : {}), ...(reproduction ? { reproduction } : {}) };
+}
+
+function checkedFinding(row, id, readers, active, signed, resolveReproduction) {
+  if (!record(row, [...locatorKeys, "id", "kind", "observation", "issue", "fix", "evidence", "caseId", "violation"])) {
+    throw new Error("代码审查问题须指向可核对的实际位置");
+  }
+  const { ref, owner } = reviewLocation(row, readers);
   const evidence = checkedEvidence(row.evidence, readers, readers.all);
   if (!evidence.some(item => item.relation !== "contradicts")) throw new Error("发现缺少支持或复现该问题的定位，请核对观察");
   if (owner === "executor" && ![ref, ...evidence].some(item => includes(readers.sources, item.file))) {
@@ -489,8 +550,27 @@ function checkedFinding(row, id, readers, active) {
   }
   const caseResult = row.caseId === undefined ? undefined : active.codeIntake.qualification.cases?.find(item => item.id === row.caseId);
   if (row.caseId !== undefined && !caseResult) throw new Error("caseId 须为当前签名回执内的实际用例编号");
-  return { ...answer, kind: row.kind, observation: rationale(row.observation, id + ".observation"), evidence,
+  const baselineCase = row.caseId === undefined ? undefined : active.codeIntake.regression.cases?.find(item => item.id === row.caseId);
+  const violation = checkedViolation(row.violation, row.kind, id, readers,
+    { ref, signed, goal: active.goal, caseResult, baselineCase, resolveReproduction });
+  const examples = active.engineeringArchitecture?.examples;
+  if (violation.reproduction?.exampleId && (owner !== "coordinator" || !examples?.cases.some(item => item.id === violation.reproduction.exampleId) ||
+    ref.start < examples.start || ref.end > examples.end)) {
+    throw new Error("该退回项须定位到架构稿中声明该示例的章节");
+  }
+  return { ...ref, id, owner, kind: row.kind, observation: rationale(row.observation, id + ".observation"), evidence, violation,
+    issue: rationale(row.issue, id + ".issue"), fix: rationale(row.fix, id + ".fix"),
     ...(caseResult ? { signedCase: { id: caseResult.id, status: caseResult.status } } : {}) };
+}
+
+function checkedObservation(row, id, readers) {
+  if (!record(row, [...locatorKeys, "id", "kind", "observation", "suggestion", "evidence"])) {
+    throw new Error("observations 仅登记观察与可选建议；明确需修复的问题用 findings");
+  }
+  const { ref } = reviewLocation(row, readers);
+  return { ...ref, id, kind: row.kind, observation: rationale(row.observation, id + ".observation"),
+    evidence: checkedEvidence(row.evidence, readers, readers.all),
+    ...(row.suggestion === undefined ? {} : { suggestion: rationale(row.suggestion, id + ".suggestion") }) };
 }
 
 function checkedArchitecture(row, current, readers) {
@@ -518,17 +598,41 @@ function checkedArchitectureSection(row, section, current, readers) {
 function reviewDraft(frame, active, binding) {
   const identity = { actor: frame.agent.id, role: frame.role, serial: active.serial, binding };
   const saved = active.codeReviewDraft;
-  if (saved && Object.keys(identity).every(key => saved[key] === identity[key])) return saved;
-  return { ...identity, files: [], constraints: [], findings: [], findingsDone: false, pendingCorrections: [] };
+  if (saved && Object.keys(identity).every(key => saved[key] === identity[key])) return { observations: [], ...saved };
+  return { ...identity, files: [], constraints: [], findings: [], observations: [], findingsDone: false, pendingCorrections: [] };
 }
 
-function reviewProgress(current, draft) {
+function architectureProbeProgress(frame, active, current, draft) {
+  const cases = current.architecture?.examples?.cases ?? [];
+  if (!cases.length) return;
+  const saved = active.codeReviewProbes;
+  const available = saved?.actor === frame.agent.id && saved.serial === active.serial && saved.binding === current.binding ? saved.rows : [];
+  const rows = cases.map(({ id }) => {
+    // One evidenced mismatch stays actionable for these exact bytes. A later
+    // successful rerun cannot hide an earlier unresolved discrepancy.
+    const attempts = (available ?? []).filter(row => row.type === "architecture" && row.exampleId === id);
+    const proof = attempts.find(row => row.outcome === "mismatch") ?? attempts.find(row => row.outcome === "match");
+    return { id, ...(proof ? { probeId: proof.id, outcome: proof.outcome } : {}) };
+  });
+  const missing = rows.filter(row => !row.outcome).map(row => row.id);
+  const mismatches = rows.filter(row => row.outcome === "mismatch");
+  const unaddressed = mismatches.filter(row => !draft.findings.some(finding => {
+    const probe = finding.violation?.reproduction;
+    return finding.owner === "coordinator" && probe?.type === "architecture" && probe.exampleId === row.id && probe.outcome === "mismatch";
+  })).map(row => row.id);
+  return { rows, missing, unaddressed, passWithMismatch: mismatches.length > 0 && draft.architecture?.status === "pass" };
+}
+
+function reviewProgress(frame, active, current, draft) {
   const recordedFiles = new Set(draft.files.map(row => keyOf(row.file)));
   const recordedCases = new Set(draft.constraints.map(row => row.caseId));
   const missingFiles = current.changes.filter(change => !recordedFiles.has(keyOf(change.path))).map(change => change.path);
   const missingCases = current.requiredCases.filter(id => !recordedCases.has(id));
   const findingIds = draft.findings.map(row => row.id);
-  const pendingCorrections = draft.pendingCorrections;
+  const observationIds = draft.observations.map(row => row.id);
+  const pendingCorrections = [...draft.pendingCorrections, ...draft.findings.filter(row => !row.violation &&
+    !draft.pendingCorrections.some(item => item.field === "findings" && item.id === row.id))
+    .map(({ id }) => ({ field: "findings", id }))];
   const sections = draft.architectureSections ?? [];
   const missingArchitectureSections = (current.architecture?.sections ?? []).filter(section =>
     !sections.some(row => row.heading === section.heading)).map(row => row.heading);
@@ -538,15 +642,18 @@ function reviewProgress(current, draft) {
   const architectureIssue = draft.architecture && draft.findingsDone &&
     ((draft.architecture.status === "revise") !== draft.findings.some(row => row.owner === "coordinator"));
   const architecture = current.architecture ? draft.architecture ? architectureIssue ? "inconsistent" : "recorded" : "missing" : "not-required";
-  return { missingFiles, missingCases, findingIds, findingsDone: draft.findingsDone, architecture, pendingCorrections,
+  const examples = architectureProbeProgress(frame, active, current, draft);
+  return { missingFiles, missingCases, findingIds, observationIds, findingsDone: draft.findingsDone, architecture, pendingCorrections,
     ...(current.architecture ? { missingArchitectureSections, architectureCodeEvidence } : {}),
+    ...(examples ? { architectureExamples: examples } : {}),
     ready: !missingFiles.length && !missingCases.length && !pendingCorrections.length && draft.findingsDone &&
-      !missingArchitectureSections.length && architectureCodeEvidence && !["missing", "inconsistent"].includes(architecture) };
+      !missingArchitectureSections.length && architectureCodeEvidence && !["missing", "inconsistent"].includes(architecture) &&
+      (!examples || !examples.missing.length && !examples.unaddressed.length && !examples.passWithMismatch) };
 }
 
 const measuredBytes = value => Buffer.byteLength(JSON.stringify(value));
 
-function applyReviewRows(frame, active, current, input) {
+function applyReviewRows(frame, active, current, input, signed, resolveReproduction) {
   if (!record(input, RECORD_KEYS)) throw new Error("代码核验请求含未登记字段");
   const draft = structuredClone(reviewDraft(frame, active, current.binding));
   const readers = reviewReaders(frame, active, current);
@@ -570,14 +677,32 @@ function applyReviewRows(frame, active, current, input) {
   const put = (field, match, row) => {
     const old = draft[field];
     const index = old.findIndex(match);
-    if (index < 0 && field === "findings" && old.length >= MAX_FINDINGS) throw new Error("发现最多 24 条，请合并或删除同类发现");
+    if (index < 0 && ["findings", "observations"].includes(field) && old.length >= MAX_FINDINGS) {
+      throw new Error("每类最多 24 条，请合并或删除同类记录");
+    }
     const next = old.slice();
     if (index < 0) next.push(row);
     else next[index] = row;
     if (measuredBytes({ ...draft, [field]: next }) > PROOF_BYTES) throw new Error("当前角色记录超过存储上限，请缩短该项说明");
     draft[field] = next;
   };
-  for (const [field, cap] of [["files", 256], ["constraints", 80], ["findings", MAX_FINDINGS]]) {
+  const removals = { findings: new Set(), observations: new Set() };
+  for (const [field, inputKey] of [["findings", "removeFindings"], ["observations", "removeObservations"]]) {
+    if (input[inputKey] === undefined) continue;
+    add(inputKey, undefined, () => {
+      const ids = input[inputKey];
+      if (!Array.isArray(ids) || ids.length > MAX_FINDINGS || ids.some(id => typeof id !== "string" || !FINDING_ID.test(id))) {
+        throw new Error("只接受已有记录编号数组");
+      }
+      removals[field] = new Set(ids);
+    });
+  }
+  const correctionGroups = ["findings", "observations"];
+  // A rejected move keeps the previous row. Explicit removal without a
+  // replacement is still possible when the reviewer withdraws a claim.
+  const requested = Object.fromEntries(correctionGroups.map(field => [field, new Set(
+    (Array.isArray(input[field]) ? input[field] : []).map(row => row?.id).filter(id => typeof id === "string"))]));
+  for (const [field, cap] of [["files", 256], ["constraints", 80], ["findings", MAX_FINDINGS], ["observations", MAX_FINDINGS]]) {
     const rows = input[field];
     if (rows === undefined) continue;
     const maximum = Math.min(cap, RECORD_LIMIT);
@@ -588,13 +713,14 @@ function applyReviewRows(frame, active, current, input) {
     const batch = new Set();
     rows.forEach((row, index) => {
       let id = field === "files" ? row?.file : field === "constraints" ? row?.caseId : row?.id ??
-        `finding-${digest(JSON.stringify([row?.file, row?.start, row?.end])).slice(0, 14)}`;
+        `${field === "findings" ? "finding" : "observation"}-${digest(JSON.stringify([row?.file, row?.start, row?.end])).slice(0, 14)}`;
       if (field === "files" && typeof id === "string") {
         const canonical = current.changes.find(item => keyOf(item.path) === keyOf(id.replaceAll("\\", "/")));
         if (canonical) id = canonical.path;
       }
       const canReplace = field === "files" ? draft.files.some(item => typeof id === "string" && keyOf(item.file) === keyOf(id)) :
-        field === "constraints" ? draft.constraints.some(item => item.caseId === id) : draft.findings.some(item => item.id === id);
+        field === "constraints" ? draft.constraints.some(item => item.caseId === id) :
+          field === "findings" && draft.findings.some(item => item.id === id);
       add(field, typeof id === "string" ? id : String(index + 1), () => {
         const key = field === "files" ? keyOf(relativeName(id)) : id;
         if (batch.has(key)) throw new Error("同一批记录重复，请只重交此项一份");
@@ -607,21 +733,27 @@ function applyReviewRows(frame, active, current, input) {
           if (!current.requiredCases.includes(id)) throw new Error("只记录 requiredCases 里的签名新增必测");
           put(field, item => item.caseId === id, checkedConstraint(row, readers));
         } else {
-          if (typeof id !== "string" || !FINDING_ID.test(id)) throw new Error("发现 id 须为不超过 48 字符的字母开头编号");
-          put(field, item => item.id === id, checkedFinding(row, id, readers, active));
+          if (typeof id !== "string" || !FINDING_ID.test(id)) throw new Error("记录 id 须为不超过 48 字符的字母开头编号");
+          const other = field === "findings" ? "observations" : "findings";
+          if (requested[other].has(id) || removals[field].has(id)) throw new Error("同一编号在本批仅允许一种最终状态");
+          if (draft[other].some(item => item.id === id) && !removals[other].has(id)) {
+            throw new Error("同一编号已在另一类记录，调整分类时请同时删除原类别编号");
+          }
+          const checked = field === "findings" ? checkedFinding(row, id, readers, active, signed, resolveReproduction) :
+            checkedObservation(row, id, readers);
+          put(field, item => item.id === id, checked);
         }
       }, canReplace);
     });
   }
-  if (input.removeFindings !== undefined) {
-    add("removeFindings", undefined, () => {
-      const ids = input.removeFindings;
-      if (!Array.isArray(ids) || ids.length > MAX_FINDINGS || ids.some(id => typeof id !== "string" || !FINDING_ID.test(id))) {
-        throw new Error("只接受已有发现编号数组");
-      }
-      draft.findings = draft.findings.filter(row => !ids.includes(row.id));
-      for (const id of ids) forgetCorrection("findings", id);
-    });
+  for (const [field, other] of [["findings", "observations"], ["observations", "findings"]]) {
+    for (const id of removals[field]) {
+      if (requested[other].has(id) && (!draft[other].some(row => row.id === id) ||
+        errors.some(row => row.field === other && (row.id === id || row.id === undefined)))) continue;
+      if (requested[field].has(id)) continue;
+      draft[field] = draft[field].filter(row => row.id !== id);
+      forgetCorrection(field, id);
+    }
   }
   if (input.architecture !== undefined) {
     const inputArchitecture = input.architecture;
@@ -662,15 +794,17 @@ function applyReviewRows(frame, active, current, input) {
       draft.findingsDone = input.findingsDone;
     });
   }
-  const progress = reviewProgress(current, draft);
+  const progress = reviewProgress(frame, active, current, draft);
   if (progress.architecture === "inconsistent") errors.push({ field: "architecture", id: current.architecture.file,
     reason: draft.architecture.status === "revise" ? "revise 须有定位到实际架构稿的发现" : "pass 不能同时保留架构退回项" });
+  if (progress.architectureExamples?.passWithMismatch) errors.push({ field: "architecture", id: current.architecture.file,
+    reason: "已登记架构示例出现可复现差异，须核对并登记关联的架构退回项" });
   return { draft, progress, errors };
 }
 
-export function recordCodeReview(frame, active, spec, input, signed) {
+export function recordCodeReview(frame, active, spec, input, signed, { resolveReproduction } = {}) {
   const current = plan(frame, active, spec, signed);
-  const { draft, progress, errors } = applyReviewRows(frame, active, current, input);
+  const { draft, progress, errors } = applyReviewRows(frame, active, current, input, signed, resolveReproduction);
   active.codeReviewDraft = draft;
   frame.changed = true;
   return { progress, errors };
@@ -679,7 +813,7 @@ export function recordCodeReview(frame, active, spec, input, signed) {
 export function verifyCodeReview(frame, active, spec, signed) {
   const current = plan(frame, active, spec, signed);
   const draft = reviewDraft(frame, active, current.binding);
-  const progress = reviewProgress(current, draft);
+  const progress = reviewProgress(frame, active, current, draft);
   if (!progress.ready) {
     const missing = [progress.missingFiles.length && "待记录文件 " + progress.missingFiles.join("、"),
       progress.missingCases.length && "待记录必测 " + progress.missingCases.join("、"),
@@ -688,14 +822,20 @@ export function verifyCodeReview(frame, active, spec, signed) {
       progress.architecture === "missing" && "缺少架构核验",
       progress.missingArchitectureSections?.length && "待记录架构章节 " + progress.missingArchitectureSections.join("、"),
       progress.architectureCodeEvidence === false && "架构核验缺少实际源码依据",
-      progress.architecture === "inconsistent" && "架构判断与发现不一致"].filter(Boolean);
+      progress.architecture === "inconsistent" && "架构判断与发现不一致",
+      progress.architectureExamples?.missing.length && "待复现架构示例 " + progress.architectureExamples.missing.join("、") +
+        "，先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 批量核验",
+      progress.architectureExamples?.unaddressed.length && "架构示例退回未绑定实际差异 " + progress.architectureExamples.unaddressed.join("、"),
+      progress.architectureExamples?.passWithMismatch && "架构判断与实际复现不一致"].filter(Boolean);
     throw new Error("代码核验尚不能提交：" + missing.join("；") + "。用 record 补齐这些项。");
   }
-  const { files, constraints, findings, architecture } = draft;
+  const { files, constraints, findings, observations, architecture } = draft;
   const missing = files.some(row => (row.comments ?? [row.comment]).some(item => item.status === "missing"));
   const failing = constraints.some(row => row.status === "revise");
   const proof = { version: 1, actor: frame.agent.id, binding: current.binding, files, constraints, findings,
-    ...(architecture ? { architecture: { ...architecture, sections: draft.architectureSections ?? [] } } : {}),
+    ...(observations.length ? { observations } : {}),
+    ...(architecture ? { architecture: { ...architecture, sections: draft.architectureSections ?? [],
+      ...(progress.architectureExamples ? { examples: progress.architectureExamples.rows } : {}) } } : {}),
     decision: missing || failing || findings.length || architecture?.status === "revise" ? "reject" : "pass" };
   // The accepted receipt stores both independent records under the 256 KiB
   // workspace receipt limit. Keep room for the surrounding signed metadata.
@@ -718,7 +858,8 @@ export function currentCodeReview(frame, id, active, spec, receipt, independent 
       (!architecture || proof.architecture?.status === "pass" && proof.architecture.source?.sha256 === architecture.sha256 &&
         (architecture.sections ?? []).every(section => proof.architecture.sections?.some(row => row.heading === section.heading &&
           row.source?.sha256 === architecture.sha256 && row.source?.start === section.start && row.source?.end === section.end &&
-          row.evidence?.length)));
+          row.evidence?.length)) && (architecture.examples?.cases ?? []).every(({ id }) =>
+          proof.architecture.examples?.some(row => row.id === id && row.outcome === "match" && typeof row.probeId === "string")));
     if (!receipt.reviewer || receipt.reviewer === active.executor || !matches(receipt.codeReview, receipt.reviewer)) return false;
     if (!independent) return true;
     const audit = receipt.independentAudit;

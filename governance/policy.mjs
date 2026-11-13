@@ -222,7 +222,8 @@ function codeTaskPolicy(value, phases) {
   object(value, "代码任务契约", ["sources", "tests", "diagnostics"]);
   let diagnostics;
   if (value.diagnostics !== undefined) {
-    const { checkSet, protocol, recipes } = object(value.diagnostics, "快速诊断授权", ["checkSet", "protocol", "recipes"]);
+    const { checkSet, protocol, recipes, reviewRecipes, syntaxRecipe } = object(value.diagnostics, "快速诊断授权",
+      ["checkSet", "protocol", "recipes", "reviewRecipes", "syntaxRecipe"]);
     const runnerId = id => typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(id);
     if (!value.tests?.regression || !runnerId(checkSet) || protocol !== undefined && protocol !== 1 && protocol !== 2) {
       throw new Error("快速诊断须在签名回归契约中登记受信检查集编号");
@@ -231,7 +232,16 @@ function codeTaskPolicy(value, phases) {
       new Set(recipes).size !== recipes.length || !recipes.every(runnerId))) {
       throw new Error("复现配方须在第二版诊断契约中登记唯一的受信配方编号");
     }
-    diagnostics = { checkSet, ...(protocol === 2 ? { protocol, recipes: recipes ?? [] } : {}) };
+    if (reviewRecipes !== undefined && (protocol !== 2 || !Array.isArray(reviewRecipes) || !reviewRecipes.length ||
+      reviewRecipes.length > 16 || new Set(reviewRecipes).size !== reviewRecipes.length ||
+      !reviewRecipes.every(id => runnerId(id) && recipes?.includes(id)))) {
+      throw new Error("代码核验配方须为第二版诊断契约中已登记配方的唯一非空子集");
+    }
+    if (syntaxRecipe !== undefined && (!runnerId(syntaxRecipe) || !reviewRecipes?.includes(syntaxRecipe))) {
+      throw new Error("语法配方须单独指定一个已授权的代码核验配方");
+    }
+    diagnostics = { checkSet, ...(protocol === 2 ? { protocol, recipes: recipes ?? [],
+      ...(reviewRecipes ? { reviewRecipes } : {}), ...(syntaxRecipe ? { syntaxRecipe } : {}) } : {}) };
   }
   const sources = pathList(value.sources);
   const grants = value.tests?.regression ? [phases.intake, phases.supplement] : [phases.intake];
@@ -435,7 +445,7 @@ export function parseAuthority(bytes) {
   const hierarchy = source.hierarchy === undefined ? undefined : hierarchyPolicy(source.hierarchy, coordinator, goalContext, protectedFiles, ledgerDocument);
   const managedImportSections = new Map();
   for (const [id, entry] of architectureEntries) {
-    object(entry, "架构验收", ["module", "headings", "importsHeading"]);
+    object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading"]);
     const file = hierarchyBodyPath(hierarchy, entry.module, false);
     const unit = units[id];
     const review = [unit.phases["first-review"], unit.phases["final-review"]];
@@ -457,11 +467,19 @@ export function parseAuthority(bytes) {
       headings.includes(importsHeading) || unit.codeTask.sources.some(source => !/\.py$/iu.test(source)))) {
       throw new Error("静态导入章节须独立于人工核验标题，且当前只支持登记的 Python 源码");
     }
+    const examplesHeading = entry.examplesHeading;
+    const diagnostics = unit.codeTask.diagnostics;
+    // Executable examples use the maintainer's data-only recipe grants; a
+    // compiler recipe accepts a source location and is never an example entry.
+    if (examplesHeading !== undefined && (!headings.includes(examplesHeading) || examplesHeading === importsHeading ||
+      !diagnostics?.reviewRecipes?.some(recipe => recipe !== diagnostics.syntaxRecipe))) {
+      throw new Error("架构示例须指定一个已登记的人工核验章节，并明确授权第二版诊断中的运行配方");
+    }
     if (managedImportSections.has(keyOf(file)) && managedImportSections.get(keyOf(file)) !== importsHeading) {
       throw new Error("共用架构稿的工程单元须使用相同的宿主静态导入章节");
     }
     managedImportSections.set(keyOf(file), importsHeading);
-    unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}) };
+    unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}), ...(examplesHeading ? { examplesHeading } : {}) };
   }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }

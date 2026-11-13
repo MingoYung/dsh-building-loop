@@ -129,10 +129,20 @@ export function prepareCodeReproduction(frame, args, runner) {
   return prepare(frame, runner, { manual: args });
 }
 
-function prepare(frame, runner, { file, fileSha256, manual }) {
+/** Review probes use the same isolation and read grants, but only explicitly
+ * reviewable recipes. The caller must also prove a current signed review. */
+export function prepareReviewReproduction(frame, args, runner) {
+  const [unit] = frame.assignment ?? [];
+  const diagnostics = frame.policy.units[unit]?.codeTask?.diagnostics;
+  if (!["reviewer", "auditor"].includes(frame.role) || diagnostics?.protocol !== 2 ||
+    !diagnostics.reviewRecipes?.includes(args.recipe)) throw new Error("当前角色无该复核配方授权");
+  return prepare(frame, runner, { manual: { action: "probe", ...args }, review: true });
+}
+
+function prepare(frame, runner, { file, fileSha256, manual, review = false }) {
   const [unit, active] = frame.assignment ?? [];
   const spec = frame.policy.units[unit];
-  if (frame.role !== "executor" || !active?.codeIntake?.regression || !spec?.codeTask?.tests?.regression) {
+  if ((!review && frame.role !== "executor") || !active?.codeIntake?.regression || !spec?.codeTask?.tests?.regression) {
     if (manual) throw new Error("仅当前已授权的代码执行方可以复现");
     return;
   }
@@ -175,7 +185,7 @@ function prepare(frame, runner, { file, fileSha256, manual }) {
       spec: protocol === 2 ? SCOPED_SPEC : LEGACY_SPEC, requestId: randomUUID(), ...binding,
       snapshotSha256: snapshotId(binding, versions, operation), ...(changed ? { changed } : {}), artifacts, ...operation,
     };
-    return { request, binding, root: frame.root, actor: active.actor, serial: active.serial, nonce: active.codeIntake.nonce,
+    return { request, binding, role: frame.role, root: frame.root, actor: active.actor, serial: active.serial, nonce: active.codeIntake.nonce,
       readablePaths, sourceLineCounts };
   } catch {
     // A diagnostic capture error must never report an already-landed edit as lost.
@@ -189,7 +199,7 @@ function prepare(frame, runner, { file, fileSha256, manual }) {
 export function codeDiagnosticsCurrent(frame, job) {
   const [unit, active] = frame.assignment ?? [];
   const { binding } = job;
-  if (frame.role !== "executor" || frame.root !== job.root || unit !== binding.unit || active.phase !== binding.phase ||
+  if (frame.role !== (job.role ?? "executor") || frame.root !== job.root || unit !== binding.unit || active.phase !== binding.phase ||
     active.actor !== job.actor || active.serial !== job.serial || active.codeIntake?.nonce !== job.nonce ||
     frame.policy.hash !== binding.policySha256 || goalSnapshot(frame).sha256 !== binding.goalSha256) return false;
   const spec = frame.policy.units[unit];

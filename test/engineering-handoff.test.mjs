@@ -186,6 +186,74 @@ test("explicit new owner goal can retire a blocked old writer without lending it
   assert.match((await native.flow("competitor", "status")).blocked, /已交由当前确认/);
 }));
 
+test("a changed owner goal supersedes an undispatched legacy planning lease, preserving files and denying the old coordinator", () => fixture(async (root, write) => {
+  const { native, start, baseline, state, saveState } = setup(root, write);
+  for (const id of ["same-goal", "new", "contender", "unapproved"]) native.coordinator(id);
+  start("root", opening("K01"));
+  await native.flow("root", "prepare");
+  await native.file("root", "write", "DESIGN.md", { content: "# Real G1 plan\n", note: "Plan before dispatch" });
+  const old = state();
+  assert.deepEqual(old.units, {});
+  const oldGoal = old.engineeringCoordinator.goalSha256;
+  delete old.engineeringCoordinator.goalSha256; // A persisted 0.7.22 lease predates this field.
+  saveState(old);
+  start("same-goal", opening("K02"));
+  assert.match((await native.flow("same-goal", "status")).checkpoint.blocked, /须先发布与原计划不同/);
+  await assert.rejects(native.file("same-goal", "write", "DESIGN.md", { content: "stolen", note: "same goal" }), /须先发布与原计划不同/);
+
+  write(projectGoal, "# New owner goal\n\nUse K02.\n");
+  assert.match((await native.flow("unapproved", "status")).blocked, /已交由当前确认/);
+  await assert.rejects(native.file("root", "write", "DESIGN.md", { content: "stale", note: "old owner" }), /目标或授权版本已变化/);
+  start("new", opening("K02"));
+  start("contender", opening("K03") + "以新目标替换工作单元 K01。");
+  assert.deepEqual((await native.flow("new", "status")).checkpoint.advance, { action: "advance", unit: "K02" });
+  await assert.rejects(native.flow("new", "advance", { unit: "K01" }), /确认工作单元 K02/);
+  assert.equal(state().engineeringCoordinator.session, "root");
+  assert.equal((await native.flow("new", "prepare", { unit: "K02" })).unit, "K02");
+  const handed = state();
+  assert.deepEqual(handed.units, {});
+  assert.equal(handed.planningHandoff.previousOpeningId, old.engineeringCoordinator.openingId);
+  assert.equal(handed.planningHandoff.oldGoalSha256, oldGoal);
+  assert.equal(handed.planningHandoff.newGoalSha256, handed.engineeringCoordinator.goalSha256);
+  assert.equal(handed.planningHandoff.userSha256, digest(opening("K02")));
+  assert.equal(handed.ledger.items["unit-K01"], undefined);
+  assert.equal(fs.readFileSync(path.join(root, "DESIGN.md"), "utf8"), "# Real G1 plan\n");
+  assert.match((await native.flow("root", "status")).blocked, /已交由当前确认/);
+  assert.match((await native.flow("contender", "status")).blocked, /已交由当前确认/);
+  await assert.rejects(native.file("root", "write", "DESIGN.md", { content: "stale", note: "old owner" }), /已交由当前确认/);
+  baseline("K02");
+  assert.equal((await native.invoke("new", "building_loop", { action: "advance" })).unit, "K02");
+  assert.deepEqual(Object.keys(state().units), ["K02"]);
+}));
+
+test("a planning claim with a wrong predecessor identity or an unrelated durable writer fails closed", () => fixture(async (root, write) => {
+  const { native, start, state, saveState } = setup(root, write);
+  native.coordinator("new");
+  start("root", opening("K01"));
+  await native.flow("root", "prepare");
+  const original = state();
+  write(projectGoal, "# Updated goal\n");
+  start("new", opening("K02") + "以新目标替换工作单元 K01。");
+  const wrong = structuredClone(original);
+  wrong.engineeringCoordinator.session = "other-owner";
+  saveState(wrong);
+  assert.match((await native.flow("new", "status")).checkpoint.blocked, /无法核对原总控/);
+  await assert.rejects(native.flow("new", "prepare", { unit: "K02" }), /无法核对原总控/);
+
+  const rolledBack = structuredClone(original);
+  rolledBack.ledger.items["unit-K01"] = { id: "unit-K01", unit: "K01", owner: "root", status: "running" };
+  saveState(rolledBack);
+  assert.match((await native.flow("new", "status")).checkpoint.blocked, /已有派单台账记录/);
+  await assert.rejects(native.flow("new", "prepare", { unit: "K02" }), /已有派单台账记录/);
+
+  const active = structuredClone(original);
+  active.units.K03 = { owner: "other-owner", actor: "actual-child", phase: "intake" };
+  saveState(active);
+  assert.match((await native.flow("new", "status")).checkpoint.blocked, /其他未关单/);
+  await assert.rejects(native.flow("new", "prepare", { unit: "K02" }), /其他未关单/);
+  assert.deepEqual(state(), active);
+}));
+
 test("missing and unregistered engineering units can be corrected before approval is committed", () => fixture(async (root, write) => {
   const { start } = setup(root, write);
   assert.throws(() => start("root", "开始建设：落实项目目标。"), /多个授权工作单元/);

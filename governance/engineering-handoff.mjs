@@ -1,7 +1,7 @@
 import path from "node:path";
 import { goalSnapshot } from "./goals.mjs";
 import { TERMINAL } from "./ledger.mjs";
-import { isImplementationPath, readBytes, text } from "./policy.mjs";
+import { isImplementationPath, keyOf, readBytes, text } from "./policy.mjs";
 import { workspaceStateFile } from "./session-mode.mjs";
 import { STATE_LIMIT } from "./transactions.mjs";
 
@@ -107,30 +107,51 @@ export function engineeringAccess(state, owner, started) {
   return started?.binding.checkpoint?.predecessor === lease.openingId;
 }
 
-function claimIssue(frame) {
+/** Recover the exact predecessor opening, including leases written before the goal was stored. */
+function planningPredecessor(frame, lease) {
+  const opening = frame.startedProject(lease.session);
+  const checkpoint = opening?.binding.checkpoint;
+  if (opening?.proposal.id !== lease.openingId || opening.binding.kind !== "workspace" ||
+    keyOf(opening.binding.root) !== keyOf(frame.root) || checkpoint?.unit !== lease.unit ||
+    (lease.goalSha256 !== undefined && lease.goalSha256 !== checkpoint.goalSha256)) {
+    throw new EngineeringHandoffDenied("无法核对原总控尚未派单的开工记录，需维护者确认");
+  }
+  return checkpoint;
+}
+
+function assessClaim(frame) {
   const { state, started, agent } = frame;
   const checkpoint = started?.binding.checkpoint;
-  if (!checkpoint) return null;
+  if (!checkpoint) return {};
   const lease = state.engineeringCoordinator;
-  if (lease?.session === agent.id && lease.openingId === started.proposal.id) return null;
-  if ((lease?.openingId ?? null) !== checkpoint.predecessor) return "工程总控交接版本已变化，请按当前项目重新确认开工";
-  if (Object.hasOwn(state.units, checkpoint.unit)) return "工作单元 " + checkpoint.unit + " 已有宿主记录；新一轮请使用新的授权单元";
+  if (lease?.session === agent.id && lease.openingId === started.proposal.id) return {};
+  const blocked = issue => ({ issue });
+  if ((lease?.openingId ?? null) !== checkpoint.predecessor) return blocked("工程总控交接版本已变化，请按当前项目重新确认开工");
+  if (Object.hasOwn(state.units, checkpoint.unit)) return blocked("工作单元 " + checkpoint.unit + " 已有宿主记录；新一轮请使用新的授权单元");
+  if (lease && !Object.hasOwn(state.units, lease.unit)) {
+    // A failed native activation can leave its durable unit ledger entry even
+    // after rolling back the stage row. That is not an undispatched plan.
+    if (Object.hasOwn(state.ledger?.items ?? {}, "unit-" + lease.unit)) return blocked("原计划已有派单台账记录，需维护者核对派单结果后再接手");
+    if (Object.values(state.units).some(unit => !TERMINAL.has(unit.phase))) return blocked("工作区仍有其他未关单单元，不能替换尚未派单的计划");
+    if (checkpoint.replaceUnit && checkpoint.replaceUnit !== lease.unit) return blocked("替换对象与当前工程总控记录不一致");
+    const previous = planningPredecessor(frame, lease);
+    if (previous.goalSha256 === checkpoint.goalSha256) return blocked("原总控尚未派单，须先发布与原计划不同的新目标版本才能接手");
+    return { planning: previous };
+  }
   if (checkpoint.replaceUnit) {
     const previous = state.units[checkpoint.replaceUnit];
-    if (lease?.unit !== checkpoint.replaceUnit || previous?.owner !== lease.session) return "替换对象与当前工程总控记录不一致";
-    if (!SHA256.test(previous.goal?.sha256 ?? "") || previous.goal.sha256 === checkpoint.goalSha256) return "须先发布与原单元不同的新目标版本才能替换";
-    if (previous.phase !== "blocked") return "原工作单元仍未退出可写阶段或已关单；只有已阻塞的未完成单元可以替换";
+    if (lease?.unit !== checkpoint.replaceUnit || previous?.owner !== lease.session) return blocked("替换对象与当前工程总控记录不一致");
+    if (!SHA256.test(previous.goal?.sha256 ?? "") || previous.goal.sha256 === checkpoint.goalSha256) return blocked("须先发布与原单元不同的新目标版本才能替换");
+    if (previous.phase !== "blocked") return blocked("原工作单元仍未退出可写阶段或已关单；只有已阻塞的未完成单元可以替换");
     if (Object.entries(state.units).some(([id, unit]) => id !== checkpoint.replaceUnit && !TERMINAL.has(unit.phase))) {
-      return "工作区仍有其他未关单单元，当前替换不能接管其权限";
+      return blocked("工作区仍有其他未关单单元，当前替换不能接管其权限");
     }
-    return null;
+    return {};
   }
-  // A coordinator that already claimed the workspace but has not yet dispatched
-  // can still be writing architecture. A blocked unit is also unfinished work.
-  if ((lease && !TERMINAL.has(state.units[lease.unit]?.phase)) || Object.values(state.units).some(unit => !TERMINAL.has(unit.phase))) {
-    return "原总控仍有写入权或未关单工作。请先完成原工作单元的关单，再从同一工作区接手";
+  if (Object.values(state.units).some(unit => !TERMINAL.has(unit.phase))) {
+    return blocked("原总控仍有写入权或未关单工作。请先完成原工作单元的关单，再从同一工作区接手");
   }
-  return null;
+  return {};
 }
 
 /** The next exact action is visible even while an older work unit prevents takeover. */
@@ -138,7 +159,7 @@ export function engineeringStatus(frame) {
   const checkpoint = frame.started?.binding.checkpoint;
   if (!checkpoint || frame.role !== "coordinator") return undefined;
   let blocked;
-  try { resolveBoundUnit(frame); blocked = claimIssue(frame); }
+  try { resolveBoundUnit(frame); blocked = assessClaim(frame).issue; }
   catch (error) { blocked = error.message; }
   return { unit: checkpoint.unit, goalSha256: checkpoint.goalSha256, policySha256: checkpoint.policySha256,
     ...(checkpoint.replaceUnit ? { replaceUnit: checkpoint.replaceUnit } : {}),
@@ -152,12 +173,12 @@ export function claimEngineeringCoordinator(frame) {
   const { state, started, agent } = frame;
   const prior = state.engineeringCoordinator;
   if (prior?.session === agent.id && prior.openingId === started.proposal.id) return;
-  const issue = claimIssue(frame);
+  const { issue, planning } = assessClaim(frame);
   if (issue) throw new EngineeringHandoffDenied(issue);
   const owners = [...new Set(Object.values(state.units).map(row => row.owner))];
   const previousOwner = prior?.session ?? (owners.length === 1 ? owners[0] : undefined);
   const { replaceUnit, goalSha256 } = started.binding.checkpoint;
-  if (replaceUnit) {
+  if (replaceUnit && !planning) {
     const old = state.units[replaceUnit];
     const retirement = { outcome: "superseded", oldGoalSha256: old.goal.sha256, newGoalSha256: goalSha256,
       previousPhase: old.resumePhase, previousBlock: old.blocked, newUnit: unit, confirmedBy: agent.id,
@@ -180,7 +201,14 @@ export function claimEngineeringCoordinator(frame) {
       ledger.revision++;
     }
   }
-  state.engineeringCoordinator = { session: agent.id, openingId: started.proposal.id, unit,
+  state.engineeringCoordinator = { session: agent.id, openingId: started.proposal.id, unit, goalSha256,
     historyOwners: [...new Set([...(prior?.historyOwners ?? []), ...(previousOwner && previousOwner !== agent.id ? [previousOwner] : [])])] };
+  if (planning) {
+    // No child was granted a stage. Record replacement of the opening itself,
+    // leaving units, any architecture draft, and prior ledger items as they were.
+    state.planningHandoff = { previousUnit: prior.unit, previousOwner: prior.session, previousOpeningId: prior.openingId,
+      oldGoalSha256: planning.goalSha256, newGoalSha256: goalSha256, unit, owner: agent.id, openingId: started.proposal.id,
+      userEvent: started.source.seq, userSha256: started.source.sha256 };
+  }
   frame.changed = true;
 }
