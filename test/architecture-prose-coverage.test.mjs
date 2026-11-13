@@ -152,6 +152,58 @@ test("the same grammar binds an arbitrary response and module to the protected f
   assert.deepEqual(linkedResponsibilityConflicts(source.replace("rejected here", "forwarded here"), [audit]), []);
 });
 
+test("a uniquely named signed module cannot own a different module's exact linked typed predicate", () => {
+  // The native G1 checkpoint passed two reviewers who described the correct owner in their reasons.
+  const wrong = "1. journal（输入校验、身份、重放）：请求不为对象时返回 `invalid-request`（[非对象请求](#bl-fact-nonobject-request)）；保留 `invalid-json`/`invalid-environment`/`invalid-budget`/`invalid-change`/`unsupported-action` 语义。";
+  const source = "# 发布规划与维护\n\n## 实施顺序\n\n" + wrong;
+  const decision = { file: "src/planner.py", line: 61, symbol: "plan", mode: "business", code: "invalid-request" };
+  const fact = { id: "nonobject-request", mode: "business", actual: decision,
+    trigger: { kind: "input-type", argument: 0, type: "object", test: "not" } };
+  const sources = ["src/release.py", "src/planner.py", "src/journal.py", "src/policy.py"];
+  const expected = { line: 5, from: "src/journal.py", actual: [{ file: "src/planner.py", line: 61, symbol: "plan" }],
+    id: fact.id, relation: "linked-responsibility" };
+  assert.deepEqual(linkedResponsibilityConflicts(source, [fact], { sources }), [expected]);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("journal（", "**journal**（"), [fact], { sources }), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("journal（输入校验、身份、重放）", "**journal（输入校验、身份、重放）**"), [fact], { sources }), [expected]);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("journal（输入校验、身份、重放）", "src/journal.py"), [fact],
+    { sources: [...sources, "other/journal.py"] }), [expected]);
+  assert.deepEqual(linkedResponsibilityConflicts(source, [fact], { sources: [...sources, "other/journal.py"] }), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source, [fact]), []);
+
+  const controls = [
+    source.replace("journal（", "planner（"),
+    source.replace("请求不为对象时返回", "请求不为对象时由 planner 返回"),
+    source.replace("请求不为对象时返回", "请求不为对象时透传"),
+    source.replace("请求不为对象时返回", "例如请求不为对象时返回"),
+    source.replace("请求不为对象时返回", "计划：保留响应；请求不为对象时返回"),
+    source.replace("请求不为对象时返回", "『请求不为对象时返回"),
+    source.replace("请求不为对象时返回", "引用文字：“第一句。请求不为对象时返回") + "”",
+    source.replace("请求不为对象时返回", "请求为对象时返回"),
+    source.replace("请求不为对象时返回", "请求不为数组时返回"),
+    source.replace("请求不为对象时返回", "请求不为对象或缺字段时返回"),
+    source.replace("`invalid-request`", "`other-code`"),
+    source.replace("`invalid-request`（", "`invalid-request`，从这里看另一条规则（"),
+    source.replace("\n1. ", "\n> 1. "),
+    source.replace("## 实施顺序", "## 反例\n\n### 实施顺序"),
+  ];
+  for (const control of controls) assert.deepEqual(linkedResponsibilityConflicts(control, [fact], { sources }), [], control);
+  const inventory = architectureProseInventory({ source, sections: [{ heading: "实施顺序", start: 3, end: 5 }], facts: [fact], sources });
+  assert.equal(checkArchitectureProseReceipt(inventory, reviewed(inventory)).status, "revise");
+});
+
+test("typed ownership checks the exact field and handles other signed Python modules and response codes", () => {
+  const fact = { id: "absent-account", mode: "business", trigger: { kind: "field-presence", argument: 0, field: "account", test: "missing" },
+    actual: { file: "src/service.py", line: 42, symbol: "validate", code: "no-account" } };
+  const sources = ["src/gateway.py", "src/service.py"];
+  const source = "## Implementation\n\n- `gateway`: When the request lacks field `account`, returns `no-account` ([rule](#bl-fact-absent-account)).";
+  const expected = { line: 3, from: "src/gateway.py", actual: [{ file: "src/service.py", line: 42, symbol: "validate" }],
+    id: fact.id, relation: "linked-responsibility" };
+  assert.deepEqual(linkedResponsibilityConflicts(source, [fact], { sources }), [expected]);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("`account`", "`customer`"), [fact], { sources }), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("lacks", "contains"), [fact], { sources }), []);
+  assert.deepEqual(linkedResponsibilityConflicts(source.replace("When the", "As an example, when the"), [fact], { sources }), []);
+});
+
 test("the real code-review path requires two independent block receipts and routes exact contradictions to the coordinator", () =>
   fixture(async (root, write) => {
     const goal = "GOAL.md";

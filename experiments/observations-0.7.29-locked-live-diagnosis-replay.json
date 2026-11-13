@@ -1,0 +1,514 @@
+{
+  "run": "r-A6f7Fu",
+  "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+  "modelCalls": 0,
+  "replayed": [
+    {
+      "label": "actual-diagnosed-failure",
+      "signedBytes": false,
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "cd0267d500b54bff7d00ace18eb60e480d7a2d1a63bae808ebd86a3a0df771ae"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "da960c794d0565bd601005ba6152d581d1a6cc3372365f8bf383c1994d8a491e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b0aa33979db15246677c00193b9ca8251875ac992bdaef05c8c2f63e77f4e853"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "observations": [
+        {
+          "case": "public-rollback-order-diagnostics:example:reverse-preserves-applied-prerequisite-edge",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a-consumer",
+                "component": "component",
+                "units": 1,
+                "depends_on": [
+                  "b-prerequisite"
+                ]
+              },
+              {
+                "id": "b-prerequisite",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "z-independent",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a-consumer",
+              "b-prerequisite",
+              "z-independent"
+            ]
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "z-independent",
+                "a-consumer",
+                "b-prerequisite"
+              ],
+              "units": 3
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "z-independent",
+              "b-prerequisite",
+              "a-consumer"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "failure": null,
+          "matched": false
+        },
+        {
+          "case": "public-rollback-order-diagnostics:example:reverse-lexical-control-without-edge",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a-consumer",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "b-prerequisite",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "z-independent",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a-consumer",
+              "b-prerequisite",
+              "z-independent"
+            ]
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "z-independent",
+                "b-prerequisite",
+                "a-consumer"
+              ],
+              "units": 3
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "z-independent",
+              "b-prerequisite",
+              "a-consumer"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "failure": null,
+          "matched": true
+        }
+      ]
+    },
+    {
+      "label": "first-signed-repair",
+      "signedBytes": true,
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "66c12c4c6227b94adc2e043c71a3bb6974654fd9866a37fe53ead7b2b5ab6cd3"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "da960c794d0565bd601005ba6152d581d1a6cc3372365f8bf383c1994d8a491e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b0aa33979db15246677c00193b9ca8251875ac992bdaef05c8c2f63e77f4e853"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "observations": [
+        {
+          "case": "public-rollback-order-diagnostics:example:reverse-preserves-applied-prerequisite-edge",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a-consumer",
+                "component": "component",
+                "units": 1,
+                "depends_on": [
+                  "b-prerequisite"
+                ]
+              },
+              {
+                "id": "b-prerequisite",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "z-independent",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a-consumer",
+              "b-prerequisite",
+              "z-independent"
+            ]
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "z-independent",
+                "a-consumer",
+                "b-prerequisite"
+              ],
+              "units": 3
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "z-independent",
+              "a-consumer",
+              "b-prerequisite"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "failure": null,
+          "matched": true
+        },
+        {
+          "case": "public-rollback-order-diagnostics:example:reverse-lexical-control-without-edge",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a-consumer",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "b-prerequisite",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "z-independent",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a-consumer",
+              "b-prerequisite",
+              "z-independent"
+            ]
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "z-independent",
+                "b-prerequisite",
+                "a-consumer"
+              ],
+              "units": 3
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "z-independent",
+              "b-prerequisite",
+              "a-consumer"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "failure": null,
+          "matched": true
+        }
+      ]
+    },
+    {
+      "label": "frozen-review-bytes",
+      "signedBytes": true,
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "67ea6458e8a1c1d359e2d92e1b396195ffebb94d2d99f5d979bdffc3216fdf52"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "205a57ef6b0bef2870840ae6336bc3f9ea1aff27b0d1ce88e14b045c3b573f60"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "fff5568dd8fd03b920daed1b142ca3f64664f417a8992a24fe763dcf2b3a3e4c"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "observations": [
+        {
+          "case": "public-rollback-order-diagnostics:example:reverse-preserves-applied-prerequisite-edge",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a-consumer",
+                "component": "component",
+                "units": 1,
+                "depends_on": [
+                  "b-prerequisite"
+                ]
+              },
+              {
+                "id": "b-prerequisite",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "z-independent",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a-consumer",
+              "b-prerequisite",
+              "z-independent"
+            ]
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "z-independent",
+                "a-consumer",
+                "b-prerequisite"
+              ],
+              "units": 3
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "z-independent",
+              "a-consumer",
+              "b-prerequisite"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "failure": null,
+          "matched": true
+        },
+        {
+          "case": "public-rollback-order-diagnostics:example:reverse-lexical-control-without-edge",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a-consumer",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "b-prerequisite",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              },
+              {
+                "id": "z-independent",
+                "component": "component",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a-consumer",
+              "b-prerequisite",
+              "z-independent"
+            ]
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "z-independent",
+                "b-prerequisite",
+                "a-consumer"
+              ],
+              "units": 3
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "z-independent",
+              "b-prerequisite",
+              "a-consumer"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "failure": null,
+          "matched": true
+        }
+      ]
+    }
+  ],
+  "acceptedArchitecture": {
+    "sha256": "4609c477fbe7fef61882f9331a160f69dc7b4e660ac7c1554e01601ae17b9bbf",
+    "first": "pass",
+    "independent": "pass",
+    "wrongCause": [
+      {
+        "line": 18,
+        "text": "2. journal.py：图校验。依赖目标不存在、`applied` 中出现未知 id 报 `unknown-dependency`；任意环报 `dependency-cycle`；产出“当前可执行者按 id 字典序取最小”的确定性拓扑序，供 planner 复用。**建图口径（已核实的修复点，对应 SPEC.md:14）**：完整拓扑序一律以全部依赖边建图，待定依赖集合取 `set(row[\"depends_on\"])`，不得减去 `applied`；`applied` 只用于 `unknown-dependency` 校验、plan 过滤与预算计算。若在建图时扣掉已应用依赖，消费者与其已应用前置项同时就绪，只剩字典序决定先后，`rollback` 取逆序后消费者会早于前置项，违反“reverse of the full deterministic topological order”。"
+      }
+    ],
+    "correctExpectedBehavior": [
+      {
+        "line": 20,
+        "text": "4. planner.py：装配结果。plan 只发射未 applied 的变更（已 applied 视为满足依赖、不占预算）；rollback 只发射已 applied 的变更，取第 2 步全量确定性拓扑序的逆序，因此逆序中每个已应用变更仍排在其已应用前置项之前；成功输出恰好 `{\"status\":\"ok\",\"actions\":[...],\"units\":n}`，失败输出恰好 `{\"status\":\"error\",\"error\":code,\"actions\":[],\"units\":0}`，失败不产生部分动作。"
+      }
+    ],
+    "correctVerification": [
+      {
+        "line": 37,
+        "text": "- 排课口径（回归主项）：`a-consumer` 依赖 `b-prerequisite` 且两者均已 applied 时，rollback 必须让 `a-consumer` 先于 `b-prerequisite` 出现；另用无依赖边的纯字典序样例作对照，确认字典序取舍未被改动破坏。"
+      }
+    ]
+  },
+  "incorrectComments": [
+    {
+      "file": "journal.py",
+      "sha256": "67ea6458e8a1c1d359e2d92e1b396195ffebb94d2d99f5d979bdffc3216fdf52",
+      "lines": [
+        {
+          "line": 96,
+          "text": "    The order is built from every dependency edge, never from"
+        },
+        {
+          "line": 97,
+          "text": "    depends_on-minus-applied: applied IDs must still constrain their consumers."
+        },
+        {
+          "line": 98,
+          "text": "    If they were dropped, a consumer and its already applied prerequisite would"
+        },
+        {
+          "line": 99,
+          "text": "    become eligible together and only lexical order would decide, so the reverse"
+        },
+        {
+          "line": 100,
+          "text": "    used by rollback would put the consumer before its prerequisite and break"
+        },
+        {
+          "line": 101,
+          "text": "    SPEC.md:14. `applied` is used here only to validate unknown IDs; plan"
+        },
+        {
+          "line": 102,
+          "text": "    filtering and budget accounting happen in planner.py."
+        }
+      ],
+      "cause": "The actual faulty snapshot puts the consumer after its prerequisite; consumer before prerequisite is the correct rollback."
+    },
+    {
+      "file": "planner.py",
+      "sha256": "205a57ef6b0bef2870840ae6336bc3f9ea1aff27b0d1ce88e14b045c3b573f60",
+      "lines": [
+        {
+          "line": 39,
+          "text": "            # Reverse the full deterministic order first, then keep the applied"
+        },
+        {
+          "line": 40,
+          "text": "            # IDs: that is literally SPEC.md:14 and it fixes the positions of the"
+        },
+        {
+          "line": 41,
+          "text": "            # emitted subset. Filtering first and reversing afterwards would give"
+        },
+        {
+          "line": 42,
+          "text": "            # a different order whenever an unapplied change sorts into the list."
+        },
+        {
+          "line": 43,
+          "text": "            actions = [ident for ident in reversed(order) if ident in applied_ids]"
+        }
+      ],
+      "cause": "Given one fixed full order and one fixed subset, filtering and reversing commute. This comment describes a different failure than deleting edges before ordering."
+    }
+  ]
+}

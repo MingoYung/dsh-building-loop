@@ -1,0 +1,352 @@
+{
+  "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+  "scope": "Both real Windows DSH locked-scope workflows. Hashed IDs and public checked clauses only. Original signed source is unchanged by rehearsal.",
+  "observations": [
+    {
+      "run": "r-K7uKAM",
+      "stage": "g2",
+      "sameExecutor": "54da20c2da44",
+      "signedSourceUnchanged": true,
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "7202f6a09bb82d670fa72d7de95c81730eb66cd22cf34dc4ace6e7aa852d1980"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "fcd0205ce0f7940876dee5703ffe2b64385a62a2a57d45d304e8a3b6ebd7a3d8"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "c844edce2db00fb3d41be8eac0be2d4323372b8ee7a7567a0acd6442db75b54c"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "signedReceiptSha256": "3985b4a39edd7137c5bfe0023a59dfc9ccaaacf81bbd901422083c9751dd43c2",
+      "documentSha256": "5bb7a05adc332218c11a5411a0d5023ab9c11d90808b9ebbb64b41077eddc5e9",
+      "scopeLines": [
+        "## 回退顺序",
+        "",
+        "回退副本须满足以下已登记验收条款，实际结果见宿主演练回执。",
+        "",
+        "- SPEC.md 第 14–14 行。Both environments support plan and rollback in G1.",
+        "- CHANGE-G2.md 第 6–6 行。For a staging plan, the effective budget is the smaller of the request budget and \\*\\*3\\*\\*. A quota violation is \\`budget-exceeded\\`, including when the request permits more.",
+        "- CHANGE-G2.md 第 7–7 行。Staging rollback accepts \\`retain\\`, default empty. It lists IDs that are already applied and must remain.",
+        "",
+        "```json building-loop-rollback",
+        "{\"proposal\":\"rollback-451e4e0ff209c67aafd642d0c6d3522c82a50881c31dfb34539b81c4f0a7251d\"}",
+        "```",
+        ""
+      ],
+      "timeline": [
+        {
+          "role": "coordinator",
+          "session": "92ddf7b2803c",
+          "seq": 61,
+          "elapsedMs": 24762,
+          "phase": "intake",
+          "assignment": {
+            "reused": false,
+            "child": "54da20c2da44"
+          }
+        },
+        {
+          "role": "executor",
+          "session": "54da20c2da44",
+          "seq": 119,
+          "elapsedMs": 88769,
+          "phase": "intake",
+          "rollbackProposalRegistered": {
+            "id": "rollback-b5f42085faa8ac8f65bf7b6c32d89923d4a08c6a479725f8c869a09f58fd5bf6",
+            "files": [
+              "policy.py"
+            ]
+          }
+        },
+        {
+          "role": "coordinator",
+          "session": "92ddf7b2803c",
+          "seq": 105,
+          "elapsedMs": 106627,
+          "phase": "architecture-sync",
+          "rollbackRehearsal": {
+            "status": "rollback-failed",
+            "total": 4,
+            "passed": 3,
+            "failures": [
+              {
+                "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+                "outcome": "mismatch",
+                "exitCode": 0,
+                "actualSha256": "a2f91d50dc0d250be1555162141f72444319fc71d613a8038cb4a8c70811e117"
+              }
+            ]
+          }
+        },
+        {
+          "role": "coordinator",
+          "session": "92ddf7b2803c",
+          "seq": 112,
+          "elapsedMs": 109081,
+          "phase": "intake",
+          "assignment": {
+            "reused": true,
+            "child": "54da20c2da44"
+          }
+        },
+        {
+          "role": "executor",
+          "session": "54da20c2da44",
+          "seq": 140,
+          "elapsedMs": 112759,
+          "phase": "intake",
+          "rollbackRepair": {
+            "id": "a4759aac7de3f241596b08806ce9e1ccf1638685dcfb3fc99759f8f5cde2fbc5",
+            "proposalId": "rollback-b5f42085faa8ac8f65bf7b6c32d89923d4a08c6a479725f8c869a09f58fd5bf6",
+            "failedChecks": [
+              "public-release-reopen-production:example:staging-plan-quota-preserved"
+            ],
+            "observedChecks": 4
+          }
+        },
+        {
+          "role": "executor",
+          "session": "54da20c2da44",
+          "seq": 152,
+          "elapsedMs": 119194,
+          "phase": "architecture-sync",
+          "rollbackProposalRegistered": {
+            "id": "rollback-451e4e0ff209c67aafd642d0c6d3522c82a50881c31dfb34539b81c4f0a7251d",
+            "files": [
+              "policy.py"
+            ]
+          }
+        },
+        {
+          "role": "coordinator",
+          "session": "92ddf7b2803c",
+          "seq": 147,
+          "elapsedMs": 122104,
+          "phase": "review-ready",
+          "rollbackRehearsal": {
+            "status": "passed",
+            "passed": 4,
+            "total": 4,
+            "binding": {
+              "policySha256": "67a6e667ea2e4c6e827f6e99e37b15746eb3d9f0c71e7578e6eff8a58a355fcf",
+              "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+              "receiptSha256": "3985b4a39edd7137c5bfe0023a59dfc9ccaaacf81bbd901422083c9751dd43c2",
+              "originalArtifactsSha256": "a85ecbd4a219fb69231bf7a1501684aa54244d1b65f48192d0cb4244a1538470",
+              "rehearsalArtifactsSha256": "eab312ce68dae9998b87d036d14e262173d368670528b0f4f09e1dacfea500eb",
+              "architectureSha256": "5bb7a05adc332218c11a5411a0d5023ab9c11d90808b9ebbb64b41077eddc5e9",
+              "rollbackSha256": "fdd466d651007ccfb5f61c5771ef84b6169f465ecc97885fb44f71c92342f986",
+              "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1",
+              "proposalId": "rollback-451e4e0ff209c67aafd642d0c6d3522c82a50881c31dfb34539b81c4f0a7251d"
+            },
+            "changed": [
+              {
+                "file": "policy.py",
+                "beforeSha256": "c844edce2db00fb3d41be8eac0be2d4323372b8ee7a7567a0acd6442db75b54c",
+                "afterSha256": "2ea05a4c23f49b940dd7e19506bfae52556b0f7b190b8623cd998e9114cac206"
+              }
+            ],
+            "receipts": [
+              {
+                "id": "public-release-reopen-production:example:restored-production-plan",
+                "snapshotSha256": "1c103028d21d4fb9b3b5f666b50dd32c128f7c2e99399886ba5c8666539489e6"
+              },
+              {
+                "id": "public-release-reopen-production:example:restored-production-rollback",
+                "snapshotSha256": "7f2b5b29e3464ed4e0de60ba5b044d2fb5b6b753ef8416eabf390321f8b51c23"
+              },
+              {
+                "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+                "snapshotSha256": "21d27fff3bdee8e69165d8fc3eb170ee7cef073781b596443fee4139a1326032"
+              },
+              {
+                "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+                "snapshotSha256": "e60f3274a23336d505ee6dce4bb18a99f05c1c92ab8b1393f4e20af7386f5bdd"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-A6f7Fu",
+      "stage": "g2",
+      "sameExecutor": "55c2e3a00438",
+      "signedSourceUnchanged": true,
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "14f244750654f2c8c4283797220ea5f7d90d49e4e59586599651e64cdcb7f5f9"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e67f604e4864ad3a1315e724a20eabc5e7721537cb55ee79b7481fee3ba1200b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "signedReceiptSha256": "55908bfe11c370c3c1fe7de878d189642d8bfd34bb30cdb5123eb5231447b98c",
+      "documentSha256": "a747fd807402be2f50b298748dd8a4e4dc3a15734abac3e845dc64358c9e020d",
+      "scopeLines": [
+        "## 回退顺序",
+        "",
+        "回退副本须满足以下已登记验收条款，实际结果见宿主演练回执。",
+        "",
+        "- SPEC.md 第 14–14 行。Both environments support plan and rollback in G1.",
+        "- CHANGE-G2.md 第 6–6 行。For a staging plan, the effective budget is the smaller of the request budget and \\*\\*3\\*\\*. A quota violation is \\`budget-exceeded\\`, including when the request permits more.",
+        "- CHANGE-G2.md 第 7–7 行。Staging rollback accepts \\`retain\\`, default empty. It lists IDs that are already applied and must remain.",
+        "",
+        "```json building-loop-rollback",
+        "{\"proposal\":\"rollback-480f03f1ca3bd02987714d6bd14811c2f3ccfc989610b879bb7e280354263fb2\"}",
+        "```",
+        ""
+      ],
+      "timeline": [
+        {
+          "role": "coordinator",
+          "session": "7802b9ba4422",
+          "seq": 64,
+          "elapsedMs": 35239,
+          "phase": "intake",
+          "assignment": {
+            "reused": false,
+            "child": "55c2e3a00438"
+          }
+        },
+        {
+          "role": "executor",
+          "session": "55c2e3a00438",
+          "seq": 145,
+          "elapsedMs": 142100,
+          "phase": "intake",
+          "rollbackProposalRegistered": {
+            "id": "rollback-72d5324e335377a83666180df89027d2964ab54740b57e5f8001e61e0c226efe",
+            "files": [
+              "policy.py"
+            ]
+          }
+        },
+        {
+          "role": "coordinator",
+          "session": "7802b9ba4422",
+          "seq": 90,
+          "elapsedMs": 153308,
+          "phase": "architecture-sync",
+          "rollbackRehearsal": {
+            "status": "rollback-failed",
+            "total": 4,
+            "passed": 3,
+            "failures": [
+              {
+                "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+                "outcome": "mismatch",
+                "exitCode": 0,
+                "actualSha256": "a2f91d50dc0d250be1555162141f72444319fc71d613a8038cb4a8c70811e117"
+              }
+            ]
+          }
+        },
+        {
+          "role": "coordinator",
+          "session": "7802b9ba4422",
+          "seq": 97,
+          "elapsedMs": 156255,
+          "phase": "intake",
+          "assignment": {
+            "reused": true,
+            "child": "55c2e3a00438"
+          }
+        },
+        {
+          "role": "executor",
+          "session": "55c2e3a00438",
+          "seq": 172,
+          "elapsedMs": 159585,
+          "phase": "intake",
+          "rollbackRepair": {
+            "id": "b4e628559e9b8dec76a6f1b03985f39fd2b4f2a506c99d4ae718963801479093",
+            "proposalId": "rollback-72d5324e335377a83666180df89027d2964ab54740b57e5f8001e61e0c226efe",
+            "failedChecks": [
+              "public-release-reopen-production:example:staging-plan-quota-preserved"
+            ],
+            "observedChecks": 4
+          }
+        },
+        {
+          "role": "executor",
+          "session": "55c2e3a00438",
+          "seq": 202,
+          "elapsedMs": 183649,
+          "phase": "architecture-sync",
+          "rollbackProposalRegistered": {
+            "id": "rollback-480f03f1ca3bd02987714d6bd14811c2f3ccfc989610b879bb7e280354263fb2",
+            "files": [
+              "policy.py"
+            ]
+          }
+        },
+        {
+          "role": "coordinator",
+          "session": "7802b9ba4422",
+          "seq": 166,
+          "elapsedMs": 188724,
+          "phase": "review-ready",
+          "rollbackRehearsal": {
+            "status": "passed",
+            "passed": 4,
+            "total": 4,
+            "binding": {
+              "policySha256": "70f89f17f70b2cf22bc696f605e78e06f1f019155846e926dc6d49299cdf0f83",
+              "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+              "receiptSha256": "55908bfe11c370c3c1fe7de878d189642d8bfd34bb30cdb5123eb5231447b98c",
+              "originalArtifactsSha256": "e6b80d42676e9f45ced4cdf4aaab50410b5bde9b5c6d302fd206f2162977c493",
+              "rehearsalArtifactsSha256": "3e9c9235dc9ac3628cf7d29072eadc790928dde9aaf3efe3e6cda9d0187d60e5",
+              "architectureSha256": "a747fd807402be2f50b298748dd8a4e4dc3a15734abac3e845dc64358c9e020d",
+              "rollbackSha256": "7001c93c265e375981693f3613cab39d01bc9b027cfc2f45f0b673c2b089f32f",
+              "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1",
+              "proposalId": "rollback-480f03f1ca3bd02987714d6bd14811c2f3ccfc989610b879bb7e280354263fb2"
+            },
+            "changed": [
+              {
+                "file": "policy.py",
+                "beforeSha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722",
+                "afterSha256": "4107809318a514554adc828c86f5681ba4fda0a662dd32d21d8062c0744218e9"
+              }
+            ],
+            "receipts": [
+              {
+                "id": "public-release-reopen-production:example:restored-production-plan",
+                "snapshotSha256": "47366f9b270c892ad69f14a391b25fb3b681731b0a5bd0b8194a042324b444ae"
+              },
+              {
+                "id": "public-release-reopen-production:example:restored-production-rollback",
+                "snapshotSha256": "9d62e0f8764a11b9980544fb8d058a173c116ed6e36e3cda9963aa86a7d1fbb8"
+              },
+              {
+                "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+                "snapshotSha256": "30b2b13f809bf9231c7a4007e8efe9313061665a6e047168d93ad2fc16685bf4"
+              },
+              {
+                "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+                "snapshotSha256": "4f57c13568046d09c6626a3bfeaacfa88f961da77c4cf51cd13323c32c41e59e"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

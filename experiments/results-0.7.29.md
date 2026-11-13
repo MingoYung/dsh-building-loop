@@ -53,3 +53,23 @@
 `33d62ae0` 版本通过本地 414 项回归和三套 Windows 零模型安装预跑。签名副本演练仍保留 2/4 的旧负例和 4/4 的正例，公开回滚顺序的当前签名正反复现仍使用受信运行器。 [Windows 预跑](observations-0.7.29-locked-preflight.json) · [签名副本](observations-0.7.29-locked-host-rehearsal.json) · [诊断](observations-0.7.29-locked-host-diagnosis.json)
 
 用两个真实冻结稿验证宿主替换错误回退小节。原始签名先逐份核验，源码字节和未涉及正文保留。隔离重放按新授权摘要给原工件和原用例重新签名，真实 Windows 到 WSL 回执各 4/4，伪签名拒绝。`r-h4cllo` 另有一个解码器名错误，宿主先拦住该错项，回放按原位置修正后继续验证回退小节。 [真实冻结稿的安装包正反回放](observations-0.7.29-locked-actual-scope.json)
+
+本包在 `r-A6f7Fu` 真实 DeepSeek 短关触发 `rollback-order`。只读诊断复现登记的公开依赖边反例，总控核实后交回同一执行会话，在 161.220 秒取得 18/18 签名结果。独立重放对比该轮失败快照和修复后签名快照，验证带依赖边的坏例和无边对照。 [真实诊断过程](observations-0.7.29-locked-live-diagnosis.json) · [正反代码复放](observations-0.7.29-locked-live-diagnosis-replay.json)
+
+第三批两轮 G2 都在原执行会话把隔离副本回退从 3/4 补到 4/4，发布的回退小节与登记的恢复和保留条款一致。两次失败都来自第一次提议丢掉 staging 配额。 `r-K7uKAM` G1 宿主在 257.334 秒结单，当前对话仍调用两次工具、产生至少 115,631 个已报告 Token，直到清理时退出，运行记录仍判为到达时限。 [回退补正](observations-0.7.29-locked-live-rehearsal.json) · [关单与时限](observations-0.7.29-locked-closure-terminal.json)
+
+两轮 G1 的实际交付都存在架构错归。`r-K7uKAM` 第 17 行用模块短名将非对象判定归给 `journal`，两份审核理由却写的是正确的 `planner`。`r-A6f7Fu` 归错了多个字段校验位置，且错误解释回滚顺序的注释随正确实现一起获通过。进一步修补已从签名文件中解析唯一模块短名，检查有明确引用的输入条件及返回值，并覆盖未加反引号的字段列表。将回退节重生成之前移除已知会被覆盖的旧断言，仍对其他章节使用同样的检查。另移除未被消费的可选 `note` 专用长度门槛，三次被拒绝的实际说明分别长 546、570、870 UTF-16 代码单元。以上补强经冻结稿和定向回归，第三批真实模型使用的是补强前的精确包。 [短名错稿回放](observations-0.7.29-typed-direct-replay.json) · [字段错稿回放](observations-0.7.29-bare-owner-replay.json) · [参数结构](observations-0.7.29-locked-proposal-shape.json)
+
+第三批三组两轮功能均为 18/18→21/21。`r-A6f7Fu` 在同目录完成 G1、G2 两轮宿主关单，且通过功能、模块边界及行为补验。`r-K7uKAM` G1 到达时限，G2 从冻结副本续跑并关单。两轮完整放行 **0/2**，各阶段都存在架构错项，`r-A6f7Fu` 的必要注释也有实质错误。后续补强的本地回归 **416/416** 通过。 [第三批原始记录](observations-0.7.29-locked-paid-public.json) · [独立放行判断](observations-0.7.29-locked-paid-exact-gate.json) · [独立注释审查](observations-0.7.29-locked-paid-independent-quality.json)
+
+| 模式 | 210 秒对齐 Token | 缓存命中 | 完整 Token | 缓存命中 |
+|---|---:|---:|---:|---:|
+| 标准 | 2,036,336 | 97.8476% | 2,116,032 | 97.9162% |
+| 标准＋清单 | 4,347,537 | 98.3840% | 4,882,814 | 98.4397% |
+| Building-loop | 6,888,905 | 92.5478% | 14,992,463 | 94.8340% |
+
+三组用量缺记、无法归属的持久化用量和会话日志读取错误均为 0。Building-loop 完整窗口用量为标准的约 7.09 倍。这组样本中三个模式的功能同分，Building-loop 的独立验收仍查到错误。 [第三批用量细项](observations-0.7.29-locked-paid-measures.json)
+
+## 放行状态
+
+三个精确付费包各做两轮短对照，总计完整放行 0/6。未启动 G3/G4 和仓库新题的付费盲测，两个场景均保留零模型预跑结果。正式 DSH 的 Profile 指纹保持一致，正式版本仍为 0.7.18。ClearAI 三方对照在隔离目录准备了同模型、同底稿和评分口径，仍待完整放行后的实测。

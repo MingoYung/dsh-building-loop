@@ -102,7 +102,8 @@ for (const lockedScope of [false, true]) test("signed rollback returns a failed 
     const { codeTask } = await harness.flow(executor, "prepare");
     const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
     save(file, { ...challenge, runId: "signed-rollback-candidate", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
-    const proposal = (actor, newText) => harness.invoke(actor, "building_loop", { action: "rollback-proposal", note: "Explain the scoped rollback", rollbackEdits: [{
+    const proposal = (actor, newText, note = lockedScope ? "" : "Explain the scoped rollback") =>
+      harness.invoke(actor, "building_loop", { action: "rollback-proposal", note, rollbackEdits: [{
       file: candidate, replacements: [{ oldText: "return min(value, 5)", newText }],
     }] });
     await assert.rejects(proposal("root", "return value"), /执行方/u);
@@ -114,6 +115,8 @@ for (const lockedScope of [false, true]) test("signed rollback returns a failed 
     if (!lockedScope) {
       assert.equal((await harness.flow("root", "architecture")).status, "rollback-plan-required");
       await setPlan(reference(wrong));
+    } else {
+      await setPlan(plan.replace("回退入口到原算法并验证旧预算。", "当前工作区，缺少 `runtime.py` 源码。"));
     }
     const failed = await harness.flow("root", "architecture");
     assert.equal(failed.status, "rollback-failed");
@@ -130,7 +133,7 @@ for (const lockedScope of [false, true]) test("signed rollback returns a failed 
     await assert.rejects(harness.invoke(executor, "building_loop", { action: "rollback-proposal", rollbackEdits: [{
       file: candidate, replacements: [{ oldText: "value, 5)", newText: "value, 4)" }],
     }] }), /修改失败提议/u);
-    const corrected = await proposal(executor, "return value");
+    const corrected = await proposal(executor, "return value", "Explain the scoped rollback. ".repeat(32));
     assert.equal(corrected.phase, "architecture-sync");
     if (!lockedScope) await setPlan(reference(corrected));
     const registered = await harness.flow("root", "architecture");
@@ -141,6 +144,7 @@ for (const lockedScope of [false, true]) test("signed rollback returns a failed 
       const document = fs.readFileSync(path.join(root, architecture), "utf8");
       assert.match(document, /After rollback, a budget of seven is accepted\./u);
       assert.doesNotMatch(document, /验证旧预算/u);
+      assert.doesNotMatch(document, /缺少 `runtime\.py`/u);
       assert.match(document, /入口限制请求预算。/u);
       await assert.rejects(setPlan(document.replace("a budget of seven", "a budget of nine")), /回退范围由宿主生成/u);
     }
@@ -616,9 +620,10 @@ test("architecture locates grouped guards, a literal rejection decision, and a w
     "- `rules.py`（规则）：校验 `quantity`/`owner` 字段。",
     "- `data.py`：由规则模块校验 `quantity`/`owner` 字段。",
     "- `entry.py`：读标准输入，`json.loads` 失败输出 `bad-json`。",
-    "- `entry.py`：读标准输入，`json.load` 失败输出 `bad-json`。"].join("\n");
+    "- `entry.py`：读标准输入，`json.load` 失败输出 `bad-json`。",
+    "- `data.py`：记录解析。校验请求形态、quantity、owner、items 结构。"].join("\n");
   assert.deepEqual(inspectArchitectureProse(inlineOwnership, graph).map(({ line, field, symbol }) => [line, field ?? symbol]),
-    [[1, "quantity"], [1, "owner"], [4, "json.loads"]]);
+    [[1, "quantity"], [1, "owner"], [4, "json.loads"], [6, "quantity"], [6, "owner"]]);
   write("entry.py", sources["entry.py"].replace("request = codec.load(stream)", "codec = stream\n    request = codec.load(stream)"));
   const rebound = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file,
     sha256: digest(fs.readFileSync(path.join(root, file))) })), { responsibilities: true });

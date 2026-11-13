@@ -20,6 +20,18 @@ const nonCurrent = /(?:计划|拟由|拟将|将来|未来|待改|建议|如果|�
 const nonCurrentHeading = /(?:计划|规划示例|举例|示例|反例|草案|提案|\b(?:plans?|planned|examples?|proposals?|draft)\b)/iu;
 const localDecision = /(?:(?:在此(?:处)?|由(?:该|本|此)(?:模块|文件|层))\s*(?:直接)?\s*(?:拦截|拒绝|校验|判定)(?:该(?:请求|输入))?\s*[，,]\s*(?:对应|详见|参见)|(?:\b(?:rejected|validated|decided)\s+here|\bthis\s+(?:module|file|layer)\s+(?:rejects|validates|decides)\s+(?:it|the\s+(?:request|input)))\s*,\s*(?:per|see|as\s+specified\s+by))\s*$/iu;
 const emission = /(?:返回|抛出|给出|\b(?:returns?|raises?|emits?))\s*$/iu;
+const MAX_TYPED_CLAUSE = 240;
+const moduleToken = String.raw`(?:${sourceName}|[\p{ID_Start}_][\p{ID_Continue}]*)`;
+const moduleDescription = String.raw`(?:\s*[（(]([^()（）:：\n]{1,80})[）)])?`;
+const modulePrefix = new RegExp(String.raw`^(${moduleToken})${moduleDescription}\s*[:：]\s*`, "u");
+const moduleTitle = new RegExp(String.raw`^(${moduleToken})${moduleDescription}$`, "u");
+const rootTypes = new Map(Object.entries({ 对象: "object", 数组: "array", 字符串: "string", 整数: "integer", 布尔值: "boolean", 空值: "null",
+  object: "object", array: "array", string: "string", integer: "integer", boolean: "boolean", null: "null" }));
+const chineseType = /^(?:当\s*)?(?:请求|输入|参数|根值|顶层(?:值)?)\s*(不(?:是|为|属于)|非|是|为|属于)\s*(?:JSON\s*)?(对象|数组|字符串|整数|布尔值|空值|null)\s*(?:时|则)?\s*(?:[，,]\s*)?(?:直接\s*)?(?:返回|抛出|给出|报出)\s*$/iu;
+const englishType = /^(?:when|if)\s+(?:the\s+)?(?:input|request|argument|root(?:\s+value)?)\s+is\s+(?:(not)\s+)?(?:an?\s+)?(?:json\s+)?(object|array|string|integer|boolean|null)\s*,?\s+(?:directly\s+)?(?:returns?|raises?|emits?)\s*$/iu;
+const chineseField = /^(?:当\s*)?(?:请求|输入|对象)\s*(缺少|缺失|包含|存在)\s*(?:字段\s*)?`([\p{ID_Start}_][\p{ID_Continue}-]*)`\s*(?:字段)?\s*(?:时|则)?\s*(?:[，,]\s*)?(?:直接\s*)?(?:返回|抛出|给出|报出)\s*$/u;
+const englishField = /^(?:when|if)\s+(?:the\s+)?(?:request|input|object)\s+(lacks|contains|is missing)\s+(?:the\s+)?(?:field\s+)?`([\p{ID_Start}_][\p{ID_Continue}-]*)`\s*,?\s+(?:directly\s+)?(?:returns?|raises?|emits?)\s*$/iu;
+const quoteEnds = new Map([["“", "”"], ["‘", "’"], ["「", "」"], ["『", "』"], ['"', '"']]);
 
 function headingTitle(node) {
   const leaves = [...node.children];
@@ -98,15 +110,116 @@ function sameFile(from, file) {
   return from === file || (!from.includes("/") || !file.includes("/")) && from.split("/").at(-1) === file.split("/").at(-1);
 }
 
+function signedModules(sources) {
+  if (!Array.isArray(sources)) return;
+  const files = new Set(sources.filter(file => typeof file === "string" && file.endsWith(".py")));
+  const aliases = new Map();
+  for (const file of files) {
+    const basename = file.split("/").at(-1);
+    for (const alias of [basename, basename.slice(0, -3)]) aliases.set(alias, aliases.has(alias) ? undefined : file);
+  }
+  return { files, resolve: token => token.includes("/") ? files.has(token) && token : aliases.get(token) };
+}
+
+function signedRole(nodes, modules) {
+  const [first, second] = nodes;
+  if (first?.type === "text") {
+    const prefix = modulePrefix.exec(first.value);
+    const from = prefix && modules.resolve(prefix[1]);
+    if (from && !nonCurrentHeading.test(prefix[2] ?? "")) {
+      return { from, nodes: [{ ...first, value: first.value.slice(prefix[0].length) }, ...nodes.slice(1)] };
+    }
+  }
+  if ((first?.type !== "strong" && first?.type !== "inlineCode") || second?.type !== "text") return;
+  const title = first.type === "strong" ? headingTitle(first) : first.value;
+  const heading = moduleTitle.exec(title);
+  const colon = /^\s*[:：]\s*/u.exec(second.value);
+  const from = colon && modules.resolve(roleFile(nodes) ?? heading?.[1] ?? "");
+  if (from && !nonCurrentHeading.test(heading?.[2] ?? title)) {
+    return { from, nodes: [{ ...second, value: second.value.slice(colon[0].length) }, ...nodes.slice(2)] };
+  }
+}
+
+/** The text before a return literal must state the entire typed trigger.
+ * Matching an exact supported form leaves partial and compound scopes alone. */
+function typedCondition(clause) {
+  const type = chineseType.exec(clause) ?? englishType.exec(clause);
+  if (type) return { kind: "input-type", argument: 0, type: rootTypes.get(type[2].toLowerCase()),
+    test: /^(?:不|非|not)/iu.test(type[1] ?? "") ? "not" : "is" };
+  const field = chineseField.exec(clause) ?? englishField.exec(clause);
+  if (field) return { kind: "field-presence", argument: 0, field: field[2],
+    test: /^(?:缺|lacks|is missing)/iu.test(field[1]) ? "missing" : "present" };
+}
+
+function sameTrigger(left, right) {
+  return right && left.kind === right.kind && left.argument === right.argument && left.test === right.test &&
+    (left.kind === "input-type" ? left.type === right.type : left.field === right.field);
+}
+
+/** A parenthesized protected reference immediately following a conditional
+ * literal is scoped to that clause. The condition, code and signed module
+ * must all be identified before calling the ownership false. */
+function typedDirectConflicts(row, facts, modules) {
+  if (!modules) return [];
+  const role = signedRole(row.node.children, modules);
+  if (!role) return [];
+  const { from, nodes } = role;
+  const opening = nodes[0]?.value?.split(clauseBreak, 1)[0] ?? "";
+  if (nonCurrentHeading.test(opening) || /(?:例如|比如|假设|旧版|历史|(?:\b(?:formerly|previously|would|will|should)\b))/iu.test(opening)) return [];
+  const result = [];
+  let clause = "";
+  let emission;
+  const quotes = [];
+  for (const [index, node] of nodes.entries()) {
+    if (node.type === "inlineCode") {
+      const trigger = clause === null || quotes.length ? undefined : typedCondition(clause.trim());
+      emission = trigger && { trigger, code: node.value, index, line: node.position.start.line };
+    }
+    if (node.type === "link" && emission?.index === index - 2 && node.url.startsWith(factAnchor)) {
+      const open = nodes[index - 1];
+      const close = nodes[index + 1];
+      const opener = open.type === "text" && /^\s*([（(])\s*$/u.exec(open.value)?.[1];
+      const closer = close?.type === "text" && /^\s*([）)])(?=\s*(?:[。！？!?；;]|\.(?:\s|$)|$))/u.exec(close.value)?.[1];
+      const id = node.url.slice(factAnchor.length);
+      const fact = facts.get(id);
+      const decision = fact?.actual ?? fact?.decision;
+      if ((opener === "（" && closer === "）" || opener === "(" && closer === ")") &&
+          (fact?.mode ?? decision?.mode) === "business" && modules.files.has(decision?.file) && decision.file !== from &&
+          Number.isSafeInteger(decision.line) && decision.line > 0 && typeof decision.symbol === "string" &&
+          emission.code === decision.code && sameTrigger(emission.trigger, fact.trigger)) {
+        result.push({ line: emission.line, from, actual: [{ file: decision.file, line: decision.line, symbol: decision.symbol }],
+          id, relation: "linked-responsibility" });
+      }
+    }
+    // Non-text markup is opaque. A quoted example or an earlier fact label
+    // cannot supply a predicate. Field names may be explicit inline literals.
+    if (node.type === "text") {
+      for (const quote of node.value.matchAll(/[“”‘’「」『』"]/gu)) {
+        if (quotes.at(-1) === quote[0]) quotes.pop();
+        else if (quoteEnds.has(quote[0])) quotes.push(quoteEnds.get(quote[0]));
+      }
+      const parts = node.value.split(clauseBreak);
+      if (parts.length > 1) clause = parts.at(-1);
+      else if (clause !== null) clause += node.value;
+    } else if (clause !== null) {
+      clause += node.type === "inlineCode" && !node.value.includes("`") ? "`" + node.value + "`" : "\u0000";
+    }
+    if (clause !== null && clause.length > MAX_TYPED_CLAUSE) clause = null;
+  }
+  return result;
+}
+
 /** A protected link can identify a fact, but can also cite delegated work.
  * Require a concrete module prefix, a repeated response code and a direct
  * assertion that this module makes the linked decision. The narrower grammar
  * leaves plans, examples, fallbacks and indirect descriptions with reviewers. */
-function linkedRowConflicts({ node, kind, nonCurrentContext }, facts) {
+function linkedRowConflicts(row, facts, modules) {
+  const { node, kind, nonCurrentContext } = row;
   if (kind === "heading" || nonCurrentContext) return [];
-  const from = roleFile(node.children);
-  if (!from) return [];
-  const conflicts = [];
+  const conflicts = typedDirectConflicts(row, facts, modules);
+  const role = roleFile(node.children);
+  const from = modules && role ? modules.resolve(role) : role;
+  if (!from) return conflicts;
   const codes = new Set();
   let prose = "";
   for (const child of node.children) {
@@ -123,12 +236,15 @@ function linkedRowConflicts({ node, kind, nonCurrentContext }, facts) {
       const claim = clauses.at(-1);
       const direct = localDecision.exec(claim);
       if ((fact?.mode ?? decision?.mode) === "business" && typeof decision?.file === "string" &&
+          (!modules || modules.files.has(decision.file)) &&
           Number.isSafeInteger(decision.line) && decision.line > 0 && typeof decision.symbol === "string" &&
-          typeof decision.code === "string" && codes.has(decision.code) && !sameFile(from, decision.file) &&
+          typeof decision.code === "string" && codes.has(decision.code) && !(modules ? from === decision.file : sameFile(from, decision.file)) &&
           direct && !nonCurrent.test(claim) && !nonCurrentHeading.test(clauses[0])) {
         const line = child.position.start.line - (direct[0].match(/\n/gu)?.length ?? 0);
-        conflicts.push({ line, from, actual: [{ file: decision.file, line: decision.line, symbol: decision.symbol }],
-          id, relation: "linked-responsibility" });
+        if (!conflicts.some(item => item.line === line && item.from === from && item.id === id)) {
+          conflicts.push({ line, from, actual: [{ file: decision.file, line: decision.line, symbol: decision.symbol }],
+            id, relation: "linked-responsibility" });
+        }
       }
       prose += "\u0000";
     } else {
@@ -140,22 +256,24 @@ function linkedRowConflicts({ node, kind, nonCurrentContext }, facts) {
 
 /** Standalone preflight for current host-verified facts, even when architecture
  * prose receipts or the import graph are disabled. */
-export function linkedResponsibilityConflicts(source, facts) {
+export function linkedResponsibilityConflicts(source, facts, { sources } = {}) {
   if (typeof source !== "string" || Buffer.byteLength(source) > MAX_SOURCE_BYTES || !Array.isArray(facts) ||
       !facts.length || facts.length > MAX_FACTS) return [];
   const known = new Map(facts.map(fact => [fact.id, fact]));
-  return parseAuthoredMarkdown(source).rows.flatMap(row => linkedRowConflicts(row, known));
+  const modules = signedModules(sources);
+  return parseAuthoredMarkdown(source).rows.flatMap(row => linkedRowConflicts(row, known, modules));
 }
 
 /** Keep author prose separate from protected host sections. Visible paragraphs
  * and each list item's own paragraph retain exact physical lines. Added
  * headings outside declared sections remain reviewable. */
-export function architectureProseInventory({ source, sections, facts, protectedHeadings = [] }) {
+export function architectureProseInventory({ source, sections, facts, protectedHeadings = [], sources }) {
   if (typeof source !== "string" || Buffer.byteLength(source) > MAX_SOURCE_BYTES || !Array.isArray(sections) ||
     !Array.isArray(facts) || !facts.length || facts.length > MAX_FACTS ||
     facts.some(item => typeof item?.id !== "string" || !factId.test(item.id)) ||
     new Set(facts.map(item => item.id)).size !== facts.length) throw new Error("Invalid architecture coverage inputs");
   const { lines, normalized, rootHeadings, rows } = parseAuthoredMarkdown(source);
+  const modules = signedModules(sources);
   const currentFacts = new Map(facts.map(fact => [fact.id, fact]));
   const known = new Map(facts.map(fact => [fact.id, { id: fact.id, sha256: digest(JSON.stringify(fact)),
     ...(fact.clause ? { clause: fact.clause } : {}), ...((fact.actual ?? fact.decision) ? { decision: fact.actual ?? fact.decision } : {}) }]));
@@ -202,7 +320,7 @@ export function architectureProseInventory({ source, sections, facts, protectedH
     const id = "p-" + basis.slice(0, 18) + "-" + occurrence;
     const block = { id, section: group.id, heading: groupHeading, kind, start: start.line, end: end.line, sha256, refs };
     if (refs.some(ref => !known.has(ref))) block.unknownRefs = refs.filter(ref => !known.has(ref));
-    const hostConflicts = linkedRowConflicts(row, currentFacts);
+    const hostConflicts = linkedRowConflicts(row, currentFacts, modules);
     if (hostConflicts.length) block.hostConflicts = hostConflicts;
     blocks.push(block);
     group.blocks.push(id);

@@ -23,8 +23,8 @@ const implementation = /^(?:(?:当前|实际|负责|直接)\s*)*(?:定义|实现
 const delegated = /(?:通过|经由|间接|委托|delegat\w*|indirectly|\bvia\b)/iu;
 const ownershipNotCurrent = /(?:计划|拟由|拟将|将来|后续|未来|改为|待改|迁移至|移交给|以前|此前|旧版|历史上|示例|反例|误写|尚未|不再|并不(?:负责|实际|直接)|\b(?:formerly|previously|planned|instead|future|would|will|should|example|no longer|used to)\b)/iu;
 const inlineLabel = /\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/gu;
-const groupGuard = /(?:校验|验证|检查|\bvalidates?\b|\bchecks?\b)\s*(?:[（(]\s*([^（()）]{1,160})[）)]|(\x60[a-z_][a-z0-9_-]*\x60(?:\s*[/、,，]\s*\x60[a-z_][a-z0-9_-]*\x60){1,7})(?!\s*[/、,，]\s*\x60))/giu;
-const guardField = /^(?:\x60([a-z_][a-z0-9_-]*)\x60|([a-z_][a-z0-9_-]*))(?:\s*(?:各自)?(?:字段|类型(?:面|检查)?))?$/iu;
+const groupGuard = /(?:校验|验证|检查|\bvalidates?\b|\bchecks?\b)\s*(?:[（(]\s*([^（()）]{1,160})[）)]|([^；;。!?！？（()）]{1,160}))/giu;
+const guardField = /^(?:\x60([a-z_][a-z0-9_-]*)\x60|([a-z_][a-z0-9_-]*))(?:\s*(?:各自)?(?:字段|结构|类型(?:面|检查)?)(?:(?:并|且|及|与).+)?)?$/iu;
 const explicitGuardDelegate = /由[^。！？,，、；;:\x60]{1,36}(?:校验|验证|检查)|\bvalidated by\b/iu;
 const rejectionDecision = /(?:做|作|给出|执行)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60\s*(?:判定|判断)|\b(?:decides?|determines?)\s+\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
 const conditionalRejection = /(?:超出|超过|不符(?:合)?|失败|缺失|无效|畸形|否则|对照)[^，,。！？；;\x60]{0,16}(?:给出|返回|抛出|报出)\s*\x60([\p{ID_Start}_][\p{ID_Continue}_-]*)\x60/iu;
@@ -317,15 +317,16 @@ export function inspectArchitectureProse(source, graph) {
 
 /** Signed bytes supersede the planning-time graph. The coordinator receives
  * only registered module names and line positions, never source contents. */
-export function inspectEngineeringArchitectureClaims(frame, spec, active, graph) {
+export function inspectEngineeringArchitectureClaims(frame, spec, active, graph, proposed) {
   const qualification = active?.codeIntake?.qualification;
   if (!qualification || !(spec.architecture?.importsHeading || spec.architecture?.proseReview)) return { conflicts: [], calls: [] };
   const current = spec.architecture.importsHeading ? graph ?? inspectArchitectureImports(frame, spec, active) : undefined;
   const source = readBytes(frame.root, spec.architecture.file);
   if (!source || current && digest(source) !== current.sha256) throw new Error("检查架构调用关系时架构稿已变化");
-  const prose = source.toString("utf8");
+  const prose = proposed ?? source.toString("utf8");
   const linked = spec.architecture.proseReview && architectureResponsibilitiesCurrent(frame, spec, qualification,
-    digest(JSON.stringify(qualification.artifacts))) ? linkedResponsibilityConflicts(prose, qualification.architectureResponsibilities.rows) : [];
+    digest(JSON.stringify(qualification.artifacts))) ? linkedResponsibilityConflicts(prose, qualification.architectureResponsibilities.rows,
+      { sources: spec.codeTask.sources }) : [];
   return { conflicts: [...linked, ...(current ? inspectArchitectureProse(prose, current.graph) : [])], calls: current?.graph.calls ?? [] };
 }
 
@@ -490,22 +491,24 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   if (active?.phase === "architecture-repair" && active.engineeringArchitecture?.contentsSha256 === plan.contentsSha256) {
     throw new Error("架构已退回，请实际修改对应内容后再登记");
   }
-  const inventory = architectureSourceInventory(frame, spec);
-  const presenceConflicts = inventory.truncated ? [] :
-    inspectArchitectureSourcePresence(text(readBytes(frame.root, plan.file)), inventory.rows);
-  if (presenceConflicts.length) throw new Error(architectureClaimIssues(presenceConflicts).join("\n"));
   // Verified diagnosis may point at code that still cannot parse. Pin only
   // the owner's current plan here; signed submission checks the repaired source.
   const imports = pendingCodeRepair ? undefined : inspectArchitectureImports(frame, spec, active);
-  if (!pendingCodeRepair) {
-    const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports);
-    if (claims.conflicts.length) throw new Error(architectureClaimIssues(claims.conflicts).join("\n"));
-  }
-  const original = imports?.proposed ?? text(readBytes(frame.root, plan.file));
+  const original = imports?.proposed ?? source;
   const responsibilities = inspectArchitectureResponsibilitiesSection(frame, spec, pendingCodeRepair ? undefined : active, original);
   const withResponsibilities = responsibilities?.proposed ?? original;
   const rollbackScope = !pendingCodeRepair && inspectLockedRollbackScope(frame, spec, active, withResponsibilities);
   const updated = rollbackScope?.proposed ?? withResponsibilities;
+  // Ignore claims in the draft rollback section the host is about to replace.
+  // Keep existing diagnostics on the original positions for ordinary plans.
+  const checkSource = locked && !locked.match ? locked.proposed : source;
+  const inventory = architectureSourceInventory(frame, spec);
+  const presenceConflicts = inventory.truncated ? [] : inspectArchitectureSourcePresence(checkSource, inventory.rows);
+  if (presenceConflicts.length) throw new Error(architectureClaimIssues(presenceConflicts).join("\n"));
+  if (!pendingCodeRepair) {
+    const claims = inspectEngineeringArchitectureClaims(frame, spec, active, imports, checkSource);
+    if (claims.conflicts.length) throw new Error(architectureClaimIssues(claims.conflicts).join("\n"));
+  }
   if (updated !== source) {
     replaceWithHistory(frame.root, plan.file, before => {
       if (!before || digest(before) !== plan.sha256) throw new Error("宿主生成架构章节时正文已变化，请重新登记");

@@ -2521,7 +2521,9 @@ export function apply(ctx, config = {}) {
     if (unexpected.length) {
       throw new Error("回退提议使用 rollbackEdits 或 rollbackRestore，另可填 unit、note。请删除未登记字段：" + unexpected.slice(0, 4).join("、"));
     }
-    if (args.note !== undefined) requireText(args.note, "回退提议说明", 500);
+    // The common workflow schema permits an optional note. It carries no
+    // authority, and is never persisted with the exact rollback operation.
+    if (args.note !== undefined && typeof args.note !== "string") throw new Error("可选回退提议说明须为文本");
     const result = change(exec.agent, frame => {
       const [unit, active] = frame.assignment ?? [];
       const spec = frame.policy.units[unit];
