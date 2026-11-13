@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
-import { isCodeReviewUnit } from "../governance/code-review.mjs";
+import { inspectArchitectureImports, isCodeReviewUnit } from "../governance/code-review.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import { fixture, host } from "./helpers.mjs";
@@ -88,19 +88,32 @@ test("signed code review uses actual changed lines and an independent receipt be
   await assert.rejects(async () => codeReview(harness, executor, "submit", verified), /没有纯代码核验授权/);
   assert.deepEqual(packet.codeReview.changes.map(row => [row.path, row.ranges]), [[worker, [{ start: 2, end: 3, removed: 2 }]]]);
   assert.ok(packet.files.every(row => row.path === goal));
-  await assert.rejects(codeReview(harness, reviewer, "submit", verified), /读取当前版本/);
+  await assert.rejects(async () => codeReview(harness, reviewer, "submit", verified), /record/);
+  const unread = await codeReview(harness, reviewer, "record", { files: verified.files });
+  assert.match(unread.errors[0].reason, /读取当前版本/);
   await harness.file(reviewer, "read", worker, { start: 2, count: 2 });
-  assert.match(packet.codeReview.submission.fields.commentQuote, /status=verified 必须填写 quote/);
-  const missingQuote = structuredClone(verified);
-  delete missingQuote.files[0].comment.quote;
-  await assert.rejects(harness.flow(reviewer, "review", { codeReview: missingQuote }), /queue\.py 的 comment\.quote.*必须填写 quote/);
-  const longBasis = structuredClone(verified);
-  longBasis.constraints[0].basis = "a".repeat(401);
-  await assert.rejects(harness.flow(reviewer, "review", { codeReview: longBasis }), /batch-bound 的 constraints\.basis.*当前长度 401/);
-  const unsupported = structuredClone(verified);
-  unsupported.files[0].comment.quote = "fabricated explanatory comment";
-  await assert.rejects(harness.flow(reviewer, "review", { codeReview: unsupported }), /逐字定位/);
-  assert.equal((await codeReview(harness, reviewer, "submit", verified)).phase, "first-audit-ready");
+  assert.match(packet.codeReview.submission.fields.commentQuote, /宿主从源码提取原文/);
+  const unsupported = structuredClone(verified.files[0]);
+  unsupported.comment.quote = "fabricated explanatory comment";
+  const partial = await codeReview(harness, reviewer, "record", {
+    files: [unsupported, { ...verified.files[0], file: entry }], constraints: verified.constraints, findingsDone: true,
+  });
+  assert.deepEqual(partial.progress.missingFiles, [worker]);
+  assert.deepEqual(partial.progress.missingCases, []);
+  assert.equal(partial.progress.findingsDone, true);
+  assert.deepEqual(partial.errors.map(({ id }) => id), [worker, entry]);
+  assert.match(partial.errors[0].reason, /逐字定位/);
+  assert.match(partial.errors[1].reason, /只记录 changes/);
+  const corrected = structuredClone(verified.files[0]);
+  delete corrected.comment.quote;
+  assert.equal((await codeReview(harness, reviewer, "record", { files: [corrected] })).progress.ready, true);
+  const longBasis = { ...verified.constraints[0], basis: "a".repeat(401) };
+  const invalidReplacement = await codeReview(harness, reviewer, "record", { constraints: [longBasis] });
+  assert.match(invalidReplacement.errors[0].reason, /batch-bound 的 constraints\.basis.*当前长度 401/);
+  assert.deepEqual(invalidReplacement.progress.pendingCorrections, [{ field: "constraints", id: "batch-bound" }]);
+  await assert.rejects(codeReview(harness, reviewer, "submit"), /待修正 batch-bound/);
+  assert.equal((await codeReview(harness, reviewer, "record", { constraints: verified.constraints })).progress.ready, true);
+  assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
   await assert.rejects(harness.ledger("root", "review", { decisions: [] }), /复核阶段/);
   const auditor = (await harness.flow("root", "advance")).childId;
   assert.notEqual(auditor, reviewer);
@@ -108,15 +121,20 @@ test("signed code review uses actual changed lines and an independent receipt be
   const blind = await prepareReview(harness, auditor);
   assert.equal(blind.codeReview.binding, packet.codeReview.binding);
   assert.ok(!JSON.stringify(blind).includes(verified.files[0].basis));
+  assert.deepEqual(blind.codeReview.progress.missingFiles, [worker]);
+  assert.deepEqual(blind.codeReview.progress.missingCases, ["batch-bound"]);
   await assert.rejects(harness.file(auditor, "read", "first.json"), /授权|白名单/);
+  assert.equal((await codeReview(harness, auditor, "record", { ...verified, findingsDone: true })).progress.ready, true);
   write(worker, update.replace("min(5", "min(6"));
-  await assert.rejects(harness.flow(auditor, "audit", { codeReview: verified }), /回归|变化/);
+  await assert.rejects(codeReview(harness, auditor, "submit"), /回归|变化/);
   write(worker, update);
-  assert.equal((await codeReview(harness, auditor, "submit", verified)).phase, "ledger-review");
+  assert.equal((await codeReview(harness, auditor, "submit")).phase, "ledger-review");
   const receipt = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
   assert.equal(receipt.codeReview.actor, reviewer);
   assert.equal(receipt.independentAudit.codeReview.actor, auditor);
   assert.equal(receipt.codeReview.binding, receipt.independentAudit.codeReview.binding);
+  assert.equal(receipt.codeReview.files[0].comment.quote, verified.files[0].comment.quote);
+  assert.equal(receipt.codeReview.files[0].comment.annotationSha256, digest(verified.files[0].comment.quote));
   assert.equal(receipt.coverage, undefined);
   const book = await harness.ledger("root", "read");
   await harness.file("root", "read", goal);
@@ -139,15 +157,29 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   assert.equal((await qualify(executor)).phase, "review-ready");
   const reviewer = (await harness.flow("root", "advance")).childId;
   await prepareReview(harness, reviewer);
-  assert.equal((await harness.flow(reviewer, "review", { codeReview: verified })).phase, "first-audit-ready");
+  await codeReview(harness, reviewer, "record", { ...verified, findingsDone: true });
+  assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
   const auditor = (await harness.flow("root", "advance")).childId;
   await prepareReview(harness, auditor);
-  const finding = { ...ref(worker, 2), issue: "The comment omits the ownership of the cap value", fix: "Explain why this queue owns the bound" };
-  assert.equal((await harness.flow(auditor, "audit", { codeReview: { ...verified, findings: [finding] } })).phase, "supplement-ready");
+  const finding = { ...ref(worker, 2), id: "cap-ownership", kind: "annotation",
+    observation: "The comment gives the memory reason. The clamp on the next line hard-codes the cap.",
+    issue: "The comment omits the ownership of the cap value", fix: "Explain why this queue owns the bound",
+    evidence: [{ ...ref(worker, 3), relation: "supports" }], caseId: "batch-bound" };
+  const fake = { ...finding, evidence: [{ ...finding.evidence[0], quote: "return n" }] };
+  const invalid = await codeReview(harness, auditor, "record", { ...verified, findings: [fake], findingsDone: true });
+  assert.match(invalid.errors[0].reason, /逐字一致/);
+  assert.deepEqual(invalid.progress.missingFiles, []);
+  assert.deepEqual(invalid.progress.missingCases, []);
+  assert.equal(invalid.progress.findingsDone, false);
+  assert.equal((await codeReview(harness, auditor, "record", { findings: [finding], findingsDone: true })).progress.ready, true);
+  assert.equal((await codeReview(harness, auditor, "submit")).phase, "supplement-ready");
   const active = await harness.flow("root", "advance");
   assert.equal(active.childId, executor);
   const rejected = await harness.file(executor, "read", "first.json");
   assert.ok(JSON.stringify(rejected).includes(finding.issue));
+  const proof = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8")).independentAudit.codeReview;
+  assert.equal(proof.findings[0].evidence[0].excerptSha256, digest(update.split("\n")[2]));
+  assert.deepEqual(proof.findings[0].signedCase, { id: "batch-bound", status: "passed" });
   await assert.rejects(qualify(executor, "same-source-new-test-run"), /退回|落实/);
   const originalEntry = fs.readFileSync(path.join(root, entry), "utf8");
   write(entry, originalEntry + "# [稿件自述] 文档化说明\n");
@@ -159,7 +191,7 @@ test("blind code rejection returns actual repair debt and prevents unchanged res
   const second = (await harness.flow("root", "advance")).childId;
   await prepareReview(harness, second);
   write(goal, goalText.replace("five items", "six items"));
-  const stale = await harness.flow(second, "review", { codeReview: verified });
+  const stale = await codeReview(harness, second, "submit");
   assert.equal(stale.phase, "goal-review-ready");
   assert.equal((await harness.flow("root", "advance")).phase, "supplement");
 }));
@@ -196,6 +228,35 @@ test("an older candidate-only review grant still admits signed multi-file work t
   assert.equal(packet.codeReview, undefined);
   assert.ok(packet.coverage);
   await assert.rejects(harness.file(reviewer, "read", worker), /授权|白名单/);
+}));
+
+test("the owned architecture section renders direct static Python imports from exactly the signed source set", () => fixture(async (root, write) => {
+  const file = "architecture.md";
+  const importsHeading = "直接依赖";
+  const original = "# 现行设计\r\n\r\n## 直接依赖\r\n\r\n错误声称 queue.py 直接导入 main.py。\r\n\r\n## 回退\r\n\r\n保留本段字节。\r\n";
+  const before = "from queue import bounded as route\n# import main\n";
+  write(file, original);
+  write(entry, before);
+  write(worker, source);
+  const spec = { architecture: { file, importsHeading }, codeTask: { sources: [entry, worker] } };
+  const pin = () => ({ codeIntake: { qualification: { artifacts: [entry, worker].map(file =>
+    ({ path: file, sha256: digest(fs.readFileSync(path.join(root, file))) })) } } });
+  const baseline = inspectArchitectureImports({ root }, spec);
+  assert.equal(baseline.match, false);
+  assert.equal(baseline.current, "错误声称 queue.py 直接导入 main.py。");
+  assert.equal(baseline.expected, '```text\n"main.py" -> "queue.py"\n"queue.py" -> []\n```');
+  assert.ok(baseline.proposed.startsWith("# 现行设计\r\n\r\n## 直接依赖\r\n\r\n"));
+  assert.ok(baseline.proposed.endsWith("\r\n\r\n## 回退\r\n\r\n保留本段字节。\r\n"));
+  write(file, baseline.proposed);
+  const first = pin();
+  assert.equal(inspectArchitectureImports({ root }, spec, first).match, true);
+  write(worker, "import main\n" + source);
+  assert.throws(() => inspectArchitectureImports({ root }, spec, first), /当前签名工件不符/);
+  const second = inspectArchitectureImports({ root }, spec, pin());
+  assert.equal(second.match, false);
+  assert.match(second.expected, /"queue\.py" -> "main\.py"/u);
+  write(file, second.proposed);
+  assert.equal(inspectArchitectureImports({ root }, spec, pin()).match, true);
 }));
 
 test("an unmarked signed qualification from before the upgrade retains prose repair debt", () => fixture(async (root, write) => {

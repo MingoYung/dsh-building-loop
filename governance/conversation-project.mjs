@@ -3,6 +3,7 @@ import path from "node:path";
 import { AUTHORITY, MANAGED, MissingProjectAuthority, authority, digest, keyOf, parseAuthority, readBytes, replaceWithHistory, text, workspaceRoot } from "./policy.mjs";
 import { sessionProjectMode } from "./session-mode.mjs";
 import { deliverableTableContract } from "./deliverable-table.mjs";
+import { bindEngineeringCheckpoint } from "./engineering-handoff.mjs";
 
 export const GOAL = "PROJECT-GOAL.md";
 export const INDEX = "INDEX.md";
@@ -138,8 +139,8 @@ function createPrivateProject(hostHome, sessionId, proposal) {
   return privateProjectRoot(hostHome, sessionId, proposal.id);
 }
 
-/** Start can reuse an effective exact grant. Consent to a task never broadens file permissions. */
-export function initializeConversationProject(hostHome, sessionId, nativeCwd, proposal) {
+/** Check the existing workspace before approval is persisted. This only reads authorized files. */
+export function existingConversationProject(hostHome, sessionId, nativeCwd, proposal) {
   const { root: published } = projectLocation(hostHome, sessionId);
   if (fs.lstatSync(published, { throwIfNoEntry: false })) {
     // Resume the already published binding before consulting any newer workspace grant.
@@ -153,11 +154,20 @@ export function initializeConversationProject(hostHome, sessionId, nativeCwd, pr
     try {
       const policy = authority(root);
       const mode = sessionProjectMode(hostHome, root, sessionId);
-      if (mode ?? !policy.sessionOptIn) return { kind: "workspace", root };
+      if (mode ?? !policy.sessionOptIn) {
+        const checkpoint = bindEngineeringCheckpoint(hostHome, root, policy, proposal);
+        return { kind: "workspace", root, ...(checkpoint ? { checkpoint } : {}) };
+      }
     } catch (error) {
       if (!(error instanceof MissingProjectAuthority)) throw error;
     }
   }
+}
+
+/** Start reuses an effective exact grant or creates a project with fixed private grants. */
+export function initializeConversationProject(hostHome, sessionId, nativeCwd, proposal) {
+  const existing = existingConversationProject(hostHome, sessionId, nativeCwd, proposal);
+  if (existing) return existing;
   createPrivateProject(hostHome, sessionId, proposal);
   return { kind: "private" };
 }

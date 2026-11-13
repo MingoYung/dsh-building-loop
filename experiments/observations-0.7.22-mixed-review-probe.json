@@ -1,0 +1,264 @@
+{
+  "spec": "building-loop-review-finding-witness/1",
+  "run": "r-JmtJ3G",
+  "receiptSha256": "f7280495cb902a491e10df0efbb7a61353d151820e0e925488f8e42014747ba3",
+  "signedArtifact": "g2-b6adb95d3c5bb20b118646bc428a73df4083282baa6512f5f754eadc8958ecd3",
+  "findings": [
+    {
+      "file": "planner.py",
+      "start": 109,
+      "end": 112,
+      "sha256": "73d98a7d9f509ecca619aec1c04ff2de25360310eb1ad1d92704e8bd60112aec",
+      "id": "RET-1",
+      "owner": "executor",
+      "issue": "CHANGE-G2 第 3 条只将 retain 定义为 rollback 的参数并声明 applies only to rollback。当前 read_retain 对每个请求无条件执行：一个 action:\"plan\" 的请求只要带离形 retain（如 retain:[1]、retain:\"b\"）就会得到 invalid-retain，而非忽略 retain 正常规划。第 109-111 行注释把该行为当成设计决定，与契约不一致。",
+      "fix": "只在 action == \"rollback\" 时调用 read_retain（或对 plan 跳过其形状校验），并修正 109-111 行注释，使它与“retain 仅对 rollback 生效”一致。",
+      "kind": "behavior",
+      "observation": "第 112 行 retain = read_retain(request) 在两条结果分支之前无条件执行；journal.read_retain 第 107-111 行对非数组/非字符串直接抛 invalid-retain。而保留集的唯一消费点在 rollback 分支内的第 132 行。",
+      "evidence": [
+        {
+          "file": "planner.py",
+          "start": 109,
+          "end": 112,
+          "sha256": "73d98a7d9f509ecca619aec1c04ff2de25360310eb1ad1d92704e8bd60112aec",
+          "relation": "supports",
+          "excerptSha256": "102f7665f8c5e27d81463236abf0dad6f855e312beb8f53016c3e64a905e50e3"
+        },
+        {
+          "file": "journal.py",
+          "start": 104,
+          "end": 111,
+          "sha256": "714218b140aa6e800a7bb734c2f4d41c0bc533f55858c0661d036a07084da9dc",
+          "relation": "supports",
+          "excerptSha256": "89e31ceca7e5d800724b644ed9c0a6cc564ea40e4a7e311c4744ca6885b37a79"
+        },
+        {
+          "file": "CHANGE-G2.md",
+          "start": 7,
+          "end": 7,
+          "sha256": "90beb630e7301c3642cea01bfdd38c58947531fea36dd9537520cac058c8357d",
+          "relation": "contradicts",
+          "excerptSha256": "580c8600d7dfe308dd4943951bf13cb8110eb2a862ffed4b00e1c56997484bcf"
+        }
+      ],
+      "signedCase": {
+        "id": "retention-validation",
+        "status": "passed"
+      }
+    },
+    {
+      "file": "policy.py",
+      "start": 23,
+      "end": 26,
+      "sha256": "f2a28e7798bd7be33048bb44c675f9230841c8261ad27eab8d0bf7939378b7ef",
+      "id": "RET-2",
+      "owner": "executor",
+      "issue": "第 23-26 行断言冻结 even when the rest of the request is malformed。但当 production 请求的 budget 非法（budget:-1 或 budget:true）时，limit_for 会在第 46-47 行先抛 invalid-budget，永远到不了 37-38 行的 production 分支。该注释声明的安全保证对“非法 budget”子集不成立。",
+      "fix": "把 budget 校验从冻结判定之后拆开（或让冻结作为独立前置步骤），使 production 无论 budget 是否合法都先返回 production-frozen；并把 23-26 行注释改为与真实保证一致的表述。",
+      "kind": "annotation",
+      "observation": "limit_for 的判定顺序是 env(37-38) → action(41-43) → budget(44-47)，故冻结先于 action 与 budget；planner.plan() 在第 104 行调用它，晚于 read_changes(107) 之前的任何图步骤。这一覆盖面在注释里没有限定条件。",
+      "evidence": [
+        {
+          "file": "policy.py",
+          "start": 44,
+          "end": 47,
+          "sha256": "f2a28e7798bd7be33048bb44c675f9230841c8261ad27eab8d0bf7939378b7ef",
+          "relation": "supports",
+          "excerptSha256": "5bf18922ffb84ad7c260d834316dc7866eaa0cd9460e370b70a1440aa34ab275"
+        },
+        {
+          "file": "policy.py",
+          "start": 46,
+          "end": 47,
+          "sha256": "f2a28e7798bd7be33048bb44c675f9230841c8261ad27eab8d0bf7939378b7ef",
+          "relation": "reproduces",
+          "excerptSha256": "5409a58691fc9eadc16bf950811edfb194658ee38848289ce22a35360d61026b"
+        },
+        {
+          "file": "planner.py",
+          "start": 104,
+          "end": 104,
+          "sha256": "73d98a7d9f509ecca619aec1c04ff2de25360310eb1ad1d92704e8bd60112aec",
+          "relation": "supports",
+          "excerptSha256": "4d8dad86bdaf83793718191f8b02b138b6de74f16ff3d5f0d7f34a02fc12c6a9"
+        }
+      ],
+      "signedCase": {
+        "id": "production-frozen-before-graph",
+        "status": "passed"
+      }
+    },
+    {
+      "file": "modules/architecture.md",
+      "start": 36,
+      "end": 36,
+      "sha256": "a2d73aa2d7c49f5c2f09ef4352de4bffc20312efc851f7490e3bb8cc0faa2594",
+      "id": "ARCH-1",
+      "owner": "coordinator",
+      "issue": "本条声明 retain 只对 rollback 生效，但实现对所有请求（包括 plan）都先跑 read_retain 形状校验，一个带离形 retain 的 plan 请求会得到 invalid-retain 而非正常规划。此处的“只对 rollback 生效”缺少关键限定，与可观察行为不符。",
+      "fix": "要么在 planner.plan() 中让 plan 不执行 retain 形状校验（与契约对齐，则本条无需改），要么在此处把表述改为与实现一致（例如：所有请求都先校验 retain 形状，plan 仅忽略其值），使“解释必须匹配可观察行为”。",
+      "kind": "architecture",
+      "observation": "第 36 行末句写“retain 只对 rollback 生效”；而 planner.plan() 第 112 行无条件调用 read_retain，journal.read_retain 第 107-111 行对形状非法直接抛 invalid-retain（与 action 无关）。",
+      "evidence": [
+        {
+          "file": "CHANGE-G2.md",
+          "start": 7,
+          "end": 7,
+          "sha256": "90beb630e7301c3642cea01bfdd38c58947531fea36dd9537520cac058c8357d",
+          "relation": "supports",
+          "excerptSha256": "580c8600d7dfe308dd4943951bf13cb8110eb2a862ffed4b00e1c56997484bcf"
+        },
+        {
+          "file": "planner.py",
+          "start": 109,
+          "end": 112,
+          "sha256": "73d98a7d9f509ecca619aec1c04ff2de25360310eb1ad1d92704e8bd60112aec",
+          "relation": "contradicts",
+          "excerptSha256": "102f7665f8c5e27d81463236abf0dad6f855e312beb8f53016c3e64a905e50e3"
+        },
+        {
+          "file": "journal.py",
+          "start": 104,
+          "end": 111,
+          "sha256": "714218b140aa6e800a7bb734c2f4d41c0bc533f55858c0661d036a07084da9dc",
+          "relation": "supports",
+          "excerptSha256": "89e31ceca7e5d800724b644ed9c0a6cc564ea40e4a7e311c4744ca6885b37a79"
+        }
+      ]
+    },
+    {
+      "file": "modules/architecture.md",
+      "start": 34,
+      "end": 34,
+      "sha256": "a2d73aa2d7c49f5c2f09ef4352de4bffc20312efc851f7490e3bb8cc0faa2594",
+      "id": "ARCH-2",
+      "owner": "coordinator",
+      "issue": "本条把“冻结先于构图与 change 校验”写成无条件保证，并只举了环/未知依赖两个反例。但若 production 请求的 budget 非法，policy.limit_for 会在第 46-47 行先抛 invalid-budget，冻结分支不被击到；因此该保证对非法 budget 子集不成立，未注明成立条件。",
+      "fix": "在 planner.plan() 中把冻结判定提到 limit_for 的其余校验之前（推荐），或在本条补上成立条件：“在请求其余字段合法时”，以免读者把该保证当成无条件成立。",
+      "kind": "architecture",
+      "observation": "第 34 行声称 production 在构图与 change 校验之前返回 production-frozen；实际冻结发生在 planner.plan() 第 104 行 limit_for 内部，而 limit_for 在 env 判完后还要过 action(41-43) 与 budget(44-47) 校验。",
+      "evidence": [
+        {
+          "file": "planner.py",
+          "start": 104,
+          "end": 104,
+          "sha256": "73d98a7d9f509ecca619aec1c04ff2de25360310eb1ad1d92704e8bd60112aec",
+          "relation": "supports",
+          "excerptSha256": "4d8dad86bdaf83793718191f8b02b138b6de74f16ff3d5f0d7f34a02fc12c6a9"
+        },
+        {
+          "file": "policy.py",
+          "start": 44,
+          "end": 47,
+          "sha256": "f2a28e7798bd7be33048bb44c675f9230841c8261ad27eab8d0bf7939378b7ef",
+          "relation": "contradicts",
+          "excerptSha256": "5bf18922ffb84ad7c260d834316dc7866eaa0cd9460e370b70a1440aa34ab275"
+        },
+        {
+          "file": "planner.py",
+          "start": 109,
+          "end": 112,
+          "sha256": "73d98a7d9f509ecca619aec1c04ff2de25360310eb1ad1d92704e8bd60112aec",
+          "relation": "contradicts",
+          "excerptSha256": "102f7665f8c5e27d81463236abf0dad6f855e312beb8f53016c3e64a905e50e3"
+        }
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "id": "plan-invalid-retain",
+      "input": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "api",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "retain": [
+          1
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "actions": [
+          "api"
+        ],
+        "units": 1
+      },
+      "actual": {
+        "status": "error",
+        "error": "invalid-retain",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "id": "production-invalid-budget",
+      "input": {
+        "environment": "production",
+        "action": "plan",
+        "budget": -1,
+        "changes": [
+          {
+            "id": "api",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "expected": {
+        "status": "error",
+        "error": "production-frozen",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "error",
+        "error": "production-frozen",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "id": "production-bool-budget",
+      "input": {
+        "environment": "production",
+        "action": "plan",
+        "budget": true,
+        "changes": [
+          {
+            "id": "api",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ]
+      },
+      "expected": {
+        "status": "error",
+        "error": "production-frozen",
+        "actions": [],
+        "units": 0
+      },
+      "actual": {
+        "status": "error",
+        "error": "production-frozen",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+{
+  "spec": "building-loop-review-finding-witness/1",
+  "run": "r-nUAPW1",
+  "receiptSha256": "3d376b566c18739c5c09366b63922a682fc5dc9f0bc8a967e7e221cb28aa9486",
+  "findings": [
+    {
+      "file": "policy.py",
+      "start": 22,
+      "end": 28,
+      "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+      "id": "POLICY-DOCSTRING-SYNTAX",
+      "owner": "executor",
+      "issue": "这是语法缺陷而非说明：22 行字符串在 'policy.' 处结束，24 行 'Policy decides … the G2 freeze.' 成为裸表达式语句，25-27 行处缩进块内同样不构成合法语句，36 行 if 前无有效语句体。据静态读数 policy.py 无法导入，py_compile 会报 SyntaxError；如果属实，release.py:5 的 from planner import plan 失败，服务对任何输入都不会输出 SPEC 约定的 JSON，这也与 TEST-STATUS.md 中 21 项全 passed 相矛盾；如果实际能运行，则说明签名工件不是这份源码。",
+      "fix": "将 22-28 行改为闭合的单对三引号文档字符串（照 planner.py:13-20 与 37-45 的写法），或把 24-27 行改写为 # 注释；随后用 python -c \"import policy\" 与签名用例重跑冒烟，确认工件哈希与测试对象一致。",
+      "kind": "annotation",
+      "observation": "limit_for 的文档字符串在第 22 行以 \"\"\" 开头，但在单引号内结束于 'policy.' 后，没有闭合 \"\"\"；第 24-27 行以 'Policy decides …' 开头、缺少引号的裸散文，第 28 行才出现孤立的 \"\"\"。",
+      "evidence": [
+        {
+          "file": "policy.py",
+          "start": 22,
+          "end": 24,
+          "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+          "relation": "reproduces",
+          "excerptSha256": "24c58f2a57d92d330e4f02db2170c6be0c1a388a5e0e2819b74f20dfed93634d"
+        },
+        {
+          "file": "policy.py",
+          "start": 25,
+          "end": 28,
+          "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+          "relation": "reproduces",
+          "excerptSha256": "60e41e8db38145a8cc67643afa912b00d256d76dcf256e274bdb3241b10ac899"
+        },
+        {
+          "file": "CHANGE-G2.md",
+          "start": 5,
+          "end": 5,
+          "sha256": "90beb630e7301c3642cea01bfdd38c58947531fea36dd9537520cac058c8357d",
+          "relation": "supports",
+          "excerptSha256": "e1b9921273d92a22d7ec2bf0fc71da3601fab83d7726443f00c1d391eb1b2e23"
+        },
+        {
+          "file": "planner.py",
+          "start": 23,
+          "end": 27,
+          "sha256": "f922f6177f822a0d8cdc428afcef2a9cdc1ab70181fab06c1b81c62ae920cca9",
+          "relation": "contradicts",
+          "excerptSha256": "566888b422480c6d39ffd47c4e6fdf589ceb2323abc09564ce1773bd2185f3fe"
+        }
+      ]
+    },
+    {
+      "file": "policy.py",
+      "start": 22,
+      "end": 22,
+      "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+      "id": "POLICY-STALE-DOCSTRING",
+      "owner": "executor",
+      "issue": "G2 新增的冻结出口没有进入函数说明，首行仍暗示「通过 policy 即可返回」，与 44-45 行的实际失败分支失实；影响面限于说明，不影响判定顺序本身。",
+      "fix": "在文档字符串中补一句：production 不返回，而以 PolicyError('production-frozen') 结束，返回路径只属于 staging。",
+      "kind": "maintenance",
+      "observation": "文档字符串首行写的是 'Return (action, budget) for a request that passes policy.'，但实现改为在 FROZEN_ENVIRONMENTS 命中时抛 production-frozen，真正返回 (action, budget) 的只有 staging。",
+      "evidence": [
+        {
+          "file": "policy.py",
+          "start": 44,
+          "end": 45,
+          "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+          "relation": "contradicts",
+          "excerptSha256": "ab1b85277facf6d2ffca2f6fd7fda4450372758204a7a7e3fe64cfadb397639a"
+        },
+        {
+          "file": "CHANGE-G2.md",
+          "start": 5,
+          "end": 7,
+          "sha256": "90beb630e7301c3642cea01bfdd38c58947531fea36dd9537520cac058c8357d",
+          "relation": "supports",
+          "excerptSha256": "23e1dc5a79c2f0d28928c703b18e36dec5158561f88aaa68af52fde31281a4b4"
+        }
+      ]
+    }
+  ],
+  "reports": [
+    {
+      "artifact": "g2-5225708dc5317e77206e4dbb6bffc2b9e77eb8febb7e57a794d02d24a212c657",
+      "policySha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+      "docstring": "Return (action, budget) for a request that passes policy.\n\nPolicy decides environment, action shape, budget shape and the G2 freeze.\nIt deliberately does not know which changes end up in the output: the cap\nhas to be applied to the emitted units after replay/deduplication, so that\ncomparison lives in the planner, which owns plan/rollback selection.",
+      "docstringStart": 22,
+      "docstringEnd": 28,
+      "probes": [
+        {
+          "environment": "staging",
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "api"
+            ],
+            "units": 1
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "api"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "error": null
+        },
+        {
+          "environment": "production",
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "expected": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null
+        }
+      ]
+    },
+    {
+      "artifact": "g2-818e1e141a874aabefc29ed02021fd8bd08feb3889d9cbaba5e0a6ce698e5d6d",
+      "policySha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+      "docstring": "Return (action, budget) for a staging request that passes policy.\n\nPolicy decides environment, action shape, budget shape and the G2 freeze.\nIt deliberately does not know which changes end up in the output: the cap\nhas to be applied to the emitted units after replay/deduplication, so that\ncomparison lives in the planner, which owns plan/rollback selection.\n\nOnly `staging` reaches the return below: a `production` request never gets\nan (action, budget) pair, it always ends with\nPolicyError(\"production-frozen\") for both plan and rollback. Callers must\ntherefore treat the returned budget as a request budget, not as the\neffective staging plan quota, which the planner still takes the minimum of.",
+      "docstringStart": 22,
+      "docstringEnd": 34,
+      "probes": [
+        {
+          "environment": "staging",
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "api"
+            ],
+            "units": 1
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "api"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "error": null
+        },
+        {
+          "environment": "production",
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "expected": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "policyDiff": [
+    "--- signed",
+    "+++ after-return",
+    "@@ -19,12 +19,18 @@",
+    " ",
+    " ",
+    " def limit_for(request):",
+    "-    \"\"\"Return (action, budget) for a request that passes policy.",
+    "+    \"\"\"Return (action, budget) for a staging request that passes policy.",
+    " ",
+    "     Policy decides environment, action shape, budget shape and the G2 freeze.",
+    "     It deliberately does not know which changes end up in the output: the cap",
+    "     has to be applied to the emitted units after replay/deduplication, so that",
+    "     comparison lives in the planner, which owns plan/rollback selection.",
+    "+",
+    "+    Only `staging` reaches the return below: a `production` request never gets",
+    "+    an (action, budget) pair, it always ends with",
+    "+    PolicyError(\"production-frozen\") for both plan and rollback. Callers must",
+    "+    therefore treat the returned budget as a request budget, not as the",
+    "+    effective staging plan quota, which the planner still takes the minimum of.",
+    "     \"\"\"",
+    "     environment = request.get(\"environment\")",
+    "     if environment not in ENVIRONMENTS:"
+  ],
+  "executorUsageThroughNextSignedVersion": {
+    "inputTokens": 15135,
+    "outputTokens": 1114,
+    "cacheReadTokens": 93184,
+    "cacheWriteTokens": 0,
+    "totalTokens": 109433
+  },
+  "finalReceiptSha256": "3d5db56737f1ca8c931b43696970fd38b0ab82144f785262eaf4e49a43ed92ef",
+  "finalReceiptSignedArtifact": "818e1e141a874aabefc29ed02021fd8bd08feb3889d9cbaba5e0a6ce698e5d6d",
+  "finalAuditorFindings": [
+    {
+      "file": "policy.py",
+      "start": 22,
+      "end": 34,
+      "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+      "id": "POLICY-DOCSTRING-SYNTAX",
+      "owner": "executor",
+      "issue": "字符串字面量后紧跟缩进裸文本属于语法错误：Python 在表达式语句后不允许另一个无连接符的同层表达式，因此 policy.py 无法被导入。release.py 第 5 行 from planner import plan 与 planner.py 第 5 行 from policy import ... 使任何请求都在导入期失败，违反 SPEC.md 第 3 行「所有请求都返回 JSON 并正常退出」。TEST-STATUS.md 第 23–27 行声称五项 G2 用例 passed，与此矛盾。",
+      "fix": "删除第 23 行空行，使第 24–33 行留在同一 docstring 内，并只保留第 34 行一个闭合引号，即可恢复可解析状态；内容可保留现有的冻结优先级与「返回的是请求预算、非生效配额」说明。",
+      "kind": "behavior",
+      "observation": "policy.py 第 22 行以 `\"\"\"Return (action, budget) for a staging request that passes policy.` 开启字符串；第 23 行是空行，第 24 行起为 `Policy decides environment, action shape, budget shape and the G2 freeze.` 等缩进裸文本，第 34 行再次出现 `\"\"\"`。",
+      "evidence": [
+        {
+          "file": "policy.py",
+          "start": 22,
+          "end": 34,
+          "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+          "relation": "reproduces",
+          "excerptSha256": "62da8558862cffaaf5f2b1b4f83074053eee1ebfa24589a2b9a4e47d8a660479"
+        },
+        {
+          "file": "policy.py",
+          "start": 24,
+          "end": 27,
+          "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+          "relation": "supports",
+          "excerptSha256": "1eaf9df5ee83e0dcc5de569db835eea379d91ad8490aaacc8e8d1257fb086584"
+        }
+      ]
+    }
+  ],
+  "firstAndFinalReviewActorsDistinct": true,
+  "firstRework": {
+    "startMs": 209354,
+    "endMs": 233271,
+    "usageByRole": {
+      "executor": {
+        "inputTokens": 15135,
+        "outputTokens": 1114,
+        "cacheReadTokens": 93184,
+        "cacheWriteTokens": 0,
+        "totalTokens": 109433,
+        "recordedResponses": 7
+      }
+    }
+  },
+  "secondSignedToFalseAudit": {
+    "startMs": 233272,
+    "endMs": 387984,
+    "usageByRole": {
+      "executor": {
+        "inputTokens": 2524,
+        "outputTokens": 2444,
+        "cacheReadTokens": 56832,
+        "cacheWriteTokens": 0,
+        "totalTokens": 61800,
+        "recordedResponses": 3
+      },
+      "coordinator": {
+        "inputTokens": 12336,
+        "outputTokens": 968,
+        "cacheReadTokens": 515328,
+        "cacheWriteTokens": 0,
+        "totalTokens": 528632,
+        "recordedResponses": 6
+      },
+      "reviewer": {
+        "inputTokens": 14309,
+        "outputTokens": 5343,
+        "cacheReadTokens": 450816,
+        "cacheWriteTokens": 0,
+        "totalTokens": 470468,
+        "recordedResponses": 12
+      },
+      "auditor": {
+        "inputTokens": 17183,
+        "outputTokens": 7469,
+        "cacheReadTokens": 335360,
+        "cacheWriteTokens": 0,
+        "totalTokens": 360012,
+        "recordedResponses": 18
+      }
+    }
+  },
+  "afterSecondFalseAuditToCap": {
+    "startMs": 387985,
+    "endMs": 420000,
+    "usageByRole": {
+      "coordinator": {
+        "inputTokens": 9356,
+        "outputTokens": 1023,
+        "cacheReadTokens": 580096,
+        "cacheWriteTokens": 0,
+        "totalTokens": 590475,
+        "recordedResponses": 6
+      },
+      "executor": {
+        "inputTokens": 14764,
+        "outputTokens": 657,
+        "cacheReadTokens": 91776,
+        "cacheWriteTokens": 0,
+        "totalTokens": 107197,
+        "recordedResponses": 7
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { digest, keyOf, readBytes, replaceBytes, text } from "./policy.mjs";
+import { checkedEngineeringCheckpoint, ownerEngineeringReplacement, ownerEngineeringUnit } from "./engineering-handoff.mjs";
 import { withWorkspaceLock } from "./transactions.mjs";
 
 const SPEC = "building-loop-conversation-start/1";
@@ -148,19 +149,22 @@ function fields(task) {
   return details;
 }
 
-function proposalId(sessionId, user, details, materials, directive, instruction) {
+function proposalId(sessionId, user, details, materials, directive, instruction, ownerUnit, replaceUnit) {
   const identity = [sessionId, user.seq, user.sha256, details, materials, directive];
   // Preserve every existing proposal ID, including approved records awaiting a retry.
   if (instruction !== undefined) identity.push(instruction);
+  if (ownerUnit !== undefined) identity.push({ ownerUnit });
+  if (replaceUnit !== undefined) identity.push({ replaceUnit });
   return digest(JSON.stringify(identity));
 }
 
 /** The activation can point only to a session-private project or the host's canonical workspace. */
 function activation(value) {
   if (value?.kind === "private" && Object.keys(value).length === 1) return { kind: "private" };
-  if (value?.kind === "workspace" && Object.keys(value).length === 2 && typeof value.root === "string" &&
+  if (value?.kind === "workspace" && Object.keys(value).length === 2 + Number(Object.hasOwn(value, "checkpoint")) && typeof value.root === "string" &&
     value.root.length <= 32767 && !value.root.includes("\0") && path.isAbsolute(value.root) && path.normalize(value.root) === value.root) {
-    return { kind: "workspace", root: value.root };
+    return { kind: "workspace", root: value.root,
+      ...(Object.hasOwn(value, "checkpoint") ? { checkpoint: checkedEngineeringCheckpoint(value.checkpoint) } : {}) };
   }
   throw new Error("Building-loop 开工项目绑定无效");
 }
@@ -191,13 +195,17 @@ function load(root, file, sessionId) {
     throw new Error("Building-loop 开工记录无效");
   }
   const details = fields(record.proposal), materials = checkedMaterials(record.proposal.materials ?? []);
-  const { instruction } = record.proposal;
+  const { instruction, ownerUnit, replaceUnit } = record.proposal;
   const directive = record.proposal.directive === undefined ? null : field(record.proposal.directive, "开工原文摘录", 512);
   if (instruction !== undefined && (directive !== null || typeof instruction !== "string" || instruction !== instruction.trim() ||
     authorizationOf(instruction).kind !== "direct" || digest(instruction) !== record.source.sha256)) {
     throw new Error("开工指令原文与会话版本不符");
   }
-  if (record.proposal.id !== proposalId(sessionId, record.source, details, materials, directive, instruction) ||
+  if (ownerUnit !== undefined && (typeof ownerUnit !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,47}$/u.test(ownerUnit) ||
+    instruction && ownerEngineeringUnit(instruction) !== ownerUnit)) throw new Error("开工原文与工程工作单元不符");
+  if (replaceUnit !== undefined && (typeof replaceUnit !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,47}$/u.test(replaceUnit) ||
+    instruction && ownerEngineeringReplacement(instruction) !== replaceUnit)) throw new Error("开工原文与旧工程单元替换不符");
+  if (record.proposal.id !== proposalId(sessionId, record.source, details, materials, directive, instruction, ownerUnit, replaceUnit) ||
     materials.some(item => item.seq > record.source.seq)) {
     throw new Error("Building-loop 开工记录与会话版本不符");
   }
@@ -205,6 +213,7 @@ function load(root, file, sessionId) {
     activation(record.binding);
     if (typeof record.wake !== "boolean") throw new Error("Building-loop 开工唤醒记录无效");
   }
+  if (record.phase === "starting" && record.binding !== undefined) activation(record.binding);
   return { bytes, record };
 }
 
@@ -274,15 +283,18 @@ export function proposeConversationTask(hostHome, sessionId, current, task, exce
     }
     if (direct && UNPAIRED_SURROGATE.test(original)) throw new Error("开工指令含无效 Unicode，请重新发送");
     const instruction = direct ? original : undefined;
-    const id = proposalId(sessionId, current, details, materials, null, instruction);
-    const proposal = { id, userSeq: current.seq, ...details, ...(instruction ? { instruction } : {}), ...(materials.length ? { materials } : {}) };
+    const ownerUnit = ownerEngineeringUnit(original);
+    const replaceUnit = ownerEngineeringReplacement(original);
+    const id = proposalId(sessionId, current, details, materials, null, instruction, ownerUnit, replaceUnit);
+    const proposal = { id, userSeq: current.seq, ...details, ...(instruction ? { instruction } : {}),
+      ...(ownerUnit ? { ownerUnit } : {}), ...(replaceUnit ? { replaceUnit } : {}), ...(materials.length ? { materials } : {}) };
     save(root, file, { spec: SPEC, phase: "proposed", source: source(current), proposal }, bytes);
     return { status: "proposed", proposal };
   });
 }
 
 /** Apply only an owner action or a recognized native human start message. The initializer must be synchronous and replay-safe for proposal.id. */
-export function decideConversationStart(hostHome, sessionId, current, proposalId, decision, initialize, { typed = false } = {}) {
+export function decideConversationStart(hostHome, sessionId, current, proposalId, decision, initialize, { typed = false, inspect } = {}) {
   if (typeof proposalId !== "string" || !ID.test(proposalId) || !["start", "discuss"].includes(decision) ||
     (typed && decision !== "start") || (decision === "start" && typeof initialize !== "function")) {
     throw new Error("开工决定需要有效的提议标识和动作");
@@ -310,12 +322,17 @@ export function decideConversationStart(hostHome, sessionId, current, proposalId
       return { ...snapshot(discussed, current), changed: true };
     }
 
+    // Inspect existing grants without side effects. Invalid engineering targets
+    // cannot leave a permanently approved, unrecoverable proposal behind.
+    const existing = record.binding ?? inspect?.(record.proposal);
+    if (existing) activation(existing);
     // Approval is committed before any project files are made. If initialization fails, retry the same immutable proposal.
     const starting = record.phase === "starting" ? record : {
       ...record, phase: "starting", approval: { ...source(current), method: typed ? "owner-message" : "owner-button" },
+      ...(existing ? { binding: existing } : {}),
     };
     const approved = record.phase === "starting" ? bytes : save(root, file, starting, bytes);
-    const initialized = initialize(starting.proposal, current);
+    const initialized = existing ?? initialize(starting.proposal, current);
     if (initialized && typeof initialized.then === "function") throw new Error("建档必须在当前宿主事务内完成");
     const binding = activation(initialized);
     // A button that completes a failed typed start must wake the now-idle chat.

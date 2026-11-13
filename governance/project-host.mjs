@@ -3,7 +3,7 @@ import path from "node:path";
 import { Remote, RemoteError, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { BUILDING_LOOP_PROJECT_REMOTE } from "./project-remote.cjs";
 import { conversationStartSnapshot, decideConversationStart, latestConversationUser, startedConversationProject } from "./conversation-start.mjs";
-import { initializeConversationProject } from "./conversation-project.mjs";
+import { existingConversationProject, initializeConversationProject } from "./conversation-project.mjs";
 
 export const name = "building-loop-conversation-start";
 export const inject = ["agents", "agentPresets", "sessionQuery", "sessionController", "typert"];
@@ -78,7 +78,9 @@ class ConversationStartService extends TypertRemoteService {
     try {
       if (session.agent && session.agent.session.seq !== session.cursor + 1) throw new Error("当前会话已有新消息，请按最新提议确认");
       const result = decideConversationStart(this.hostHome, sessionId, session.current, proposalId, decision,
-        task => initializeConversationProject(this.hostHome, sessionId, session.header.cwd, task));
+        task => initializeConversationProject(this.hostHome, sessionId, session.header.cwd, task), {
+          inspect: task => existingConversationProject(this.hostHome, sessionId, session.header.cwd, task),
+        });
       if (result.status === "started" && needsWake(session, startedConversationProject(this.hostHome, sessionId))) {
         if (!session.agent) throw new Error("项目已经建档，重新打开会话后可以继续");
         // A host notice wakes the same session without manufacturing a second user request.

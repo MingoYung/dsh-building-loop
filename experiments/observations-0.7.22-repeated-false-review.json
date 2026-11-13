@@ -1,0 +1,110 @@
+{
+  "method": "Match cited source SHA to independently assessed candidate and reparse exact bytes using Python AST.",
+  "observations": [
+    {
+      "run": "r-nUAPW1",
+      "receiptName": "K02-first.json",
+      "candidateSnapshotPrefix": "5225708dc5317e77206e",
+      "receiptDecision": "reject",
+      "actorRole": "first-reviewer",
+      "policySha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+      "finding": {
+        "file": "policy.py",
+        "start": 22,
+        "end": 28,
+        "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+        "id": "POLICY-DOCSTRING-SYNTAX",
+        "owner": "executor",
+        "issue": "这是语法缺陷而非说明：22 行字符串在 'policy.' 处结束，24 行 'Policy decides … the G2 freeze.' 成为裸表达式语句，25-27 行处缩进块内同样不构成合法语句，36 行 if 前无有效语句体。据静态读数 policy.py 无法导入，py_compile 会报 SyntaxError；如果属实，release.py:5 的 from planner import plan 失败，服务对任何输入都不会输出 SPEC 约定的 JSON，这也与 TEST-STATUS.md 中 21 项全 passed 相矛盾；如果实际能运行，则说明签名工件不是这份源码。",
+        "fix": "将 22-28 行改为闭合的单对三引号文档字符串（照 planner.py:13-20 与 37-45 的写法），或把 24-27 行改写为 # 注释；随后用 python -c \"import policy\" 与签名用例重跑冒烟，确认工件哈希与测试对象一致。",
+        "kind": "annotation",
+        "observation": "limit_for 的文档字符串在第 22 行以 \"\"\" 开头，但在单引号内结束于 'policy.' 后，没有闭合 \"\"\"；第 24-27 行以 'Policy decides …' 开头、缺少引号的裸散文，第 28 行才出现孤立的 \"\"\"。",
+        "evidence": [
+          {
+            "file": "policy.py",
+            "start": 22,
+            "end": 24,
+            "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+            "relation": "reproduces",
+            "excerptSha256": "24c58f2a57d92d330e4f02db2170c6be0c1a388a5e0e2819b74f20dfed93634d"
+          },
+          {
+            "file": "policy.py",
+            "start": 25,
+            "end": 28,
+            "sha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+            "relation": "reproduces",
+            "excerptSha256": "60e41e8db38145a8cc67643afa912b00d256d76dcf256e274bdb3241b10ac899"
+          },
+          {
+            "file": "CHANGE-G2.md",
+            "start": 5,
+            "end": 5,
+            "sha256": "90beb630e7301c3642cea01bfdd38c58947531fea36dd9537520cac058c8357d",
+            "relation": "supports",
+            "excerptSha256": "e1b9921273d92a22d7ec2bf0fc71da3601fab83d7726443f00c1d391eb1b2e23"
+          },
+          {
+            "file": "planner.py",
+            "start": 23,
+            "end": 27,
+            "sha256": "f922f6177f822a0d8cdc428afcef2a9cdc1ab70181fab06c1b81c62ae920cca9",
+            "relation": "contradicts",
+            "excerptSha256": "566888b422480c6d39ffd47c4e6fdf589ceb2323abc09564ce1773bd2185f3fe"
+          }
+        ]
+      },
+      "observations": {
+        "pythonAstParse": true,
+        "parsedDocstring": "Return (action, budget) for a request that passes policy.\n\n    Policy decides environment, action shape, budget shape and the G2 freeze.\n    It deliberately does not know which changes end up in the output: the cap\n    has to be applied to the emitted units after replay/deduplication, so that\n    comparison lives in the planner, which owns plan/rollback selection.\n    ",
+        "binaryTestsPassed": 21,
+        "freezeInDocstring": true
+      }
+    },
+    {
+      "run": "r-nUAPW1",
+      "receiptName": "K02-final.json",
+      "candidateSnapshotPrefix": "818e1e141a874aabefc2",
+      "receiptDecision": "reject",
+      "actorRole": "independent-auditor",
+      "policySha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+      "finding": {
+        "file": "policy.py",
+        "start": 22,
+        "end": 34,
+        "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+        "id": "POLICY-DOCSTRING-SYNTAX",
+        "owner": "executor",
+        "issue": "字符串字面量后紧跟缩进裸文本属于语法错误：Python 在表达式语句后不允许另一个无连接符的同层表达式，因此 policy.py 无法被导入。release.py 第 5 行 from planner import plan 与 planner.py 第 5 行 from policy import ... 使任何请求都在导入期失败，违反 SPEC.md 第 3 行「所有请求都返回 JSON 并正常退出」。TEST-STATUS.md 第 23–27 行声称五项 G2 用例 passed，与此矛盾。",
+        "fix": "删除第 23 行空行，使第 24–33 行留在同一 docstring 内，并只保留第 34 行一个闭合引号，即可恢复可解析状态；内容可保留现有的冻结优先级与「返回的是请求预算、非生效配额」说明。",
+        "kind": "behavior",
+        "observation": "policy.py 第 22 行以 `\"\"\"Return (action, budget) for a staging request that passes policy.` 开启字符串；第 23 行是空行，第 24 行起为 `Policy decides environment, action shape, budget shape and the G2 freeze.` 等缩进裸文本，第 34 行再次出现 `\"\"\"`。",
+        "evidence": [
+          {
+            "file": "policy.py",
+            "start": 22,
+            "end": 34,
+            "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+            "relation": "reproduces",
+            "excerptSha256": "62da8558862cffaaf5f2b1b4f83074053eee1ebfa24589a2b9a4e47d8a660479"
+          },
+          {
+            "file": "policy.py",
+            "start": 24,
+            "end": 27,
+            "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882",
+            "relation": "supports",
+            "excerptSha256": "1eaf9df5ee83e0dcc5de569db835eea379d91ad8490aaacc8e8d1257fb086584"
+          }
+        ]
+      },
+      "observations": {
+        "pythonAstParse": true,
+        "parsedDocstring": "Return (action, budget) for a staging request that passes policy.\n\n    Policy decides environment, action shape, budget shape and the G2 freeze.\n    It deliberately does not know which changes end up in the output: the cap\n    has to be applied to the emitted units after replay/deduplication, so that\n    comparison lives in the planner, which owns plan/rollback selection.\n\n    Only `staging` reaches the return below: a `production` request never gets\n    an (action, budget) pair, it always ends with\n    PolicyError(\"production-frozen\") for both plan and rollback. Callers must\n    therefore treat the returned budget as a request budget, not as the\n    effective staging plan quota, which the planner still takes the minimum of.\n    ",
+        "binaryTestsPassed": 21,
+        "freezeInDocstring": true
+      }
+    }
+  ],
+  "conclusion": "Both independent roles reported the same syntax defect. Both exact cited artifacts parse successfully and pass all 21 behavioral cases. In each case the text was inside one multiline docstring."
+}

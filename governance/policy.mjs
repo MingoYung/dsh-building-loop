@@ -295,11 +295,13 @@ export function parseAuthority(bytes) {
     throw new Error("注入的项目规则须在总控只读授权中，最多三份");
   }
   const units = Object.create(null);
+  const architectureEntries = new Map();
   const mutable = [...coordinator.write];
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture"]);
+    if (value.architecture !== undefined) architectureEntries.set(id, value.architecture);
     if (value.plainLast !== undefined && typeof value.plainLast !== "boolean") throw new Error("plainLast 须为布尔值；非文字产物由项目维护者明确关闭");
     if (value.cacheReadRotationThreshold !== undefined && (!Number.isSafeInteger(value.cacheReadRotationThreshold) || value.cacheReadRotationThreshold < 1)) {
       throw new Error("cacheReadRotationThreshold 须为正整数；未配置时不按用量轮换");
@@ -431,6 +433,36 @@ export function parseAuthority(bytes) {
     unit.phases[prefix + "-audit"] = { ...grant, write: [], read: grant.read.filter(file => !receiptsSeen.has(keyOf(file))) };
   }
   const hierarchy = source.hierarchy === undefined ? undefined : hierarchyPolicy(source.hierarchy, coordinator, goalContext, protectedFiles, ledgerDocument);
+  const managedImportSections = new Map();
+  for (const [id, entry] of architectureEntries) {
+    object(entry, "架构验收", ["module", "headings", "importsHeading"]);
+    const file = hierarchyBodyPath(hierarchy, entry.module, false);
+    const unit = units[id];
+    const review = [unit.phases["first-review"], unit.phases["final-review"]];
+    const editable = [...unit.phases.intake.write, ...unit.phases.supplement.write];
+    if (!goalContext.length || hierarchy.private || !unit.codeTask?.tests?.regression || unit.plainLast || unit.claims.length ||
+      unit.requireSourcePins || Object.keys(sourcePins).length || requiredLinesGoal ||
+      review.some(grant => !includes(grant.read, file) || grant.evidence.length || editable.some(path => !includes(grant.read, path))) ||
+      editable.some(path => !isImplementationPath("reviewed" + path.slice(path.lastIndexOf("."))))) {
+      throw new Error("架构验收须登记三级项目中的签名纯代码单元，架构由总控写且两道核验可精确读取");
+    }
+    const headings = entry.headings;
+    if (!Array.isArray(headings) || !headings.length || headings.length > 12 || new Set(headings).size !== headings.length ||
+      headings.some(heading => typeof heading !== "string" || !heading.trim() || heading !== heading.trim() || heading.length > 80 || /[\x00-\x1f]/u.test(heading))) {
+      throw new Error("架构验收须明确登记 1 至 12 个唯一正文标题");
+    }
+    const importsHeading = entry.importsHeading;
+    if (importsHeading !== undefined && (typeof importsHeading !== "string" || !importsHeading.trim() ||
+      importsHeading !== importsHeading.trim() || importsHeading.length > 80 || /[\x00-\x1f]/u.test(importsHeading) ||
+      headings.includes(importsHeading) || unit.codeTask.sources.some(source => !/\.py$/iu.test(source)))) {
+      throw new Error("静态导入章节须独立于人工核验标题，且当前只支持登记的 Python 源码");
+    }
+    if (managedImportSections.has(keyOf(file)) && managedImportSections.get(keyOf(file)) !== importsHeading) {
+      throw new Error("共用架构稿的工程单元须使用相同的宿主静态导入章节");
+    }
+    managedImportSections.set(keyOf(file), importsHeading);
+    unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}) };
+  }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }
 

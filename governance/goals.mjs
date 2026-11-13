@@ -4,6 +4,7 @@ import { sourceVersionCurrent } from "./evidence.mjs";
 import { candidateCitationProfiles, requireStoredCalculations, requireStoredFootnoteBindings, requireStoredObjectChecks } from "./coverage.mjs";
 import { reviewedCodeArtifactsCurrent } from "./code-intake.mjs";
 import { currentCodeReview } from "./code-review.mjs";
+import { engineeringArchitectureCurrent } from "./engineering-architecture.mjs";
 
 const REQUIRED_MARKERS = new Set(["[稿件自述]", "[摘录范围]"]);
 const LEADING_MARKER = /^ {0,3}(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)?(\[(?:稿件自述|摘录范围)\])(?!\(|\[|:)/u;
@@ -193,12 +194,14 @@ export function acceptedVersion(frame, id, active) {
   const bytes = readBytes(frame.root, active.receipt);
   if (!bytes || digest(bytes) !== active.receiptHash) throw new Error("验收回执在账本复核前发生变化，停止关单并核实");
   const receipt = JSON.parse(bytes.toString("utf8"));
+  const spec = frame.policy.units[id];
+  if (spec.architecture && !receipt.codeReview) throw new Error("缺少两道架构验收回执，须重新按当前工程单元验收");
   if (receipt.codeReview) {
-    const spec = frame.policy.units[id];
     const current = goalSnapshot(frame);
     const candidate = readBytes(frame.root, spec.candidate);
     if (receipt.decision !== "accept" || receipt.goal?.sha256 !== current.sha256 ||
       !candidate || receipt.candidateSha256 !== digest(candidate) ||
+      !engineeringArchitectureCurrent(frame, spec, active.engineeringArchitecture, active) ||
       !currentCodeReview(frame, id, active, spec, receipt, true)) {
       throw new Error("当前代码、目标或签名结果与两份独立验收不符，须重新取得签名回归和验收");
     }
@@ -227,7 +230,6 @@ export function acceptedVersion(frame, id, active) {
   }
   requireProofSources(frame, id, active);
   const coverages=[active.proof.reviewerCoverage, active.proof.auditorCoverage];
-  const spec=frame.policy.units[id];
   requireStoredCalculations(frame, spec, coverages, candidate);
   requireStoredObjectChecks(frame, spec, coverages, candidate, receipt.phase);
   // Do not retroactively reinterpret a completed historical receipt. Open

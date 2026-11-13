@@ -1,0 +1,1242 @@
+{
+  "method": "Post-hoc probes; excluded from fixed signed score. Extra helper inventory is observed after host exit, so same-directory G1 may reflect G2 changes.",
+  "retentionInterpretation": "Walk all graph dependencies and retain only applied ancestors, including across an unapplied intermediary. Owner text did not explicitly specify the intermediary case.",
+  "observations": [
+    {
+      "run": "r-nUAPW1",
+      "mode": "standard",
+      "stage": "g1",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [],
+      "additionalPythonFilesAtFreeze": [],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "a2333a0df815b08d5a42e589e5c72aa03ab519275a5fc532e6198715c7ea4123"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ba3b3f66cf2a81dccf5686d8cf9ba8b38acb4f1f7e63c97053f1920ad1bf3a7b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "7bf86f7426e31d4c8b81905571570f1eeb9e05508a619cc93ed685365c0560bd"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_dependency_ids",
+            "_invalid",
+            "check_references",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 85
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_topological_order",
+            "_units_of",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 75
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 24
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      }
+    },
+    {
+      "run": "r-nUAPW1",
+      "mode": "standard",
+      "stage": "g2",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "retained-ancestor-across-unapplied-middle",
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "worker"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "worker",
+              "platform"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [],
+      "additionalPythonFilesAtFreeze": [],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "fd3bdb511b91b4fe2ab137c673ba89473daeab9cb4071d7f5cd19cab3e1dda4a"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8d2074622e0d35286b0c093a99fb3da01b99e5f8eead280e174e8a048a4693d8"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "1044760a01f54d8cd849723f2cc572b6d5289865c38e830f2f654219d59b23c2"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_dependency_ids",
+            "_invalid",
+            "check_references",
+            "check_retain",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 111
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_retained_ids",
+            "_topological_order",
+            "_units_of",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 109
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 38
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      }
+    },
+    {
+      "run": "r-nUAPW1",
+      "mode": "building-loop",
+      "stage": "g1",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py"
+      ],
+      "additionalPythonFilesAtFreeze": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py"
+      ],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "05ea64fe257f001a45ed01f43646680601f5e715d3bacbe1d971fd6d8d2caad8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "33dc156e9474d5d767ef547233fb313ad63c704a1771bbf312e67340f10b5feb"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "91ab1ae92ebe38f6a617511ff8ae28ad5ebba344c670cb70c654a9648018f97c"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_dependencies",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_graph",
+            "_select",
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 105
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 29
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      }
+    },
+    {
+      "run": "r-nUAPW1",
+      "mode": "building-loop",
+      "stage": "g2",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "retained-ancestor-across-unapplied-middle",
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "worker"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "worker",
+              "platform"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py"
+      ],
+      "additionalPythonFilesAtFreeze": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py"
+      ],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "8bfae50fd5e7d41441439bb25eac6371aa73cb3e59a5f72398ba78125c148135"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f922f6177f822a0d8cdc428afcef2a9cdc1ab70181fab06c1b81c62ae920cca9"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "51c175dda3ebb95e20df842a8a643e1287a14a872a10728b515ace54fb958882"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 114
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_graph",
+            "_retention_closure",
+            "_select",
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 142
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 52
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      }
+    },
+    {
+      "run": "r-JmtJ3G",
+      "mode": "standard",
+      "stage": "g1",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [],
+      "additionalPythonFilesAtFreeze": [
+        "_probe.py",
+        "_selfcheck.py"
+      ],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "dc60f2a1c50d04437f09daefb581bba720db7011cc9109a3238baea3f0700b14"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f0e54ed8b4c7a72bec548ab51520184efc8ddc45ca739d5ef8f3e89868e717ce"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "45e91321374b997d48e3465aaaf13533119fa1caea98bfc8c92338f888f59d37"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_count",
+            "_read_dependency_list",
+            "collapse",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 93
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_check_graph",
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 115
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 27
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      }
+    },
+    {
+      "run": "r-JmtJ3G",
+      "mode": "standard",
+      "stage": "g2",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "error": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "matched": false
+        },
+        {
+          "id": "retained-ancestor-across-unapplied-middle",
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "worker"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "worker",
+              "platform"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [],
+      "additionalPythonFilesAtFreeze": [],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "1da905c4ad824be305df830962523bc6f5acd902ded48479ead42c00451e3dea"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "6ddba7e33498085b85f3bc6461143067361209081f8105654f208f63011cc7db"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "fa0f4cfd675fbb74dcdd3274b3f5c091a205019e59e6c40d385aac7ed55716df"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_count",
+            "_read_dependency_list",
+            "collapse",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 111
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_check_graph",
+            "_retained_ids",
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 162
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 40
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      }
+    },
+    {
+      "run": "r-JmtJ3G",
+      "mode": "building-loop",
+      "stage": "g1",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py",
+        ".building-loop/latest_backup/release.py"
+      ],
+      "additionalPythonFilesAtFreeze": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py",
+        ".building-loop/latest_backup/release.py"
+      ],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "489e0ec2076962fd79bf1e5e854f24ab853c35a0dee8a57ef5597d555c6a1629"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c5032fd26c1310da35d7630cab38e8a195c16b40499402308b7287af0afbb99f"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "4cfb6495e80752dbb9350b379aaf1b987c5faece23453716bb9c72c2b46393fc"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2ce392d67eefc8889c028a64c39cdc5507395457ce4909d4611c030a106ecc68"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_identity",
+            "_string_list",
+            "check_targets",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 110
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 95
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "check_budget",
+            "limit_for"
+          ],
+          "lineCount": 45
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "main"
+          ],
+          "lineCount": 36
+        }
+      }
+    },
+    {
+      "run": "r-JmtJ3G",
+      "mode": "building-loop",
+      "stage": "g2",
+      "cases": [
+        {
+          "id": "invalid-environment-array",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-array-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "invalid-environment-object-before-graph",
+          "expected": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        },
+        {
+          "id": "retained-ancestor-across-unapplied-middle",
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "worker"
+            ],
+            "units": 2
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "worker",
+              "platform"
+            ],
+            "units": 3
+          },
+          "exitCode": 0,
+          "error": null,
+          "matched": false
+        }
+      ],
+      "additionalPythonFilesAfterHost": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py",
+        ".building-loop/latest_backup/release.py"
+      ],
+      "additionalPythonFilesAtFreeze": [
+        ".building-loop/latest_backup/journal.py",
+        ".building-loop/latest_backup/planner.py",
+        ".building-loop/latest_backup/policy.py",
+        ".building-loop/latest_backup/release.py"
+      ],
+      "sourceDigests": [
+        {
+          "path": "journal.py",
+          "sha256": "714218b140aa6e800a7bb734c2f4d41c0bc533f55858c0661d036a07084da9dc"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "045bca75be2f30f07e127e7499c721d0a29aabc7d0d184d09bd3916d641073e3"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "d72a108191963666a40fabe3ead10d0934cb8794d808bcfd76455eb22ee69332"
+        },
+        {
+          "path": "release.py",
+          "sha256": "18f558f713f27133587545e8406a279952d39aa22b0d92251f4d2fdfda69bc25"
+        }
+      ],
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_identity",
+            "_string_list",
+            "check_targets",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 132
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "plan",
+            "retention_closure",
+            "topological_order"
+          ],
+          "lineCount": 158
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "check_budget",
+            "limit_for"
+          ],
+          "lineCount": 75
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "failure",
+            "main"
+          ],
+          "lineCount": 41
+        }
+      }
+    }
+  ]
+}

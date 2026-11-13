@@ -54,6 +54,7 @@ function document(file, source) {
   const visible = node => visibility[node.position.start.line - 1]?.trim();
   const headings = root.children.filter(node => node.type === "heading" && visible(node)).map(node => ({
     title: headingText(node), depth: node.depth, start: node.position.start.offset, end: node.position.end.offset,
+    line: node.position.start.line,
   }));
   const definitions = new Map();
   for (const node of root.children) if (node.type === "definition" && !definitions.has(node.identifier)) definitions.set(node.identifier, node.url);
@@ -108,6 +109,53 @@ function requiredDocument(root, file) {
 function readableModuleBody(source) {
   return typeof source === "string" && source.trim() && !/[\p{Surrogate}\x00]/u.test(source) &&
     fromMarkdown(source, options).children.some(node => !["html", "definition", "footnoteDefinition"].includes(node.type));
+}
+
+/** An architecture checkpoint uses the two visible, unique navigation links and
+ * substantive Markdown beneath each maintainer-declared heading. */
+export function architectureDocument(frame, spec) {
+  const { file, headings } = spec;
+  const { overview, index } = frame.policy.hierarchy;
+  const top = requiredDocument(frame.root, overview.path);
+  const middle = requiredDocument(frame.root, index.path);
+  if (!routeExists(top, section(top, overview.heading), index.path) ||
+      !routeExists(middle, section(middle, index.heading), file)) {
+    throw new Error("架构稿须沿唯一的总纲、索引、正文导航定位");
+  }
+  const bytes = readBytes(frame.root, file);
+  if (!bytes) throw new Error("缺少架构正文 " + file);
+  const source = decoder.decode(bytes);
+  const doc = document(file, source);
+  const sections = [];
+  const bodies = headings.map(title => {
+    const anchor = section(doc, title);
+    const content = source.slice(anchor.end, anchor.stop);
+    const substantive = fromMarkdown(content, options).children.filter(node =>
+      ["paragraph", "list", "table", "code"].includes(node.type));
+    const normalized = substantive.map(node => content.slice(node.position.start.offset, node.position.end.offset).trim().replace(/\s+/gu, " "));
+    if (!normalized.length || normalized.every(value => /^(?:[-*+>]\s*)?(?:待填写|待补充|暂无|未填写|TODO|TBD|placeholder|…|\.{3})[。.!！\s]*$/iu.test(value))) {
+      throw new Error("架构稿「" + title + "」须写实际内容");
+    }
+    const next = doc.headings.find(item => item.start === anchor.stop);
+    const end = next ? next.line - 1 : source.trimEnd().split(/\r\n|\n|\r/u).length;
+    sections.push({ heading: title, start: anchor.line, end });
+    return normalized;
+  });
+  return { file, sha256: digest(bytes), headings, sections, contentsSha256: digest(JSON.stringify(bodies)) };
+}
+
+/** Locate the designated generated section through the same visible-heading parser. */
+export function architectureImportsSection(frame, spec, proposed) {
+  const { file, importsHeading } = spec.architecture;
+  const bytes = readBytes(frame.root, file);
+  if (!bytes) throw new Error("缺少架构正文 " + file);
+  const source = proposed ?? decoder.decode(bytes);
+  const doc = document(file, source);
+  const anchor = section(doc, importsHeading);
+  if (doc.headings.some(heading => heading.start > anchor.start && heading.start < anchor.stop)) {
+    throw new Error("宿主静态导入章节不能包含其他标题，移到同级章节保留正文");
+  }
+  return { source, sha256: digest(bytes), bodyStart: anchor.end, bodyEnd: anchor.stop };
 }
 
 /** Central-file edits can replace one existing section, preserving the route and every other section. */

@@ -3,7 +3,7 @@ import { lineList } from "./preflight.mjs";
 import { acceptedVersion } from "./goals.mjs";
 
 export const TERMINAL = new Set(["closed", "retired"]);
-const FINISHED = new Set(["completed", "covered", "obsolete"]);
+const FINISHED = new Set(["completed", "covered", "obsolete", "superseded"]);
 // The projection version distinguishes explicit model-reason labels from the
 // historical generic "依据" format without rewriting stored dispositions.
 const EXPORT_FORMAT="building-loop-ledger/2";
@@ -78,7 +78,11 @@ export function trackUnit(frame, id, active, interrupted = false) {
 /** Expose open work; historical dispositions remain stored and available on demand. */
 export function ledgerSummary(frame, includeClosed = false) {
   const ledger = book(frame);
-  const items = Object.values(ledger.items).filter(item => item.owner === frame.agent.id && (includeClosed || !FINISHED.has(item.status)));
+  const coordinator = frame.state.engineeringCoordinator;
+  const history = coordinator?.session === frame.agent.id ? new Set(coordinator.historyOwners) : new Set();
+  const items = Object.values(ledger.items).filter(item =>
+    item.owner === frame.agent.id && (includeClosed || !FINISHED.has(item.status)) ||
+    includeClosed && history.has(item.owner) && FINISHED.has(item.status));
   return { revision: ledger.revision, items };
 }
 
@@ -97,7 +101,10 @@ export function exportLedger(frame) {
     next:"项目维护者可配置 ledgerDocument 并加入 coordinator.write；未配置时保留现有文档，宿主台账仍为权威。"};
   if(frame.role!=="coordinator"||!includes(frame.policy.coordinator.write,file))throw new Error("账本导出缺少总控的精确路径授权");
   const view=ledgerSummary(frame,true),items=[...view.items].sort((a,b)=>a.id.localeCompare(b.id));
-  const units=Object.entries(frame.state.units).filter(([,unit])=>unit.owner===frame.agent.id).sort(([a],[b])=>a.localeCompare(b));
+  const coordinator=frame.state.engineeringCoordinator;
+  const history=new Set(coordinator?.session===frame.agent.id?coordinator.historyOwners:[]);
+  const units=Object.entries(frame.state.units).filter(([,unit])=>unit.owner===frame.agent.id || history.has(unit.owner)&&TERMINAL.has(unit.phase))
+    .sort(([a],[b])=>a.localeCompare(b));
   const counts=items.reduce((result,item)=>{result[item.status]=(result[item.status]??0)+1;return result;},{});
   const lines=["# 当前总控账本快照","", "账本 revision："+view.revision,
     "总控："+literal(frame.agent.id),"条目总数："+items.length,"",
@@ -115,6 +122,11 @@ export function exportLedger(frame) {
     if(coverage)lines.push("覆盖关系："+literal(coverage.unit)+"；验收回执 "+literal(coverage.receipt)+"；回执 SHA-256 "+literal(coverage.receiptHash)
       +"；候选 SHA-256 "+literal(coverage.candidateSha256)+"；目标 SHA-256 "+literal(coverage.goal?.sha256));
     if(item.origin)lines.push("原始请求："+literal(item.origin.session)+"；事件 "+item.origin.event+"；SHA-256 "+literal(item.origin.sha256));
+    if(item.retirement?.outcome === "superseded") {
+      const { newUnit, confirmedBy, userEvent, userSha256, oldGoalSha256, newGoalSha256 } = item.retirement;
+      lines.push("所有者确认替换为工作单元 "+literal(newUnit)+"；确认会话 "+literal(confirmedBy)+"；事件 "+userEvent
+        +"；原文 SHA-256 "+literal(userSha256)+"；原目标 SHA-256 "+literal(oldGoalSha256)+"；新目标 SHA-256 "+literal(newGoalSha256));
+    }
     if(item.lastInterruption)lines.push("宿主最近中断："+literal(item.lastInterruption.phase)+"；"+literal(item.lastInterruption.reason));
     if(item.updatedAt)lines.push("最近登记时间："+literal(item.updatedAt));
   }
