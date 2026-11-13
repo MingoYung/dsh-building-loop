@@ -33,6 +33,21 @@ test("typed abnormal cases expand from one valid control and reject unsafe contr
   assert.throws(() => parseInputContracts(distinct, [recipe]), /24/u);
 });
 
+test("owner examples pin complete multi-item behavior and share the normal input limits", () => {
+  const input = { items: [{ account: "closed" }, null] };
+  const expectedJson = { error: "account-closed", index: 0 };
+  const example = { id: "ordered", input, expectedJson };
+  const group = { id: "request-order", recipe, examples: [example] };
+  assert.deepEqual(inputContractCases(parseInputContracts([group], [recipe])), [{
+    id: "request-order:example:ordered", input: { recipe, stdin: JSON.stringify(input) + "\n" },
+    expected: { exitCode: 0, json: expectedJson }, publicExample: true,
+  }]);
+  assert.equal(inputContractCases(parseInputContracts([{ ...contract, examples: [example] }], [recipe])).length, 9);
+  assert.throws(() => parseInputContracts([{ ...group, examples: [example, example] }], [recipe]), /异常输入/u);
+  assert.throws(() => parseInputContracts([{ ...group, examples: [{ ...example, input: "x".repeat(8192) }] }], [recipe]), /异常输入/u);
+  assert.throws(() => parseInputContracts([{ ...group, expectedJson }], [recipe]), /异常输入/u);
+});
+
 test("registered input probes compare exact outputs, report real differences and cannot qualify stale bytes", () => fixture(async (root, write) => {
   const source = "gateway.py";
   write(source, "def read_request(value):\n    return value\n");
@@ -40,7 +55,10 @@ test("registered input probes compare exact outputs, report real differences and
   const phase = { write: [source] };
   const spec = { candidate: source, phases: { intake: phase, supplement: phase }, codeTask: { sources: [source],
     tests: { regression: { inputs: [] }, requiredCases: ["new"] },
-    diagnostics: { checkSet: "request-test", protocol: 2, recipes: [recipe], inputContracts: [contract] } } };
+    diagnostics: { checkSet: "request-test", protocol: 2, recipes: [recipe], inputContracts: [contract, {
+      id: "whole-request", recipe, examples: [{ id: "graph", input: { nodes: ["a", "b"], edges: [["a", "b"]] },
+        expectedJson: { order: ["a", "b"] } }],
+    }] } } };
   const active = { actor: "executor-1", phase: "intake", serial: 1,
     codeIntake: { nonce: "test-nonce", regression: { cases: [{ id: "old", status: "passed" }] } } };
   const frame = { root, role: "executor", reads: [source], assignment: ["K01", active],
@@ -53,7 +71,12 @@ test("registered input probes compare exact outputs, report real differences and
     const { spec, requestId, snapshotSha256, probe, artifacts } = JSON.parse(Buffer.concat(chunks));
     observed.push({ probe, artifacts });
     const input = JSON.parse(probe.stdin);
-    const labels = Array.isArray(input.entries) ? input.entries[0]?.labels : undefined;
+    if (input?.nodes) {
+      if (defect) return res.end(JSON.stringify({ spec, requestId, snapshotSha256, status: "execution-timeout" }));
+      return res.end(JSON.stringify({ spec, requestId, snapshotSha256, status: "passed",
+        probe: { exitCode: 0, stdout: '{"order":["a","b"]}' } }));
+    }
+    const labels = Array.isArray(input?.entries) ? input.entries[0]?.labels : undefined;
     const exitCode = labels === null && defect ? 1 : 0;
     const stdout = JSON.stringify(Array.isArray(labels) ? control : invalid);
     res.end(JSON.stringify({ spec, requestId, snapshotSha256, status: exitCode ? "failed" : "passed", probe: {
@@ -72,7 +95,10 @@ test("registered input probes compare exact outputs, report real differences and
     assert.deepEqual(failed.failures[0], { id: "request-shapes:1:null", shape: { path: ["entries", 0, "labels"], type: "null" },
       outcome: "mismatch", actual: { exitCode: 1 }, stdin: '{"entries":[{"labels":null}],"count":4}\n',
       expected: { exitCode: 0, json: invalid }, stack: [{ path: source, line: 2, function: "read_request" }] });
-    assert.equal(observed.length, 8);
+    assert.deepEqual(failed.failures[1], { id: "whole-request:example:graph", outcome: "mismatch",
+      actual: { status: "execution-timeout" }, stdin: '{"nodes":["a","b"],"edges":[["a","b"]]}\n',
+      expected: { exitCode: 0, json: { order: ["a", "b"] } } });
+    assert.equal(observed.length, 9);
     assert.ok(observed.every(row => row.artifacts[0].sha256 === observed[0].artifacts[0].sha256));
     write(source, "def read_request(value):\n    return {} if value is None else value\n");
     defect = false;
@@ -80,7 +106,7 @@ test("registered input probes compare exact outputs, report real differences and
     const corrected = prepareInputContractBatch(frame, spec, runner);
     const passed = await runInputContractBatch(corrected, runner);
     assert.equal(passed.status, "passed");
-    assert.equal(passed.receipts.length, 8);
+    assert.equal(passed.receipts.length, 9);
     assert.equal(inputContractBatchCurrent(frame, corrected), true);
     active.serial++;
     assert.equal(inputContractBatchCurrent(frame, corrected), false);

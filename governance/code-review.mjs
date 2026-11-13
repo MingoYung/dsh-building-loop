@@ -1,4 +1,5 @@
 import { requireCodeRegressionCurrent } from "./code-intake.mjs";
+import { isGroundedRuntimeProof } from "./code-review-probes.mjs";
 import { expectedClaims } from "./evidence.mjs";
 import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { lineList } from "./preflight.mjs";
@@ -7,7 +8,7 @@ import { parser as pythonParser } from "./vendor/python-parser.cjs";
 import { pythonImportEvidence } from "./python-dependencies.mjs";
 
 export const CODE_COMMENT_RULE = "必要注释写在非显然的职责、调用方向、跨模块状态、权限、数据保护、回滚或重试边界旁，交代原因与成立条件。改动使旧说明失实时同步更新。核验对照实际控制流和测试证据。";
-export const CODE_REVIEW_REJECTION_RULE = "行为退回先用 runtime probe 绑定已读规格条款的原话、输入和可观察预期。实际结果符合规格、规格没有规定顺序、或仅建议优化时写 observations。必测 revise 要关联同一 caseId 和条款的已证实发现。";
+export const CODE_REVIEW_REJECTION_RULE = "行为退回须使用当前角色的 runtime 复现，且 outcome=mismatch、blocking=true。逐字引用明确规定该输出字段和值的条款，或使用绑定该条款的已登记示例。字段只在实际结果出现、当前条款不能确定预期，或仅建议优化时写 observations。退回中的实测预期和结果由宿主填入。必测 revise 要关联同一 caseId 和条款的已证实发现。";
 export const CODE_REVIEW_PROBE_RULE = "已签名的通过用例无需逐个重复运行。有具体可疑差异再用探针；已登记的必跑架构示例仍须核验。";
 const BASELINE_LINES = 16000;
 const RANGE_LIMIT = 48;
@@ -641,6 +642,9 @@ function checkedViolation(value, kind, id, readers, context) {
     if (reproduction?.id !== value.reproduction || reproduction.type !== proofType || reproduction.outcome !== "mismatch") {
       throw new Error("该复现尚未证明当前签名版本的实际不一致，先核对真实运行结果");
     }
+    if (runtime && !isGroundedRuntimeProof(reproduction)) {
+      throw new Error("当前复现未用条款或登记示例证明预期输出");
+    }
     if (runtime && !sameClause(requirement, reproduction.requirement)) {
       throw new Error("退回须引用 runtime probe 已绑定的相同当前规格条款");
     }
@@ -648,7 +652,8 @@ function checkedViolation(value, kind, id, readers, context) {
   if (type === "annotation" && !COMMENT_OBLIGATIONS.includes(value.obligation) || type !== "annotation" && value.obligation !== undefined) {
     throw new Error("annotation 退回须选择必要注释规则 obligation；其他发现不得用注释规则代替证据");
   }
-  return { type, expected, actual, ...(requirement ? { requirement } : {}), ...(reproduction ? { reproduction } : {}),
+  const facts = runtime ? reproduction.summary : { expected, actual };
+  return { type, ...facts, ...(requirement ? { requirement } : {}), ...(reproduction ? { reproduction } : {}),
     ...(value.obligation ? { obligation: value.obligation } : {}) };
 }
 
@@ -832,7 +837,8 @@ function reviewProgress(frame, active, current, draft) {
   };
   for (const { id, kind, violation, staticProof } of draft.findings) {
     if (!violation || !TYPES_BY_KIND[kind]?.includes(violation.type) ||
-      ["requirement", "runtime", "maintainability"].includes(violation.type) && !sameClause(violation.requirement, violation.reproduction?.requirement) ||
+      ["requirement", "runtime", "maintainability"].includes(violation.type) &&
+        (!isGroundedRuntimeProof(violation.reproduction) || !sameClause(violation.requirement, violation.reproduction.requirement)) ||
       ["annotation", "architecture"].includes(violation.type) && !staticProof) requireCorrection("findings", id);
   }
   for (const { file, comment, comments } of draft.files) {

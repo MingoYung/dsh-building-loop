@@ -112,7 +112,7 @@ function rejectionCode(node, source) {
  * conditional branch with a literal rejection, and keep weaker field guards
  * so a plausible local validation is not falsely attributed elsewhere. */
 function functionResponsibilities(file, source, functions, lineOf) {
-  const definitions = [], validation = [], rejections = new Set();
+  const definitions = [], validation = [], rejectionSites = [], rejections = new Set();
   for (const node of functions) {
     const parts = children(node);
     const named = parts.find(item => item.name === "VariableName");
@@ -142,6 +142,16 @@ function functionResponsibilities(file, source, functions, lineOf) {
         if (!["if", "elif"].includes(part.name) || parts[index + 2]?.name !== "Body") continue;
         const condition = parts[index + 1];
         const fields = new Set();
+        const directFields = new Set();
+        const principal = condition.firstChild?.name === "not" ? condition.firstChild.nextSibling : condition;
+        const firstCheck = principal?.name === "BinaryExpression" && principal.firstChild?.nextSibling?.name === "or"
+          ? principal.firstChild : undefined;
+        if (firstCheck?.name === "CallExpression" && nameParts(firstCheck.firstChild, source) === "isinstance") {
+          const subject = firstCheck.lastChild?.firstChild?.nextSibling;
+          const binding = subject?.name === "VariableName" ? assignments.get(source.slice(subject.from, subject.to)) : null;
+          const field = subject && (fieldRead(subject, source) || (binding?.offset <= subject.from ? binding.field : null));
+          if (field) directFields.add(field);
+        }
         walk(condition, item => {
           const explicit = fieldRead(item, source);
           if (explicit) fields.add(explicit);
@@ -149,17 +159,17 @@ function functionResponsibilities(file, source, functions, lineOf) {
           const binding = assignments.get(source.slice(item.from, item.to));
           if (binding?.offset <= item.from) fields.add(binding.field);
         });
-        if (!fields.size) continue;
         const exits = children(parts[index + 2]).filter(item => ["RaiseStatement", "ReturnStatement"].includes(item.name));
         for (const exit of exits) {
           const code = rejectionCode(exit, source);
+          if (code) rejectionSites.push({ file, symbol, code, line: lineOf(exit.from) });
           for (const field of fields) validation.push({ file, symbol, field, line: lineOf(exit.from),
-            ...(code && fields.size === 1 ? { code } : {}) });
+            ...(code && (fields.size === 1 || directFields.has(field)) ? { code } : {}) });
         }
       }
     }
   }
-  return { definitions, validation, rejections: [...rejections] };
+  return { definitions, validation, rejectionSites, rejections: [...rejections] };
 }
 
 /** Only prove directly resolvable syntactic calls. An alias that is rebound
@@ -177,8 +187,11 @@ function localCalls(file, source, imports, callNodes, names, lineOf) {
         for (const target of [...item.possibleSubmodule, ...item.candidates]) uncertainTargets.add(target);
         continue;
       }
-      if (item.candidates.length !== 1 || item.candidates[0] === file || item.member === "*") continue;
-      const alias = { ...item, scope, to: item.candidates[0] };
+      // Keep the statically resolved standard JSON codec separate from project
+      // modules. A shadowing local json.py always wins over this inference.
+      const jsonCodec = item.module === "json" && !item.candidates.length && !statement.from.startsWith(".");
+      if (!jsonCodec && (item.candidates.length !== 1 || item.candidates[0] === file || item.member === "*")) continue;
+      const alias = { ...item, scope, to: item.candidates[0], jsonCodec };
       if (!aliases.has(item.binding)) aliases.set(item.binding, []);
       aliases.get(item.binding).push(alias);
     }
@@ -188,21 +201,29 @@ function localCalls(file, source, imports, callNodes, names, lineOf) {
     if (!aliases.has(value) || inImport(node) || loadIsCallReceiver(node)) continue;
     shadowed.add(value);
   }
-  const calls = [];
+  // A proven sibling codec call cannot refute another call when any JSON
+  // binding in the module has been passed around, shadowed or rebound.
+  const jsonBindings = [...aliases].filter(([, items]) => items.some(item => item.jsonCodec));
+  const uncertainCodec = uncertainAll || jsonBindings.some(([binding, items]) =>
+    bindings.get(binding) !== 1 || shadowed.has(binding) || items.some(item => item.scope !== "Script"));
+  const calls = [], jsonDecoders = [];
   for (const call of callNodes) {
     const syntax = nameParts(call.firstChild, source);
     if (!syntax) continue;
     const root = syntax.split(".")[0];
     const matches = (aliases.get(root) ?? []).filter(item => item.member ? syntax === item.prefix : syntax.startsWith(item.prefix + "."));
     if (matches.length > 1 || matches.length && (bindings.get(root) !== 1 || shadowed.has(root) || matches[0].scope !== "Script")) {
-      for (const { to } of matches) uncertainTargets.add(to);
+      for (const { to } of matches) if (to) uncertainTargets.add(to);
       continue;
     }
     const resolved = matches[0];
-    if (resolved) calls.push({ file, line: lineOf(call.from), target: resolved.to,
-      symbol: resolved.member ?? syntax.slice(resolved.prefix.length + 1) });
+    if (!resolved) continue;
+    const symbol = resolved.member ?? syntax.slice(resolved.prefix.length + 1);
+    if (resolved.jsonCodec) {
+      if (!uncertainCodec && ["load", "loads"].includes(symbol)) jsonDecoders.push({ file, line: lineOf(call.from), symbol: "json." + symbol });
+    } else calls.push({ file, line: lineOf(call.from), target: resolved.to, symbol });
   }
-  return { calls, uncertainAll, uncertainTargets: [...uncertainTargets] };
+  return { calls, jsonDecoders, uncertainAll, uncertainTargets: [...uncertainTargets] };
 }
 
 /** Bound facts to exact signed readable source bytes and use only declared
@@ -211,7 +232,7 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
   const files = artifacts.filter(row => row.sha256 && /\.py$/iu.test(row.path) && includes(frame.reads, row.path));
   const local = new Map(files.map(({ path }) => [keyOf(path), path]));
   const checkedFiles = [], unparsedFiles = [], edges = [], ambiguous = [], calls = [], uncertainCalls = [];
-  const definitions = [], validation = [], localRejections = [];
+  const definitions = [], validation = [], rejectionSites = [], jsonDecoders = [], localRejections = [], sourceIdentifiers = [];
   let responsibilitiesTruncated = false;
   let truncated = false;
   for (const { path: file, sha256 } of files) {
@@ -220,12 +241,21 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
     if (!bytes || digest(bytes) !== sha256) throw new Error("已签名源码已变化：" + file);
     const source = text(bytes).replace(/\r\n?/gu, "\n");
     const imports = [], callNodes = [], names = [], functions = [];
+    const identifiers = new Set();
     let invalid = false;
     parser.parse(source).iterate({ enter(node) {
       if (node.type.isError) invalid = true;
       if (node.name === "ImportStatement") imports.push(node.node);
       if (node.name === "CallExpression") callNodes.push(node.node);
-      if (node.name === "VariableName") names.push({ node: node.node, value: source.slice(node.from, node.to) });
+      if (node.name === "VariableName") {
+        const value = source.slice(node.from, node.to);
+        names.push({ node: node.node, value });
+        if (responsibilities) identifiers.add(value);
+      }
+      if (responsibilities && node.name === "String") {
+        const value = literalString(node.node, source);
+        if (value) identifiers.add(value);
+      }
       if (responsibilities && node.name === "FunctionDefinition" && node.node.parent?.name === "Script") functions.push(node.node);
     } });
     if (invalid) { unparsedFiles.push(file); continue; }
@@ -256,12 +286,16 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
     if (responsibilities) {
       const current = functionResponsibilities(file, source, functions, lineOf);
       if (definitions.length + current.definitions.length > 128 || validation.length + current.validation.length > 128 ||
-        current.rejections.length > 128) {
+        rejectionSites.length + current.rejectionSites.length > 128 || jsonDecoders.length + resolved.jsonDecoders.length > 64 ||
+        current.rejections.length > 128 || identifiers.size > 512) {
         responsibilitiesTruncated = true;
       }
       definitions.push(...current.definitions.slice(0, 128 - definitions.length));
       validation.push(...current.validation.slice(0, 128 - validation.length));
+      rejectionSites.push(...current.rejectionSites.slice(0, 128 - rejectionSites.length));
+      jsonDecoders.push(...resolved.jsonDecoders.slice(0, 64 - jsonDecoders.length));
       if (current.rejections.length && !responsibilitiesTruncated) localRejections.push({ file, codes: current.rejections });
+      if (!responsibilitiesTruncated) sourceIdentifiers.push({ file, identifiers: [...identifiers] });
     }
     // Deduplicate repeated calls to one symbol. A large call inventory must
     // not invalidate the pre-existing bounded static import inventory.
@@ -275,6 +309,7 @@ export function pythonImportEvidence(frame, artifacts, { responsibilities = fals
     calls.push(...[...unique.values()].slice(0, 64 - calls.length));
   }
   return { kind: "python-static-local", checkedFiles, unparsedFiles, edges, ambiguous, truncated, calls,
-    uncertainCalls, ...(responsibilities ? { definitions, validation, localRejections, responsibilitiesTruncated } : {}),
+    uncertainCalls, ...(responsibilities ? { definitions, validation, rejectionSites, jsonDecoders, localRejections, sourceIdentifiers,
+      responsibilitiesTruncated } : {}),
     scope: "仅登记当前可读取的 Python 本地静态导入和可定位的直接调用语法。别名传播、动态调用、间接调用和实际运行路径需另行验证。" };
 }

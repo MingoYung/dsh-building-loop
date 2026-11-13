@@ -114,6 +114,50 @@ test("the host preloads architecture sources and both reviewers decide only the 
   }
 }));
 
+test("architecture planning shows source metadata without granting reads and rejects a definite false absence", () => fixture(async (root, write) => {
+  const importsHeading = "静态导入";
+  const { harness } = project(root, write, { importsHeading });
+  write(candidate, "from limits import MAXIMUM\n\ndef budget(value):\n    return min(value, MAXIMUM)\n");
+  const prepare = async () => (await harness.flow("root", "prepare")).architecture.sourceFacts;
+  assert.deepEqual(await prepare(), {
+    modules: [{ file: candidate, presence: "present" }, { file: "limits.py", presence: "present" }],
+    directLocalImports: [{ file: candidate, imports: ["limits.py"] }, { file: "limits.py", imports: [] }],
+  });
+  await assert.rejects(harness.file("root", "read", candidate), /读白名单/u);
+  await assert.rejects(harness.file("root", "read", "limits.py"), /读白名单/u);
+  const block = "\n## " + importsHeading + "\n\n待由宿主生成。\n";
+  const wrong = plan.replace("入口限制请求预算。", "工作区当前只有 GOAL.md，没有 `runtime.py`、limits 的源码。");
+  await harness.file("root", "write", architecture, { content: wrong + block, note: "Capture a false present-state claim" });
+  await assert.rejects(harness.flow("root", "architecture"), /第 5 行.*runtime\.py、limits\.py/u);
+  const precise = plan.replace("入口限制请求预算。", "若未来没有 `runtime.py` 的源码，则使用只读规格恢复。");
+  await harness.file("root", "write", architecture, { content: precise + block, note: "Replace with a conditional recovery note" });
+  assert.equal((await harness.flow("root", "architecture")).phase, "dispatch");
+  fs.unlinkSync(path.join(root, "limits.py"));
+  assert.deepEqual(await prepare(), {
+    modules: [{ file: candidate, presence: "present" }, { file: "limits.py", presence: "missing" }],
+  });
+}));
+
+test("labeled import clauses distinguish direct imports from continued design prose", () => {
+  const graph = {
+    checkedFiles: ["start.py", "middle.py", "end.py", "side.py"],
+    edges: [{ file: "start.py", line: 1, imports: ["middle.py"] }, { file: "middle.py", line: 1, imports: ["end.py"] }],
+    calls: [], uncertainCalls: [],
+  };
+  const notes = [
+    "导入方向固定为：`start.py` → `middle.py` / `end.py`；`middle.py` → `end.py`。",
+    "",
+    "导入方向固定：`start.py` → `middle.py` / `side.py`，后三者之间只允许现有依赖，不得反向。",
+    "",
+    "导入方向：`start.py` → `middle.py`；计划由 `middle.py` → `side.py`。",
+    "",
+    "实施顺序：`start.py` → `end.py`。",
+  ].join("\n");
+  assert.deepEqual(inspectArchitectureProse(notes, graph).map(({ line, from, to }) => ({ line, from, to })), [
+    { line: 1, from: "start.py", to: "end.py" }, { line: 3, from: "start.py", to: "side.py" },
+  ]);
+});
+
 async function approve(harness, actor, changed) {
   const review = (action, fields) => harness.invoke(actor, "building_loop_code_review", { action, ...fields });
   await review("prepare");
@@ -286,12 +330,83 @@ test("architecture checks explicit import chains without interpreting unlabeled 
     "未来导入方向：`main.py` → `policy.py`。",
     "静态导入关系：`main.py` → `shared.py` → `engine.py`。",
     "导入方向：`main.py` → `outside.py`。",
+    "导入方向：`main.py` → policy/engine；其余文字。",
+    "导入方向固定：`main.py -> engine.py -> (policy.py)`，叶子不再导入。",
+    "导入方向：main → (policy, engine)。",
+    "导入方向：main → `a/shared.py`。",
+    "导入方向：main → (shared, engine)。",
+    "导入方向：main → policy.unknown。",
+    "导入方向：main → policy/engine → main。",
     "", "> Import direction: `main.py` -> `policy.py`.", "", "~~~text",
     "导入方向固定：`main.py` → `policy.py`。", "~~~"].join("\n");
   assert.deepEqual(inspectArchitectureProse(note, graph), [
     { line: 3, from: "main.py", to: "policy.py", relation: "import", actual: [{ file: "engine.py", line: 1 }] },
     { line: 3, from: "policy.py", to: "engine.py", relation: "import", actual: [] },
+    { line: 10, from: "main.py", to: "policy.py", relation: "import", actual: [{ file: "engine.py", line: 1 }] },
+    { line: 12, from: "main.py", to: "policy.py", relation: "import", actual: [{ file: "engine.py", line: 1 }] },
+    { line: 13, from: "main.py", to: "a/shared.py", relation: "import", actual: [{ file: "engine.py", line: 1 }] },
   ]);
+}));
+
+test("architecture locates grouped guards, a literal rejection decision, and a wrongly delegated JSON decoder", () => fixture(async (root, write) => {
+  const sources = {
+    "entry.py": "import json as codec\nfrom calculation import compute\ndef main(stream):\n    request = codec.load(stream)\n    return compute(request)\n",
+    "calculation.py": "from rules import limit\ndef fail(code): return {'error': code}\ndef compute(request):\n    allowed = limit(request)\n    if 10 > allowed: return fail('over-quota')\n    if not isinstance(request, dict): return fail('bad-root')\n    return allowed\n",
+    "data.py": "def normalize(request): return request['items']\n",
+    "rules.py": "def limit(request):\n    quantity = request.get('quantity')\n    owner = request.get('owner')\n    if not isinstance(owner, str) or owner not in allowed[quantity]:\n        raise ValueError('invalid-owner')\n    if not isinstance(quantity, int):\n        raise ValueError('invalid-quantity')\n    kind = request.get('kind')\n    if kind not in ('small', 'large'):\n        raise ValueError('invalid-kind')\n    return quantity\n",
+  };
+  for (const [file, content] of Object.entries(sources)) write(file, content);
+  const reads = Object.keys(sources);
+  const graph = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file, sha256: digest(sources[file]) })),
+    { responsibilities: true });
+  const note = ["# Modules", "", "- `entry.py`：读取原始文本，交付给 data 解析。",
+    "- `data.py`：字段校验（`quantity`/`owner`/`items` 各自类型面）。",
+    "- `rules.py`：做 `over-quota` 判定。",
+    "- `data.py`：无需校验（`quantity`/`owner`）。",
+    "- `entry.py`：JSON 解析后交给 data 解析业务字段。",
+    "- `rules.py`：通过 calculation 做 `over-quota` 判定。",
+    "- `rules.py`：准备做 `over-quota` 判定并迁移至下一版本。",
+    "- `rules.py`：检查（`quantity`/`owner`）。",
+    "- `rules.py`：对照额度给出 `over-quota`。",
+    "- `data.py`：校验输入结构（`bad-root`）与子字段。",
+    "- `calculation.py`：校验输入结构（`bad-root`）。",
+    "- `entry.py`：下游校验失败时返回 `bad-root`，原样序列化。",
+    "- `data.py`：将来校验输入结构（`bad-root`）。",
+    "- `rules.py`：预算超出时不返回 `over-quota`。",
+    "- `rules.py`：支持文档列举错误码 `over-quota`。",
+    "- `entry.py`：读取原始文本 → `json.loads`。",
+    "- `entry.py`：读取原始文本 → `json.load`。",
+    "- `entry.py`：将来拟用 `json.loads`。",
+    "- `entry.py`：调用 `json.loads` 或 `json.load`。",
+    "- `data.py`：归档并校验种类是否属于 `small`/`large`（`invalid-kind`）。",
+    "- `rules.py`：对请求判定有效额度（超出→`over-quota`）。",
+    "- `data.py`：委托规则模块校验种类是否属于 `small`/`large`（`invalid-kind`）。",
+    "- `data.py`：检查种类是否属于 `small`/`large`（`maybe-invalid-kind`）。",
+    "- `calculation.py`：对请求判定有效额度（超出→`over-quota`）。",
+  ].join("\n");
+  const problems = inspectArchitectureProse(note, graph);
+  assert.deepEqual(problems.map(({ line, from, relation, field, code, to, symbol }) => [line, from, relation, field ?? code ?? to ?? symbol]), [
+    [3, "entry.py", "json-decoding", "data.py"], [4, "data.py", "validation", "quantity"],
+    [4, "data.py", "validation", "owner"], [5, "rules.py", "decision", "over-quota"],
+    [11, "rules.py", "decision", "over-quota"], [12, "data.py", "decision", "bad-root"],
+    [18, "entry.py", "json-decoder-call", "json.loads"],
+    [22, "data.py", "decision", "invalid-kind"], [23, "rules.py", "decision", "over-quota"],
+  ]);
+  assert.ok(problems[2].actual.some(row => row.file === "rules.py" && row.line === 5 && row.code === "invalid-owner"));
+  assert.deepEqual(problems[3].actual, [{ file: "calculation.py", line: 5, symbol: "compute", code: "over-quota" }]);
+  write("entry.py", sources["entry.py"].replace("request = codec.load(stream)", "codec = stream\n    request = codec.load(stream)"));
+  const rebound = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file,
+    sha256: digest(fs.readFileSync(path.join(root, file))) })), { responsibilities: true });
+  assert.deepEqual(inspectArchitectureProse(note, rebound).map(row => row.relation),
+    ["validation", "validation", "decision", "decision", "decision", "decision", "decision"]);
+  write("entry.py", "import json as other\n" + sources["entry.py"].replace("return compute(request)", "return other.loads(stream) if stream else compute(request)"));
+  const both = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file,
+    sha256: digest(fs.readFileSync(path.join(root, file))) })), { responsibilities: true });
+  assert.equal(inspectArchitectureProse(note, both).some(row => row.relation === "json-decoder-call"), false);
+  write("entry.py", "import json as other\n" + sources["entry.py"].replace("return compute(request)", "return compute(other)"));
+  const escaped = pythonImportEvidence({ root, reads }, reads.map(file => ({ path: file,
+    sha256: digest(fs.readFileSync(path.join(root, file))) })), { responsibilities: true });
+  assert.equal(inspectArchitectureProse(note, escaped).some(row => row.relation === "json-decoder-call"), false);
 }));
 
 test("architecture attributes definite guards and definitions without accusing delegation or unknown ownership", () => fixture(async (root, write) => {

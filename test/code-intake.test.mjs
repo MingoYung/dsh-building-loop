@@ -342,8 +342,11 @@ test("a signed green submission still stops on registered malformed input and re
   const recipe = "python-json";
   const success = { status: "ok" };
   const invalid = { status: "error", error: "invalid-settings" };
+  const mixed = { items: [{ state: "closed" }, null] };
+  const firstError = { status: "error", error: "closed-account", index: 0 };
   const inputContracts = [{ id: "settings-shape", recipe, seed: { settings: { active: true } }, expectedJson: success,
-    checks: [{ path: ["settings"], invalid: ["array", "null"], expectedJson: invalid }] }];
+    checks: [{ path: ["settings"], invalid: ["array", "null"], expectedJson: invalid }],
+    examples: [{ id: "ordered", input: mixed, expectedJson: firstError }] }];
   let seen = 0;
   await withDiagnosticRunner((request, send) => {
     if (request.operation !== "probe") {
@@ -352,7 +355,12 @@ test("a signed green submission still stops on registered malformed input and re
     }
     seen++;
     const current = Buffer.from(request.artifacts.find(row => row.path === module).contentBase64, "base64").toString();
-    const { settings } = JSON.parse(request.probe.stdin);
+    const { settings, items } = JSON.parse(request.probe.stdin);
+    if (items) {
+      assert.deepEqual(items, mixed.items);
+      const response = current.includes("value + 2") ? firstError : { status: "error", error: "invalid-item", index: 1 };
+      return send({ status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(response) } });
+    }
     const rejects = settings === null || Array.isArray(settings) && current.includes("value + 2");
     send({ status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(rejects ? invalid : success), stderr: "" } });
   }, async () => {
@@ -369,12 +377,20 @@ test("a signed green submission still stops on registered malformed input and re
     assert.equal(first.phase, "intake");
     assert.equal(first.submission.status, "input-check");
     assert.equal(first.submission.inputContracts.status, "failed");
-    assert.deepEqual(first.submission.inputContracts.failures.map(row => row.shape?.type), ["array"]);
-    assert.equal(seen, 3);
+    assert.deepEqual(first.submission.inputContracts.failures.map(row => row.id),
+      ["settings-shape:1:array", "settings-shape:example:ordered"]);
+    assert.equal(seen, 4);
+    const examples = (await harness.flow(childId, "prepare")).codeTask.reproduction.publicExamples;
+    assert.deepEqual(examples, [{ id: "settings-shape:example:ordered", recipe, expected: { exitCode: 0, json: firstError } }]);
+    const runExample = (id, extra = {}) => harness.invoke(id, "building_loop_reproduce",
+      { action: "example", exampleId: examples[0].id, ...extra });
+    await assert.rejects(runExample("root"), /执行方/u);
+    await assert.rejects(runExample(childId, { stdin: '{"fake":true}' }), /只填/u);
+    assert.equal((await runExample(childId)).outcome, "mismatch");
     await edit(1, 2);
     const repaired = await submitSigned();
     assert.equal(repaired.phase, "review-ready");
-    assert.equal(seen, 6);
+    assert.equal(seen, 9);
     await harness.flow("root", "advance");
     assert.equal(harness.activations.length, 2);
   });

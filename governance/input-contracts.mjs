@@ -1,4 +1,5 @@
 const MAX_CASES = 24;
+const MAX_EXAMPLES = 8;
 const MAX_JSON = 2048;
 const MAX_STDIN = 8192;
 const CONTRACT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
@@ -26,6 +27,14 @@ function boundedJson(value, bytes) {
   return validJson(value) && Buffer.byteLength(JSON.stringify(value)) <= bytes;
 }
 
+function validRequirement(row) {
+  return object(row, ["file", "start", "end", "quote"]) &&
+    typeof row.file === "string" && row.file.length > 0 && row.file.length <= 500 &&
+    Number.isSafeInteger(row.start) && Number.isSafeInteger(row.end) && row.start > 0 && row.end >= row.start &&
+    row.end - row.start <= 64 && typeof row.quote === "string" && row.quote.trim() && row.quote.length <= 400 &&
+    row.quote.isWellFormed();
+}
+
 function target(root, path) {
   let value = root;
   for (const segment of path) {
@@ -36,22 +45,42 @@ function target(root, path) {
   return value;
 }
 
-/** Authority only: a known-good JSON request and exact expected responses
- * define one-change checks. Defaults for a missing optional field therefore
- * remain under project authority, as does error precedence across fields. */
+/** Authority only: single-field variants and exact public examples share one
+ * isolated runner. Multi-item order and shared-dependency behavior need whole
+ * examples because mutating one field cannot express every interaction. */
 export function parseInputContracts(value, reviewRecipes, syntaxRecipe) {
   if (value === undefined) return;
-  const invalid = () => new Error("异常输入契约须登记授权 JSON 配方、合法样例、路径、异常类型及明确预期");
+  const invalid = () => new Error("异常输入契约须登记授权 JSON 配方和明确预期，可用合法样例加单字段变体，或登记完整公开示例");
   if (!Array.isArray(value) || !value.length || value.length > 8) throw invalid();
   const ids = new Set();
-  let cases = 0;
+  let cases = 0, exampleCount = 0;
   for (const row of value) {
-    if (!object(row, ["id", "recipe", "seed", "expectedExitCode", "expectedJson", "checks"]) ||
+    if (!object(row, ["id", "recipe", "seed", "expectedExitCode", "expectedJson", "checks", "examples"]) ||
       typeof row.id !== "string" || !CONTRACT_ID.test(row.id) || ids.has(row.id) ||
-      !reviewRecipes?.includes(row.recipe) || row.recipe === syntaxRecipe || !own(row, "seed") ||
-      !own(row, "expectedJson") || !boundedJson(row.seed, MAX_STDIN - 1) || !boundedJson(row.expectedJson, MAX_JSON) ||
-      !validCode(row.expectedExitCode) || !Array.isArray(row.checks) || !row.checks.length || row.checks.length > MAX_CASES) throw invalid();
+      !reviewRecipes?.includes(row.recipe) || row.recipe === syntaxRecipe) throw invalid();
     ids.add(row.id);
+    const { examples } = row;
+    if (examples !== undefined) {
+      if (!Array.isArray(examples) || !examples.length || examples.length > MAX_EXAMPLES) throw invalid();
+      const exampleIds = new Set();
+      for (const example of examples) {
+        if (!object(example, ["id", "input", "expectedJson", "expectedExitCode", "requirement"]) ||
+          !CONTRACT_ID.test(typeof example.id === "string" ? example.id : "") || exampleIds.has(example.id) ||
+          !own(example, "input") || !boundedJson(example.input, MAX_STDIN - 1) || !own(example, "expectedJson") ||
+          !boundedJson(example.expectedJson, MAX_JSON) || !validCode(example.expectedExitCode) ||
+          example.requirement !== undefined && !validRequirement(example.requirement)) throw invalid();
+        exampleIds.add(example.id);
+        exampleCount++;
+      }
+    }
+    const hasVariants = ["seed", "expectedExitCode", "expectedJson", "checks"].some(key => own(row, key));
+    if (!hasVariants) {
+      if (!examples) throw invalid();
+      continue;
+    }
+    if (!own(row, "seed") || !own(row, "expectedJson") || !boundedJson(row.seed, MAX_STDIN - 1) ||
+      !boundedJson(row.expectedJson, MAX_JSON) || !validCode(row.expectedExitCode) ||
+      !Array.isArray(row.checks) || !row.checks.length || row.checks.length > MAX_CASES) throw invalid();
     cases++;
     const mutations = new Set();
     for (const check of row.checks) {
@@ -71,6 +100,7 @@ export function parseInputContracts(value, reviewRecipes, syntaxRecipe) {
     }
   }
   if (cases > MAX_CASES) throw new Error("异常输入契约最多展开 24 条检查（含合法对照）");
+  if (exampleCount > MAX_EXAMPLES) throw new Error("输入契约最多登记 8 条完整公开示例");
   inputContractCases(value);
   return value;
 }
@@ -90,19 +120,30 @@ function mutate(seed, path, type) {
  * recipe as other code reproductions. Only failed rows need to reach actors. */
 export function inputContractCases(contracts) {
   const result = [];
-  for (const { id, recipe, seed, expectedExitCode, expectedJson, checks } of contracts ?? []) {
-    const add = (caseId, stdin, exitCode, json, shape) => {
+  for (const { id, recipe, seed, expectedExitCode, expectedJson, checks, examples = [] } of contracts ?? []) {
+    const add = (caseId, stdin, exitCode, json, details) => {
       const input = { recipe, stdin: JSON.stringify(stdin) + "\n" };
       if (Buffer.byteLength(input.stdin) > MAX_STDIN) throw new Error("异常输入契约样例超过复现输入限制");
-      result.push({ id: caseId, input, expected: { exitCode: exitCode ?? 0, json }, ...(shape ? { shape } : {}) });
+      result.push({ id: caseId, input, expected: { exitCode: exitCode ?? 0, json }, ...details });
     };
-    add(id + ":seed", seed, expectedExitCode, expectedJson);
-    for (const [index, check] of checks.entries()) {
+    if (checks) add(id + ":seed", seed, expectedExitCode, expectedJson);
+    for (const [index, check] of (checks ?? []).entries()) {
       for (const type of check.invalid) {
         add(id + ":" + (index + 1) + ":" + type, mutate(seed, check.path, type), check.expectedExitCode,
-          check.expectedJson, { path: check.path, type });
+          check.expectedJson, { shape: { path: check.path, type } });
       }
+    }
+    for (const example of examples) {
+      add(id + ":example:" + example.id, example.input, example.expectedExitCode, example.expectedJson,
+        { publicExample: true, ...(example.requirement ? { requirement: example.requirement } : {}) });
     }
   }
   return result;
+}
+
+/** Discovery exposes the owner-approved expectations without regenerating
+ * or repeatedly transferring large request bodies to model sessions. */
+export function publicInputExamples(contracts) {
+  return inputContractCases(contracts).filter(row => row.publicExample)
+    .map(({ id, input, expected, requirement }) => ({ id, recipe: input.recipe, expected, ...(requirement ? { requirement } : {}) }));
 }

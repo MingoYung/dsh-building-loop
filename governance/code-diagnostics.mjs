@@ -137,8 +137,26 @@ export function prepareCodeReproduction(frame, args, runner) {
 export function prepareInputContractBatch(frame, spec, runner) {
   const cases = inputContractCases(spec.codeTask?.diagnostics?.inputContracts);
   if (!cases.length) return;
-  return cases.map(check => ({ check,
-    job: prepareCodeReproduction(frame, { action: "probe", ...check.input }, runner) }));
+  return cases.map(check => {
+    const { requirement } = check;
+    if (requirement) {
+      const { file, start, end, quote } = requirement;
+      const bytes = includes(frame.policy.goalContext, file) && readBytes(frame.root, file);
+      const lines = bytes && bytes.toString("utf8").split(/\r\n|\n|\r/u);
+      if (!lines || end > lines.length || !lines.slice(start - 1, end).join("\n").includes(quote)) {
+        return { check, job: { result: { status: "unavailable", reason: "public-example-clause-stale" } } };
+      }
+    }
+    return { check, job: prepareCodeReproduction(frame, { action: "probe", ...check.input }, runner) };
+  });
+}
+
+/** Only an authenticated sandbox result can establish that the candidate
+ * exceeded its execution limit. Transport timeout has unknown behavior. */
+export function compareInputContract(check, result) {
+  return result.status === "execution-timeout"
+    ? { outcome: "mismatch", actual: { status: "execution-timeout" } }
+    : compareReviewProbe(check, result);
 }
 
 /** All rows must run against the same freshly signed artifact snapshot. Only
@@ -152,12 +170,12 @@ export async function runInputContractBatch(batch, runner, signal) {
   }
   const failures = [];
   for (const { check, result } of results) {
-    const compared = compareReviewProbe(check, result);
+    const compared = compareInputContract(check, result);
     if (compared.outcome === "match") continue;
     const { id, shape, input, expected } = check;
     failures.push({ id, ...(shape ? { shape } : {}), ...compared,
       ...(compared.outcome === "mismatch" ? { ...(failures.length < 4 ? { stdin: input.stdin, expected } : {}),
-        ...(result.probe.stack ? { stack: result.probe.stack } : {}) }
+        ...(result.probe?.stack ? { stack: result.probe.stack } : {}) }
         : { status: result.status, ...(result.reason ? { reason: result.reason } : {}) }) });
   }
   return { status: failures.some(row => row.outcome === "mismatch") ? "failed" : failures.length ? "unavailable" : "passed",
@@ -362,6 +380,9 @@ function checkFeedback(reply, job) {
 }
 
 function probeFeedback(reply, job) {
+  if (reply.status === "execution-timeout" && hasOnly(reply, replyEnvelope)) {
+    return { status: "execution-timeout", snapshotSha256: reply.snapshotSha256 };
+  }
   // Older adapters still return unavailable. New adapters may reject a
   // parameter without sending exception text or echoing the hidden input.
   if (reply.status === "invalid-input") {

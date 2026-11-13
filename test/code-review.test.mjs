@@ -16,7 +16,7 @@ const worker = "queue.py";
 const goal = "SPEC.md";
 const source = "def bounded(n):\n    # Reject negative batch sizes before enqueue.\n    return max(0, n)\n";
 const update = "def bounded(n):\n    # Clamp before enqueue to keep downstream memory bounded.\n    return min(5, max(0, n))\n";
-const goalText = "# Queue release\nBound each submitted batch between zero and five items.\n";
+const goalText = "# Queue release\nBound each submitted batch between zero and five items. Output field `size` is at most 5.\n";
 
 function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false,
   receiptReads = true, diagnostics, text = goalText } = {}) {
@@ -265,7 +265,7 @@ test("behavior rejection requires the current reviewer's exact clause and a real
   try {
     const unknown = "Missing queue or missing worker both return `unknown-reference`.";
     const diagnostics = { checkSet: "review-clause", protocol: 2, recipes: ["queue"], reviewRecipes: ["queue"] };
-    const { harness, qualify } = prepareProject(root, write, { diagnostics, text: goalText + unknown + "\n" });
+    const { harness, qualify } = prepareProject(root, write, { diagnostics, receiptReads: false, text: goalText + unknown + "\n" });
     const executor = (await harness.flow("root", "advance")).childId;
     write(worker, update);
     assert.equal((await qualify(executor)).phase, "review-ready");
@@ -330,6 +330,7 @@ test("behavior rejection requires the current reviewer's exact clause and a real
       expectedPointer: "/size", expectedOperator: "at-most", expectedJson: "5" });
     assert.equal(failed.outcome, "mismatch");
     assert.equal(failed.actual.json, 6);
+    assert.equal(failed.blocking, true);
     assert.match((await recordFinding({ ...finding, violation: { ...finding.violation, reproduction: failed.id } })).errors[0].reason, /相同当前规格条款/);
     const real = { ...finding, id: "over-cap", observation: "The signed reproduction observed six queued items.", issue: "The queue exceeds five items.",
       fix: "Clamp the reproduced queue operation before downstream processing.", violation: { type: "runtime", expected: "The observed size is at most five.",
@@ -341,6 +342,94 @@ test("behavior rejection requires the current reviewer's exact clause and a real
       expected: { exitCode: 0, pointer: "/size", operator: "at-most", json: 5 } });
     assert.equal(proof.actual.jsonSha256, digest("6"));
     assert.equal(proof.requirement.quote, capClause.quote);
+    assert.equal(proof.summary.expected, "JSON 字段 /size ≤ 5");
+    assert.equal(proof.summary.actual, "JSON 字段 /size 实测 6");
+    const supplement = await harness.flow("root", "advance");
+    assert.equal(supplement.childId, executor);
+    const handoff = (await harness.flow(executor, "prepare")).codeRepair;
+    assert.equal(handoff.receipt, "first.json");
+    assert.deepEqual(handoff.findings, [{ id: "over-cap", kind: "behavior", ...ref(worker, 3), issue: real.issue,
+      fix: real.fix, requirement: { ...ref(goal, 2), sha256: digest(goalText + unknown + "\n") } }]);
+    await assert.rejects(harness.file(executor, "read", "first.json"), /读白名单/u);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    server.close();
+    await once(server, "close");
+  }
+}));
+
+test("the archived G4 success clause cannot justify an error index or an invented normalization rule", () => fixture(async (root, write) => {
+  const archive = JSON.parse(fs.readFileSync(new URL("../experiments/observations-0.7.26-hard-g4-review-grounding.json", import.meta.url), "utf8"));
+  const { actualReplay, correctIdenticalPayloadControl, receipt } = archive;
+  const token = "only-test-frozen-review-replay-token-1234";
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const job = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    assert.equal(request.headers.authorization, "Bearer " + token);
+    const input = JSON.parse(job.probe.stdin);
+    const outcome = Object.hasOwn(input.requests[1], "retain") ? correctIdenticalPayloadControl : actualReplay;
+    assert.deepEqual(input, outcome.input);
+    calls.push(job);
+    response.end(JSON.stringify({ spec: job.spec, requestId: job.requestId, snapshotSha256: job.snapshotSha256,
+      status: "passed", probe: { exitCode: outcome.exitCode, stdout: JSON.stringify(outcome.output) } }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const env = { DSH_BUILDING_LOOP_DIAGNOSTICS_URL: "http://127.0.0.1:" + server.address().port + "/run",
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: token };
+  const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    const { harness, qualify } = prepareProject(root, write, {
+      receiptReads: false,
+      diagnostics: { checkSet: "review-frozen-replay", protocol: 2, recipes: ["queue"], reviewRecipes: ["queue"] },
+      text: goalText + receipt.clauseFullLine + "\n",
+    });
+    const executor = (await harness.flow("root", "advance")).childId;
+    write(worker, update);
+    assert.equal((await qualify(executor)).phase, "review-ready");
+    const reviewer = (await harness.flow("root", "advance")).childId;
+    await prepareReview(harness, reviewer);
+    const requirement = { ...ref(goal, 3), quote: receipt.requirement.quote };
+    const originalAssertion = { assertion: "runtime", file: worker, recipe: "queue", requirement,
+      expectedExitCode: receipt.replayExpected.exitCode, expectedPointer: receipt.replayExpected.pointer,
+      expectedJson: JSON.stringify(receipt.replayExpected.json) };
+    const replay = input => codeReview(harness, reviewer, "probe", { ...originalAssertion, stdin: JSON.stringify(input) });
+    const ambiguous = await replay(actualReplay.input);
+    assert.equal(ambiguous.outcome, "mismatch");
+    assert.equal(ambiguous.actual.json, 1);
+    assert.equal(ambiguous.blocking, false);
+    assert.equal(ambiguous.replay, undefined);
+    const passing = await replay(correctIdenticalPayloadControl.input);
+    assert.equal(passing.outcome, "unavailable");
+    assert.equal(passing.reason, "missing-unstated-field");
+    assert.equal(calls.length, 2);
+    const falseRejection = await codeReview(harness, reviewer, "record", { findings: [{
+      id: "retain-default-not-normalized", kind: "behavior", ...ref(worker, 3),
+      observation: "Explicit and omitted fields took different paths.",
+      issue: "Treat absence as an explicit empty list for identity.",
+      fix: "Normalize the default before checking identity.",
+      evidence: [{ ...ref(worker, 3), relation: "supports" }],
+      violation: { type: "requirement", expected: "An error index of zero.", actual: "An error index of one.",
+        requirement: ref(goal, 3), reproduction: ambiguous.id },
+    }] });
+    assert.match(falseRejection.errors[0].reason, /探索复现不能用于退回/u);
+    assert.deepEqual(falseRejection.progress.findingIds, []);
+    await codeReview(harness, reviewer, "record", { ...verified, findingsDone: true });
+    assert.equal((await codeReview(harness, reviewer, "submit")).phase, "first-audit-ready");
+    const auditor = (await harness.flow("root", "advance")).childId;
+    await prepareReview(harness, auditor);
+    await codeReview(harness, auditor, "record", { ...verified, findingsDone: true });
+    assert.equal((await codeReview(harness, auditor, "submit")).phase, "ledger-review");
+    const saved = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
+    assert.deepEqual(saved.codeReview.findings, []);
+    assert.deepEqual(saved.independentAudit.codeReview.findings, []);
+    assert.notEqual(saved.codeReview.actor, saved.independentAudit.codeReview.actor);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];

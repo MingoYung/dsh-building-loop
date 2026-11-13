@@ -71,3 +71,67 @@ test("exploratory probe quota cannot consume mandatory registered example slots"
   assert.equal(save(registered).outcome, "mismatch");
   assert.equal(reviewProbeRows(frame, active, "current").length, 17);
 });
+
+test("a registered reviewer example binds exact input, owner clause, response and execution status", () => {
+  const { frame, active } = fixture();
+  const requirement = { file: "SPEC.md", start: 8, end: 8, quote: "The designated sample returns ordered entries." };
+  const expected = { order: ["a", "b"], count: 2 };
+  const input = { key: "list", data: ["b", "a"] };
+  const withCases = { codeTask: { ...spec.codeTask, diagnostics: { ...spec.codeTask.diagnostics,
+    inputContracts: [{ id: "sort", recipe: "app-json", examples: [
+      { id: "ordered", input, expectedJson: expected, requirement },
+    ] }],
+  } } };
+  const args = { assertion: "runtime", file: signedFile, exampleId: "sort:example:ordered" };
+  const prepare = (data = {}, clause = requirement) =>
+    reviewProbeRequest({ ...args, ...data }, frame, active, withCases, architecture, clause);
+  const check = prepare();
+  assert.deepEqual(check.input, { recipe: "app-json", stdin: JSON.stringify(input) + "\n" });
+  assert.deepEqual(check.expected, { exitCode: 0, json: expected });
+  assert.deepEqual(check.grounding, { kind: "registered-example", caseId: args.exampleId, exit: true, field: true });
+  assert.throws(() => prepare({ stdin: "{}" }), /固定的配方和输入/u);
+  assert.throws(() => prepare({ expectedJson: "0", expectedPointer: "/requestIndex" }), /已登记示例不一致/u);
+  assert.equal(prepare({}, { ...requirement, quote: "A different clause" }).grounding, undefined);
+  const sameInput = prepare({ exampleId: undefined, recipe: "app-json", expectedExitCode: 0,
+    expectedPointer: "/order", expectedJson: '["a","b"]', stdin: '{"data":["b","a"], "key":"list"}' });
+  assert.deepEqual(sameInput.input, check.input);
+  assert.equal(sameInput.grounding.kind, "registered-example");
+  const otherInput = prepare({ exampleId: undefined, recipe: "app-json", expectedExitCode: 0,
+    expectedPointer: "/count", expectedJson: "0", stdin: JSON.stringify(input) });
+  assert.equal(otherInput.grounding, undefined);
+
+  const proofId = reviewProbeId("current", check);
+  const location = { type: "runtime", file: signedFile, start: 2, end: 3 };
+  const match = saveReviewProbe(frame, active, "current", proofId, check, result(0, JSON.stringify(expected)));
+  assert.equal(match.outcome, "match");
+  assert.throws(() => reviewReproduction(frame, active, "current", proofId, location), /符合预期/u);
+  assert.equal(compareReviewProbe(check, { status: "timeout" }).outcome, "unavailable");
+  assert.equal(compareReviewProbe(check, { status: "execution-timeout" }).outcome, "unavailable");
+  assert.equal(compareReviewProbe(prepare({}, { ...requirement, start: 9, end: 9 }),
+    { status: "execution-timeout", snapshotSha256: "runner-pin" }).outcome, "unavailable");
+  const timed = saveReviewProbe(frame, active, "current", proofId, check,
+    { status: "execution-timeout", snapshotSha256: "runner-pin" });
+  assert.equal(timed.blocking, true);
+  assert.equal(reviewReproduction(frame, active, "current", proofId, location).summary.actual, "运行器确认执行超时");
+});
+
+test("output clauses reject branch alternatives, examples and negated assertions as proof", () => {
+  const { frame, active } = fixture();
+  const prepare = quote => reviewProbeRequest({ assertion: "runtime", file: signedFile, recipe: "app-json",
+    expectedExitCode: 0, expectedPointer: "/size", expectedJson: "5" }, frame, active, spec, architecture, { quote });
+  for (const quote of [
+    "Output field `size` equals 5 or 7.",
+    "For branch A output field `size` equals 5. For branch B output field `size` equals 7.",
+    "The implementation must not return `{\"size\":5}`.",
+    "For example, it returns `{\"size\":5}`.",
+    "Input field `size` equals 5. The command prints one result.",
+    "The command takes `{\"size\":5}` and returns a record.",
+  ]) {
+    const check = prepare(quote);
+    assert.equal(check.grounding, undefined, quote);
+    const probe = saveReviewProbe(frame, active, "current", reviewProbeId("current", check), check, result(0, '{"size":7}'));
+    assert.equal(probe.outcome, "mismatch");
+    assert.equal(probe.blocking, false, quote);
+  }
+  assert.deepEqual(prepare("The command returns `{\"size\":5}`.").grounding, { kind: "clause", field: true, exit: false });
+});

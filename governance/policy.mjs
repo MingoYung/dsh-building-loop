@@ -384,6 +384,13 @@ export function parseAuthority(bytes) {
       calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
     }
     const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases);
+    for (const contract of codeTask?.diagnostics?.inputContracts ?? []) {
+      for (const { requirement } of contract.examples ?? []) {
+        if (requirement && (relativeName(requirement.file) !== requirement.file || !includes(goalContext, requirement.file))) {
+          throw new Error("公开示例的预期条款须指向当前目标授权内的规范路径");
+        }
+      }
+    }
     units[id] = { candidate, claims, continuation, phases, calculations, covers,
       requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
       cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}) };

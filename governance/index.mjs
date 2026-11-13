@@ -26,16 +26,17 @@ import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./
 import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
   currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview, verifyCodeReview } from "./code-review.mjs";
-import { codeDiagnosticsCurrent, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
+import { codeDiagnosticsCurrent, compareInputContract, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
   prepareInputContractBatch, prepareReviewReproduction, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
 import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
+import { inputContractCases, publicInputExamples } from "./input-contracts.mjs";
 import { compareReviewProbe, requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, runtimeExpectation, saveReviewProbe } from "./code-review-probes.mjs";
 import { createStallReproductionProof, DIAGNOSIS_WAIT, observeExecutionDiagnostic, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
-  requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims } from "./engineering-architecture.mjs";
+  requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims, engineeringArchitectureSourceFacts } from "./engineering-architecture.mjs";
 
 export const name = "building-loop-governance";
 export const inject = ["agents", "subagents", "systemPrompt", "tools", "sessionQuery"];
@@ -890,6 +891,10 @@ export function apply(ctx, config = {}) {
       const unit = frame.started?.binding.checkpoint?.unit ?? Object.keys(frame.policy.units).find(id => frame.state.units[id] === current && current);
       const architectureUnit = unit ?? (Object.keys(frame.policy.units).length === 1 ? Object.keys(frame.policy.units)[0] : undefined);
       const architecture = checkpoint ? architectureNext(frame, architectureUnit) : engineeringArchitectureStatus(frame, architectureUnit);
+      if (architecture?.next) {
+        const sourceFacts = engineeringArchitectureSourceFacts(frame, architectureUnit);
+        if (sourceFacts) architecture.sourceFacts = sourceFacts;
+      }
       const phase = assignment?.[1].phase ?? current?.phase ?? "dispatch";
       if(spec)refreshCheckpoints(frame,current,spec);
       if (frame.role === "diagnostician" && current.stallDiagnostic.preparedSerial !== current.serial) {
@@ -954,10 +959,12 @@ export function apply(ctx, config = {}) {
         const diagnostics = spec.codeTask.diagnostics;
         const { reviewRecipes, syntaxRecipe } = diagnostics ?? {};
         const recipeInputs = visibleRecipeInputs(diagnostics, reviewRecipes);
+        const publicExamples = publicInputExamples(diagnostics?.inputContracts);
         if (reviewRecipes?.length) codeReview.reproduction = { action: "probe",
           runtimeRecipes: reviewRecipes.filter(recipe => recipe !== syntaxRecipe), syntax: Boolean(syntaxRecipe),
           ...(recipeInputs ? { recipeInputs } : {}),
-          requirement: "阻塞退回的 runtime 探针带 {file,start,end,quote}，quote 逐字引用支持预期的当前规格。JSON 只核一个字段，例如 expectedPointer:'/error',expectedJson:'\"invalid-input\"'；数值界限可用 expectedOperator:'at-most' 或 'at-least'。",
+          ...(publicExamples.length ? { publicExamples } : {}),
+          requirement: "阻塞退回的 runtime 探针带 {file,start,end,quote}。quote 须明确支持预期字段和值。JSON 只核一个字段，例如 expectedPointer:'/error',expectedJson:'\"invalid-input\"'。登记示例用 exampleId 执行原输入；数值界限可用 expectedOperator:'at-most' 或 'at-least'。",
           architectureExamples: (current.engineeringArchitecture?.examples?.cases ?? []).map(({ id }) => id) };
       } else if(spec&&["reviewer","auditor"].includes(frame.role)) {
         try {
@@ -970,13 +977,18 @@ export function apply(ctx, config = {}) {
         } catch(error) { coverage={pendingRead:true,reason:error.message}; }
       }
       const diagnostic = frame.role === "diagnostician" && reproductionPolicy(frame);
+      const diagnosticExamples = diagnostic ? publicInputExamples(diagnostic.inputContracts) : [];
       const stallDiagnostic = ["executor", "diagnostician"].includes(frame.role) ||
         frame.role === "coordinator" && current?.owner === frame.agent.id ? diagnosisPacket(current, frame.role) : undefined;
       const codeTask = frame.role === "executor" && assignment && current.codeIntake &&
         (phase === "intake" || current.codeIntake.regression) ? prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) : null;
       const codeRepair = codeTask && codeRepairPacket(frame, current);
       const recipeInputs = codeTask && visibleRecipeInputs(reproductionPolicy(frame));
-      if (recipeInputs) codeTask.reproduction = { tool: REPRODUCE, recipeInputs };
+      if (codeTask) {
+        const publicExamples = publicInputExamples(spec.codeTask?.diagnostics?.inputContracts);
+        if (recipeInputs || publicExamples.length) codeTask.reproduction = { tool: REPRODUCE,
+          ...(recipeInputs ? { recipeInputs } : {}), ...(publicExamples.length ? { publicExamples } : {}) };
+      }
       let submission;
       if (frame.role === "executor" && isCodeReviewUnit(frame, current, spec)) {
         try {
@@ -1010,6 +1022,7 @@ export function apply(ctx, config = {}) {
         ...(stallDiagnostic ? { stallDiagnostic } : {}),
         ...(diagnostic ? { reproduction: { recipes: diagnostic.recipes ?? [], syntaxRecipe: diagnostic.syntaxRecipe,
           recipeInputs: visibleRecipeInputs(diagnostic),
+          ...(diagnosticExamples.length ? { publicExamples: diagnosticExamples } : {}),
           behavior: { tool: DIAGNOSTIC_PROBE, action: "probe",
             note: "用实际配方与最小输入。比较输出字段时给 expectedPointer 和该字段的标量或数组 JSON。退出码足以证伪时省略这两项。",
             example: { expectedExitCode: 0, expectedPointer: "/items", expectedJson: "[]",
@@ -1263,9 +1276,9 @@ export function apply(ctx, config = {}) {
         if (frame.role !== "diagnostician") return {};
         const record = context.active.stallDiagnostic;
         if (!sameStallVersion(record, version)) return { stale: true };
-        const comparison = investigation?.expected && compareReviewProbe({ type: "runtime",
-          expected: investigation.expected, requirement: investigation.requirement }, diagnostics);
-        const evidence = { ...observation, result: diagnostics, expected: investigation?.expected, comparison };
+        const comparison = investigation?.expected && (investigation.exampleId ? compareInputContract(investigation, diagnostics)
+          : compareReviewProbe({ type: "runtime", expected: investigation.expected, requirement: investigation.requirement }, diagnostics));
+        const evidence = { ...observation, result: diagnostics, expected: investigation?.expected, exampleId: investigation?.exampleId, comparison };
         const layers = [record.layer, ...STALL_LAYERS.filter(layer => layer !== record.layer)];
         const proof = layers.map(layer => createStallReproductionProof({ ...record, layer }, evidence)).find(Boolean);
         if (!proof) return comparison ? { outcome: comparison.outcome, actual: comparison.actual } : {};
@@ -1308,7 +1321,7 @@ export function apply(ctx, config = {}) {
     const { agent, signal } = exec;
     signal?.throwIfAborted();
     const { file } = coordinates(agent);
-    const { job, recipes, recipeInputs, investigation } = withWorkspaceLock(stateHome, file, () => {
+    const { job, recipes, recipeInputs, investigation, registered } = withWorkspaceLock(stateHome, file, () => {
       const frame = scope(agent, { lockedFile: file, inspection: true });
       const policy = reproductionPolicy(frame);
       if (!policy) throw new Error("仅已登记复现的当前代码执行方或只读诊断方可以运行");
@@ -1316,6 +1329,18 @@ export function apply(ctx, config = {}) {
       const { active, spec } = diagnosticContext(frame);
       if (frame.role === "diagnostician" && active.stallDiagnostic.preparedSerial !== active.serial) {
         throw new Error("先用 prepare 读取本次诊断的版本和配方");
+      }
+      if (args.action === "example" || behavior && args.exampleId !== undefined) {
+        if (Object.keys(args).some(key => !["action", "exampleId"].includes(key))) throw new Error("复现登记示例只填 action 和 exampleId");
+        const registered = inputContractCases(policy.inputContracts).find(row => row.publicExample && row.id === args.exampleId);
+        if (!registered) throw new Error("当前单元未登记该公开输入示例");
+        if (behavior && (frame.role !== "diagnostician" || !registered.requirement)) {
+          throw new Error("行为诊断只接受当前目标已登记条款的公开示例");
+        }
+        if (behavior) requireGoalRead(frame, active);
+        const requirement = behavior ? codeReviewRequirement(frame, active, registered.requirement) : undefined;
+        return { registered, ...(behavior ? { investigation: { expected: registered.expected, requirement, exampleId: registered.id } } : {}),
+          job: prepareCodeReproduction(frame, { action: "probe", ...registered.input }, diagnosticRunner) };
       }
       let investigation;
       if ([expectedExitCode, expectedJson, expectedPointer, expectedOperator, clause].some(value => value !== undefined)) {
@@ -1341,6 +1366,9 @@ export function apply(ctx, config = {}) {
     reproductions.add(agent);
     try {
       const result = await completeDiagnostics(job, exec, investigation);
+      if (registered && !["superseded", "cancelled"].includes(result.status)) {
+        return { ...result, exampleId: registered.id, expected: registered.expected, ...compareInputContract(registered, result) };
+      }
       return args.action === "check" && result.status !== "superseded"
         ? { ...result, recipes, ...(recipeInputs ? { recipeInputs } : {}) } : result;
     } finally {
@@ -2400,7 +2428,10 @@ export function apply(ctx, config = {}) {
       if (batch && !examples?.length) throw new Error("当前架构稿未登记可执行示例");
       const rows = reviewProbeRows(frame, active, binding);
       const jobs = (examples ? examples.map(({ id }) => ({ ...args, exampleId: id })) : [args]).map(input => {
-        const requirement = codeReviewRequirement(frame, active, input.requirement);
+        const registered = input.assertion === "runtime" && input.exampleId !== undefined
+          ? inputContractCases(spec.codeTask.diagnostics?.inputContracts).find(row => row.id === input.exampleId)
+          : undefined;
+        const requirement = codeReviewRequirement(frame, active, input.requirement ?? registered?.requirement);
         const check = reviewProbeRequest(input, frame, active, spec, architecture, requirement);
         const id = reviewProbeId(binding, check);
         const cached = rows.find(row => row.id === id);
@@ -2416,7 +2447,9 @@ export function apply(ctx, config = {}) {
         signal?.throwIfAborted();
         if (cached) { rows.push(cached); continue; }
         const result = await completeDiagnostics(job, exec);
-        if (!result.probe) {
+        const registeredTimeout = result.status === "execution-timeout" && check.type === "runtime" &&
+          check.grounding?.kind === "registered-example";
+        if (!result.probe && !registeredTimeout) {
           if (!batch || result.status === "superseded") return result;
           rows.push({ exampleId: check.exampleId, id, outcome: "unavailable", status: result.status, reason: result.reason,
             ...(result.status === "invalid-input" ? { field: result.field, message: result.message } : {}) });
@@ -2585,15 +2618,17 @@ export function apply(ctx, config = {}) {
       required: ["path", "content"], additionalProperties: false,
     }, description: "在临时目录生成的用例文件，相对路径以 / 分隔" },
   };
-  register(tool(REPRODUCE, "在当前实现的隔离副本上复现。check 只填 action，返回旧回归首错、新增必测及可用配方。probe 用已登记配方及最小数据，返回实际退出码、输出和堆栈。", ["check", "probe"],
-    reproductionInput, reproduce), { when: visible(["executor", "diagnostician"], reproductionPolicy) });
-  register(tool(DIAGNOSTIC_PROBE, "只读行为诊断。在当前隔离副本上执行最小用例，用已读目标条款固定预期。要比较 JSON 时，同时填 expectedPointer 和该字段的标量或数组 JSON。只有实测差异才生成 proofId。", ["probe"], {
+  register(tool(REPRODUCE, "在当前实现的隔离副本上复现。check 只填 action，返回旧回归首错、新增必测及可用配方。example 只填已登记 exampleId，比较真实响应。probe 用已登记配方及最小数据。", ["check", "probe", "example"],
+    { ...reproductionInput, exampleId: { ...string, description: "prepare 返回的公开示例编号" } }, reproduce),
+  { when: visible(["executor", "diagnostician"], reproductionPolicy) });
+  register(tool(DIAGNOSTIC_PROBE, "只读行为诊断。用已读目标条款固定预期。可以用 example 复现当前条款已登记的原样例，也可用 probe 自拟最小输入和可比较预期。只有实测差异才生成 proofId。", ["probe", "example"], {
     ...reproductionInput,
     expectedExitCode: { ...number, minimum: 0, maximum: 4294967295 },
     expectedJson: { ...string, maxLength: 2048, description: "只填选中字段的预期标量或数组 JSON，例如 []" },
     expectedPointer: { ...string, maxLength: 256, description: "例如 /items；根值用空串" },
     requirement: codeReviewProbeRequirement,
-  }, (args, exec) => reproduce(args, exec, true), ["recipe", "expectedExitCode", "requirement"]),
+    exampleId: { ...string, description: "example 使用 prepare 中已登记条款的公开用例编号" },
+  }, (args, exec) => reproduce(args, exec, true)),
   { when: visible(["diagnostician"], reproductionPolicy) });
 
   register(tool(DIAGNOSE, "执行停滞诊断。总控 triage 给 layer 和 reason，然后 advance。只读诊断方用真实复现 proofId、已读源码行、cause 和 fix 提交 submit。发现另一层用 reroute 带该层 proofId 和 cause。总控 verify 给 evidenceId、decision 和 reason。确认后 advance 回原执行会话。", ["triage", "submit", "reroute", "verify"], {
@@ -2629,7 +2664,7 @@ export function apply(ctx, config = {}) {
     note: { ...string, description: "仅 block 填写可核实的阻塞原因。" },
     codeReviewOffset: { type: "integer", minimum: 0, description: "prepare 的变更源码分页位置，默认 0" },
     assertion: { enum: ["architecture", "runtime", "syntax"], description: "probe 的断言类型" },
-    exampleId: { ...string, description: "architecture 可省略，一次复现全部已登记示例，已核实的用缓存" },
+    exampleId: { ...string, description: "runtime 可直接执行 prepare 登记的公开用例，仍须提供目标条款。architecture 省略时复现全部已登记架构示例" },
     file: { ...string, description: "runtime/syntax 定位当前已授权源码" },
     recipe: { ...string, maxLength: 128, description: "runtime 使用当前授权的数据输入配方" },
     stdin: { ...string, maxLength: 8192, description: "runtime 的复现输入" },

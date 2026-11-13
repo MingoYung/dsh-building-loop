@@ -240,8 +240,8 @@ async function startInvestigation(kind, harness, executor) {
   assert.ok(harness.visible(investigator).includes(behaviorProbe));
   assert.ok(!harness.visible("root").includes(behaviorProbe));
   assert.ok(!harness.visible(executor).includes(behaviorProbe));
-  assert.deepEqual(Object.keys(harness.schema(reproduction).properties), ["action", "recipe", "args", "stdin", "files"]);
-  assert.deepEqual(harness.schema(behaviorProbe).required, ["action", "recipe", "expectedExitCode", "requirement"]);
+  assert.deepEqual(Object.keys(harness.schema(reproduction).properties), ["action", "recipe", "args", "stdin", "files", "exampleId"]);
+  assert.deepEqual(harness.schema(behaviorProbe).properties.action.enum, ["probe", "example"]);
   assert.ok(!harness.visible(investigator).includes("building_loop_code_review"));
   for (const name of ["pwsh", "read", "glob", "search", "write", "grep", "terminal"]) {
     assert.match(harness.guard(investigator, name), /禁止直接调用/u);

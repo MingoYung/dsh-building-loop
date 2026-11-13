@@ -243,7 +243,10 @@ function syntaxProof({ artifacts, recipe, syntaxRecipe, input, result, sourceLin
   return { kind: status, path, line, fileSha256: source.sha256, exitCode: result.probe.exitCode };
 }
 
-function behaviorProof({ expected, comparison, result }) {
+function behaviorProof({ expected, exampleId, comparison, result }) {
+  if (expected && safeId(exampleId) && comparison?.outcome === "mismatch" && result.status === "execution-timeout") {
+    return { kind: "execution-timeout", exampleId, expectedExitCode: expected.exitCode };
+  }
   if (!expected || comparison?.outcome !== "mismatch" || !["passed", "failed"].includes(result.status) ||
     !result.probe || !Number.isSafeInteger(result.probe.exitCode) || result.probe.truncated ||
     !Number.isSafeInteger(expected.exitCode) || comparison.actual?.exitCode !== result.probe.exitCode) return undefined;

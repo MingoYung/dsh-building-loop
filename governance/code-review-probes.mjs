@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import { inputContractCases } from "./input-contracts.mjs";
 import { digest, includes, keyOf, relativeName } from "./policy.mjs";
 
 function expectedOutput(value) {
@@ -41,6 +42,7 @@ export function runtimeExpectation({ expectedExitCode, expectedJson, expectedPoi
 
 const clauseLiterals = requirement => new Set(requirement.quote.match(/[\p{L}\p{N}_]+(?:[-.][\p{L}\p{N}_]+)*/gu));
 const pointerSegments = pointer => pointer.split("/").slice(1).map(token => token.replace(/~1/gu, "/").replace(/~0/gu, "~"));
+const regexLiteral = value => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 function projectedOutput(value, pointer) {
   for (const field of pointerSegments(pointer)) {
@@ -49,6 +51,81 @@ function projectedOutput(value, pointer) {
     value = value[field];
   }
   return value;
+}
+
+function matchesValue(actual, { json, operator }) {
+  if (operator === "at-most") return Number.isFinite(actual) && actual <= json;
+  if (operator === "at-least") return Number.isFinite(actual) && actual >= json;
+  return isDeepStrictEqual(actual, json);
+}
+
+function hasExpectedValue(actual, expected) {
+  const projected = expected.pointer === undefined ? actual : projectedOutput(actual, expected.pointer);
+  return projected !== undefined && matchesValue(projected, expected);
+}
+
+function namesExitCode(quote, exitCode) {
+  const explicit = [...quote.matchAll(/(?:\b(?:exit|return)\s+(?:code|status)|退出码|退出状态)\s*(?:为|是|is|=|[:：])?\s*\x60?(\d+)\x60?(?!\d)/giu)];
+  if (explicit.length) return explicit.every(match => Number(match[1]) === exitCode);
+  return exitCode === 0 && /(?:正常退出|\b(?:exits? normally|normal exit)\b)/iu.test(quote);
+}
+
+/** Compare literal, output-specific assertions. A token elsewhere in the
+ * clause can describe the input, another branch or an unrelated number. */
+function clauseGrounding(requirement, expected) {
+  if (!requirement) return;
+  const { quote } = requirement;
+  if (/(?:不得|不能|不会|禁止|除非|例如|比如|示例|反例|否则|或者|\b(?:not|never|unless|example|e\.g\.|otherwise|or)\b)/iu.test(quote)) return;
+  const exit = namesExitCode(quote, expected.exitCode);
+  if (!Object.hasOwn(expected, "json")) return exit ? { kind: "clause", exit: true } : undefined;
+  const inline = [...quote.matchAll(/(?:\b(?:returns?|outputs?|responds?\s+with)\s+(?:exactly\s+)?|返回\s*|输出\s*|响应(?:为|是)\s*)\x60([^\x60\r\n]+)\x60/giu)].flatMap(([, value]) => {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed !== null && typeof parsed === "object" ? [parsed] : [];
+    } catch { return []; }
+  });
+  if (inline.length && inline.every(value => hasExpectedValue(value, expected))) {
+    return { kind: "clause", field: true, exit };
+  }
+  const segments = pointerSegments(expected.pointer);
+  // A leaf name does not establish the location of a nested JSON value.
+  if (segments.length !== 1) return;
+  const field = segments[0];
+  if (/^(?:error|(?:error[_-]?)?code)$/iu.test(field) && typeof expected.json === "string" && !expected.operator) {
+    const returned = [...quote.matchAll(/(?:\breturns?\s+|返回\s*|报(?:错|出)?\s*)\x60([a-z0-9]+(?:[-_][a-z0-9]+)+)\x60/giu)];
+    if (returned.length && returned.every(([, code]) => code === expected.json)) {
+      return { kind: "clause", field: true, exit };
+    }
+  }
+  const operators = expected.operator === "at-most" ? "(?:at most|<=|≤|至多|不超过|上限(?:为|是)?)"
+    : expected.operator === "at-least" ? "(?:at least|>=|≥|至少|不小于|下限(?:为|是)?)" : "(?:equals?|为|是|=)";
+  const namedField = "(?:响应|输出|返回(?:值|的)?|\\b(?:response|output))\\s*(?:(?:字段|field)\\s*)?\\x60" +
+    regexLiteral(field) + "\\x60";
+  const mentions = [...quote.matchAll(new RegExp(namedField, "giu"))];
+  if (mentions.length !== 1) return;
+  const literal = regexLiteral(JSON.stringify(expected.json));
+  const namedValue = new RegExp("^\\s*(?:is\\s+)?" + operators + "\\s*(?:\\x60" + literal +
+    "\\x60|" + literal + "(?=$|[\\s,，;；:：!?！？。]|\\.(?![\\p{L}\\p{N}_.-])))", "iu");
+  const [{ 0: mention, index }] = mentions;
+  if (namedValue.test(quote.slice(index + mention.length))) return { kind: "clause", field: true, exit };
+}
+
+function sameRegisteredClause(requirement, registered) {
+  return !!requirement && !!registered && keyOf(requirement.file) === keyOf(registered.file) &&
+    requirement.start === registered.start && requirement.end === registered.end && requirement.quote === registered.quote;
+}
+
+function registeredGrounding(requirement, registered, expected) {
+  if (sameRegisteredClause(requirement, registered.requirement)) {
+    return { kind: "registered-example", caseId: registered.id, exit: true, field: true };
+  }
+  if (!registered.requirement && expected.pointer !== undefined) return clauseGrounding(requirement, expected);
+}
+
+function parseRegisteredInput(stdin) {
+  if (typeof stdin !== "string") return;
+  try { return { json: JSON.parse(stdin) }; }
+  catch { return undefined; }
 }
 
 /** The maintainer approves recipes. Models only supply data, and the
@@ -70,7 +147,9 @@ export function reviewProbeRequest(args, frame, active, spec, architecture, requ
       expected: { exitCode: example.expectedExitCode,
         ...(Object.hasOwn(example, "expectedJson") ? { json: example.expectedJson } : {}) } };
   }
-  if (!["runtime", "syntax"].includes(assertion) || exampleId !== undefined) throw new Error("复核断言类型无效");
+  if (!["runtime", "syntax"].includes(assertion) || assertion === "syntax" && exampleId !== undefined) {
+    throw new Error("复核断言类型无效");
+  }
   const source = relativeName(file);
   if (!includes(frame.reads, source) || !spec.codeTask.sources.includes(source) ||
     !active.codeIntake.qualification?.artifacts.some(row => row.path === source && row.sha256)) {
@@ -82,13 +161,47 @@ export function reviewProbeRequest(args, frame, active, spec, architecture, requ
     }
     return { type: assertion, file: source, input: { recipe: syntaxRecipe, args: [source] }, expected: { exitCode: 0 } };
   }
+  if (exampleId !== undefined) {
+    const registered = inputContractCases(spec.codeTask.diagnostics?.inputContracts).find(row => row.publicExample && row.id === exampleId);
+    if (!registered || !reviewRecipes?.includes(registered.input.recipe) || registered.input.recipe === syntaxRecipe) {
+      throw new Error("该行为复核示例未获授权");
+    }
+    if (recipe !== undefined || stdin !== undefined) throw new Error("登记示例使用已固定的配方和输入，请省略 recipe 和 stdin");
+    if (expectedExitCode !== undefined && expectedExitCode !== registered.expected.exitCode) {
+      throw new Error("预期退出码与已登记示例不一致");
+    }
+    const { exitCode, json } = registered.expected;
+    const supplied = [expectedJson, expectedPointer, expectedOperator].some(value => value !== undefined);
+    const expected = supplied ? runtimeExpectation({ ...args, expectedExitCode: exitCode }) : registered.expected;
+    if (!Object.hasOwn(expected, "json") || !hasExpectedValue(json, expected)) {
+      throw new Error("预期 JSON 或所选字段与已登记示例不一致");
+    }
+    const grounding = registeredGrounding(requirement, registered, expected);
+    return { type: assertion, file: source, input: registered.input, expected, contractCase: exampleId,
+      ...(requirement ? { requirement } : {}), ...(grounding ? { grounding } : {}) };
+  }
   if (!reviewRecipes?.includes(recipe) || recipe === syntaxRecipe) throw new Error("该行为复核配方未获授权");
   if (!Number.isSafeInteger(expectedExitCode) || expectedExitCode < 0 || expectedExitCode > 0xffffffff) {
     throw new Error("行为复核须先提供预期退出码 expectedExitCode");
   }
   const expected = runtimeExpectation(args, requirement);
-  return { type: assertion, file: source, input: { recipe, ...(stdin === undefined ? {} : { stdin }) }, expected,
-    ...(requirement ? { requirement } : {}) };
+  const input = { recipe, ...(stdin === undefined ? {} : { stdin }) };
+  const structuredInput = parseRegisteredInput(stdin);
+  // The recipe receives the bytes approved in the contract. JSON object order
+  // and whitespace cannot make a caller accidentally run a different example.
+  const candidates = structuredInput && requirement
+    ? inputContractCases(spec.codeTask.diagnostics?.inputContracts).filter(row =>
+      row.input.recipe === recipe && isDeepStrictEqual(structuredInput, parseRegisteredInput(row.input.stdin))) : [];
+  const exact = candidates.find(row => sameRegisteredClause(requirement, row.requirement)) ?? candidates[0];
+  const consistent = exact && exact.expected.exitCode === expected.exitCode &&
+    (!Object.hasOwn(expected, "json") || hasExpectedValue(exact.expected.json, expected));
+  // The project contract has priority over a model's proposed expectation for
+  // the same input. An unrelated clause or a different expected response is advisory.
+  const grounding = exact ? consistent && registeredGrounding(requirement, exact, expected)
+    : clauseGrounding(requirement, expected);
+  return { type: assertion, file: source, expected,
+    ...(consistent && grounding?.kind === "registered-example" ? { input: exact.input, contractCase: exact.id } : { input }),
+    ...(requirement ? { requirement } : {}), ...(grounding ? { grounding } : {}) };
 }
 
 export function reviewProbeId(binding, check) {
@@ -97,6 +210,10 @@ export function reviewProbeId(binding, check) {
 
 /** An unavailable runner or clipped relevant output provides no verdict. */
 export function compareReviewProbe(check, result) {
+  if (check.type === "runtime" && check.grounding?.kind === "registered-example" &&
+    result.status === "execution-timeout" && result.snapshotSha256) {
+    return { outcome: "mismatch", actual: { status: "execution-timeout" } };
+  }
   if (!["passed", "failed"].includes(result.status) || !result.probe) return { outcome: "unavailable" };
   const { exitCode, stdout, truncated } = result.probe;
   const actual = { exitCode };
@@ -119,13 +236,14 @@ export function compareReviewProbe(check, result) {
       const output = JSON.parse(stdout);
       const projected = pointer === undefined ? output : projectedOutput(output, pointer);
       if (projected === undefined) {
-        const field = pointerSegments(pointer).at(-1);
-        if (check.requirement && !clauseLiterals(check.requirement).has(field)) return { outcome: "unavailable", reason: "missing-unstated-field" };
+        const field = pointer === undefined ? undefined : pointerSegments(pointer).at(-1);
+        if (check.requirement && !check.grounding?.field && !clauseLiterals(check.requirement).has(field)) {
+          return { outcome: "unavailable", reason: "missing-unstated-field" };
+        }
         actual.output = "missing-field";
       } else actual.json = projected;
     } catch { actual.output = "invalid-json"; }
-    match = Object.hasOwn(actual, "json") && (operator === "at-most" ? Number.isFinite(actual.json) && actual.json <= json :
-      operator === "at-least" ? Number.isFinite(actual.json) && actual.json >= json : isDeepStrictEqual(actual.json, json));
+    match = Object.hasOwn(actual, "json") && matchesValue(actual.json, { json, operator });
   }
   return { outcome: match ? "match" : "mismatch", actual };
 }
@@ -152,18 +270,51 @@ export function saveReviewProbe(frame, active, binding, id, check, result) {
   const { outcome, actual } = resultRow;
   const pin = value => ({ exitCode: value.exitCode,
     ...(value.line ? { line: value.line } : {}),
+    ...(value.status ? { status: value.status } : {}),
     ...(Object.hasOwn(value, "json") ? { jsonSha256: digest(JSON.stringify(value.json)) } : {}),
     ...(value.output ? { output: value.output } : {}) });
   // Keep potentially sensitive candidate stdout inside the current role's
   // tool response. The coordinator-visible receipt stores only its pin.
+  // A JSON assertion cannot prove an unstated exit-code expectation. Record
+  // that mismatch as an observation even if the clause establishes a field.
+  const blocking = check.type !== "runtime" || !!(outcome === "mismatch" && (actual.status === "execution-timeout" ||
+    (actual.exitCode !== expected.exitCode ? check.grounding?.exit : check.grounding?.field)));
+  const summary = blocking && check.type === "runtime" ? runtimeProofSummary(expected, actual, pin(actual)) : undefined;
   const entry = { id, ...location, recipe: input.recipe, expected: pin(expected), outcome, actual: pin(actual),
     snapshotSha256: result.snapshotSha256, inputSha256: digest(JSON.stringify(input)),
-    ...(location.requirement && outcome === "mismatch" ? { replay: { input, expected } } : {}) };
+    ...(check.type === "runtime" ? { blocking, ...(!blocking && outcome === "mismatch"
+      ? { reason: "expectation-not-established-by-clause" } : {}) } : {}),
+    ...(location.requirement && outcome === "mismatch" && blocking ? { replay: { input, expected }, summary } : {}) };
   requireReviewProbeCapacity(rows, id, check.type);
   active.codeReviewProbes = { actor: frame.agent.id, serial: active.serial, binding,
     rows: [...rows.filter(row => row.id !== id), entry] };
   frame.changed = true;
   return { ...entry, actual };
+}
+
+/** Keep runtime findings tied to host observations while avoiding disclosure
+ * of arbitrary stdout in the persisted review receipt. */
+function runtimeProofSummary(expected, actual, pin) {
+  const { exitCode, pointer, operator } = expected;
+  if (actual.status === "execution-timeout") {
+    return { expected: "登记示例应在运行器执行限时内返回，退出码 " + exitCode, actual: "运行器确认执行超时" };
+  }
+  if (actual.exitCode !== exitCode || !Object.hasOwn(expected, "json")) {
+    return { expected: "退出码 " + exitCode, actual: "实际退出码 " + actual.exitCode };
+  }
+  const target = pointer ? "JSON 字段 " + pointer : "完整 JSON 响应";
+  const expectation = JSON.stringify(expected.json);
+  const format = value => value.length <= 180 ? value : "SHA-256 " + digest(value);
+  const relation = operator === "at-most" ? " ≤ " : operator === "at-least" ? " ≥ " : " = ";
+  const observed = actual.output === "missing-field" ? "缺少字段" : actual.output === "invalid-json" ? "输出无法解析为 JSON"
+    : typeof actual.json === "number" || typeof actual.json === "boolean" || actual.json === null ? String(actual.json)
+      : "值摘要 SHA-256 " + pin.jsonSha256;
+  return { expected: target + relation + format(expectation), actual: target + " 实测 " + observed };
+}
+
+export function isGroundedRuntimeProof(proof) {
+  return proof?.type === "runtime" && proof.outcome === "mismatch" && proof.blocking === true &&
+    !!proof.requirement && !!proof.grounding && !!proof.replay && !!proof.summary;
 }
 
 /** A proof can only support a finding by this actor for the bound bytes. */
@@ -173,8 +324,8 @@ export function reviewReproduction(frame, active, binding, id, location) {
     throw new Error("复现证明不属于当前角色、签名版本或发现位置");
   }
   if (proof.outcome !== "mismatch") throw new Error("实际运行符合预期，不能将该复现作为退回理由");
-  if (proof.type === "runtime" && (!proof.requirement || !proof.replay)) {
-    throw new Error("探索复现不能用于退回。先用已读条款原文和可观察预期重新执行 runtime probe");
+  if (proof.type === "runtime" && !isGroundedRuntimeProof(proof)) {
+    throw new Error("探索复现不能用于退回。使用明确约定该输出的当前条款或绑定条款的已登记示例，重跑实际复现");
   }
   if (proof.actual.line && (location.start > proof.actual.line || location.end < proof.actual.line) ||
     proof.exampleId && (location.end < proof.start || location.start > proof.end)) {
