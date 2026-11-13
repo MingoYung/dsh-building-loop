@@ -166,9 +166,10 @@ export function reviewProbeRequest(args, frame, active, spec, architecture, requ
     }
     const example = architecture?.examples?.cases.find(row => row.id === exampleId);
     if (!example) throw new Error("当前架构稿没有该可执行示例");
+    const owner = spec.architecture?.ownerExamples?.find(row => row.id === exampleId);
     return { type: assertion, exampleId, file: architecture.file, start: architecture.examples.start, end: architecture.examples.end,
-      input: { recipe: example.recipe, ...(example.stdin === undefined ? {} : { stdin: example.stdin }) },
-      expected: { exitCode: example.expectedExitCode,
+      input: owner?.input ?? { recipe: example.recipe, ...(example.stdin === undefined ? {} : { stdin: example.stdin }) },
+      expected: owner?.expected ?? { exitCode: example.expectedExitCode,
         ...(Object.hasOwn(example, "expectedJson") ? { json: example.expectedJson } : {}) } };
   }
   if (!["runtime", "syntax"].includes(assertion) || assertion === "syntax" && exampleId !== undefined) {

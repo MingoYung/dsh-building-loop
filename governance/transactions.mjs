@@ -106,7 +106,10 @@ export function withWorkspaceLock(home, file, operation, warnCleanup) {
   const lock = path.join(home, file + ".lock");
   observeLock(lock, () => retireLock(lock));
   const occupied = () => observeLock(lock, () => fs.lstatSync(lock, { throwIfNoEntry: false }));
-  const staged = fs.mkdtempSync(path.join(home, file + ".claim-"));
+  // Windows mkdtemp needs an explicit extended-length path. Keep the normal
+  // sibling path for owner creation, publication and cleanup of this claim.
+  const prefix = path.join(home, file + ".claim-");
+  const staged = path.join(path.dirname(prefix), path.basename(fs.mkdtempSync(path.toNamespacedPath(prefix))));
   const owner = "owner-" + process.pid + "-" + randomUUID();
   let acquired = false;
   try {

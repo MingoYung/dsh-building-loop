@@ -516,8 +516,9 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
   const pendingCodeRepair = active?.phase === "diagnosis-repair-ready" ||
     active?.phase === "blocked" && ["intake", "supplement"].includes(active.resumePhase) || resumeExecution;
   const locked = source && !pendingCodeRepair && inspectLockedRollbackScope(frame, spec, active, source);
-  const draftSpec = locked && !locked.match ? { ...spec.architecture, rollback: undefined } : spec.architecture;
-  let plan = architectureDocument(frame, draftSpec, diagnostics);
+  let plan = architectureDocument(frame, spec.architecture, diagnostics, { skipRollback: locked && !locked.match });
+  if (plan.goalCoverage?.issues.length) return { unit, phase: active?.phase ?? "dispatch", status: "goal-coverage-required",
+    goalCoverage: plan.goalCoverage, next: { action: "architecture", unit } };
   const qualification = active?.codeIntake?.qualification;
   const previous = frame.state.engineeringArchitecture?.[keyOf(plan.file)];
   if (previous?.goalSha256 !== goal.sha256 && previous?.contentsSha256 === plan.contentsSha256) {
@@ -614,7 +615,9 @@ export function engineeringArchitectureCurrent(frame, spec, snapshot, active, ch
     const plan = architectureDocument(frame, spec.architecture, spec.codeTask.diagnostics);
     // Rebuild the typed data from the exact document before any runner uses the
     // stored examples. The validated data must still be that revision's data.
-    if (plan.sha256 !== snapshot.sha256 || JSON.stringify(plan.examples) !== JSON.stringify(snapshot.examples)) return false;
+    if (plan.sha256 !== snapshot.sha256 || JSON.stringify(plan.examples) !== JSON.stringify(snapshot.examples) ||
+      plan.goalCoverage && (plan.goalCoverage.issues.length ||
+        JSON.stringify(plan.goalCoverage.pins) !== JSON.stringify(snapshot.goalCoverage?.pins))) return false;
     if (!checkImports) return true;
     if (spec.architecture.rollback && active?.codeIntake?.qualification) {
       const signed = requireCodeRegressionCurrent(frame, snapshot.unit, active, spec, goalSnapshot(frame));
@@ -650,6 +653,8 @@ export function engineeringArchitectureStatus(frame, unit) {
   const generatedHeadings = generatedArchitectureHeadings(spec.architecture, active);
   const contract = { file, headings, editableHeadings: headings.filter(heading => !generatedHeadings.includes(heading)),
     generatedHeadings, ...(examplesHeading ? { examplesHeading } : {}), ...(importsHeading ? { importsHeading } : {}),
+    ...(spec.architecture.ownerExamples ? { ownerExamples: spec.architecture.ownerExamples.map(({ id, expected, requirement }) =>
+      ({ id, expectedExitCode: expected.exitCode, expectedJson: expected.json, requirement })) } : {}),
     ...(responsibilitiesHeading ? { responsibilitiesHeading, generated: "关键职责由宿主生成，请保留该章节及原文。其他章节用职责编号引用，说明计划和验证方式。" +
       (spec.architecture.proseReview ? "引用用 [显示文字](#bl-fact-职责编号)。" : "不要另写一份当前判定位置。"),
       responsibilityIds: spec.architecture.responsibilities.map(({ id }) => id) } : {}) };
@@ -679,6 +684,15 @@ export function engineeringArchitectureStatus(frame, unit) {
   if (issues.length) {
     return { ...contract, status: "broken-links", issues, edit: architectureLinkRepairAction(file, issues[0]),
       ...(active?.phase === "architecture-repair" ? { receipt: active.receipt } : {}), next: { action: "architecture", unit } };
+  }
+  if (spec.architecture.goalCoverage) {
+    try {
+      const plan = architectureDocument(frame, spec.architecture, spec.codeTask.diagnostics, { skipRollback: true });
+      if (plan.goalCoverage.issues.length) return { ...contract, status: "goal-coverage-required", goalCoverage: plan.goalCoverage,
+        next: { action: "architecture", unit } };
+    } catch (error) {
+      return { ...contract, status: "required", reason: error.message, next: { action: "architecture", unit } };
+    }
   }
   if (active?.phase === "architecture-repair") {
     return { ...contract, status: "repair", receipt: active.receipt, next: { action: "architecture", unit } };

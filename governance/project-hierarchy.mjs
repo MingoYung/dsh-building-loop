@@ -1,7 +1,9 @@
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import parser from "./vendor/markdown-parser.cjs";
 import { digest, equal, hierarchyBodyPath, includes, keyOf, readBytes, relativeName, replaceWithHistory } from "./policy.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
+import { responsibilityClause } from "./architecture-responsibilities.mjs";
 import { parseArchitectureRollbackFence } from "./architecture-rollback.mjs";
 
 const { fromMarkdown, gfmFootnoteFromMarkdown, gfmFootnote } = parser;
@@ -49,6 +51,12 @@ function localTarget(file, url) {
   } catch { return undefined; }
 }
 
+function hasLinkContext(node) {
+  if (["link", "linkReference", "html"].includes(node.type)) return false;
+  if (node.type === "text" || node.type === "inlineCode") return /[\p{L}\p{N}]/u.test(node.value);
+  return node.children?.some(hasLinkContext) ?? false;
+}
+
 function document(file, source) {
   const root = fromMarkdown(source, options);
   const { visible: visibility, htmlHidden } = markdownStructure(source.replace(/^\uFEFF/u, "").split(/\r\n|\n|\r/u));
@@ -60,16 +68,20 @@ function document(file, source) {
   const definitions = new Map();
   for (const node of root.children) if (node.type === "definition" && !definitions.has(node.identifier)) definitions.set(node.identifier, node.url);
   const links = [];
-  const pending = root.children.slice().reverse();
+  const pending = root.children.slice().reverse().map(node => ({ node }));
   while (pending.length) {
-    const node = pending.pop();
+    const { node, paragraph } = pending.pop();
     if (["html", "code", "blockquote", "footnoteDefinition"].includes(node.type)) continue;
     if ((node.type === "link" || node.type === "linkReference") && visible(node)) {
       const url = node.type === "link" ? node.url : definitions.get(node.identifier);
       const target = url && localTarget(file, url);
-      if (target) links.push({ target, start: node.position.start.offset });
+      // A reference attached to authored prose is distinct from a bare link list.
+      const explained = paragraph && hasLinkContext(paragraph);
+      if (target) links.push({ target, start: node.position.start.offset, url, label: headingText(node),
+        from: node.position.start.line, to: node.position.end.line, explained });
     }
-    if (node.children) pending.push(...node.children.slice().reverse());
+    if (node.children) pending.push(...node.children.slice().reverse().map(child => ({ node: child,
+      paragraph: node.type === "paragraph" ? node : paragraph })));
   }
   return { file, source, headings, links, htmlHidden };
 }
@@ -89,6 +101,44 @@ function routeExists(doc, anchor, target) {
     throw new Error(`导航文件 ${doc.file} 中的 ${target} 须唯一且位于「${anchor.title}」章节`);
   }
   return true;
+}
+
+/** Resolve the same visible, current goal sentence used by responsibility proofs. */
+export function currentArchitectureExampleClause(frame, requirement) {
+  return responsibilityClause(frame, { requirement });
+}
+
+function goalCoverage(frame, spec, doc, sections) {
+  const issues = [], pins = [];
+  const clauses = new Map();
+  const protectedTitles = [spec.importsHeading, spec.responsibilitiesHeading, spec.examplesHeading,
+    spec.rollback?.lockedScope && spec.rollback.heading].filter(Boolean);
+  const protectedSections = protectedTitles.filter(title => doc.headings.some(item => item.title === title))
+    .map(title => section(doc, title));
+  for (const { heading, examples } of spec.goalCoverage) {
+    const { start, end } = sections.find(row => row.heading === heading);
+    const bounds = section(doc, heading);
+    for (const { id, requirement } of examples) {
+      const file = requirement.file;
+      const first = requirement.start, last = requirement.end;
+      const fragment = first === last ? `#L${first}` : `#L${first}-L${last}`;
+      const target = path.posix.relative(path.posix.dirname(doc.file), file).split("/").map(encodeURIComponent).join("/");
+      const reference = `[${id}](${target}${fragment})`;
+      if (!clauses.has(id)) clauses.set(id, currentArchitectureExampleClause(frame, requirement));
+      const clause = clauses.get(id);
+      // A copied label cannot count when it points to the wrong file or line.
+      // Markdown code, quotations, definitions and protected sections are not authored links.
+      const link = clause && doc.links.find(link => link.start >= bounds.end && link.start < bounds.stop && link.explained &&
+        !protectedSections.some(item => item.start <= link.start && link.start < item.stop) &&
+        link.label === id && keyOf(link.target) === keyOf(file) && link.url.endsWith(fragment) &&
+        !link.url.slice(0, -fragment.length).includes("?") && !link.url.slice(0, -fragment.length).includes("#") &&
+        !doc.htmlHidden.slice(link.from - 1, link.to).some(Boolean));
+      if (link) pins.push({ heading, exampleId: id, clause, line: link.from });
+      else issues.push({ heading, start, end, exampleId: id, reason: clause ? "missing-reference" : "stale-owner-clause",
+        reference, requirement: { file, start: first, end: last } });
+    }
+  }
+  return { issues, pins };
 }
 
 function addRoute(doc, anchor, target, label) {
@@ -117,7 +167,7 @@ const exampleBytes = 16 * 1024;
 
 /** Parse the exact visible Markdown fence as data. The runner, its executable,
  * arguments and mounts come from the maintainer's recipe, never this file. */
-function architectureExamples(nodes, content, heading, firstLine, diagnostics) {
+function architectureExamples(frame, nodes, content, heading, firstLine, diagnostics, ownerExamples) {
   const fence = nodes[0];
   const invalid = message => new Error("架构示例「" + heading + "」" + message);
   if (nodes.length !== 1 || fence.type !== "code" || fence.lang !== "json" || fence.meta !== null) {
@@ -138,31 +188,49 @@ function architectureExamples(nodes, content, heading, firstLine, diagnostics) {
   } catch {
     throw invalid("须提供有效且有界的 JSON 数据");
   }
-  if (!Array.isArray(cases) || !cases.length || cases.length > 8) throw invalid("须包含 1 至 8 条自包含输入与预期结果");
+  if (!Array.isArray(cases) || !cases.length || cases.length > 8) throw invalid("须包含 1 至 8 条示例与预期结果");
   const ids = new Set();
+  const ownerCases = new Map(ownerExamples?.map(example => [example.id, example]));
   for (const row of cases) {
     if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).some(key => !exampleKeys.has(key)) ||
-      typeof row.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u.test(row.id) || ids.has(row.id) ||
+      typeof row.id !== "string" || (!ownerCases.has(row.id) && !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u.test(row.id)) || ids.has(row.id) ||
       !Number.isSafeInteger(row.expectedExitCode) || row.expectedExitCode < 0 || row.expectedExitCode > 0xffffffff) {
       throw invalid("须使用唯一 ID 和明确退出码，且不得包含未登记字段");
     }
-    if (typeof row.recipe !== "string" || row.recipe === diagnostics?.syntaxRecipe ||
-      !diagnostics?.reviewRecipes?.includes(row.recipe)) throw invalid("引用未授权的运行配方");
-    if (row.stdin !== undefined && (typeof row.stdin !== "string" || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(row.stdin) ||
-      Buffer.byteLength(row.stdin) > 8 * 1024)) throw invalid("stdin 须为不超过 8 KiB 的受限 UTF-8 文本");
     if (Object.hasOwn(row, "expectedJson") && Buffer.byteLength(JSON.stringify(row.expectedJson)) > 2048) {
       throw invalid("预期 JSON 最多 2 KiB");
     }
+    const owner = ownerCases.get(row.id);
+    // A matching run of an author-selected expectation is not an owner check.
+    // Owner cases reuse the registered input; the document can only assert the result.
+    if (owner) {
+      if (Object.hasOwn(row, "recipe") || Object.hasOwn(row, "stdin") || row.expectedExitCode !== owner.expected.exitCode ||
+        !isDeepStrictEqual(row.expectedJson, owner.expected.json)) {
+        throw invalid("与维护者登记的预期结果不一致，或试图覆盖固定输入：" + row.id);
+      }
+    } else {
+      if (typeof row.recipe !== "string" || row.recipe === diagnostics?.syntaxRecipe ||
+        !diagnostics?.reviewRecipes?.includes(row.recipe)) throw invalid("引用未授权的运行配方");
+      if (row.stdin !== undefined && (typeof row.stdin !== "string" || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(row.stdin) ||
+        Buffer.byteLength(row.stdin) > 8 * 1024)) throw invalid("stdin 须为不超过 8 KiB 的受限 UTF-8 文本");
+    }
     ids.add(row.id);
   }
-  const result = { heading, start: firstLine + fence.position.start.line - 1, end: firstLine + fence.position.end.line - 1, cases };
+  const ownerProofs = [...ownerCases].map(([id, { requirement }]) => {
+    if (!ids.has(id)) throw invalid("缺少维护者登记的可执行实证：" + id);
+    const clause = currentArchitectureExampleClause(frame, requirement);
+    if (!clause) throw invalid("维护者登记的目标条款已变化：" + id);
+    return { id, clause };
+  });
+  const result = { heading, start: firstLine + fence.position.start.line - 1, end: firstLine + fence.position.end.line - 1, cases,
+    ...(ownerProofs.length ? { ownerProofs } : {}) };
   if (Buffer.byteLength(JSON.stringify(result)) > exampleBytes) throw invalid("登记结果最多 16 KiB");
   return result;
 }
 
 /** An architecture checkpoint uses the two visible, unique navigation links and
  * substantive Markdown beneath each maintainer-declared heading. */
-export function architectureDocument(frame, spec, diagnostics) {
+export function architectureDocument(frame, spec, diagnostics, { skipRollback = false } = {}) {
   const { file, headings, examplesHeading, rollback: rollbackConfig } = spec;
   const { overview, index } = frame.policy.hierarchy;
   const top = requiredDocument(frame.root, overview.path);
@@ -182,12 +250,13 @@ export function architectureDocument(frame, spec, diagnostics) {
     const anchor = section(doc, title);
     const content = source.slice(anchor.end, anchor.stop);
     const nodes = fromMarkdown(content, options).children;
-    if (title === rollbackConfig?.heading) {
+    if (!skipRollback && title === rollbackConfig?.heading) {
       rollback = parseArchitectureRollbackFence(rollbackConfig, nodes, content,
         source.slice(0, anchor.end).split(/\r\n|\n|\r/u).length, doc.htmlHidden);
     }
     if (title === examplesHeading) {
-      examples = architectureExamples(nodes, content, title, source.slice(0, anchor.end).split(/\r\n|\n|\r/u).length, diagnostics);
+      examples = architectureExamples(frame, nodes, content, title,
+        source.slice(0, anchor.end).split(/\r\n|\n|\r/u).length, diagnostics, spec.ownerExamples);
     }
     const substantive = nodes.filter(node =>
       ["paragraph", "list", "table", "code"].includes(node.type));
@@ -204,6 +273,7 @@ export function architectureDocument(frame, spec, diagnostics) {
       [normalized, rollback.sha256] : normalized;
   });
   return { file, sha256: digest(bytes), headings, sections, contentsSha256: digest(JSON.stringify(bodies)),
+    ...(spec.goalCoverage ? { goalCoverage: goalCoverage(frame, spec, doc, sections) } : {}),
     ...(examples ? { examples } : {}), ...(rollback ? { rollback } : {}) };
 }
 

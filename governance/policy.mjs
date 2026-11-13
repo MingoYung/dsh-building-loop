@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, createPublicKey, randomUUID } from "node:crypto";
-import { parseInputContracts } from "./input-contracts.mjs";
+import { inputContractCases, parseInputContracts, publicInputExamples } from "./input-contracts.mjs";
 import { parseRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
 import { parseArchitectureResponsibilities } from "./architecture-responsibilities.mjs";
 import { parseArchitectureRollback } from "./architecture-rollback.mjs";
@@ -295,6 +295,22 @@ export function authority(root) {
   return parseAuthority(bytes);
 }
 
+function architectureGoalCoverage(value, headings, publicCases) {
+  if (value === undefined) return;
+  const invalid = () => new Error("架构目标覆盖须为独立的人工章节登记唯一且带目标条款的公开示例编号");
+  if (!Array.isArray(value) || !value.length || value.length > headings.length) throw invalid();
+  const seen = new Set();
+  return value.map(row => {
+    object(row, "架构目标覆盖", ["heading", "examples"]);
+    const { heading, examples } = row;
+    if (!headings.includes(heading) || seen.has(heading) || !Array.isArray(examples) || !examples.length ||
+      examples.length > publicCases.size || new Set(examples).size !== examples.length ||
+      examples.some(id => !publicCases.has(id))) throw invalid();
+    seen.add(heading);
+    return { heading, examples: examples.map(id => ({ id, requirement: publicCases.get(id).requirement })) };
+  });
+}
+
 /** 新建授权也通过现有宿主解析器，写入前就检查角色隔离。 */
 export function parseAuthority(bytes) {
   if (bytes.length > 64 * 1024) throw new Error("授权文件超过大小上限");
@@ -467,7 +483,7 @@ export function parseAuthority(bytes) {
   const managedResponsibilitySections = new Map();
   for (const [id, entry] of architectureEntries) {
     object(entry, "架构验收", ["module", "headings", "importsHeading", "examplesHeading", "allowedLocalImports",
-      "responsibilitiesHeading", "responsibilities", "proseReview", "rollback"]);
+      "responsibilitiesHeading", "responsibilities", "proseReview", "rollback", "goalCoverage", "ownerExamples"]);
     const file = hierarchyBodyPath(hierarchy, entry.module, false);
     const unit = units[id];
     const review = [unit.phases["first-review"], unit.phases["final-review"]];
@@ -516,6 +532,21 @@ export function parseAuthority(bytes) {
       !diagnostics?.reviewRecipes?.some(recipe => recipe !== diagnostics.syntaxRecipe))) {
       throw new Error("架构示例须指定一个已登记的人工核验章节，并明确授权第二版诊断中的运行配方");
     }
+    // Only owner cases pinned to this project's authorized goals can drive either architecture gate.
+    const publicCases = new Map((entry.ownerExamples !== undefined || entry.goalCoverage !== undefined
+      ? inputContractCases(diagnostics?.inputContracts) : []).filter(row => row.publicExample && row.requirement &&
+      includes(goalContext, row.requirement.file)).map(row => [row.id, row]));
+    let ownerExamples;
+    if (entry.ownerExamples !== undefined) {
+      const ids = entry.ownerExamples;
+      if (!examplesHeading || !Array.isArray(ids) || !ids.length || ids.length > publicCases.size ||
+        new Set(ids).size !== ids.length || ids.some(id => !publicCases.has(id))) {
+        throw new Error("架构实证须指定已登记的示例章节，并使用唯一且带当前目标条款的公开示例编号");
+      }
+      ownerExamples = ids.map(id => publicCases.get(id));
+    }
+    const goalCoverage = architectureGoalCoverage(entry.goalCoverage, headings.filter(heading => heading !== examplesHeading &&
+      !(rollback?.lockedScope && heading === rollback.heading)), publicCases);
     if (managedImportSections.has(keyOf(file)) && managedImportSections.get(keyOf(file)) !== importsHeading) {
       throw new Error("共用架构稿的工程单元须使用相同的宿主静态导入章节");
     }
@@ -541,7 +572,8 @@ export function parseAuthority(bytes) {
     managedResponsibilitySections.set(keyOf(file), responsibilitiesHeading);
     unit.architecture = { file, headings, ...(importsHeading ? { importsHeading } : {}), ...(examplesHeading ? { examplesHeading } : {}),
       ...(allowedLocalImports ? { allowedLocalImports } : {}), ...(responsibilities ? { responsibilitiesHeading, responsibilities } : {}),
-      ...(entry.proseReview ? { proseReview: true } : {}), ...(rollback ? { rollback } : {}) };
+      ...(entry.proseReview ? { proseReview: true } : {}), ...(rollback ? { rollback } : {}), ...(goalCoverage ? { goalCoverage } : {}),
+      ...(ownerExamples ? { ownerExamples } : {}) };
   }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
 }

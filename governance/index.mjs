@@ -264,6 +264,13 @@ function architectureNext(frame, unit) {
   const register = { tool: WORKFLOW, ...status.next };
   if (status.status === "broken-links") return { ...status, next: status.edit
     ? { tool: FILE, ...status.edit, then: register } : register };
+  if (status.status === "goal-coverage-required") {
+    const issues = status.goalCoverage.issues;
+    const headings = [...new Set(issues.map(({ heading }) => heading))];
+    const editable = includes(frame.writes, status.file) && issues.every(({ reason }) => reason === "missing-reference");
+    return { ...status, next: editable ? { tool: FILE, action: "edit", path: status.file, headings,
+      required: ["heading", "beforeSha256", "note", "newText"], then: register } : register };
+  }
   if (status.next.action === "advance") return { ...status, next: register };
   if (!["required", "repair", "sync"].includes(status.status) || !includes(frame.writes, status.file)) return { ...status, next: register };
   const previous = frame.state.units[unit]?.engineeringArchitecture ?? frame.state.engineeringArchitecture?.[keyOf(status.file)];
@@ -1060,7 +1067,8 @@ export function apply(ctx, config = {}) {
       const spec = assignment && unitOf(frame,assignment[0]);
       const unit = frame.started?.binding.checkpoint?.unit ?? Object.keys(frame.policy.units).find(id => frame.state.units[id] === current && current);
       const architectureUnit = unit ?? (Object.keys(frame.policy.units).length === 1 ? Object.keys(frame.policy.units)[0] : undefined);
-      const architecture = checkpoint ? architectureNext(frame, architectureUnit) : engineeringArchitectureStatus(frame, architectureUnit);
+      const architecture = checkpoint || frame.policy.units[architectureUnit]?.architecture?.goalCoverage
+        ? architectureNext(frame, architectureUnit) : engineeringArchitectureStatus(frame, architectureUnit);
       if (architecture?.next) {
         const sourceFacts = engineeringArchitectureSourceFacts(frame, architectureUnit);
         if (sourceFacts) architecture.sourceFacts = sourceFacts;
@@ -2715,7 +2723,7 @@ export function apply(ctx, config = {}) {
     }, { requestedUnit: args.unit });
     if (setup.result) {
       const result = setup.result;
-      if (result.status === "architecture-broken-links") {
+      if (["architecture-broken-links", "goal-coverage-required"].includes(result.status)) {
         return { ...result, next: architectureNext(scope(exec.agent, { inspection: true }), result.unit)?.next ?? result.next };
       }
       if (result.phase === "dispatch" && ctx.sessionQuery?.observeSession) {

@@ -6,6 +6,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
 import { signedExplicitResponsibilityIssues } from "../governance/architecture-responsibilities.mjs";
+import { compareReviewProbe, reviewProbeRequest } from "../governance/code-review-probes.mjs";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { inspectArchitectureProse } from "../governance/engineering-architecture.mjs";
@@ -59,7 +60,7 @@ test("signed explicit outcome ownership distinguishes a local guard from importe
     assert.deepEqual(check(manifest(), before), []);
   }));
 
-function project(root, write, { importsHeading, examplesHeading, diagnostics, allowedLocalImports,
+function project(root, write, { importsHeading, examplesHeading, ownerExamples, diagnostics, allowedLocalImports,
   responsibilitiesHeading, responsibilities, rollback, goalClause = "预算最多五项。" } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = importsHeading ? [candidate, "limits.py"] : [candidate];
@@ -82,7 +83,7 @@ function project(root, write, { importsHeading, examplesHeading, diagnostics, al
     coordinator: { read: [goal, "INDEX.md", architecture, "first.json", "final.json"], write: [architecture] },
     units: { K01: { candidate, plainLast: false, architecture: {
       module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading,
-      examplesHeading, allowedLocalImports, responsibilitiesHeading, responsibilities, rollback,
+      examplesHeading, ownerExamples, allowedLocalImports, responsibilitiesHeading, responsibilities, rollback,
     },
       codeTask: { sources, tests, diagnostics }, phases: { intake: execute, supplement: execute,
         "first-review": review("first.json"), "final-review": review("final.json") } } } }));
@@ -867,6 +868,40 @@ test("architecture registration pins one bounded fence of explicitly granted exa
   await setPlan(section(fence([{ ...example, stdin: " 4  \n" }])));
   assert.equal((await harness.flow("root", "prepare")).architecture.status, "required");
   assert.notEqual((await harness.flow("root", "architecture")).architecture.contentsSha256, result.architecture.contentsSha256);
+}));
+
+test("owner examples bind current architecture results to the registered clause and fixed execution input", () => fixture(async (root, write) => {
+  const examplesHeading = "可执行验证";
+  const clause = "同一个键重复提交只产生一个结果。";
+  const contract = { id: "replay", recipe: "entry", examples: [{ id: "same-key", input: ["A", "A"],
+    expectedJson: { results: ["A"] }, requirement: { file: goal, start: 3, end: 3, quote: clause } }] };
+  const id = "replay:example:same-key";
+  const diagnostics = { checkSet: "smoke", protocol: 2, recipes: ["entry"], reviewRecipes: ["entry"], inputContracts: [contract] };
+  const { harness } = project(root, write, { examplesHeading, ownerExamples: [id], diagnostics, goalClause: clause });
+  const correct = { id, expectedExitCode: 0, expectedJson: { results: ["A"] } };
+  const wrong = { ...correct, expectedJson: { results: ["A", "A"] } };
+  const heading = plan + "\n## " + examplesHeading + "\n\n";
+  const fence = rows => "~~~json\n" + JSON.stringify(rows) + "\n~~~\n";
+  const publish = async body => {
+    await harness.file("root", "write", architecture, { content: heading + body, note: "Verify the owner contract." });
+    return harness.flow("root", "architecture");
+  };
+  await assert.rejects(publish("Old free text claiming two results.\n"), /一个 json 围栏/u);
+  await assert.rejects(publish(fence([wrong])), /与维护者登记的预期结果不一致/u);
+  await assert.rejects(publish(fence([{ ...correct, recipe: "entry", stdin: '["A"]' }])), /覆盖固定输入/u);
+  await assert.rejects(publish(fence([{ ...correct, id: "author-only", recipe: "entry" }])), /缺少维护者登记/u);
+  const result = await publish(fence([correct]));
+  assert.equal(result.architecture.examples.ownerProofs[0].id, id);
+  assert.equal(result.architecture.examples.ownerProofs[0].clause.file, goal);
+  const { K01 } = authority(root).units;
+  const probe = reviewProbeRequest({ assertion: "architecture", exampleId: id }, {}, {}, K01, result.architecture);
+  assert.deepEqual(probe.input, { recipe: "entry", stdin: '["A","A"]\n' });
+  const observed = expectedJson => ({ status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(expectedJson) } });
+  assert.equal(compareReviewProbe(probe, observed(correct.expectedJson)).outcome, "match");
+  assert.equal(compareReviewProbe(probe, observed(wrong.expectedJson)).outcome, "mismatch");
+  write(goal, fs.readFileSync(path.join(root, goal), "utf8").replace(clause, "当前规则改为保留两个结果。"));
+  assert.equal((await harness.flow("root", "prepare")).architecture.status, "required");
+  await assert.rejects(harness.flow("root", "architecture"), /登记的目标条款已变化/u);
 }));
 
 test("a signed architecture mismatch blocks approval, then both roles verify the corrected example independently", () => fixture(async (root, write) => {
