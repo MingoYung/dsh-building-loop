@@ -1,0 +1,817 @@
+{
+  "method": "Independent Python AST, direct source clauses and isolated runtime on hash-pinned stage artifacts.",
+  "stages": [
+    {
+      "run": "r-Ku113T",
+      "stage": "g1",
+      "phase": "closed",
+      "terminal": "closed",
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "7a60ed773b8a1074f37f82fc05a66f87fcbd3191866ed866ae681919ffa3d35f"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "648b5ff5bb179e5273c3fe8b4b1a8a74964dab0fa4d472a6527d92c49a8cd006"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "cdefbb929bce393505b1ff3e5cbe7ae89ade6df30d6af048cd32798543e2c166"
+        },
+        {
+          "path": "release.py",
+          "sha256": "99d49f02c008f580da11dae6d9ad9cd5428bbda939a7621b5beb789ceb3955cf"
+        }
+      ],
+      "architectureSha256": "6146b162e7e3d6c47d555281e036635dfe5100cab7af95f3a378dd9457b765a0",
+      "ast": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_normalize",
+            "_string_array",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 81
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_emit",
+            "failure",
+            "plan",
+            "topological_order"
+          ],
+          "lineCount": 96
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 38
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 28
+        }
+      },
+      "checks": {
+        "changedPlan": false,
+        "moduleEdges": true,
+        "transportOnlyIo": true
+      },
+      "architectureProse": [
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 5,
+            "text": "- `release.py`（入口，仅传输）：从 stdin 读一次原始文本，交付给 journal 解析；只做 JSON 编解码与输出，不判断业务规则。解析失败输出 `invalid-json`，顶层非对象/缺字段输出 `invalid-request`。所有路径正常退出并打印一个 JSON 对象，不建文件、不联网。"
+          },
+          "kind": "parse-owner",
+          "reason": "The entrypoint parses JSON itself and passes the parsed request directly to planner. journal does not parse the transport.",
+          "source": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "text": "from planner import plan"
+            },
+            {
+              "file": "release.py",
+              "line": 16,
+              "text": "        request = json.load(sys.stdin)"
+            },
+            {
+              "file": "release.py",
+              "line": 22,
+              "text": "        result = plan(request)"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 5,
+            "text": "- `release.py`（入口，仅传输）：从 stdin 读一次原始文本，交付给 journal 解析；只做 JSON 编解码与输出，不判断业务规则。解析失败输出 `invalid-json`，顶层非对象/缺字段输出 `invalid-request`。所有路径正常退出并打印一个 JSON 对象，不建文件、不联网。"
+          },
+          "kind": "invalid-request-owner",
+          "reason": "The structured wrong-root response is returned by planner. Documenting a transport failure propagated by release is valid, but this clause groups root and missing fields under invalid-request. Missing named fields are rejected by policy or journal with their field-specific error codes.",
+          "source": [
+            {
+              "file": "planner.py",
+              "line": 75,
+              "text": "        return failure(\"invalid-request\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 30,
+              "text": "        raise PolicyError(\"invalid-environment\")"
+            },
+            {
+              "file": "journal.py",
+              "line": 49,
+              "text": "        raise JournalError(\"invalid-change\")"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 6,
+            "text": "- `journal.py`（校验/身份/回放）：整单结构与字段类型校验（`environment`/`action`/`budget`/`changes` 各自类型面），生成变更身份、做完全重复记录折叠（id+component+units+依赖集合相等）、识别冲突重复 ID（`conflicting-change`）、校验 `depends_on` 与会话内 `applied` 为字符串数组（`invalid-change`）、校验 `applied` 中 ID 存在（`unknown-dependency`）。"
+          },
+          "kind": "field-guard-owner",
+          "reason": "journal validates change and journal records. Environment, action and budget validation is in policy.",
+          "source": [
+            {
+              "file": "policy.py",
+              "line": 30,
+              "text": "        raise PolicyError(\"invalid-environment\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 33,
+              "text": "        raise PolicyError(\"unsupported-action\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 37,
+              "text": "        raise PolicyError(\"invalid-budget\")"
+            },
+            {
+              "file": "journal.py",
+              "line": 46,
+              "text": "def read_changes(records):"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 7,
+            "text": "- `policy.py`（环境与预算）：判定 environment 合法性与该环境支持的动作（G1 两环境均支持 `plan` 和 `rollback`），非法环境 `invalid-environment`，不支持的动作 `unsupported-action`；预算数值校验 `invalid-budget`，并对 plan 的发出单位总和做 `budget-exceeded` 判定；rollback 只校验不封顶。"
+          },
+          "kind": "budget-decision-owner",
+          "reason": "policy validates/normalizes budget and sets a limit. The emitted-units comparison itself is in planner.",
+          "source": [
+            {
+              "file": "policy.py",
+              "line": 20,
+              "text": "def limit_for(request):"
+            },
+            {
+              "file": "planner.py",
+              "line": 94,
+              "text": "    if units > budget:"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 9,
+            "text": "- 导入方向：`release.py` → journal/policy/planner；planner 仅调用 policy 做预算判定，journal 不调用 policy 与 planner。仅用标准库，保持四模块结构。"
+          },
+          "kind": "explicit-import-label-outside-exact-grammar",
+          "reason": "The prose labels release→journal/policy/planner as import direction using unwrapped slash alternatives. The actual direct import is release→planner; planner uses both journal and policy.",
+          "source": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "text": "from planner import plan"
+            },
+            {
+              "file": "planner.py",
+              "line": 10,
+              "text": "from journal import JournalError, read_applied, read_changes"
+            },
+            {
+              "file": "planner.py",
+              "line": 11,
+              "text": "from policy import PolicyError, limit_for"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-Ku113T",
+      "stage": "g2",
+      "phase": "closed",
+      "terminal": "closed",
+      "carry": "same-workspace-new-session",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "4aa75ac3d734c56ac83bdd918d0bb8838bd7de1561f9751681679bcf5b354990"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "55f35bf94f8c0767728645a2666fa5c083c0d1cf968a9afd79d039990ca7b2b5"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "0a71951694d87660910046667be41f757f956f04b8f54b6e2fac580600ca181d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "99d49f02c008f580da11dae6d9ad9cd5428bbda939a7621b5beb789ceb3955cf"
+        }
+      ],
+      "architectureSha256": "08630255cc8551964cd90730010907325dbed561d9e0722a4e266d49ba2257dc",
+      "ast": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_normalize",
+            "_string_array",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 113
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_emit",
+            "failure",
+            "plan",
+            "retained_closure",
+            "topological_order"
+          ],
+          "lineCount": 138
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 60
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 28
+        }
+      },
+      "checks": {
+        "changedPlan": true,
+        "moduleEdges": true,
+        "transportOnlyIo": true
+      },
+      "architectureProse": [
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 5,
+            "text": "- `release.py`（入口，仅传输）：从 stdin 读一次原始文本，交付给 journal 解析；只做 JSON 编解码与输出，不判断业务规则。解析失败输出 `invalid-json`，顶层非对象/缺字段输出 `invalid-request`。所有路径正常退出并打印一个 JSON 对象，不建文件、不联网。G2 不改动入口。"
+          },
+          "kind": "parse-owner",
+          "reason": "The entrypoint parses JSON itself and passes the parsed request directly to planner. journal does not parse the transport.",
+          "source": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "text": "from planner import plan"
+            },
+            {
+              "file": "release.py",
+              "line": 16,
+              "text": "        request = json.load(sys.stdin)"
+            },
+            {
+              "file": "release.py",
+              "line": 22,
+              "text": "        result = plan(request)"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 5,
+            "text": "- `release.py`（入口，仅传输）：从 stdin 读一次原始文本，交付给 journal 解析；只做 JSON 编解码与输出，不判断业务规则。解析失败输出 `invalid-json`，顶层非对象/缺字段输出 `invalid-request`。所有路径正常退出并打印一个 JSON 对象，不建文件、不联网。G2 不改动入口。"
+          },
+          "kind": "invalid-request-owner",
+          "reason": "The structured wrong-root response is returned by planner. Documenting a transport failure propagated by release is valid, but this clause groups root and missing fields under invalid-request. Missing named fields are rejected by policy or journal with their field-specific error codes.",
+          "source": [
+            {
+              "file": "planner.py",
+              "line": 107,
+              "text": "        return failure(\"invalid-request\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 44,
+              "text": "        raise PolicyError(\"invalid-environment\")"
+            },
+            {
+              "file": "journal.py",
+              "line": 49,
+              "text": "        raise JournalError(\"invalid-change\")"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 6,
+            "text": "- `journal.py`（校验/身份/回放）：整单结构与字段类型校验（`environment`/`action`/`budget`/`changes` 各自类型面），生成变更身份、做完全重复记录折叠（id+component+units+依赖集合相等）、识别冲突重复 ID（`conflicting-change`）、校验 `depends_on` 与会话内 `applied` 为字符串数组（`invalid-change`）、校验 `applied` 中 ID 存在（`unknown-dependency`）。G2 增补：`retain` 仅对 `environment: staging` 且 `action: rollback` 生效，默认空数组；非数组、含非字符串、空字符串 ID 判 `invalid-retain`。"
+          },
+          "kind": "field-guard-owner",
+          "reason": "journal validates change and journal records. Environment, action and budget validation is in policy.",
+          "source": [
+            {
+              "file": "policy.py",
+              "line": 44,
+              "text": "        raise PolicyError(\"invalid-environment\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 51,
+              "text": "        raise PolicyError(\"unsupported-action\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 57,
+              "text": "        raise PolicyError(\"invalid-budget\")"
+            },
+            {
+              "file": "journal.py",
+              "line": 46,
+              "text": "def read_changes(records):"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 7,
+            "text": "- `policy.py`（环境与预算）：判定 environment 合法性与该环境支持的动作，非法环境 `invalid-environment`，不支持的动作 `unsupported-action`；预算数值校验 `invalid-budget`，并对 plan 的发出单位总和做 `budget-exceeded` 判定；rollback 只校验不封顶。G2 变更：`production` 的 plan 与 rollback 一律 `production-frozen`，该判定要早于图与变更校验（畸形图也返回此码）；`staging` plan 的有效预算取 `min(request budget, 3)`，配额违例一律 `budget-exceeded`。"
+          },
+          "kind": "budget-decision-owner",
+          "reason": "policy validates/normalizes budget and sets a limit. The emitted-units comparison itself is in planner.",
+          "source": [
+            {
+              "file": "policy.py",
+              "line": 59,
+              "text": "        return action, min(budget, STAGING_PLAN_CAP)"
+            },
+            {
+              "file": "planner.py",
+              "line": 135,
+              "text": "    if units > budget:"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 9,
+            "text": "- 导入方向：`release.py` → journal/policy/planner；planner 仅调用 policy 做预算判定，journal 不调用 policy 与 planner。仅用标准库，保持四模块结构。"
+          },
+          "kind": "explicit-import-label-outside-exact-grammar",
+          "reason": "The prose labels release→journal/policy/planner as import direction using unwrapped slash alternatives. The actual direct import is release→planner; planner uses both journal and policy.",
+          "source": [
+            {
+              "file": "release.py",
+              "line": 10,
+              "text": "from planner import plan"
+            },
+            {
+              "file": "planner.py",
+              "line": 10,
+              "text": "from journal import JournalError, read_applied, read_changes, read_retain"
+            },
+            {
+              "file": "planner.py",
+              "line": 11,
+              "text": "from policy import PolicyError, limit_for"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-eBxs00",
+      "stage": "g1",
+      "phase": "ledger-review",
+      "terminal": "completion-cap",
+      "carry": "same-frozen-seed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "d0790594bd43c10f5b7db45f83ed4000b4fc68b79791f4d8ec4b3105fe75a351"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8980ea9a5be4b573a0b213725bf6429d1320ad38947eee7c544779a7c62990dc"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "2d75eff5042386336218addc6688abadd0150d0a509146a79e393043b2c4a4c2"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d7e0eb2463fd8611af597ea5391bca070d715c88a6e1caa6c2efefd954538e58"
+        }
+      ],
+      "architectureSha256": "5a914cb42edf0e6487bd43f5a6470913789809fecb20a3b7430401afbb9f7b6c",
+      "ast": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_identifier",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes"
+          ],
+          "lineCount": 95
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 103
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 41
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_failure",
+            "_shape",
+            "main"
+          ],
+          "lineCount": 56
+        }
+      },
+      "checks": {
+        "changedPlan": false,
+        "moduleEdges": true,
+        "transportOnlyIo": true
+      },
+      "architectureProse": [
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 12,
+            "text": "导入方向固定：`release.py -> planner.py -> (journal.py, policy.py)`，journal 与 policy 互不依赖、不得反向导入入口。"
+          },
+          "kind": "positive-grouped-import",
+          "reason": "Grouped arrow text matches the direct AST imports. Only labeled and fully code-wrapped simple chains are parsed by the new deterministic grammar.",
+          "source": [
+            {
+              "file": "release.py",
+              "line": 11,
+              "text": "from planner import plan"
+            },
+            {
+              "file": "planner.py",
+              "line": 12,
+              "text": "from journal import JournalError, read_applied, read_changes"
+            },
+            {
+              "file": "planner.py",
+              "line": 13,
+              "text": "from policy import PolicyError, limit_for"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-eBxs00",
+      "stage": "g2",
+      "phase": "blocked",
+      "terminal": "blocked",
+      "carry": "frozen-workspace-continuation-after-timeout",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "cd39fa72bb16c0645834e13434ba163c2835b0bcd3e4f1b67b5ab43953e2e8c7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d76aa436956f90b577e34cf951014ff1496a7f5685b7180f563f1699dac6fc9c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "43c538c03dda307b454e2ef4f51808dea2cfdddb9cd3249653e1c2665bcdb19d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d7e0eb2463fd8611af597ea5391bca070d715c88a6e1caa6c2efefd954538e58"
+        }
+      ],
+      "architectureSha256": "489a99f8931d6693ede78b224173a588a1e0962a2d0b0cde4044d8cf6c9a5212",
+      "ast": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_is_identifier",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 130
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_retained_closure",
+            "_topological_order",
+            "failure",
+            "plan"
+          ],
+          "lineCount": 159
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "limit_for"
+          ],
+          "lineCount": 79
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_failure",
+            "_shape",
+            "main"
+          ],
+          "lineCount": 56
+        }
+      },
+      "checks": {
+        "changedPlan": true,
+        "moduleEdges": true,
+        "transportOnlyIo": true
+      },
+      "architectureProse": [
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 15,
+            "text": "导入方向固定：`release.py -> planner.py -> (journal.py, policy.py)`，journal 与 policy 互不依赖、不得反向导入入口。"
+          },
+          "kind": "positive-grouped-import",
+          "reason": "Grouped arrow text matches the direct AST imports. Only labeled and fully code-wrapped simple chains are parsed by the new deterministic grammar.",
+          "source": [
+            {
+              "file": "release.py",
+              "line": 11,
+              "text": "from planner import plan"
+            },
+            {
+              "file": "planner.py",
+              "line": 18,
+              "text": "from journal import JournalError, read_applied, read_changes, read_retain"
+            },
+            {
+              "file": "planner.py",
+              "line": 19,
+              "text": "from policy import PolicyError, limit_for"
+            }
+          ]
+        },
+        {
+          "architecture": {
+            "file": "modules/architecture.md",
+            "line": 9,
+            "text": "- `policy.py`（环境与预算）：校验 `environment` 属于 `staging`/`production`（否则 `invalid-environment`），`budget` 为非负 int 且排除 bool（否则 `invalid-budget`），`action` 属于 `plan`/`rollback`（未知动作 `unsupported-action`）。G2 起：先做上述字段级校验，再做环境冻结判定——`production` 任动作一律 `production-frozen`，此判定必须发生在 `changes` 字段校验与图构建之前；`staging` 的 `plan` 有效预算取 `min(请求 budget, 3)`，超额即 `budget-exceeded`；`staging` 的 `rollback` 只校验 budget 字段本身、不设上限。"
+          },
+          "kind": "under-specified-order",
+          "reason": "The code and prose validate action and budget first, and freeze before changes/graph. The public clause orders freeze only against change/graph checks; do not demand an order against invalid action or budget.",
+          "source": [
+            {
+              "file": "policy.py",
+              "line": 65,
+              "text": "    action = request.get(\"action\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 68,
+              "text": "    budget = request.get(\"budget\")"
+            },
+            {
+              "file": "policy.py",
+              "line": 75,
+              "text": "    if environment in FROZEN_ENVIRONMENTS:"
+            }
+          ]
+        }
+      ],
+      "reportedRetainDispute": {
+        "input": {
+          "environment": "staging",
+          "action": "rollback",
+          "budget": 0,
+          "changes": [
+            {
+              "id": "a",
+              "component": "base",
+              "units": 1,
+              "depends_on": []
+            },
+            {
+              "id": "b",
+              "component": "web",
+              "units": 1,
+              "depends_on": [
+                "a"
+              ]
+            },
+            {
+              "id": "c",
+              "component": "web",
+              "units": 1,
+              "depends_on": [
+                "b"
+              ]
+            },
+            {
+              "id": "d",
+              "component": "api",
+              "units": 1,
+              "depends_on": []
+            },
+            {
+              "id": "e",
+              "component": "api",
+              "units": 1,
+              "depends_on": [
+                "d"
+              ]
+            }
+          ],
+          "applied": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "retain": [
+            "c"
+          ]
+        },
+        "expected": {
+          "status": "ok",
+          "actions": [
+            "e",
+            "d"
+          ],
+          "units": 2
+        },
+        "actual": {
+          "status": "ok",
+          "actions": [
+            "e",
+            "d"
+          ],
+          "units": 2
+        },
+        "exitCode": 0,
+        "failure": null,
+        "reason": "a and b are transitively required by retained c, leaving d and e in reverse topological order.",
+        "nativeProbe": {
+          "wrongExpectations": [
+            [
+              "d",
+              "b"
+            ],
+            [
+              "e",
+              "d",
+              "c"
+            ],
+            [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e"
+            ]
+          ],
+          "actualProjection": [
+            "e",
+            "d"
+          ],
+          "sourceSeq": [
+            63,
+            71,
+            83
+          ],
+          "resultSeq": [
+            65,
+            73,
+            85
+          ],
+          "snapshotSha256": "ae4d004162c3c6b75565615d76968b9797e4451dff797da3898f6a35b9cf77ea",
+          "inputSha256": "38be1d2ec20755e967c38b085582b8ee7ffb74cbf472f2a3a2213cd048f2c84e"
+        },
+        "whyBlocked": "First-review child ended without a durable receipt. Behavioral finding named planner.py while the stored probe named release.py. Signed-case revise had no accepted finding. Later compact file rows repeatedly included unsupported file/comments. Coordinator stopped instead of resuming the eligible role.",
+        "findingRejectionResultSeq": [
+          91,
+          103
+        ],
+        "unsupportedSignedReviseResultSeq": 109,
+        "invalidDecisionResultSeq": [
+          245,
+          251,
+          257,
+          263
+        ],
+        "reviewerTurnEndSeq": 269,
+        "durableResumePhase": "first-review"
+      }
+    }
+  ]
+}
