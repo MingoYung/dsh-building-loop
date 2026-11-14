@@ -294,6 +294,26 @@ function architectureNext(frame, unit) {
 }
 
 /** 向总控只暴露阶段、身份和回执入口，正文仍走文件授权。 */
+/** Report the existing authorized goal-write route. This does not grant
+ * writes or treat a coordinator tool call as the owner's decision. */
+function ownerClarificationPacket(frame, unit, id) {
+  const waiting = unit?.outcomeClarification;
+  if (!waiting || unit.phase !== "blocked" || unit.owner !== frame.agent.id || frame.role !== "coordinator") return null;
+  const goal = goalSnapshot(frame);
+  if (waiting.goalSha256 !== goal.sha256) return null;
+  const files = goal.files.filter(({file}) => includes(frame.reads, file) && includes(frame.writes, file));
+  return { ...waiting, afterOwnerReply: files.length ? {
+    updates: files.map(({file}) => ({
+      read: { tool: FILE, action: "read", path: file },
+      write: { tool: FILE, action: "write", path: file, required: ["content", "note",
+        ...([frame.policy.hierarchy?.overview, frame.policy.hierarchy?.index].some(row => row && keyOf(row.path) === keyOf(file))
+          ? ["heading"] : [])] },
+    })),
+    then: { tool: WORKFLOW, action: "advance", unit: id },
+    note: "先取得用户对待澄清事项的明确决定，才用 write 的 content 写回完整总纲。只改变有关条款；如须 heading，填刚读到的该条款所在原有章节标题。不要用 edit。"
+  } : { note: "当前会话没有总纲写权限。取得用户决定后，由维护者更新现有总纲，再 advance。" } };
+}
+
 function viewUnits(frame) {
   const currentUnit = frame.started?.binding.checkpoint?.unit;
   const historical = currentUnit ? Object.keys(frame.state.units).filter(id => !Object.hasOwn(frame.policy.units, id)) : [];
@@ -313,7 +333,7 @@ function viewUnits(frame) {
       unit: id, phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions,
       ...(currentUnit ? { current: true } : {}),
       ...notice,
-      ...(waiting && unit.owner===frame.agent.id ? {outcomeClarification:unit.outcomeClarification} : {}),
+      ...(waiting && unit.owner===frame.agent.id ? {outcomeClarification:ownerClarificationPacket(frame, unit, id)} : {}),
       ...(unit.owner === frame.agent.id && unit.stallDiagnostic && !TERMINAL.has(phase)
         ? { stallDiagnostic: diagnosisPacket(unit, "coordinator") } : {}),
       ...(frame.policy.units[id].cacheReadRotationThreshold ? {executorUsage:{session:executor,
@@ -1080,6 +1100,7 @@ export function apply(ctx, config = {}) {
         if (sourceFacts) architecture.sourceFacts = sourceFacts;
       }
       const phase = assignment?.[1].phase ?? current?.phase ?? "dispatch";
+      const clarification = ownerClarificationPacket(frame, current, unit);
       if(spec)refreshCheckpoints(frame,current,spec);
       if (frame.role === "diagnostician" && current.stallDiagnostic.preparedSerial !== current.serial) {
         // A new activation must expose its own version before a probe or
@@ -1229,7 +1250,10 @@ export function apply(ctx, config = {}) {
         : codeTask?.regressionProof ? "落实当前目标，读回改动和候选，取得当前版本的签名回归回执后 submit"
         : phase==="supplement" ? "按退回项修改，读回、preflight、submit"
         : frame.role==="executor"&&phase==="intake" ? (frame.managed ? "按当前目标写出首稿，完整读回后 submit" : "保留原稿 submit")
-        : phase==="blocked" ? "核对阻塞原因；可恢复时用 advance 续派到原子会话"
+        : phase==="blocked" ? (clarification ? "取得用户的具体决定后，按 outcomeClarification.afterOwnerReply 更新总纲再续做"
+          : current?.outcomeClarification && frame.role === "coordinator" && current.owner === frame.agent.id
+            ? { tool: WORKFLOW, action: "advance", unit }
+            : "核对阻塞原因；可恢复时用 advance 续派到原子会话")
         : phase==="ledger-review" ? "ledger read 后逐项 ledger review；若有 reviewPage.cursor 则随 review 提交"
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付");
       const outcomeContract = spec && !codeReviewMode && ["executor","reviewer","auditor"].includes(frame.role)
@@ -1260,7 +1284,7 @@ export function apply(ctx, config = {}) {
         ...(deliverableTable ? { deliverableTable } : {}),
         ...(outcomeContract ? { outcomeContract:deliveryOutcomeInstructions(outcomeContract) } : {}),
         ...(outcomeFields ? { outcomeFields } : {}),
-        ...(frame.role==="coordinator" && current?.outcomeClarification ? {outcomeClarification: current.outcomeClarification} : {}),
+        ...(clarification ? { outcomeClarification: clarification } : {}),
         ...(frame.role==="executor" && current?.outcomeIssues?.length ? {outcomeIssues: current.outcomeIssues} : {}),
         ...reconciliationNotice(frame,current),
         ...(codeReview ? { codeReview } : {}),...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
@@ -1350,7 +1374,12 @@ export function apply(ctx, config = {}) {
               (!frame.state.units[unit] || frame.state.units[unit].owner === frame.agent.id))
           : undefined;
         if (edit) {
-          if (frame.role !== "executor" && !architectureUnit) throw new Error("只有当前执行者可以局部编辑；总控仅可编辑获授权的架构章节");
+          if (frame.role !== "executor" && !architectureUnit) {
+            if (frame.role === "coordinator" && includes(frame.policy.goalContext, file)) {
+              throw new Error("总控更新已授权的总纲用 building_loop_file write：给 path、完整 content 和 note；有三级导航时填现有小节 heading，保留其他章节。");
+            }
+            throw new Error("只有当前执行者可以局部编辑；总控仅可编辑获授权的架构章节");
+          }
           if (!includes(frame.reads, file)) throw new Error("该文件不在当前读白名单");
           if (args.content !== undefined) throw new Error("局部编辑不能使用整文件 content");
         } else if (typeof args.content !== "string") throw new Error("需要 UTF-8 正文");
@@ -3163,7 +3192,7 @@ export function apply(ctx, config = {}) {
       newText: { ...string, description: "替换片段，空字符串表示删除该片段" },
     }, required: ["oldText", "newText"], additionalProperties: false,
   };
-  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。已有回归代码和已登记的逐段核验架构用 edit；新建文件用 write。代码局部编辑用 beforeSha256 和唯一旧片段；架构按 heading、beforeSha256、newText 替换该节正文（坏引用按宿主 next）。写入保留一个滚动备份及逐文件日志。add-module 仅在所有者明确批准后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
+  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。已有回归代码和已登记的逐段核验架构用 edit；新建文件和改已授权总纲用 write。总纲用完整 content 并给现有 heading（有三级导航时）。代码局部编辑用 beforeSha256 和唯一旧片段；架构按 heading、beforeSha256、newText 替换该节正文（坏引用按宿主 next）。写入保留一个滚动备份及逐文件日志。add-module 仅在所有者明确批准后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
     path: string, query: string, content: string, note: string, start: number, count: number,
     beforeSha256: { ...string, description: "edit 必填：当前目标文件的完整 SHA-256，可从 read 获取" },
     ...editFragment.properties,

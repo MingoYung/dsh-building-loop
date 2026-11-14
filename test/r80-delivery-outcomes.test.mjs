@@ -199,13 +199,20 @@ function reportFor(variant, draft) {
   return results;
 }
 
-async function materializeReview(root, variant) {
+async function materializeReview(root, variant, {ownerCanWriteGoal = false} = {}) {
   installFrozenAssertionFixture(root);
+  if (ownerCanWriteGoal) {
+    const authority = path.join(root, "BUILDING-LOOP.json");
+    const policy = JSON.parse(fs.readFileSync(authority, "utf8"));
+    policy.coordinator.write.push(goalFile);
+    fs.writeFileSync(authority, JSON.stringify(policy));
+  }
   const draft = variants[variant];
-  const goal = variant === "clarification" ? deliveryVariants.clarificationGoal : frozenAssertionMaterial[goalFile];
+  const originalGoal = variant === "clarification" ? deliveryVariants.clarificationGoal : frozenAssertionMaterial[goalFile];
+  const goal = ownerCanWriteGoal ? originalGoal.replace(/^(# [^\n]+\n)/u, "$1\n## 当前口径\n") : originalGoal;
   fs.writeFileSync(path.join(root, candidateFile), draft);
   fs.writeFileSync(path.join(root, goalFile), goal);
-  const goalRef = rawRow(goalFile, 4, goal.split("\n")[3]);
+  const goalRef = rawRow(goalFile, ownerCanWriteGoal ? 6 : 4, goal.split("\n")[ownerCanWriteGoal ? 5 : 3]);
   const h = host(root, { automaticCoverage: false });
   const executor = (await h.flow("root", "advance")).childId;
   await h.flow(executor, "prepare");
@@ -338,6 +345,8 @@ test("genuine unresolved owner definition blocks with a specific question and re
     assert.ok(JSON.stringify(ownerPacket.outcomeClarification).includes(outcomes[2].question),
       "the coordinator receives exactly the question the independent reviewer needs answered");
     assert.doesNotMatch(JSON.stringify(ownerPacket.outcomeClarification), /澄清后按原始材料续做/u);
+    assert.ok(!ownerPacket.outcomeClarification.afterOwnerReply.updates);
+    assert.match(ownerPacket.outcomeClarification.afterOwnerReply.note, /没有总纲写权限/u);
     assert.equal(digest(fs.readFileSync(path.join(root, goalFile))), digest(Buffer.from(deliveryVariants.clarificationGoal)));
     await assert.rejects(h.flow("root", "advance"), /等待用户澄清|更新总纲/u);
 
@@ -348,6 +357,33 @@ test("genuine unresolved owner definition blocks with a specific question and re
     assert.equal(resumed.childId, reviewer);
     assert.equal(resumed.phase, "final-review");
     assert.equal((await h.flow(reviewer, "prepare")).outcomeContract.goalSha256, archivedDeliveryAcceptance.goalSha256);
+  }));
+
+test("a blocked owner gets the existing scoped goal write path instead of an edit or premature advance", () =>
+  fixture(async root => {
+    const { h, reviewer, outcomes } = await materializeReview(root, "clarification", {ownerCanWriteGoal:true});
+    assert.equal((await h.flow(reviewer, "review", {checks, outcomes})).phase, "blocked");
+    const owner = await h.flow("root", "prepare");
+    const expected = {
+      read: {tool:"building_loop_file", action:"read", path:goalFile},
+      write: {tool:"building_loop_file", action:"write", path:goalFile, required:["content","note","heading"]},
+    };
+    assert.deepEqual(owner.outcomeClarification.afterOwnerReply.updates,[expected]);
+    assert.deepEqual(owner.outcomeClarification.afterOwnerReply.then,{tool:"building_loop",action:"advance",unit:"K01"});
+    assert.match(owner.next,/afterOwnerReply/u);
+    assert.deepEqual((await h.flow("root", "status")).units[0].outcomeClarification, owner.outcomeClarification);
+    await assert.rejects(h.flow("root", "advance"), /等待用户澄清/u);
+    await assert.rejects(h.file("root", "edit", goalFile, {heading:"验收规则"}), /总纲用 building_loop_file write/u);
+    const current = fs.readFileSync(path.join(root, goalFile), "utf8");
+    const next = frozenAssertionMaterial[goalFile].replace(/^(# [^\n]+\n)/u, "$1\n## 当前口径\n");
+    const heading = "当前口径";
+    await assert.rejects(h.file("root", "write", goalFile, {heading:"分块入口", content:next, note:"测试错误章节。"}), /章节|heading|导航/u);
+    await h.file("root", "write", goalFile, {heading, content:next, note:"测试已收到的所有者澄清。"});
+    assert.equal(fs.readFileSync(path.join(root,".building-loop","latest_backup",goalFile),"utf8"), current);
+    const amended = await h.flow("root", "prepare");
+    assert.equal(amended.outcomeClarification, undefined);
+    assert.deepEqual(amended.next, {tool:"building_loop",action:"advance",unit:"K01"});
+    assert.equal((await h.flow("root", "advance")).childId, reviewer);
   }));
 
 test("correct explicit outcomes need two distinct current role proofs before their receipt reaches the ledger", () =>
