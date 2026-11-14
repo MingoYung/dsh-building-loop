@@ -6,7 +6,7 @@ import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { acceptedVersion, goalSnapshot, needsRevalidation } from "../governance/goals.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
-import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredObjectChecks, sourceLineEnumerationChecks, simulationScopeLocatorIssues } from "../governance/coverage.mjs";
+import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredFootnoteBindings, requireStoredObjectChecks, sourceLineEnumerationChecks, simulationScopeLocatorIssues } from "../governance/coverage.mjs";
 
 /** Raw helpers test the mandatory production gate without auto-generated reviews. */
 function environment(root) {
@@ -25,6 +25,65 @@ function environment(root) {
 const nonfact = {kind:"nonfactual",status:"supported",basis:"这是文档结构标题，没有陈述外部事实。"};
 const ref = {file:"functional.csv",start:2,end:2,quote:"19,20"};
 const fact = {kind:"direct",status:"supported",sourceRelation:"supports",basis:"只转述该样例的通过和总数。",evidence:[ref]};
+
+test("project-policy proofs bind the current read goal and keep external evidence separate", () => fixture(async (root, write) => {
+  const clause = "待补件按当前项目规则进入复核。";
+  const rule = { file: "overview.md", start: 2, end: 2, quote: clause };
+  const p = structuredClone(policy);
+  p.goalContext = [rule.file];
+  p.units.K01.requireSourcePins = true;
+  p.sourcePins = Object.fromEntries(["functional.csv", "timing.csv"].map(file => [file, {
+    kind: "primary", locator: `fixture:${file}`, sha256: digest(fs.readFileSync(path.join(root, file))),
+  }]));
+  write("BUILDING-LOOP.json", JSON.stringify(p));
+  write(rule.file, "# 总纲\n" + clause + "\n另行处理归档。\n");
+  write("candidate.md", "本项目将待补件列入复核（出处：overview.md 第2行）。\n");
+  const e = environment(root);
+  e.frame.reads = [...e.frame.reads, rule.file];
+  e.active.goal = goalSnapshot(e.frame);
+  delete e.active.seen[keyOf(rule.file)];
+  const [block] = e.invoke("inventory").blocks;
+  const inference = { rule: "project-policy", policy: [rule], premises: [], scope: "当前项目待补件",
+    assumptions: [], counterexample: { possible: false, reason: "当前总纲直接给待补件指定复核动作。" } };
+  const part = { kind: "inference", status: "supported", sourceRelation: "supports", basis: "转述已授权项目规则。", inference };
+  const record = part => e.invoke("record", { entries: [{ block: block.id, parts: [part] }] });
+  assert.throws(() => record(part), /已读的当前总纲/);
+  e.read(rule.file);
+  assert.throws(() => record({ ...fact, evidence: [rule] }), /总纲条款可用于项目内规则/);
+  assert.throws(() => record({ ...part, inference: { ...inference, policy: [{ ...rule, quote: "所有件均通过" }] } }), /逐字/);
+  assert.throws(() => record({ ...part, inference: { ...inference, premises: [rule] } }), /总纲条款可用于项目内规则/);
+  assert.throws(() => record({ ...part, inference: { ...inference, policy: [{ ...rule, start: 3, end: 3, quote: "另行处理归档。" }] } }), /位置须与/);
+  assert.deepEqual(record(part).recorded, [block.id]);
+  const [{ parts: [saved] }] = e.finish().records;
+  assert.equal(saved.proofObject, "project-policy");
+  assert.equal(saved.inference.policy[0].goalSha256, e.active.goal.sha256);
+  assert.equal(saved.inference.policy[0].provenance, "current-project-policy");
+  assert.deepEqual(saved.inference.premises, []);
+  // Quoting the project rule itself uses the same role's exact quote and
+  // locator, while unrelated facts still require independently pinned sources.
+  for (const [quote, ok, footnote] of [[clause, true, false], ["待补件按规定归档", false, false], [clause, true, true]]) {
+    const text = footnote ? `项目规则原文为“${quote}”[^p]。\n\n[^p]: overview.md 第2行\n`
+      : `项目规则原文为“${quote}”（出处：overview.md 第2行）。\n`;
+    write("candidate.md", text);
+    e.read("candidate.md");
+    const inventory = e.invoke("inventory").blocks;
+    const entries = inventory.map(({id,text},i) => ({block:id,parts:[i===0?part:{
+      kind:"nonfactual",status:"supported",basis:`脚注定位不另外声明事实：${text}` }]}));
+    e.invoke("record", {entries});
+    const summary=e.finish();
+    assert.equal(summary.quotations[0].matches, ok, JSON.stringify({footnote, entries:summary.records, check:summary.quotations[0]}));
+    assert.equal(summary.rejected.length, ok?0:1);
+    assert.equal(summary.quotations[0].refs.length, 0);
+    if (ok) assert.equal(summary.quotations[0].policyRefs[0].provenance, "current-project-policy");
+    if (footnote) assert.doesNotThrow(() => requireStoredFootnoteBindings(e.spec,[summary],Buffer.from(text),e.active.phase,e.active.goal));
+  }
+  write("candidate.md", "本项目将待补件列入复核（出处：overview.md 第2行）。\n");
+  e.read("candidate.md");
+  write(rule.file, "# 总纲\n" + clause + "\n目标已改。\n");
+  e.read(rule.file);
+  assert.deepEqual(e.invoke("inventory").pending, [block.id]);
+  assert.throws(() => record(part), /当前总纲/);
+}));
 
 const enumerationSource = "sources/github-checks.md";
 const enumerationRow = (range, locator = "第 6-8 行") =>
@@ -1257,6 +1316,66 @@ test("ordinal ranges compare the complete set beyond the bounded result preview"
   });
   e.put(check,{status:"unsupported",finding:objectFinding("第2-26、28行")});
   saved=e.invoke("status",{block:e.blocks[0].id}).record.parts[0].objectCheck;assert.equal(saved.result.actual,26);assert.equal(saved.result.matches,false);
+}));
+
+test("standalone manuscript count hints preserve authored quantity, exact ordinals and separate sibling claims", async () => fixture(async (root, write) => {
+  const source = "sources/regional-register.md";
+  const raw = "[稿件自述] 本稿带 `sources/regional-register.md` 行号引用的共 3 行（第16、17、18行）；";
+  const body = claim => ["# 交付稿", ...Array(14).fill(""), ...[3, 4, 5].map(i => `出处：${source} 第${i}行。`), "", claim].join("\n");
+  const materials = { sources: { [source]: "登记样例\n空行\n甲\n乙\n丙\n" } };
+  const originalBlock = `${raw}附加断言：有用户已上线。`;
+  const check = { kind: "candidate", check: "citation-count", source, expected: 3 };
+  for (const sentence of [originalBlock, raw.replace("（第16、17、18行）", "，分别是第16、17、18行"),
+    ...["：第 16、17、18 行。","，行号为第16、17、18行。","，具体行号如下：第16、17、18行。"]
+      .map(suffix=>`[稿件自述] 本稿共 3 行带 ${source} 的原文行号引用${suffix}`),
+    raw.replace("行号引用的共 3 行", "行号定位的共 三 行"), raw.replace("行号引用的共 3 行", "行号引用的共 ３ 行")]) {
+    const e = objectEnvironment(root, write, body(sentence), materials);
+    const page = e.invoke("inventory", { count: 24 });
+    const block = page.blocks.find(row => row.text.startsWith("[稿件自述]"));
+    assert.deepEqual(block.objectCheckHint, check);
+    e.put(block.objectCheckHint, { block: block.id });
+    const proof = e.invoke("status", { block: block.id }).record.parts[0].objectCheck;
+    assert.equal(proof.result.matches, true);
+    assert.deepEqual(proof.result.claimedLines, [16, 17, 18]);
+    assert.deepEqual(proof.result.lines, [16, 17, 18]);
+    if (sentence === originalBlock) {
+      const sibling = page.blocks.find(row => row.text.includes("有用户已上线"));
+      assert.equal(sibling.objectCheckHint, undefined);
+      assert.ok(e.invoke("status").pending.includes(sibling.id));
+    }
+  }
+  for (const tail of ["，分别是第16、17、18行（C2、C3、C4 各一行）；", "（第16、17、18行），与某计数器一致；",
+    "：第16、17、18行（所有均已上线）；"]) {
+    const e = objectEnvironment(root, write, body(raw.replace("（第16、17、18行）；", tail)), materials);
+    const block = e.invoke("inventory", { count: 24 }).blocks.find(row => row.text.startsWith("[稿件自述]"));
+    assert.equal(block.objectCheckHint, undefined);
+    assert.throws(() => e.put(check, { block: block.id }), /不能忽略未核列表/u);
+  }
+  for (const [changed, expected, missing] of [[raw.replace("16、17、18", "16、17、19"), 3, [18]],
+    [raw.replace("共 3 行", "共 4 行"), 4, []]]) {
+    const e = objectEnvironment(root, write, body(changed), materials);
+    const block = e.invoke("inventory", { count: 24 }).blocks.find(row => row.text.startsWith("[稿件自述]"));
+    assert.deepEqual(block.objectCheckHint, { ...check, expected });
+    assert.throws(() => e.put(block.objectCheckHint, { block: block.id }), error => {
+      const diagnostic = objectDiagnostic(error);
+      assert.equal(diagnostic.actual, 3);
+      assert.equal(diagnostic.matches, false);
+      assert.deepEqual(diagnostic.missingLines, missing);
+      return true;
+    });
+  }
+  const split = `[稿件自述] 本稿共 3 行带 ${source} 的原文行号引用`;
+  for (const [suffix, expectedMatch] of [["：第 16、17、18 行。", true], ["：第 16、17、19 行。", false]]) {
+    const e = objectEnvironment(root, write, body(split+suffix), materials);
+    const block = e.invoke("inventory",{count:24}).blocks.find(row=>row.text.startsWith("[稿件自述]"));
+    assert.throws(() => e.invoke("record",{entries:[{block:block.id,parts:[
+      {kind:"direct",status:"supported",sourceRelation:"supports",basis:"实测正好三行。",quote:split,objectCheck:check},
+      {kind:"nonfactual",status:"supported",basis:"说成仅是版式。",quote:suffix},
+    ]}]}), /核对完整原句/u);
+    const measured=candidateCitationProfiles(fs.readFileSync(path.join(root,"candidate.md")),[source],"candidate.md");
+    assert.equal(measured[0].matches,expectedMatch);
+    assert.deepEqual(measured[0].lines,[16,17,18]);
+  }
 }));
 
 test("ordinal grammar rejects unverified abbreviations, ambiguous source lists and oversized ranges as parameters",async()=>fixture(async(root,write)=>{

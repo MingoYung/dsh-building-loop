@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {fixture,host,policy} from "./helpers.mjs";
+import {captureRequest,ledgerAction} from "../governance/ledger.mjs";
 import {authority,digest,readBytes} from "../governance/policy.mjs";
 import {QUALITY,supplementChecks} from "../governance/preflight.mjs";
 
@@ -141,6 +142,115 @@ test("a repeated stable ledger ID needs a fresh item version to change its conte
   assert.equal((await h.ledger("root", "record", update)).note, update.note);
   await assert.rejects(h.ledger("root", "record", { ...probe, expectedItemSha256: update.expectedItemSha256 }), /编号已经存在/);
   assert.equal((await h.ledger("root", "read")).items[0].title, original.title);
+}));
+
+const ownerPlans = [
+  { id: "dashboard-animation", kind: "planned", title: "制作地区看板动画", note: "在地区简报之后安排演示动画。" },
+  { id: "extra-faq", kind: "temporary", title: "单独写一份入组 FAQ", note: "解释已排除与待补材料的区别。" },
+  { id: "paused-quiz", kind: "interrupted", title: "地区判断互动测验", note: "等当前范围清楚再决定是否恢复。" },
+  { id: "future-link-check", kind: "planned", title: "后续原始来源复查", note: "以后核对公开链接是否仍有效。" },
+];
+
+test("origin amendments preserve the request and direct distinct tasks to their own IDs", async () => fixture(async (root, write) => {
+  configure(write);
+  const h = host(root);
+  await h.user("root", 9, "按给定编号分别登记四项计划。\n" + JSON.stringify(ownerPlans));
+  const { items: [raw] } = await h.ledger("root", "read");
+  const record = args => h.ledger("root", "record", args);
+  const first = { originId: raw.id, kind: "planned", title: "用户请求的四项登记", note: "原始请求汇总；事项分别登记。" };
+  assert.equal(raw.originClassified, false);
+
+  const missing = await record({ kind: first.kind, title: first.title, note: first.note });
+  assert.equal(missing.status, "record-id-required");
+  assert.deepEqual(missing.next.required, ["id", "kind", "title", "note"]);
+  const before = await h.ledger("root", "read");
+  const conflict = await record({ ...first, id: ownerPlans[0].id });
+  assert.equal(conflict.status, "record-identity-conflict");
+  assert.equal(conflict.recorded, false);
+  assert.deepEqual(await h.ledger("root", "read"), before);
+
+  let result = await record({ ...first, expectedItemSha256: "0".repeat(64) });
+  assert.equal(result.status, "origin-version-required");
+  assert.deepEqual(await h.ledger("root", "read"), before);
+  const initial = await record(first);
+  assert.equal(initial.originClassified, true);
+  assert.deepEqual(initial.origin, raw.origin);
+  const classified = await h.ledger("root", "read");
+  assert.deepEqual(await record(first), initial);
+  assert.equal((await h.ledger("root", "read")).revision, classified.revision);
+
+  for (const { id, ...plan } of ownerPlans) {
+    result = await record({ ...plan, originId: raw.id });
+    assert.equal(result.recorded, false);
+    assert.equal(result.status, "origin-version-required");
+    assert.deepEqual(result.amendment.id, raw.id);
+    assert.match(result.next.note, /各自稳定的 id/u);
+    assert.equal((await record({ id, ...plan })).id, id);
+  }
+  const after = await h.ledger("root", "read");
+  assert.deepEqual(after.items.map(item => item.id), [raw.id, ...ownerPlans.map(plan => plan.id)]);
+  assert.equal(after.items[0].title, first.title);
+  const lookup = await h.ledger("root", "lookup", { id: raw.id });
+  const update = { ...first, kind: "temporary", note: "同一消息归类更新，仍以四个原编号跟踪。" };
+  const amended = await record({ ...update, expectedItemSha256: lookup.item.itemSha256 });
+  assert.deepEqual(amended.origin, raw.origin);
+  assert.equal(amended.status, "pending");
+  const unchanged = await h.ledger("root", "read");
+  assert.deepEqual(await record({ ...update, expectedItemSha256: lookup.item.itemSha256 }), amended);
+  assert.equal((await record({ ...first, expectedItemSha256: lookup.item.itemSha256 })).status, "origin-version-required");
+  assert.deepEqual(await h.ledger("root", "read"), unchanged);
+
+  h.coordinator("other");
+  await assert.rejects(h.ledger("other", "record", update), /本总控已有/u);
+}));
+
+test("legacy or disposed origin rows require the current item hash without changing lifecycle state", () => {
+  for (const kind of ["legacy-raw", "legacy-classified", "new-disposed"]) {
+    const frame = { role: "coordinator", state: { units: {} }, agent: { id: "owner" } };
+    captureRequest(frame, { session: "owner", seq: 1, title: "原请求", sha256: digest("原请求") });
+    const [row] = Object.values(frame.state.ledger.items);
+    if (kind.startsWith("legacy")) delete row.originClassified;
+    if (kind === "legacy-classified") row.title = "旧版已归类";
+    if (kind === "new-disposed") {
+      row.status = "covered";
+      row.disposition = { outcome: "covered", basis: "由具备验收的原单元覆盖。" };
+    }
+    const item = () => ledgerAction(frame, { action: "lookup", id: row.id }).item;
+    const original = item();
+    const input = { action: "record", originId: row.id, kind: "temporary", title: "同一条原请求", note: "经版本核对更新归类。" };
+    assert.equal(ledgerAction(frame, input).status, "origin-version-required", kind);
+    assert.deepEqual(item(), original);
+    const updated = ledgerAction(frame, { ...input, expectedItemSha256: original.itemSha256 });
+    assert.equal(updated.originClassified, true);
+    assert.deepEqual(updated.origin, original.origin);
+    assert.equal(updated.status, original.status);
+    assert.deepEqual(updated.disposition, original.disposition);
+  }
+});
+
+test("goal-aware review independently disposes four explicit owner plans and keeps the original request", async () => fixture(async (root, write) => {
+  configure(write, { ledger: true });
+  write("overview.md", "# G2\n动画和测验取消，独立 FAQ 被本轮交付覆盖，原始来源复查仍为后续事项。\n");
+  const h = host(root);
+  await h.user("root", 9, "分别登记四项计划。\n" + JSON.stringify(ownerPlans));
+  for (const plan of ownerPlans) await h.ledger("root", "record", plan);
+  const { book, decisions } = await closeReady(h);
+  const action = { "dashboard-animation": "obsolete", "extra-faq": "covered", "paused-quiz": "obsolete",
+    "future-link-check": "keep" };
+  const evidence = { file: "overview.md", start: 2, end: 2 };
+  const reviewed = decisions.map(item => Object.hasOwn(action, item.id) ? { ...item, outcome: action[item.id], evidence,
+    basis: "按 G2 当前总纲逐项复盘。", ...(action[item.id] === "covered" ? { coveredBy: "K01" } : {}) } : item);
+  const request = { decisions: reviewed };
+  const result = await h.ledger("root", "review", request);
+  assert.equal(result.phase, "closed");
+  assert.equal(result.reviewed, book.itemCount);
+  const final = await h.ledger("root", "read", { includeClosed: true });
+  const rows = Object.fromEntries(final.items.map(item => [item.id, item]));
+  assert.equal(final.items.filter(item => item.origin).length, 1);
+  assert.deepEqual(ownerPlans.map(plan => rows[plan.id].status), ["obsolete", "covered", "obsolete", "pending"]);
+  assert.equal(rows["extra-faq"].disposition.coverage.unit, "K01");
+  assert.deepEqual((await h.ledger("root", "review", request)).phase, "closed");
+  assert.equal((await h.ledger("root", "read", { includeClosed: true })).revision, final.revision);
 }));
 
 test("canonical ledger exports every current item including a late request and blocks model rewrites",async()=>fixture(async(root,write)=>{

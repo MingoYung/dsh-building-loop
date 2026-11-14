@@ -1,11 +1,11 @@
 import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseline, adjacentCitationLocator, exactCitationLocator, footnoteQuoteIndex, verbatimQuotes, requiredLineMarkdown } from "./preflight.mjs";
-import { evidenceReference, evidenceSpan, registeredObservation, UnobservedExcerptError, webSourceLocator } from "./evidence.mjs";
+import { evidenceReference, evidenceSpan, projectPolicyReference, registeredObservation, UnobservedExcerptError, webSourceLocator } from "./evidence.mjs";
 
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 8;
+export const CLASSIFICATION_VERSION = 9;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -13,6 +13,7 @@ const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example
 const STATUSES = ["supported", "unsupported", "uncertain"];
 const INVENTORY_LIMIT = 24;
 const RECORD_LIMIT = 12;
+const COUNT_NUMBER = "\\d+|[零〇一二两三四五六七八九十]+";
 // These unambiguous surface connectives are a conservative minimum, not a
 // universal parser. Untagged/implicit deductions remain the reviewers' duty.
 const explicitInference = text => /(?:因此|所以|由此(?:可见|可得|推出)?|据此(?:可知|推出)?|therefore|\bhence\b|\bthus\b)/i.test(text);
@@ -176,6 +177,9 @@ function explanation(value, label, limit = 1200) {
 
 /** Verify exact quotations against authorized, actually read current source lines. */
 function sourceQuote(frame, active, spec, value) {
+  if (typeof value?.file === "string" && includes(frame.policy.goalContext ?? [], value.file.replaceAll("\\", "/"))) {
+    throw new Error("总纲条款可用于项目内规则推导：kind=inference、rule=project-policy、policy 填实际总纲行，premises 填外部事实原文");
+  }
   if (typeof value?.file === "string" && keyOf(relativeName(value.file)) === keyOf(spec.candidate)) {
     throw objectFailure("unverifiable", "资料引用不在本轮证据授权中 " + spec.candidate + "：候选稿只能证明稿内结构", candidateProofGuide());
   }
@@ -244,8 +248,19 @@ function bodyVisibility(lines) {
  * attribution the reader sees. A bad author locator remains an author finding. */
 function validateAttribution(frame,active,spec,block,parts,visible) {
   if(!spec.requireSourcePins)return null;
-  const grant=spec.phases[active.phase],bound=listedAttribution(block,grant.evidence)??explicitAttribution(block,grant.evidence);
+  const grant=spec.phases[active.phase];
+  const policyRefs = parts.filter(part => part.status === "supported").flatMap(part => part.inference?.policy ?? []);
+  const files = [...grant.evidence, ...new Set(policyRefs.map(ref => ref.file))];
+  const bound=listedAttribution(block,files)??explicitAttribution(block,files);
   if(!bound||[...verbatimQuotes(block.text)].length||!visible(block.line))return null;
+  // Sentence splitting can place the closing punctuation and attached
+  // locator in a second block. The full-line quote gate owns that locator.
+  for(const match of verbatimQuotes(block.lineText)) {
+    const end=match.index+match[0].length;
+    if(block.start<end-1)continue;
+    const attached=adjacentCitationLocator(block.lineText,end,files);
+    if(attached&&block.start+bound.start<attached.end)return null;
+  }
   const marker=simulationMarker(block.text);
   // An isolated [模拟] proof establishes the cited file's scope. Its header can
   // live outside the cited substantive rows. A part with any narrative text
@@ -273,16 +288,24 @@ function validateAttribution(frame,active,spec,block,parts,visible) {
     return null;
   }
   if(bound.excludedLocators.length)return bound.excludedLocators[0];
+  const external = [];
   for(const ref of bound.locators) {
     const bytes=readBytes(frame.root,ref.file);
     if(bytes&&ref.end>lineList(bytes).length)return {...ref,reason:"invalid-range"};
+    if (includes(frame.policy.goalContext ?? [], ref.file)) {
+      if (!policyRefs.some(policy => keyOf(policy.file) === keyOf(ref.file) && policy.start >= ref.start && policy.end <= ref.end)) {
+        throw new Error("[coverage-attribution] 正文所引总纲位置须与当前 project-policy 的 policy 引句一致");
+      }
+      continue;
+    }
+    external.push(ref);
     try { evidenceReference(frame,active,spec,ref); }
     catch(error) {
       if(error instanceof UnobservedExcerptError)return {...ref,reason:"unobserved-excerpt"};
       throw error;
     }
   }
-  if(!facts.some(part=>part.status==="supported"&&proofReferences(part).some(source=>bound.locators.some(ref=>keyOf(source.file)===keyOf(ref.file)
+  if(external.length&&!facts.some(part=>part.status==="supported"&&proofReferences(part).some(source=>external.some(ref=>keyOf(source.file)===keyOf(ref.file)
     &&source.start>=ref.start&&source.end<=ref.end))))throw new Error("[coverage-attribution] 正文明确给出出处，须用该出处同一范围内的实际原文核验；改核验参数，确实缺证则提交真实 finding");
   return null;
 }
@@ -507,19 +530,32 @@ function ordinalLines(list,profile=false) {
  * Unrecognized/oversize list syntax stays a parameter error, not author debt.
  */
 function candidateCountClaim(quote,source,guide) {
-  const clause=candidateClause(quote),path=quotedLiteral(source),number="(?:\\d+|[零〇一二两三四五六七八九十]+)",subject="(?:本稿|本文|本节|稿件|候选稿?|当前文档)(?:中)?";
-  const bound=new RegExp("^"+subject+"\\s*(?:对\\s*"+path+"\\s*有\\s*"+number+"\\s*行可识别同行引用|有\\s*"+number+"\\s*行带\\s*"+path+"\\s*的行号定位|带\\s*"+path+"\\s*行号定位的共\\s*"+number+"\\s*行)$","u");
-  const suffix=/(?:\(\s*第\s*([^()]+?)\s*行\s*\)|,\s*(?:即|分别为)\s*第\s*([^()]+?)\s*行)$/u.exec(clause);
+  const clause=candidateClause(quote),path=quotedLiteral(source),number="("+COUNT_NUMBER+")",subject="(?:本稿|本文|本节|稿件|候选稿?|当前文档)(?:中)?";
+  const locator="(?:的\\s*)?(?:原文\\s*)?行号\\s*(?:定位|引用)";
+  // Parse the exact count independently of its optional ordinal list. A
+  // typographic separator can change, but no extra predicate gets absorbed.
+  const bound=new RegExp("^"+subject+"\\s*(?:对\\s*"+path+"\\s*(?:有|共有?)\\s*"+number+"\\s*行可识别同行引用|(?:有|共有?)\\s*"+number+"\\s*行\\s*(?:带|有|含)\\s*"+path+"\\s*"+locator+"|(?:带|有|含)\\s*"+path+"\\s*"+locator+"\\s*的\\s*(?:共|有|共有)\\s*"+number+"\\s*行)$","u");
+  const authorCount=value=>{
+    const match=bound.exec(value);
+    if(!match)return undefined;
+    const parsed=countNumber(match[1]??match[2]??match[3]);
+    return Number.isSafeInteger(parsed)?parsed:undefined;
+  };
+  // List introductions only delimit the ordinal field. They never add or
+  // relax a proof; the remainder must parse entirely as physical rows.
+  const suffix=/(?:\(\s*第\s*([^()]+?)\s*行\s*\)|(?:\s*:\s*|,\s*(?:即|分别[为是]|(?:具体\s*)?行号\s*(?:为|是|如下\s*:?))\s*)第\s*([^()]+?)\s*行)$/u.exec(clause);
   if(!suffix) {
-    if(/第\s*\d+\s*[,、]\s*\d/u.test(clause))throw objectFailure("parameter","行号清单须是同一计数句末尾完整的（第2、4-6行）或‘，即第2、4-6行’，不能忽略未核列表",guide);
-    return {quantityQuote:quote,fullyBound:bound.test(clause)};
+    if(/第\s*\d+\s*[,、]\s*\d/u.test(clause))throw objectFailure("parameter","行号清单须在同一计数句末尾完整列出，可用括号、冒号或‘，即/分别是第2、4-6行’，不能忽略未核列表",guide);
+    const expected=authorCount(clause);
+    return {quantityQuote:quote,fullyBound:expected!==undefined,expected};
   }
   const quantityQuote=clause.slice(0,suffix.index).trim(),list=(suffix[1]??suffix[2]).trim();
-  if(!bound.test(quantityQuote))throw objectFailure("parameter","带行号表的 citation-count 只核明确稿件计数句；请拆开外部行号、标记或其他独立断言，保留作者原文",{...guide,countForms:["本稿有6行带 "+source+" 的行号定位（第2、4-8行）","本稿对 "+source+" 有2行可识别同行引用（第2、4行）"]});
+  const expected=authorCount(quantityQuote);
+  if(expected===undefined)throw objectFailure("parameter","带行号表的 citation-count 只核明确稿件计数句；请拆开外部行号、标记或其他独立断言，保留作者原文",{...guide,countForms:["本稿有6行带 "+source+" 的行号定位（第2、4-8行）","本稿对 "+source+" 有2行可识别同行引用（第2、4行）"]});
   const {claimedLines,problem}=ordinalLines(list);
   if(problem==="syntax")throw objectFailure("parameter","完整行号表仅支持正整数及递增范围，以顿号/逗号分隔；不接受省略号、‘等’或附加断言",guide);
   if(problem==="range")throw objectFailure("parameter","完整行号表每次最多256项，须为安全正整数及递增范围；超出范围请单独核验，不能截断清单",guide);
-  return {quantityQuote,claimedLines,fullyBound:true};
+  return {quantityQuote,claimedLines,fullyBound:true,expected};
 }
 
 /** Recognize a two-clause self-report without changing normal block boundaries.
@@ -571,12 +607,39 @@ function profileHint(block,grant,candidate) {
   return match?{kind:"candidate",check:"citation-profile",source:match.source}:null;
 }
 
-/** Require both recognized statistics to use their measured object, including
- * the second block which does not repeat the tag or the source name. */
-function requireProfileProof(block,grant,candidate,parts) {
-  const hint=profileHint(block,grant,candidate);
-  if(hint&&!parts.some(part=>part.objectCheck?.check===hint.check&&part.objectCheck.source===hint.source)) {
-    throw objectFailure("parameter","组合稿件统计须按本块的 objectCheckHint 复算；不能用外部出处或 nonfactual 跳过数量、行号或标记",{objectCheckHint:hint});
+/** Only explicit, complete manuscript claims can suggest their authored count. */
+function countHint(block,grant,candidate) {
+  if(objectMarker(block.text)!=="稿件自述")return null;
+  const hints=grant.evidence.flatMap(source=>{
+    if(keyOf(source)===keyOf(candidate))return [];
+    try {
+      const claim=candidateCountClaim(block.text,source,{});
+      if(claim.fullyBound&&Number.isSafeInteger(claim.expected))return [{kind:"candidate",check:"citation-count",source,expected:claim.expected}];
+    } catch { /* Full-sentence proof validates exact syntax and reports specific errors. */ }
+    return [];
+  });
+  return hints.length===1?hints[0]:null;
+}
+
+/** Require the whole recognized assertion, so author-listed ordinals cannot
+ * be relabeled nonfactual while a separately proved count passes. */
+function requireManuscriptProof(block,grant,candidate,parts,{historical=false}={}) {
+  // Historical outcomes can contain a retired block ID. Saved typed parts
+  // still fail independently if their assertion can no longer be recomputed.
+  if(!block)return;
+  const hint=profileHint(block,grant,candidate)??countHint(block,grant,candidate);
+  if(!hint)return;
+  if(hint.check==="citation-count"&&historical) {
+    // An old, accepted count may have skipped its ordinal suffix. Keep that
+    // receipt only if the host can now recompute the whole original sentence.
+    return hint;
+  }
+  const hintMatched=parts.some(part=>part.objectCheck?.check===hint.check&&part.objectCheck.source===hint.source&&
+    // A reviewer may split off a neutral Markdown label, but the measured
+    // part still has to match the entire count and optional ordinal text.
+    (hint.check!=="citation-count"||part.objectCheck.expected===hint.expected&&candidateClause(part.quote)===candidateClause(block.text)));
+  if(!hintMatched) {
+    throw objectFailure("parameter","稿件统计须按本块的 objectCheckHint 核对完整原句；不能全部 nonfactual，也不能把数量、行号、标记拆成 nonfactual 或用外部出处代证",{objectCheckHint:hint});
   }
 }
 
@@ -611,6 +674,14 @@ function measureCitationProfile(profile,lines,citedLines) {
     lines:actualLines.slice(0,24),...ordinals,exampleLines,wrongExampleLines,...(marker?{marker,markerPosition}:{})};
 }
 
+/** Use one measurement for authored counts in executor preflight and review. */
+function measureCitationCount(claim,expected,lines) {
+  const result={matches:lines.length===expected,actual:lines.length,unit:"candidate-citation-lines",lines:lines.slice(0,24)};
+  if(!claim.claimedLines)return result;
+  const ordinals=compareOrdinals(claim.claimedLines,lines,expected);
+  return {...result,matches:result.matches&&ordinals.lineListMatches,...ordinals};
+}
+
 /** Preflight computes only recognized clauses in the current candidate bytes.
  * Source names come from the caller's existing grant; no external file is read.
  * Reuse the reviewer predicate so a passing executor preflight cannot mean a
@@ -621,10 +692,14 @@ export function candidateCitationProfiles(bytes,authorizedSources,candidate) {
   const counts=new Map();
   return documentCoverage(bytes).blocks.flatMap(block=>{
     const matched=profileAtBlock(block,authorizedSources,candidate);
-    if(!matched)return [];
-    const {source,profile}=matched;
+    const count=matched?null:countHint(block,{evidence:authorizedSources},candidate);
+    if(!matched&&!count)return [];
+    const {source}=matched??count;
     if(!counts.has(source))counts.set(source,citationLineCounts(bytes,[source])[0].lines);
-    return [{line:block.line,block:block.id,source,...measureCitationProfile(profile,lines,counts.get(source))}];
+    const measurement=matched?measureCitationProfile(matched.profile,lines,counts.get(source)):
+      {profileClause:"citation-count",expected:count.expected,
+        ...measureCitationCount(candidateCountClaim(block.text,source,{}),count.expected,counts.get(source))};
+    return [{line:block.line,block:block.id,source,...measurement}];
   });
 }
 
@@ -642,23 +717,24 @@ function candidateMarkClaim(quote,source,marker,leading,guide) {
   if(!contract.test(candidateClause(quote)))throw objectFailure("parameter",(leading?"citations-leading-marked":"citations-marked")+" 须绑定完整正向全称标记句、同一来源和明确标记位置；数量/行号表请用 citation-count，‘未全标’与‘完全没标’均不能用此谓词代证",{...guide,claimForm:"本稿所有 "+source+" 引用行都"+(leading?"在行首标了":"含")+marker+"标记。",next:"只修核验参数；若同句另有数量、否定或独立后半句，请按实际原文拆分核验，不要求作者改写正确句子。"});
 }
 
+function countNumber(value) {
+  if(/^\d+$/u.test(value))return Number(value);
+  const digits="零一二三四五六七八九";value=value.replaceAll("两","二").replaceAll("〇","零");
+  if(value==="十")return 10;
+  if(/^[一二三四五六七八九]?十[一二三四五六七八九]?$/u.test(value)) {
+    const [a,b]=value.split("十");return (a?digits.indexOf(a):1)*10+(b?digits.indexOf(b):0);
+  }
+  return value.length===1?digits.indexOf(value):NaN;
+}
+
 /** Bind a count parameter to the same visible quantity, not a C-number or locator. */
 function countAssertion(quote,expected,unit,guide={}) {
   const normalized=quote.normalize("NFKC").replace(/第\s*\d+(?:\s*[-–—、至到]\s*\d+)?\s*行|#L\d+(?:-L?\d+)?/gu,""),values=[];
   if(/至少|至多|超过|少于|多于|不低于|不超过|不到|小于|大于|并非|不是|不为|约\s*\d|[≥≤<>]/u.test(normalized))throw objectFailure("parameter","count 只核精确等值，不能替范围、近似或否定数量作证",guide);
-  const chinese=value=>{
-    if(/^\d+$/u.test(value))return Number(value);
-    const digits="零一二三四五六七八九";value=value.replaceAll("两","二").replaceAll("〇","零");
-    if(value==="十")return 10;
-    if(/^[一二三四五六七八九]?十[一二三四五六七八九]?$/u.test(value)) {
-      const [a,b]=value.split("十");return (a?digits.indexOf(a):1)*10+(b?digits.indexOf(b):0);
-    }
-    return value.length===1?digits.indexOf(value):NaN;
-  };
-  for(const match of normalized.matchAll(/(\d+|[零〇一二两三四五六七八九十]+)\s*(条|句|项|行)/gu)) {
+  for(const match of normalized.matchAll(new RegExp("("+COUNT_NUMBER+")\\s*(条|句|项|行)","gu"))) {
     if(/第\s*$/u.test(normalized.slice(0,match.index)))continue;
     if(unit==="candidate-citation-lines"&&match[2]!=="行")continue;
-    values.push(chinese(match[1]));
+    values.push(countNumber(match[1]));
   }
   if(values.length!==1||values[0]!==expected) {
     // A unique literal in the current sentence can repair the example parameter;
@@ -736,11 +812,7 @@ function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
     } else if(input.check==="citation-count") {
       const claim=candidateCountClaim(assertion.quote,source,guide);
       countAssertion(claim.quantityQuote,input.expected,"candidate-citation-lines",guide);
-      result.result={matches:counted.count===input.expected,actual:counted.count,unit:"candidate-citation-lines",lines:counted.lines.slice(0,24)};
-      if(claim.claimedLines) {
-        const ordinals=compareOrdinals(claim.claimedLines,counted.lines,input.expected);
-        result.result={...result.result,matches:result.result.matches&&ordinals.lineListMatches,...ordinals};
-      }
+      result.result=measureCitationCount(claim,input.expected,counted.lines);
     } else {
       const leading=input.check==="citations-leading-marked";
       candidateMarkClaim(assertion.quote,source,input.marker,leading,guide);
@@ -769,11 +841,17 @@ function validateObjectPart(frame,active,spec,part,lines,block,bytes,{host=false
 /** Recheck typed objects at ledger closure without new coordinator access/reads. */
 export function requireStoredObjectChecks(frame,spec,coverages,bytes,phase="final-review") {
   const lines=lineList(bytes),blocks=new Map(documentCoverage(bytes).blocks.map(block=>[block.id,block]));
+  const counted=new Map();
   try {
     if(!["first-review","final-review"].includes(phase))throw new Error("invalid review authority");
     for(const coverage of coverages)for(const record of coverage.records) {
       const block=blocks.get(record.block);
-      requireProfileProof(block,spec.phases[phase],spec.candidate,record.parts);
+      const count=requireManuscriptProof(block,spec.phases[phase],spec.candidate,record.parts,{historical:true});
+      if(count) {
+        if(!counted.has(count.source))counted.set(count.source,citationLineCounts(bytes,[count.source])[0].lines);
+        const measured=measureCitationCount(candidateCountClaim(block.text,count.source,{}),count.expected,counted.get(count.source));
+        if(!measured.matches)throw new Error("manuscript citation count or ordinal list not accepted");
+      }
       validateSimulationScope(frame,{phase},spec,block,record.parts);
       validateBoundedRecord(frame,{phase},spec,block,record.parts,{host:true});
       for(const part of record.parts) {
@@ -838,10 +916,18 @@ function configuredCalculation(frame, spec, id, lines, assertion, premises) {
  * by a separate blind auditor; these structural checks never certify it by themselves.
  */
 function inferenceProof(frame, active, spec, value, lines, assertion) {
-  if (!value || !["source-warrant", "modus-ponens", "equality-transitive", "configured-calculation"].includes(value.rule)) {
-    throw new Error("推导需明确 rule：source-warrant、modus-ponens、equality-transitive 或 configured-calculation");
+  const projectPolicy = value?.rule === "project-policy";
+  if (!value || !["source-warrant", "project-policy", "modus-ponens", "equality-transitive", "configured-calculation"].includes(value.rule)) {
+    throw new Error("推导需明确 rule：source-warrant、project-policy、modus-ponens、equality-transitive 或 configured-calculation");
   }
-  if (!Array.isArray(value.premises) || !value.premises.length || value.premises.length > 12) throw new Error("推导须逐项列 premises 原始前提，不得引用候选自证");
+  if (!Array.isArray(value.premises) || (!projectPolicy && !value.premises.length) || value.premises.length > 12) {
+    throw new Error("推导须逐项列 premises 原始事实；仅转述当前项目规则可填空列表，不得引用候选自证");
+  }
+  if ((!projectPolicy && value.policy !== undefined) || (projectPolicy &&
+      (!Array.isArray(value.policy) || !value.policy.length || value.policy.length > 8 ||
+       ["warrant", "formal", "calculation"].some(key => value[key] !== undefined)))) {
+    throw new Error("project-policy 须用 policy 填 1–8 处逐字总纲条款，勿混填 warrant、formal 或 calculation");
+  }
   const premises = value.premises.map(ref => sourceQuote(frame, active, spec, ref));
   // A structured scope is semantically equivalent to the short text contract;
   // preserve it instead of misreporting a meaningful object as empty evidence.
@@ -859,7 +945,9 @@ function inferenceProof(frame, active, spec, value, lines, assertion) {
   if (typeof counterexample?.possible !== "boolean") throw new Error("须判断前提成立而结论不成立的反例是否可能，counterexample.possible 为布尔值");
   const counter = { possible: counterexample.possible, reason: explanation(counterexample.reason, "反例或排除反例的理由") };
   const proof = { rule: value.rule, premises, scope, assumptions, counterexample: counter };
-  if (value.rule === "source-warrant") {
+  if (projectPolicy) {
+    proof.policy = value.policy.map(ref => projectPolicyReference(frame, active, ref));
+  } else if (value.rule === "source-warrant") {
     if (!Array.isArray(value.warrant) || !value.warrant.length || value.warrant.length > 8) throw new Error("自然语言推导须 warrant 指出原文中的桥接关系，不能仅重复结论");
     proof.warrant = value.warrant.map(ref => sourceQuote(frame, active, spec, ref));
   } else if (value.rule === "configured-calculation") {
@@ -993,14 +1081,14 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible) {
         throw new Error("[coverage-non-entailment] finding.quote 须引用实际‘其他都不是’断言，不能退回前面正确的单向规则");
       }
       result.inference=bounded;
-    } else if (part.status === "supported") {
+    } else if (part.status === "supported" || part.kind === "inference" && part.inference?.rule === "project-policy") {
       if (part.kind === "direct") {
         if (!Array.isArray(part.evidence) || !part.evidence.length || part.evidence.length > 12) throw new Error("直接事实须给 evidence 原文及逐字 quote");
         result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
       } else {
         result.inference = inferenceProof(frame, active, spec, part.inference, lines,
           { line: block.line, start: block.start + start, end: block.start + cursor, quote });
-        if (result.inference.counterexample.possible) {
+        if (part.status === "supported" && result.inference.counterexample.possible) {
           result.status = "uncertain";
           result.repair = "存在前提成立而结论不成立的反例，补充排除它的依据或收窄结论";
           result.finding = { kind: "invalid-inference", quote, fix: result.repair };
@@ -1019,7 +1107,7 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible) {
         }
         result.finding = { kind: finding.kind, quote: finding.quote, fix: explanation(finding.fix, "事实最小修正") };
         result.repair = result.finding.fix;
-        if (finding.kind === "contradiction" && !part.evidence?.length && result.objectCheck?.result.matches!==false) throw new Error("矛盾退回须 evidence 给实际原文反证及逐字引句，或已验证为 false 的 objectCheck");
+        if (finding.kind === "contradiction" && !part.evidence?.length && !result.inference?.policy?.length && result.objectCheck?.result.matches!==false) throw new Error("矛盾退回须给实际原文反证、当前项目条款证明或已验证为 false 的 objectCheck");
       }
       if (part.evidence?.length) result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
     }
@@ -1027,12 +1115,13 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible) {
     // excerpt registry cannot establish a fact about the external world.
     if(["direct","inference"].includes(part.kind)) {
       const marker=objectMarker(block.lineText);
-      result.proofObject=result.objectCheck?.kind??(marker==="稿件自述"?"candidate":marker==="摘录范围"?"registered-excerpts":"external");
+      result.proofObject=result.inference?.rule==="project-policy"?"project-policy":result.objectCheck?.kind??
+        (marker==="稿件自述"?"candidate":marker==="摘录范围"?"registered-excerpts":"external");
     }
     return result;
   });
   if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
-  requireProfileProof(block,spec.phases[active.phase],spec.candidate,reviewed);
+  requireManuscriptProof(block,spec.phases[active.phase],spec.candidate,reviewed);
   const range=registeredLineRange(block.text,spec.phases[active.phase].evidence);
   if(range&&!reviewed.some(part=>part.objectCheck?.check==="line-range"&&keyOf(part.objectCheck.file)===keyOf(range.file))) {
     throw objectFailure("parameter","明确本地快照登记区间须按 objectCheckHint 复核，不能用外部事实或另一来源替代",{objectCheckHint:range});
@@ -1081,7 +1170,8 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       ...(requested > count ? { pageLimit: { requested, applied: count } } : {}) };
     for (const row of manifest.blocks.slice(offset,offset+count)) {
       const {lineText,...block}=row;
-      const hint=profileHint(row,spec.phases[active.phase],spec.candidate)??registeredLineRange(row.text,spec.phases[active.phase].evidence);
+      const grant=spec.phases[active.phase];
+      const hint=profileHint(row,grant,spec.candidate)??countHint(row,grant,spec.candidate)??registeredLineRange(row.text,grant.evidence);
       if(hint)block.objectCheckHint=hint;
       const bounded=boundedCase(row,spec.phases[active.phase]);
       if(bounded)block.inferenceHint={rule:"bounded-non-entailment",kind:"inference",quote:row.text.slice(...bounded.tail),
@@ -1194,7 +1284,7 @@ export function requireStoredCalculations(frame, spec, coverages, bytes) {
  * Retiring a stale proof means pending, never a verdict about the new source.
  */
 function validateRecordSources(frame, active, spec, record, lines, block, bytes, visible) {
-  requireProfileProof(block,spec.phases[active.phase],spec.candidate,record.parts);
+  requireManuscriptProof(block,spec.phases[active.phase],spec.candidate,record.parts);
   validateBoundedRecord(frame,active,spec,block,record.parts);
   // Syntax is neutral only while its locator remains authorized, read and pinned.
   // Keep the same ordinary refs for host closure to check without exposing text.
@@ -1207,6 +1297,12 @@ function validateRecordSources(frame, active, spec, record, lines, block, bytes,
       const current = sourceQuote(frame, active, spec, ref);
       if (ref.sha256 !== current.sha256||ref.origin&&JSON.stringify(ref.origin)!==JSON.stringify(current.origin)
         ||ref.evidenceSpan&&ref.evidenceSpan!==current.evidenceSpan) throw new Error("覆盖证据或获取回执版本已经变化，须重新判断该块而非仅重读文件");
+    }
+    for (const ref of part.inference?.policy ?? []) {
+      const current = projectPolicyReference(frame, active, ref);
+      if (current.goalSha256 !== ref.goalSha256 || current.evidenceSpan !== ref.evidenceSpan) {
+        throw new Error("项目规则证明的目标或总纲原文已变化，须重新核验");
+      }
     }
     validateCalculationPart(frame, spec, part, lines, block);
     validateObjectPart(frame, active, spec, part, lines, block, bytes);
@@ -1336,7 +1432,7 @@ export function coverageSummary(frame, active, spec, complete = true) {
       repair:fix,finding:{kind:"missing-evidence",quote:block.text,fix},attribution:problem};
     rejected.push({...finding,repairBaseline:repairBaseline(frame.root,spec,lines,{...finding,contextStart:block.start},frame.reads,active.seen,[])});
   }
-  const quotations = complete ? quotationChecks(frame, active, spec, manifest) : [];
+  const quotations = complete ? quotationChecks(frame, active, spec, manifest, inventory.records) : [];
   const modelRejections=rejected.slice();
   for (const quote of quotations.filter(row => !row.matches)) {
     const unavailable = quote.excludedLocators?.some(ref => ["unapproved-source", "invalid-range"].includes(ref.reason)
@@ -1459,11 +1555,12 @@ export function sourceLineEnumerationChecks(frame, active, spec, bytes, manifest
 /** Deterministic validation of explicitly verbatim quotations with a literal
  * inline locator or a unique touching footnote. Other styles still need review.
  */
-function quotationChecks(frame, active, spec, manifest) {
+function quotationChecks(frame, active, spec, manifest, records) {
   const results = [];
   const normalize = value => value.replace(/\s+/gu," ").trim();
   const lines = lineList(readBytes(frame.root,spec.candidate));
-  const grant=spec.phases[active.phase],files=grant.evidence;
+  const grant=spec.phases[active.phase], policyFiles=active.goal?.files?.map(row=>row.file)??[];
+  const files=[...new Set([...grant.evidence,...policyFiles])];
   const footnotes=lines.some(line=>line.includes("[^"))?footnoteQuoteIndex(lines,files):null;
   for (const [index,line] of lines.entries()) {
     for (const match of verbatimQuotes(line)) {
@@ -1476,9 +1573,22 @@ function quotationChecks(frame, active, spec, manifest) {
         return cited?.start ? [{file,start:cited.start,end:cited.end}] : [];
       });
       if (!locators.length && !bound?.excludedLocators.length) continue;
+      const block=manifest.blocks.find(b=>b.line===index+1&&b.start<=match.index&&b.end>match.index);
+      const part=records[block?.id]?.parts.find(row=>row.status==="supported"&&
+        row.start<=match.index-block.start&&row.end>=quoteEnd-1-block.start&&row.inference?.rule==="project-policy");
       const refs = [];
+      const policyRefs = [];
       const excludedLocators = [...(bound?.excludedLocators ?? [])];
       for (const locator of locators) {
+        if (includes(policyFiles,locator.file)) {
+          // A literal project quote needs its own typed proof in this role's
+          // exact passage. It never joins the external quotation references.
+          const cited=part?.inference.policy.find(ref=>keyOf(ref.file)===keyOf(locator.file)&&
+            ref.start>=locator.start&&ref.end<=locator.end&&ref.quote.includes(match[1]));
+          if(cited)policyRefs.push(cited);
+          else excludedLocators.push({...locator,reason:part?"project-quote-mismatch":"unapproved-source"});
+          continue;
+        }
         if(footnote&&includes(grant.read,locator.file)){
           const bytes=readBytes(frame.root,locator.file);
           if(bytes&&locator.end>lineList(bytes).length){excludedLocators.push({...locator,reason:"invalid-range"});continue;}
@@ -1491,15 +1601,16 @@ function quotationChecks(frame, active, spec, manifest) {
           excludedLocators.push(locator);
         }
       }
-      const matches = refs.some(ref => {
+      const matches = policyRefs.length>0 || refs.some(ref => {
         const excerpt = lineList(readBytes(frame.root,ref.file)).slice(ref.start-1,ref.end);
         // Observed excerpts remain independent even when Markdown whitespace is
         // normalized; ordinary continuous local sources retain multi-line quotes.
         return ref.origin?.observation ? excerpt.some(line => normalize(line).includes(normalize(match[1])))
           : normalize(excerpt.join("\n")).includes(normalize(match[1]));
       });
-      results.push({block:manifest.blocks.find(b=>b.line===index+1&&b.start<=match.index&&b.end>match.index)?.id ?? "Q"+(index+1),
+      results.push({block:block?.id ?? "Q"+(index+1),
         line:index+1,text:footnote?line.slice(match.index,footnote.end):match[0],lineText:line,contextStart:match.index,refs,matches,
+        ...(policyRefs.length ? {policyRefs} : {}),
         ...(footnote ? {binding:"adjacent-footnote",footnote:footnote.footnote} : bound ? {binding:"adjacent-single-source",locatorEnd:bound.end} : {}),
         ...(excludedLocators.length ? { excludedLocators } : {}) });
     }
@@ -1509,18 +1620,23 @@ function quotationChecks(frame, active, spec, manifest) {
 
 /** An old pending proof could have matched an unrelated inline citation. Open
  * workflows with a touching footnote must carry the new exact host binding. */
-export function requireStoredFootnoteBindings(spec,coverages,bytes,phase) {
+export function requireStoredFootnoteBindings(spec,coverages,bytes,phase,goal) {
   const lines=lineList(bytes);
   if(!lines.some(line=>line.includes("[^")))return;
-  const footnotes=footnoteQuoteIndex(lines,spec.phases[phase].evidence);
+  const footnotes=footnoteQuoteIndex(lines,[...new Set([...spec.phases[phase].evidence,...(goal?.files??[]).map(row=>row.file)])]);
   for(const [index,line] of lines.entries())for(const match of verbatimQuotes(line)){
     const bound=footnotes(index+1,match.index,match.index+match[0].length);
     if(!bound||bound.ignored)continue;
-    const valid=bound.locators.length===1&&coverages.every(coverage=>coverage?.quotations?.some(row=>
-      row.binding==="adjacent-footnote"&&row.line===index+1&&row.contextStart===match.index&&row.matches===true
-      &&row.text===line.slice(match.index,bound.end)&&row.footnote?.id===bound.footnote.id
-      &&row.footnote?.definitionLine===bound.footnote.definitionLine&&row.refs?.length===1
-      &&["file","start","end"].every(key=>row.refs[0][key]===bound.locators[0][key])));
+    const valid=bound.locators.length===1&&coverages.every(coverage=>coverage?.quotations?.some(row=>{
+      if(row.binding!=="adjacent-footnote"||row.line!==index+1||row.contextStart!==match.index||row.matches!==true||
+        row.text!==line.slice(match.index,bound.end)||row.footnote?.id!==bound.footnote.id||
+        row.footnote?.definitionLine!==bound.footnote.definitionLine)return false;
+      const {file,start,end}=bound.locators[0];
+      if(goal?.files?.some(row=>keyOf(row.file)===keyOf(file)))return row.policyRefs?.length===1&&
+        row.policyRefs[0].goalSha256===goal.sha256&&keyOf(row.policyRefs[0].file)===keyOf(file)&&
+        row.policyRefs[0].start>=start&&row.policyRefs[0].end<=end&&row.policyRefs[0].quote.includes(match[1]);
+      return row.refs?.length===1&&["file","start","end"].every(key=>row.refs[0][key]===bound.locators[0][key]);
+    }));
     if(!valid)throw new Error("当前开放验收缺少逐字引句的唯一脚注定位证明，须按当前稿重新核验");
   }
 }
@@ -1563,6 +1679,7 @@ function factualMask(record) {
   return mask;
 }
 function objectKind(part) {
+  if (part?.inference?.rule === "project-policy") return "project-policy";
   return part?.objectCheck?JSON.stringify([part.objectCheck.kind,part.objectCheck.file??part.objectCheck.source??null]):"external";
 }
 
@@ -1643,8 +1760,10 @@ export function coverageSchema() {
     left: { ...string, description: "具体命题/对象标识。implies 表示 left→right；asserts 仅断言 left；equals 表示 left=right。同一命题必须用相同字符串。" },
     right: { ...string, description: "仅 implies/equals 必填；asserts 必须省略，不填空串或复述左项。" } }, required: ["relation", "left"], additionalProperties: false };
   const inference = { type: "object", properties: {
-    rule: { type: "string", enum: ["source-warrant", "modus-ponens", "equality-transitive", "configured-calculation"] },
+    rule: { type: "string", enum: ["source-warrant", "project-policy", "modus-ponens", "equality-transitive", "configured-calculation"] },
     premises: { type: "array", items: ref }, warrant: { type: "array", items: ref },
+    policy: { type: "array", minItems: 1, maxItems: 8, items: ref,
+      description: "仅 project-policy：逐字引用当前总纲已读条款，支持项目内规则及其应用。应用到具体记录时，原始事实仍由 premises 提供。" },
     scope: { anyOf: [string, { type: "object", properties: { objects: {type:"array",items:string,minItems:1,maxItems:12}, conditions: {type:"array",items:string,minItems:1,maxItems:12} }, required:["objects","conditions"],additionalProperties:false }],description:"具体说明适用对象、概念和条件，可用短句或明确的 objects/conditions 对象。" },
     assumptions: { type: "array", items: { type: "object", properties: { statement: string, evidence: ref }, required: ["statement", "evidence"], additionalProperties: false } },
     counterexample: { type: "object", properties: { possible: { type: "boolean" }, reason: string }, required: ["possible", "reason"], additionalProperties: false },
@@ -1653,7 +1772,7 @@ export function coverageSchema() {
   const objectCheck={type:"object",properties:{kind:{type:"string",enum:["registered-excerpts","candidate"]},check:{type:"string",enum:["count","contains","excludes","line-status","line-range","citation-count","citations-marked","citations-leading-marked","citation-profile"]},
     file:string,source:string,line:integer,expected:{anyOf:[integer,{type:"string",enum:["registered","unregistered"]}]},quote:string,marker:string,
     start:integer,end:integer,mode:{type:"string",enum:["subset","exact"]}},required:["kind","check"],additionalProperties:false,
-    description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)、line-range(file,start,end,mode，按 inventory)，只核本地登记摘录，不证明网页全文，勿与其他事实或来源合用。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source，按块照填 inventory 的 objectCheckHint)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding。"};
+    description:"direct 专用，与 evidence 互斥。有 objectCheckHint 时按对应块原样提交，包括独立计数的 expected。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)、line-range(file,start,end,mode，按 inventory)，只核本地登记摘录，不证明网页全文，勿与其他事实或来源合用。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding。"};
   return { offset: { ...integer, minimum: 0, description: "inventory 的起始位置，使用上页 next.offset。" },
     count: { ...integer, minimum: 1, maximum: INVENTORY_LIMIT, description: "inventory 每页 1–24 块，下一页按返回的 next 原样传入 offset/count。" },
     block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,

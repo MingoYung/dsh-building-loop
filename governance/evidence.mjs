@@ -76,6 +76,26 @@ export function evidenceSpan(bytes, ref) {
   return digest(JSON.stringify([ref.sha256,ref.start,ref.end,ref.quote]));
 }
 
+/** Quote the assigned project's current rule, with a provenance separate from sources. */
+export function projectPolicyReference(frame, active, value) {
+  const file = relativeName(value?.file);
+  const version = active.goal?.files?.find(row => keyOf(row.file) === keyOf(file));
+  if (!version || !includes(frame.policy.goalContext, file) || !includes(frame.reads, file)) {
+    throw new Error("project-policy 只能引用当前单元已登记且可读的总纲文件");
+  }
+  const { start, end, quote } = value;
+  const bytes = readBytes(frame.root, file);
+  const observed = active.seen?.[keyOf(file)];
+  if (!bytes || digest(bytes) !== version.sha256 || observed?.hash !== version.sha256 ||
+      !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || !observed?.ranges?.some(([a, b]) => a <= start && b >= end)) {
+    throw new Error("project-policy 须使用本角色已读的当前总纲原文行，目标变化后须重新验收");
+  }
+  const ref = { file, start, end, quote, sha256: version.sha256 };
+  const span = typeof quote === "string" && quote.length <= 2000 && evidenceSpan(bytes, ref);
+  if (!span) throw new Error("project-policy 的 quote 须逐字出现在所指总纲行");
+  return { ...ref, evidenceSpan: span, goalSha256: active.goal.sha256, provenance: "current-project-policy" };
+}
+
 /** Fragments locate material within a page without creating another source. */
 export function webSourceLocator(value) {
   if(!/^https?:\/\/[^\s<>]+$/iu.test(value??""))return null;

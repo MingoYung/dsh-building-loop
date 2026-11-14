@@ -39,7 +39,22 @@ function requireProofSources(frame, id, active) {
     for (const ref of proofSources(coverage)) {
       if (!sourceVersionCurrent(frame.root, ref)) throw new Error("验收后来源已经变化（原文或获取回执），须重新判断，不能用旧证明关单：" + ref.file);
     }
+    if (!projectPolicyProofsCurrent(frame, active.goal, coverage)) {
+      throw new Error("验收使用的项目规则不再对应当前总纲，须重新核验");
+    }
   }
+}
+
+/** Closure checks the rule version recorded by the role without adding a tool read. */
+function projectPolicyProofsCurrent(frame, goal, coverage) {
+  return (coverage.records ?? []).every(record => record.parts.every(part => {
+    if (part.inference?.rule !== "project-policy") return true;
+    const refs = part.inference.policy;
+    return Array.isArray(refs) && refs.length > 0 && refs.every(ref =>
+      ref.provenance === "current-project-policy" && ref.goalSha256 === goal?.sha256 && typeof ref.evidenceSpan === "string" &&
+      includes(frame.policy.goalContext, ref.file) && goal.files?.some(row =>
+        keyOf(row.file) === keyOf(ref.file) && row.sha256 === ref.sha256) && sourceVersionCurrent(frame.root, ref));
+  }));
 }
 
 /** Obtain contract bytes from the same goal read used to calculate its pin. */
@@ -234,7 +249,7 @@ export function acceptedVersion(frame, id, active) {
   requireStoredObjectChecks(frame, spec, coverages, candidate, receipt.phase);
   // Do not retroactively reinterpret a completed historical receipt. Open
   // units, including accepted units still awaiting their ledger, need it now.
-  if(active.phase!=="closed")requireStoredFootnoteBindings(spec,coverages,candidate,receipt.phase);
+  if(active.phase!=="closed")requireStoredFootnoteBindings(spec,coverages,candidate,receipt.phase,active.goal);
   for (const ref of [...(receipt.checks ?? []), ...(receipt.observedSources ?? [])]) {
     if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) throw new Error("验收后编号证据或获取回执已经变化：" + ref.file);
   }
@@ -261,7 +276,7 @@ export function needsRevalidation(frame, id, active) {
     if (pending.codeReview) {
       if (!currentCodeReview(frame, id, active, frame.policy.units[id], pending)) return true;
     } else {
-      try { requireStoredFootnoteBindings(frame.policy.units[id],[pending.coverage],candidate,pending.phase); }
+      try { requireStoredFootnoteBindings(frame.policy.units[id],[pending.coverage],candidate,pending.phase,active.goal); }
       catch { return true; }
       for (const ref of [...(pending.checks ?? []), ...(pending.observedSources ?? [])]) {
         if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) return true;
@@ -269,6 +284,7 @@ export function needsRevalidation(frame, id, active) {
       for (const ref of proofSources(pending.coverage)) {
         if (!sourceVersionCurrent(frame.root, ref)) return true;
       }
+      if (!projectPolicyProofsCurrent(frame, active.goal, pending.coverage)) return true;
     }
   }
   // Old rejected fingerprints cannot describe text after a citation. Rebuild them

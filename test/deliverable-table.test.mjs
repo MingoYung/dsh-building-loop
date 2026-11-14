@@ -6,7 +6,7 @@ import { deliverableTableContract, deliverableTableIssues } from "../governance/
 import { decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
 import { DELIVERY, GOAL, MATERIALS, initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable } from "../governance/conversation-project.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
-import { fixture, host } from "./helpers.mjs";
+import { fixture, host, policy } from "./helpers.mjs";
 import { QUALITY } from "../governance/preflight.mjs";
 
 const declaration = "交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 Q1、Q2、Q3、Q4、Q5、Q6，每个编号恰好一行。值一格只写题目要求的值。";
@@ -68,6 +68,11 @@ test("rows in quoted, fenced, nested or HTML Markdown cannot replace visible row
 });
 
 test("the actual intake handler keeps an invalid draft at intake and accepts the corrected table", () => fixture(async (root, write) => {
+  // This existing project requires the owner's Q table, not the unrelated
+  // shared test fixture's prose C labels or its CSV calculation.
+  const manifest=structuredClone(policy);
+  manifest.units.K01.claims=[];manifest.units.K01.calculations={};
+  write("BUILDING-LOOP.json",JSON.stringify(manifest));
   const hostHome = process.env.DSH_HOME;
   const current = latestConversationUser([{ type: "user/message", seq: 9,
     data: { source: { kind: "user" }, content: [{ type: "text", text: opening }] } }]);

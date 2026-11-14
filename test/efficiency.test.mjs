@@ -14,8 +14,8 @@ const quality=()=>({...Object.fromEntries(Object.keys(QUALITY).map(k=>[k,"本例
   sourceRefs:[source],unverifiedSources:[],unlisted:[],revise:[],goalFit:{pass:true,basis:"符合当前只核本例记录的交付目标。"}});
 
 /** Keep source/format fixtures small enough to expose mechanical regressions. */
-function single(write,{plainLast=false,body="# 摘要\n- C1：通过19/20（出处：functional.csv 第 2 行）。\n"}={}) {
-  const p=structuredClone(policy);p.units.K01.claims=["C1"];p.units.K01.calculations={};p.units.K01.plainLast=plainLast;
+function single(write,{plainLast=false,claims=["C1"],body="# 摘要\n- C1：通过19/20（出处：functional.csv 第 2 行）。\n"}={}) {
+  const p=structuredClone(policy);p.units.K01.claims=claims;p.units.K01.calculations={};p.units.K01.plainLast=plainLast;
   write("BUILDING-LOOP.json",JSON.stringify(p));write("candidate.md",body);
 }
 
@@ -69,7 +69,7 @@ test("search observations survive same-role interruption but flag changed materi
 }));
 
 test("bounded searches expose scan limits and missing files without granting source-read stamps",async()=>fixture(async(root,write)=>{
-  single(write,{body:Array.from({length:45},(_,i)=>"hit "+(i+1)).join("\n")});
+  single(write,{claims:[],body:Array.from({length:45},(_,i)=>"hit "+(i+1)).join("\n")});
   const p=JSON.parse(fs.readFileSync(path.join(root,"BUILDING-LOOP.json"),"utf8"));
   p.units.K01.phases["first-review"].read.push("absent.md");write("BUILDING-LOOP.json",JSON.stringify(p));
   const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
@@ -132,7 +132,7 @@ test("prepare returns actual authorized lines, records their versions and reuses
 }));
 
 test("prepare pagination never stamps undisclosed lines as read",async()=>fixture(async(root,write)=>{
-  single(write,{body:Array.from({length:402},(_,i)=>"第"+(i+1)+"行").join("\n")});
+  single(write,{claims:[],body:Array.from({length:402},(_,i)=>"第"+(i+1)+"行").join("\n")});
   const h=host(root,{automaticCoverage:false});const executor=(await h.flow("root","advance")).childId;
   const a=await h.flow(executor,"prepare");const candidate=a.files.find(f=>f.path==="candidate.md");
   assert.equal(candidate.lines.length,250);assert.equal(a.complete,false);
@@ -224,7 +224,7 @@ test("supplement preflight and submit block wrong compound stats and expose actu
 }));
 
 test("prepare shows up to twenty-four blocks and pending IDs cannot authorize unseen block judgments",async()=>fixture(async(root,write)=>{
-  single(write,{body:Array.from({length:27},(_,i)=>"# 结构分块"+(i+1)).join("\n")});
+  single(write,{claims:[],body:Array.from({length:27},(_,i)=>"# 结构分块"+(i+1)).join("\n")});
   const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
   const packet=await h.flow(reviewer,"prepare");assert.equal(packet.coverage.blocks.length,24);
   assert.equal(packet.coverage.pendingCount,27);assert.equal(packet.coverage.next.offset,24);
@@ -235,7 +235,7 @@ test("prepare shows up to twenty-four blocks and pending IDs cannot authorize un
 }));
 
 test("the prepare byte budget never marks an omitted long block as presented",async()=>fixture(async(root,write)=>{
-  single(write,{body:"# 结构标题\n"+"长".repeat(7000)+"\n"});
+  single(write,{claims:[],body:"# 结构标题\n"+"长".repeat(7000)+"\n"});
   const h=host(root,{automaticCoverage:false});const {reviewer}=await reviewStage(h);
   const packet=await h.flow(reviewer,"prepare");assert.equal(packet.complete,true);
   assert.equal(packet.coverage.blocks.length,1);assert.ok(Buffer.byteLength(JSON.stringify(packet.coverage))<=16*1024);

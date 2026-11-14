@@ -24,6 +24,13 @@ export function claimRow(lines, id) {
   return found.length === 1 ? found[0] : null;
 }
 
+/** Catch explicit required rows on the author side before review pays to
+ * read the whole draft. Reuse the same unique row lookup as the reviewer. */
+export function requiredClaimRowIssues(lines, ids) {
+  return ids.filter(id=>!claimRow(lines,id)?.body.trim()).map(id=>
+    id+" 需要保留唯一的编号断言行，格式为 `"+id+"：正文`。业务标签放在冒号之后，例如 `"+id+"：E1 的判断……`");
+}
+
 /** 识别准确路径及原文行范围，排除同名前缀和备份别名。 */
 export function citation(body, file) {
   const pattern = new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、；;])" + escape(file)

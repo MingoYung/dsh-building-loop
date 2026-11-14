@@ -9,7 +9,7 @@ import {
 } from "./policy.mjs";
 import {
   QUALITY, citation, claimRow, deliveryQuality, lineList, numericChecks, plainLastIssues,
-  rejectedClaims, reviewedQuality, supplementChecks, repairBaseline,
+  rejectedClaims, reviewedQuality, supplementChecks, repairBaseline, requiredClaimRowIssues,
 } from "./preflight.mjs";
 import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory } from "./evidence.mjs";
 import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
@@ -135,14 +135,14 @@ const RULES = {
   diagnosis: "只读诊断。先 prepare 获取现行目标和源码。语法、参数、运行器用 building_loop_reproduce。行为用 building_loop_diagnosis_probe 比较一个可见字段，附已读条款。得到 proofId 后按 next 提交原因和定点修法。若实测落在另一层，用 reroute 交总控重新分层。",
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
-const REVIEW_FORMAT = '先完整读当前目标文件、候选和引用原文。事实与写法分别判定：有据的事实应 supported，禁止因可选解释、排版或材料未提供的精度判 unsupported。事实退回须 finding={kind:"missing-evidence"|"contradiction"|"scope",quote:候选编号行内实际有问题的逐字正文片段,fix:最小修正}；contradiction 还须 file/start/end 指向已读反证。不要要求补写原稿没有的新事实。事实支持后用 building_loop_quality assess：六项短依据、sourceRefs(file/start/end)、unverifiedSources、unlisted(line/basis)、revise；goalFit={pass,basis}明确现稿是否满足当前目标，符合便可通过，无需为“修订”而改字。质量退回须 revisions=[{field,change,requirement:{file,start,end}}]引用实际读取的目标或项目规则；可选改进放 suggestions，不阻止验收。最后按 prepare 的实际 claims 提交 review checks，支持项填 id/status="supported"/file/start/end/basis。空列表填 []。';
+const REVIEW_FORMAT = '先完整读当前目标、候选和引用原文。有据事实给 supported。事实退回提供 finding，定位实际错句和最小修正；contradiction 的编号核验还须 file/start/end 指向已读反证。用 building_loop_quality assess 记录六项依据、sourceRefs、unverifiedSources、unlisted、revise；goalFit={pass,basis} 独立填写。质量退回用 revisions 引已读目标或项目规则，选做建议放 suggestions。最后按 prepare 的实际 claims 提交 review checks。支持项可给同行 file/start/end；正文自动发现的编号用已保存全文证明时填 useCoverage:true。';
 const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
 const CODE_SUBMIT_RULE = "落实已确认目标后，用 prepare 查看当前候选的签名和送审条件。submission.status 为 ready 就提交当前版本。返回 read-back 时核对当前行并按 submission.next 完成读回，再提交同一版。有实际需求缺口时修订并重新测试当前版本。";
 const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据。没有授权原始资料时填 []，仍须逐块判断，缺源事实应退回。候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
 // Semantic alignment is an explicit review duty, not a host claim that quote
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
-const OBJECT_RULE="区分三个证据对象：外部事实用实际原文 evidence；已登记摘录的数量、成员或逐字范围用 direct.objectCheck 的 registered-excerpts；当前稿引用行数或逐处标记用 direct.objectCheck 的 candidate。inventory 给出 objectCheckHint 时，按原样作为该块 direct.objectCheck，只填提示里的 kind/check/source。组合统计的两块分别提交，宿主从当前原句逐项核数量、完整行号、错例注记和同源标记子集。已登记摘录无某字面不证明完整网页没有该内容，稿件自述也不能用外部标题证明。纯定位、编号和格式边界不另作事实；错例后说明及大白话若含事实仍逐项核。";
+const OBJECT_RULE="外部事实用实际原文 evidence；项目规则与处置用 inference 的 project-policy，把总纲凭证放 policy、事实原文放 premises。已登记摘录范围与稿件自身计数用各自的 direct.objectCheck，按块原样传 objectCheckHint（包括计数的 expected）。局部登记范围只代表该登记范围。错例后说明及大白话含事实时仍逐项核。";
 const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
 const FOOTNOTE_RULE="逐字引句紧接脚注标记时，读当前稿的同名定义和所指原文。旁边其他出处不能替该脚注证明引句。脚注定义后的事实照常核验。";
 const EXAMPLE_RULE = '原句明确以“误读：”“错例：”“错误推理：”或 [误读]/[错例] 开头时，按 error-example 单列：sourceRelation 核其中展示的推理是 contradicts 或 insufficient，evidence 给实际反证或不足依据。宿主保留它作为已标注的错例，不作为已证前提；不要求作者为了核验换一个同义标签。没有显式标签绝不能用此分类。';
@@ -1255,6 +1255,8 @@ export function apply(ctx, config = {}) {
         contract:!codeReviewMode&&(frame.role==="auditor"||frame.role==="reviewer")?{
           direct:{kind:"direct",status:"supported|unsupported|uncertain",sourceRelation:"supports|contradicts|insufficient",basis:"具体判断",
             evidence:[{file:"授权原文",start:1,end:1,quote:"对应行逐字引句"}]},
+          ...(frame.policy.goalContext.length ? { projectPolicy: { files: frame.policy.goalContext, kind: "inference", rule: "project-policy",
+            note: "总纲规则按已读行逐字放 inference.policy。仅转述规则可用 premises:[]；对具体记录作判定时，除 policy 外在 premises 引该记录事实原文。两类证明独立，sourceRefs 只放外部事实。" } } : {}),
           rejected:{kind:"inference",status:"unsupported",sourceRelation:"insufficient",basis:"具体缺口",
             finding:{kind:"invalid-inference",quote:"候选真实原句",fix:"最小修正"}},
           ...(coverage?.blocks?.some(block=>block.neutralSpans?.length)?{neutralSpanRule:NEUTRAL_SPAN_RULE}:{}),
@@ -2408,6 +2410,9 @@ export function apply(ctx, config = {}) {
     }
     if(preservation.proof)result={...result,requiredLines:preservation.proof,
       ok:result.ok&&preservation.issues.length===0,issues:[...result.issues,...preservation.issues]};
+    const claimIssues=requiredClaimRowIssues(lines,spec.claims);
+    if(claimIssues.length)result={...result,ok:false,issues:[...result.issues.filter(issue=>
+      !claimIssues.some(message=>message.startsWith(issue+"，"))),...claimIssues]};
     // Review cannot certify a scope marker that the draft attaches to more
     // than one possible source. Report that author repair before the handoff.
     const simulationIssues=simulationScopeLocatorIssues(frame,active,spec,bytes);
@@ -2586,6 +2591,10 @@ export function apply(ctx, config = {}) {
           const issues = deliverableTableIssues(bytes, table);
           if (issues.length) throw new Error("[building-loop/deliverable-table] " + issues.join("；"));
         }
+        if (active.phase === "intake" && !codeRoute) {
+          const issues=requiredClaimRowIssues(lineList(bytes),spec.claims);
+          if(issues.length)throw new Error("[building-loop/preflight] "+issues.join("；"));
+        }
         if (active.phase === "supplement" && codeRoute) {
           active.phase = "final-review-ready";
         } else if (active.phase === "supplement") {
@@ -2633,7 +2642,9 @@ export function apply(ctx, config = {}) {
         // normal source, citation and read validation on every check again.
         let coverage;
         const fullCoverage=()=>coverage??=coverageSummary(frame,active,spec);
-        let checked = reviewChecks(frame, active, spec, grant, args.checks??previous, lines, binding, fullCoverage);
+        const checks = args.checks ?? previous?.map(check => check.supportOrigin?.kind === "same-reviewer-coverage"
+          ? { id: check.id, status: check.status, basis: check.basis, useCoverage: true } : check);
+        let checked = reviewChecks(frame, active, spec, grant, checks, lines, binding, fullCoverage);
         coverage=fullCoverage();
         requireDisputedProof(active,coverage.records,true);
         rememberDirectCoverage(frame,active,spec,coverage);
@@ -2652,8 +2663,9 @@ export function apply(ctx, config = {}) {
         const observedSources = qualityChecks ? active.assessment.refs?.map(ref => evidenceReference(frame, active, spec, ref)) : [];
         // A source-free design can pass independent review. Supported factual
         // spans and numbered claims still require their own verified evidence.
-        if (!unsupported.length && ((grant.evidence.length > 0 && !observedSources?.length) || checked.some(check => !observedSources.some(ref =>
-          keyOf(ref.file) === keyOf(check.file) && ref.sha256 === check.sha256 && ref.start <= check.end && ref.end >= check.start)))) {
+        if (!unsupported.length && ((grant.evidence.length > 0 && !observedSources?.length) || checked.some(check =>
+          check.supportOrigin?.proofObject !== "project-policy" && !observedSources.some(ref =>
+            keyOf(ref.file) === keyOf(check.file) && ref.sha256 === check.sha256 && ref.start <= check.end && ref.end >= check.start)))) {
           throw new Error("资料核验须覆盖每份支持结论的实际原文，请重新提交 sourceRefs");
         }
         const qualityRejected = qualityChecks ? Object.keys(qualityChecks).filter(field => !qualityChecks[field].pass) : [];
@@ -3128,7 +3140,7 @@ export function apply(ctx, config = {}) {
   const referenceSchema = { type: "object", properties: { file: string, start: number, end: number }, required: ["file", "start", "end"], additionalProperties: false };
   register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
     unit: { ...string, description: "可省略，宿主沿用当前子会话唯一已授权单元；显式编号须与授权一致。" }, ...qualityFields,
-    goalFit: { type: "object", properties: { pass: { type: "boolean" }, basis: string }, required: ["pass","basis"], additionalProperties: false },
+    goalFit: { type: "object", description: "单独填目标是否满足；goalFit 这个名字不进入 revise 或 revisions。", properties: { pass: { type: "boolean" }, basis: string }, required: ["pass","basis"], additionalProperties: false },
     revisions: { type: "array", items: { type: "object", properties: {
       field: { type: "string", enum: qualityNames }, change: string, requirement: referenceSchema,
     }, required: ["field","change","requirement"], additionalProperties: false } },
@@ -3157,11 +3169,13 @@ export function apply(ctx, config = {}) {
     requirement: codeReviewProbeRequirement,
   }, codeReviewAction), {when:visible(["reviewer","auditor"], codeReviewRole)});
   register(tool(LEDGER, "总控登记后续计划、临时需求和搁置事项。每轮事实验收后 read 当前账本和项目现状，再逐项 review。历史按 ID lookup，浏览用 nextCursor 续读，复盘用 reviewPage.cursor 提交本页。配置 ledgerDocument 时，review 关单会由宿主生成账本，export 可单独刷新账本。"+LEDGER_BASIS_RULE, ["read", "lookup", "record", "review", "export"], {
-    unit: { ...string, description: "复盘时指定单元；record(kind=interrupted) 指明已有宿主中断的单元时，返回原 unit-账项，勿重复登记。独立搁置任务可省略。" }, id: string, kind: { type: "string", enum: ["planned", "temporary", "interrupted"] },
-    title: string, note: string, originId: string, includeClosed: { type: "boolean" },
+    unit: { ...string, description: "复盘时指定单元；record(kind=interrupted) 指明已有宿主中断的单元时，返回原 unit-账项，勿重复登记。独立搁置任务可省略。" },
+    id: { ...string, description: "独立事项使用用户给定的稳定编号；一条消息有多项时分别登记。与 originId 二选一。" },
+    kind: { type: "string", enum: ["planned", "temporary", "interrupted"] },
+    title: string, note: string, originId: { ...string, description: "自动用户请求的编号，仅归类这一条原请求；不可复用为不同事项。" }, includeClosed: { type: "boolean" },
     cursor: { ...string, description: "浏览时将 nextCursor 给 read；复盘时将 reviewPage.cursor 给 review。首次 read 和每次读新的待复盘页时省略。" },
     limit: { type: "integer", minimum: 1, maximum: 32, description: "分段读取条数上限。" },
-    expectedItemSha256: { ...string, description: "显式修改已有独立账项时必填；取最近 ledger read 对应项目的 itemSha256。新增项目和原请求归类不填。" },
+    expectedItemSha256: { ...string, description: "已有独立事项或已归类的自动请求有实质改动时，用最新 read/lookup 的 itemSha256。" },
     decisions: { type: "array", items: { type: "object", properties: {
       id: string, outcome: { type: "string", enum: ["keep", "resume", "defer", "completed", "covered", "obsolete"] },
       basis: {...string,description:LEDGER_BASIS_RULE}, evidence: referenceSchema, coveredBy: string,
@@ -3177,9 +3191,10 @@ export function apply(ctx, config = {}) {
       type: "object", properties: {
         id: string, status: { type: "string", enum: ["supported", "unsupported"] },
         line: { ...number, description: "退回项在候选中没有编号行时填写候选行号" },
-        file: { ...string, description: "supported 或 finding.kind=contradiction 均必填。实际已读原文路径，与 id/status 同级，不放 finding 内。" },
-        start: { ...number, description: "supported 或 contradiction 必填。原文起始行，1 起计，与 id/status 同级。" },
-        end: { ...number, description: "supported 或 contradiction 必填。原文结束行，1 起计，与 id/status 同级。" },
+        useCoverage: { type: "boolean", description: "仅用于正文自动发现的编号，用当前角色、当前稿该行的已验全文证明；与 file/start/end 二选一。" },
+        file: { ...string, description: "用直接出处支持或反驳断言时，填写实际已读原文路径，与 id/status 同级。" },
+        start: { ...number, description: "直接引用原文的起始行，1 起计。" },
+        end: { ...number, description: "直接引用原文的结束行，1 起计。" },
         basis: { ...string, description: "为何支持或为何不足" },
         finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence","contradiction","scope"] },
           quote: { ...string, description: "从当前候选的对应编号行逐字复制有问题的正文片段，优先只填正文。" },
@@ -3263,7 +3278,7 @@ export function apply(ctx, config = {}) {
           "文件用 building_loop_file，阶段用 " + (codeReview ? CODE_REVIEW : WORKFLOW) + "。" + (!codeReview && frame.role === "reviewer" ? "质量判断用 building_loop_quality。" : ""),
           ...(frame.role === "coordinator" ? ["计划、临时需求和中断事项记入 building_loop_ledger。用户消息已自动登记待判定，结合现状分类处置。",
             ...(frame.policy.ledgerDocument?["账本快照 "+frame.policy.ledgerDocument+" 由宿主在 ledger review 成功后自动生成；需要当前快照用 ledger export，不调用 file write 二次转写。"]:[]),
-            "已有请求用 originId 关联记录，不另起同义任务。独立计划不能借其他工作的验收标 completed；取消用 obsolete，被成果满足用 covered。covered 必须 coveredBy 指向当前目标下验收通过的单元；read 返回覆盖关系。",
+            "一条用户消息有一条自动请求记录。归类该请求用 originId。同一消息内的不同事项各用稳定 id，用户给了编号则逐个照用。改已有事项前读其最新版本。独立计划不能借其他工作验收标 completed；取消用 obsolete，被通过的成果覆盖用 covered 并填写 coveredBy。",
             (() => {
               const { items } = ledgerSummary(frame);
               const sample = items.slice(0, 12).map(({ id, kind, title, status }) => ({ id, kind, title, status }));
@@ -3325,8 +3340,8 @@ function citationProfileIssue(row) {
     : row.source+" 的实际引用行";
   const lines=row.lines.join("、")||"无";
   const preview=row.actual>row.lines.length?"（仅预览，完整清单须按当前稿核对）":"";
-  const labelIssue=row.wrongExampleLines.length?"错例注记不符的行号为 "+row.wrongExampleLines.join("、")+"。":"";
-  return "第 "+row.line+" 行组合稿件统计不符。"+subject+"实测 "+row.actual+" 行，物理行号为 "+lines+preview
+  const labelIssue=row.wrongExampleLines?.length?"错例注记不符的行号为 "+row.wrongExampleLines.join("、")+"。":"";
+  return "第 "+row.line+" 行"+(row.profileClause==="citation-count"?"稿件引用计数":"组合稿件统计")+"不符。"+subject+"实测 "+row.actual+" 行，物理行号为 "+lines+preview
     +"。"+labelIssue+"请修正原句的数量、完整行号或错例注记后读回。";
 }
 
@@ -3423,6 +3438,62 @@ function carryNumberedFinding(frame,active,grant,row,material,fullCoverage) {
   return {finding:part.finding,basis:part.basis,origin:{kind:"same-reviewer-coverage",block:record.block}};
 }
 
+/** Reuse the reviewer's substantive proof on exactly this inferred row.
+ * Keep project rules distinct from external sources, even on mixed rows. */
+function numberedCoverageSupport(frame, active, spec, grant, id, candidate, material, fullCoverage) {
+  const unavailable = reason => new Error(id + " 无法复用本次全文核验：" + reason);
+  const row = claimRow(candidate, id);
+  const owner = active.coverage?.presentationOwner;
+  if (!row || frame.role !== "reviewer" || owner?.actor !== frame.agent.id || owner.phase !== active.phase ||
+      owner.candidateSha256 !== material.candidateSha256) {
+    throw unavailable("须由当前核验者在本阶段读取并核验当前唯一编号行");
+  }
+  const coverage = fullCoverage();
+  if (coverage.candidateSha256 !== material.candidateSha256 || coverage.rejected.some(item => item.line === row.line)) {
+    throw unavailable("该编号行存在实际退回，请按保存的事实发现提交");
+  }
+  const cited = grant.evidence.flatMap(file => {
+    const range = citation(row.body, file);
+    return range ? [{ file, ...range }] : [];
+  });
+  const usable = ref => ref?.file && keyOf(ref.file) !== keyOf(spec.candidate) &&
+    (!cited.length || cited.some(source => keyOf(source.file) === keyOf(ref.file) &&
+      (!source.start || ref.start <= source.end && ref.end >= source.start &&
+        active.seen[keyOf(ref.file)]?.ranges.some(([a, b]) => a <= source.start && b >= source.end))));
+  const assessment = active.assessment?.hash === material.candidateSha256 ? active.assessment : null;
+  const observed = ref => assessment?.refs?.some(source => keyOf(source.file) === keyOf(ref.file) &&
+    source.sha256 === ref.sha256 && source.start <= ref.end && source.end >= ref.start);
+  const facts = coverage.records.filter(record => !record.reusedProof &&
+    record.line === row.line && record.lineText === candidate[row.line - 1]).flatMap(record =>
+    record.parts.filter(part => ["direct", "inference"].includes(part.kind)).map(part => ({ part, block: record.block })));
+  const supported = part => part.status === "supported" && part.sourceRelation === "supports" && !part.objectCheck &&
+    !part.inference?.counterexample?.possible;
+  // `coverageSummary` already validates each exact project-policy quote and
+  // current goal version. Its premises, if present, are external references.
+  const policyFact = part => supported(part) && part.proofObject === "project-policy" &&
+    part.inference?.rule === "project-policy" && part.inference.policy?.length > 0;
+  const supports = facts.flatMap(({ part, block }) => {
+    if (!(supported(part) && part.proofObject === "external") && !policyFact(part)) return [];
+    return [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? [])]
+      .filter(usable).map(ref => ({ ref, block }));
+  });
+  if (!supports.length && !cited.length && facts.length && facts.every(({ part }) =>
+      policyFact(part) && !part.inference.premises.length && !part.evidence?.length &&
+      !part.inference.assumptions?.some(item => item.evidence))) {
+    return { line: row.line, supportOrigin: { kind: "same-reviewer-coverage", proofObject: "project-policy",
+      blocks: [...new Set(facts.map(({ block }) => block))] } };
+  }
+  if (!supports.length) throw unavailable("须先保存支持该行实际断言的原文和逐字证据");
+  // Full coverage already revalidates every source here. The numbered receipt
+  // keeps a representative locator for legacy readers and names its proofs.
+  // Prefer a proof the current quality assessment also references so ordering
+  // of the original evidence does not decide whether the old source gate passes.
+  const primary = supports.find(({ ref }) => observed(ref)) ?? supports[0];
+  const proof = evidenceReference(frame, active, spec, primary.ref);
+  return { ...proof, line: row.line, supportOrigin: { kind: "same-reviewer-coverage",
+    blocks: [...new Set(supports.map(({ block }) => block))] } };
+}
+
 /** 覆盖项目最低断言与候选新增编号，再核每项原始出处。 */
 function reviewChecks(frame, active, spec, grant, checks, candidate, material, fullCoverage) {
   if (!Array.isArray(checks) || checks.length > 64) throw new Error("核验须逐条提交检查结果");
@@ -3439,6 +3510,14 @@ function reviewChecks(frame, active, spec, grant, checks, candidate, material, f
   // The absence of numbered claims is not a reason to invent one for the receipt.
   return ids.map(id => {
     const supplied=byId.get(id);
+    if (supplied?.useCoverage === true) {
+      if (supplied.status !== "supported" || !declared.includes(id) || spec.claims.includes(id) ||
+          ["file", "start", "end", "line", "finding"].some(field => Object.hasOwn(supplied, field))) {
+        throw new Error(id + " 的 useCoverage 仅用于正文自动识别的支持项；不与项目明确编号、原文参数、行号或退回理由混用");
+      }
+      const basis = requireText(supplied.basis, "核验依据", 600);
+      return { id, status: "supported", ...numberedCoverageSupport(frame, active, spec, grant, id, candidate, material, fullCoverage), basis };
+    }
     const carried=!supplied||supplied.status==="unsupported"&&!Object.hasOwn(supplied,"finding")
       ? carryNumberedFinding(frame,active,grant,claimRow(candidate,id),material,fullCoverage):null;
     const check=carried

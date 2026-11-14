@@ -7,6 +7,8 @@ export const TERMINAL = new Set(["closed", "retired"]);
 const FINISHED = new Set(["completed", "covered", "obsolete", "superseded"]);
 const PAGE_SIZE = 32;
 const itemHash = item => digest(JSON.stringify(item));
+const independentRecord = () => ({ tool: "building_loop_ledger", action: "record", required: ["id", "kind", "title", "note"],
+  note: "同一条消息内的不同事项分别使用用户给定或各自稳定的 id，省略 originId。" });
 
 /** Keep the book in the same locked, atomic state file as workflow transitions. */
 function book(frame) {
@@ -52,7 +54,7 @@ export function captureRequest(frame, event) {
   const running = Object.values(frame.state.units).some(unit => !TERMINAL.has(unit.phase));
   put(frame, id, { kind: running ? "temporary" : "planned", status: "pending",
     title: event.title, note: "用户消息待结合项目现状判定，原文见会话事件。",
-    origin: { session: owner, event: event.seq, sha256: event.sha256 }, owner });
+    origin: { session: owner, event: event.seq, sha256: event.sha256 }, originClassified: false, owner });
   // A notice consumed after closure must still receive a ledger checkpoint.
   // This reopens administration only; a changed goal still forces independent review.
   if (!running) {
@@ -280,8 +282,10 @@ export function ledgerAction(frame, args) {
       document };
   }
   if (args.action === "record") {
-    const linked = args.originId && ledger.items[args.originId];
-    if (args.originId && (!linked?.origin || linked.owner !== frame.agent.id)) throw new Error("originId 须指向本总控已有的自动请求记录");
+    if (args.originId !== undefined && args.id !== undefined) return { status: "record-identity-conflict", recorded: false,
+      next: independentRecord(), note: "id 与 originId 二选一。只归类原始请求时，保留 originId，省略 id。" };
+    const linked = args.originId === undefined ? undefined : ledger.items[args.originId];
+    if (args.originId !== undefined && (!linked?.origin || linked.owner !== frame.agent.id)) throw new Error("originId 须指向本总控已有的自动请求记录");
     // A recorded interruption of a known unit already has an authoritative item.
     // Reuse it so completion follows the unit's acceptance, not an unrelated plan.
     if (!linked && args.kind === "interrupted" && typeof args.unit === "string") {
@@ -292,16 +296,24 @@ export function ledgerAction(frame, args) {
       }
     }
     const id = linked?.id ?? args.id;
-    if (!linked && (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id ?? "") || id.startsWith("unit-") || id.startsWith("request-"))) throw new Error("已有请求请用 originId 关联；独立计划须使用稳定编号");
+    if (!linked && (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id ?? "") || id.startsWith("unit-") || id.startsWith("request-"))) {
+      return { status: "record-id-required", recorded: false, next: independentRecord(),
+        note: "只归类已有的原始请求时，用 originId；独立事项使用不以 unit- 或 request- 开头的稳定编号。" };
+    }
     if (!["planned", "temporary", "interrupted"].includes(args.kind)) throw new Error("账本分类须为 planned、temporary 或 interrupted");
     const title = reason(args.title, 300), note = reason(args.note);
     const previous = ledger.items[id];
     if (previous && previous.owner !== frame.agent.id) throw new Error("账目由其他总控持有");
-    if (previous && !linked) {
+    if (previous) {
       if (previous.kind === args.kind && previous.title === title && previous.note === note) return previous;
-      // A stable ID is not permission to overwrite a different task's content.
-      // Explicit amendments use the last item version returned by ledger read.
-      if (args.expectedItemSha256 !== digest(JSON.stringify(previous))) {
+      // Legacy records have no marker and cannot prove a first classification.
+      // A reviewed origin also needs a fresh pin, even if never explicitly classified.
+      const firstClassification = linked?.originClassified === false && !linked.disposition;
+      const versionRequired = !firstClassification || args.expectedItemSha256 !== undefined;
+      if (versionRequired && args.expectedItemSha256 !== itemHash(previous)) {
+        if (linked) return { status: "origin-version-required", recorded: false, originId: linked.id, next: independentRecord(),
+          amendment: { tool: "building_loop_ledger", action: "lookup", id: linked.id,
+            note: "若确实要改写同一条原请求，先查最新 itemSha256，再用 originId 和 expectedItemSha256 提交。" } };
         throw new Error("账目编号已经存在。修改该项须先读最新账本并提供 expectedItemSha256；新事项使用新编号");
       }
     } else if (args.expectedItemSha256 !== undefined) {
@@ -311,7 +323,8 @@ export function ledgerAction(frame, args) {
       && item.title.normalize("NFKC").replace(/\s/g, "") === title.normalize("NFKC").replace(/\s/g, ""));
     if (duplicate) throw new Error("同名事项已登记 " + duplicate.id + "，请沿用原编号或 originId");
     // Reclassification never reopens completed/covered/obsolete items.
-    return put(frame, id, { kind: args.kind, title, note, status: previous?.status ?? "pending", owner: frame.agent.id });
+    return put(frame, id, { kind: args.kind, title, note, status: previous?.status ?? "pending", owner: frame.agent.id,
+      ...(linked ? { originClassified: true } : {}) });
   }
   // A single owned checkpoint is unambiguous when the caller reads the global book.
   const unitId = args.unit ?? Object.keys(frame.state.units).find(id =>
