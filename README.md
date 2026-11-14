@@ -2,7 +2,7 @@
 
 **一句话交代目标，后续按项目推进。** Building-loop 是 DeepSeek Harness（DSH）的长任务模式。你告诉它要交付什么、哪些业务边界不能动。Building-loop 按当前会话判断该直接回答、澄清还是开工；确认后自动建档、分工、核验和记账。需求变了更新目标，新会话接手时可以顺着项目文件找到现状和证据。
 
-**当前稳定版：0.7.39** · [这次更新了什么](docs/release-0.7.39.md) · [安装](#安装) · [实测与复算](experiments/README.md)
+**当前稳定版：0.7.39** · [下载验收包（GitHub Release）](https://github.com/MingoYung/dsh-building-loop/releases/tag/v0.7.39) · [这次更新了什么](docs/release-0.7.39.md) · [安装](#安装) · [实测与复算](experiments/README.md)
 
 ## 同一条短指令，多通过 15 项工程检查
 
@@ -72,7 +72,7 @@
 
 兼容基线为 DeepSeek Harness `0.2.2-rc.1`，对应 DSH NEXT `2.0.22-next`。Desktop 和 Web 的插件安装入口各自管理对应的 Profile。
 
-- Windows Desktop 可从侧栏「插件」打开「添加插件」，选择该版本的发行包或仓库来源。
+- Windows Desktop 可从侧栏「插件」打开「添加插件」，选择从 [0.7.39 Release](https://github.com/MingoYung/dsh-building-loop/releases/tag/v0.7.39) 下载的 `.tgz` 安装包，或选择仓库来源。
 - 命令行管理 Desktop 时，先启动应用初始化目标 Profile，再使用 DSH NEXT 打开的内置终端和它自带的 `dsh`。安装后重新打开应用并核对模式。Windows 系统终端里的 npm 版 `dsh` 只用于它自己管理的 Profile。
 
 ```powershell
