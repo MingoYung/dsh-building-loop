@@ -320,7 +320,16 @@ test("genuine unresolved owner definition blocks with a specific question and re
     const { h, reviewer, outcomes } = await materializeReview(root, "clarification");
     await assert.rejects(h.flow(reviewer, "review", { checks, outcomes: outcomes.map(({ question, ...outcome }) => outcome) }),
       /澄清|question|待确认/u);
-    const result = await h.flow(reviewer, "review", { checks, outcomes });
+    const question = outcomes[2].question;
+    const asDecided = outcomes.map(row => row.id === "E3"
+      ? { ...row, status:"decided", decision:"待确认", question:undefined } : row);
+    await assert.rejects(h.flow(reviewer, "review", { checks, outcomes:asDecided }), /status=clarify.*status=missing/u);
+    const withTwoQuestions = outcomes.map(row => row.id === "E3"
+      ? { ...row, question: question + "还有别的口径吗？" } : row);
+    await assert.rejects(h.flow(reviewer, "review", { checks, outcomes:withTwoQuestions }), /question 字段/u);
+    const withNextStep = outcomes.map(row => row.id === "E3"
+      ? { ...row, question: question + "澄清后按原始材料续做。" } : row);
+    const result = await h.flow(reviewer, "review", { checks, outcomes:withNextStep });
     assert.equal(result.phase, "blocked");
     assert.equal(fs.existsSync(path.join(root, "records/final.json")), false);
     const status = await h.flow("root", "status");
@@ -328,6 +337,7 @@ test("genuine unresolved owner definition blocks with a specific question and re
     const ownerPacket = await h.flow("root", "prepare");
     assert.ok(JSON.stringify(ownerPacket.outcomeClarification).includes(outcomes[2].question),
       "the coordinator receives exactly the question the independent reviewer needs answered");
+    assert.doesNotMatch(JSON.stringify(ownerPacket.outcomeClarification), /澄清后按原始材料续做/u);
     assert.equal(digest(fs.readFileSync(path.join(root, goalFile))), digest(Buffer.from(deliveryVariants.clarificationGoal)));
     await assert.rejects(h.flow("root", "advance"), /等待用户澄清|更新总纲/u);
 

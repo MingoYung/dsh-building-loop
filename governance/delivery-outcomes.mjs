@@ -64,6 +64,16 @@ const summaryLabel = /^(?:#{1,6}\s*)?(?:大白话|直白说明)\s*(?:[:：]|$)/u
 // field. A workflow disposition such as "待补" is itself actionable.
 const unresolved = /(?:^|\s)(?:是否|若|如果|除非|可能|或许|未定|未确定|不确定|待定|待确认|待澄清|有待|需确认|需澄清|暂无法|无法确定|maybe\b|if\b|whether\b|unknown\b|undecided\b|unresolved\b|to be determined\b)|(?:是否|除非|若是|待确认|待澄清)/iu;
 
+/** A complete question may be followed by an operational note. Persist only
+ * the single question and never infer an answer or choose among questions. */
+function clarificationQuestion(value) {
+  if (!brief(value, 360)) return null;
+  const marks = [...value.matchAll(/[？?]/gu)];
+  if (marks.length !== 1 || marks[0].index === 0) return null;
+  const question = value.slice(0, marks[0].index + 1);
+  return /[\p{L}\p{N}]/u.test(question) ? question : null;
+}
+
 /** Match the outcome field, not an occurrence of a result word in prose.
  * The chosen witness is always literal and bounded inside the actual line. */
 function declarationsAt(raw, id, summary) {
@@ -230,12 +240,13 @@ function decideRow(view, item, row, coverage, contract) {
   const summary = row.summary && locate(view, row.summary, true);
   const result = { id, status: row.status, basis: row.basis, ...(body ? { body } : {}), ...(summary ? { summary } : {}) };
   if (row.status === "clarify") {
-    if (!body || !brief(row.question, 360) || !/[？?]$/u.test(row.question) || row.decision !== undefined) {
-      throw new Error(id + " 的待澄清须给相关正文和可回答的具体问题，不填处置结果");
-    }
+    if (row.decision !== undefined) throw new Error(id + " 的 status=clarify 不能填 decision，等待用户选择");
+    if (!body) throw new Error(id + " 的 status=clarify 须给 body:{line,quote} 定位实际规则缺口");
+    const question = clarificationQuestion(row.question);
+    if (!question) throw new Error(id + " 的 status=clarify 须在 question 字段给一个用户可以直接回答的问题，用问号标明");
     const proof = application(coverage, view, body, id, contract.goalSha256);
     if (!proof) throw new Error(id + " 的澄清位置缺本角色已核的 project-application 证明，须绑定当前条款及所涉实际记录");
-    return { ...result, question: row.question, bodyProof: proofHash(proof) };
+    return { ...result, question, bodyProof: proofHash(proof) };
   }
   if (row.status !== "decided") {
     if (row.decision !== undefined || row.question !== undefined || row.status === "inconsistent" && (!body || !summary)) {
@@ -243,7 +254,10 @@ function decideRow(view, item, row, coverage, contract) {
     }
     return result;
   }
-  if (!brief(row.decision, 32) || !scalar.test(row.decision) || unresolved.test(row.decision) || row.question !== undefined) {
+  if (typeof row.decision === "string" && unresolved.test(row.decision)) {
+    throw new Error(id + " 的 decision 仍未给明确处置。如果当前条款和实际记录确实无法确定处置，请用 status=clarify、body:{line,quote}、question、basis，省略 decision；材料已足够作答而稿件漏写才用 status=missing");
+  }
+  if (!brief(row.decision, 32) || !scalar.test(row.decision) || row.question !== undefined) {
     throw new Error(id + " 的 status=decided 须给明确处置的 decision 字段，不填 question");
   }
   if (!body || contract.summary && !summary) throw new Error(id + " 须分别定位正文和已要求的大白话");
