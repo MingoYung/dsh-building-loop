@@ -126,6 +126,7 @@ const BEGIN = {
   "first-audit-ready": "first-audit",
   "final-audit-ready": "final-audit",
 };
+const REVIEW_HANDOFFS = new Set(["review-ready", "final-review-ready", "first-audit-ready", "final-audit-ready"]);
 const LEDGER_BASIS_RULE="账本 basis 只说明本项处置与当前目标或验收结果的关系；不要复述运行历史、宿主已有计数或哈希，宿主字段由账本导出负责。确需涉及数量时沿用原字段单位，全文块数不是行数。这是写作约束，不代替对依据内容的核实。";
 
 const RULES = {
@@ -683,33 +684,84 @@ export function apply(ctx, config = {}) {
     } finally { observed[Symbol.dispose](); }
   }
 
-  /** A passing code review already authorizes only the blind check of the
-   * same signed delivery. Leaving that receipt idle adds no owner decision. */
-  async function finishCodeAuditDispatch(frame) {
-    if (frame.role !== "coordinator" || !frame.started) return;
+  /** A review may start only after the exact owner and its live children
+   * finish their native turns. A timed DSH question can outlive an idle turn. */
+  function reviewHandoffIdle(agent) {
+    if (ctx.agents.get(agent.id) !== agent || agent.status !== "idle" || agent.inbox?.hasPending !== false) return false;
+    const tree = (ctx.agents.list?.() ?? []).filter(child => child.session.header.parentSession === agent.id);
+    if (tree.some(child => child.status !== "idle" || child.inbox?.hasPending !== false)) return false;
+    const pending = ctx.get?.("typertGateway")?.getPendingRemoteEvents?.() ?? [];
+    return ![...pending].some(({ agentId, event }) =>
+      (agentId === agent.id || tree.some(child => child.id === agentId)) &&
+      ["user-questions/request", "approval/request"].includes(event));
+  }
+
+  function reviewHandoffAction(frame, id, active) {
+    if (frame.role !== "coordinator" || active?.owner !== frame.agent.id ||
+        active.metricClarification || active.outcomeClarification || active.reconciliationExhausted ||
+        active.goal?.sha256 !== goalSnapshot(frame).sha256) return;
     const checkpoint = engineeringStatus(frame);
-    if (checkpoint?.blocked) return;
-    const ready = Object.entries(frame.state.units).filter(([id, active]) =>
-      (!checkpoint || checkpoint.unit === id) && active.owner === frame.agent.id &&
-      ["first-audit-ready", "final-audit-ready"].includes(active.phase) && active.pendingReceipt?.codeReview &&
-      active.pendingReceipt.decision === "pending-audit" && active.auditActivationAttempt !== active.serial);
-    if (ready.length !== 1 || !await openingStillConfirmed(frame)) return;
-    const [[unit, active]] = ready;
-    const claimed = change(frame.agent, current => {
-      const row = current.state.units[unit];
-      if (current.started?.proposal.id !== frame.started.proposal.id || row?.owner !== frame.agent.id || row.phase !== active.phase ||
-        row.serial !== active.serial || row.auditActivationAttempt === row.serial || needsRevalidation(current, unit, row)) return false;
-      row.auditActivationAttempt = row.serial;
-      current.changed = true;
-      return true;
-    }, { requestedUnit: unit, claim: false });
-    if (!claimed) return;
-    try { await advance({ unit }, { agent: frame.agent, signal: AbortSignal.timeout(20_000) }); }
-    catch (error) {
-      // The ready receipt stays valid. Explicit advance remains available if
-      // native startup failed; do not wake the same coordinator repeatedly.
-      ctx.logger.warn("building-loop 独立复核仍待派发：" + error.message);
-    }
+    if (checkpoint?.blocked || checkpoint && checkpoint.unit !== id) return;
+    const spec = unitOf(frame, id);
+    if (hostSourceUpdate(frame, active, spec) || needsRevalidation(frame, id, active)) return;
+    if (REVIEW_HANDOFFS.has(active.phase)) return "dispatch";
+    const host = previousActivationHost(active.activationHost);
+    if (active.reviewHandoff && ["first-review", "final-review", "first-audit", "final-audit"].includes(active.phase) &&
+        (host === "dead" || host === "live" && active.activationHost?.instance === activationHost.instance &&
+          active.reviewHandoff.retry === "scheduled")) return "recover";
+  }
+
+  // Native lifecycle callbacks must return before waiting for their own Agent.
+  // Coalesce sibling notifications and use durable state as the authority.
+  const checkingReviews = new WeakMap();
+  const reviewHandoffStop = new AbortController();
+  ctx.on("dispose", () => reviewHandoffStop.abort());
+  function scheduleReviewHandoff(agent) {
+    if (!agent || !ctx.sessionQuery?.observeSession || typeof agent.whenIdle !== "function" ||
+        typeof agent.status !== "string" || reviewHandoffStop.signal.aborted) return;
+    const check = checkingReviews.get(agent);
+    if (check) { check.again = true; return; }
+    const currentCheck = { again: false };
+    checkingReviews.set(agent, currentCheck);
+    setImmediate(async () => {
+      const signal = AbortSignal.any([reviewHandoffStop.signal, AbortSignal.timeout(20_000)]);
+      try {
+        // Creation and turn/end can be emitted before native maintenance or
+        // the previous turn has released its driver.
+        await waitIdle(agent, signal);
+        if (!reviewHandoffIdle(agent)) return;
+        const frame = scope(agent, { inspection: true });
+        const ready = Object.entries(frame.state.units).filter(([, row]) =>
+          row.owner === agent.id && (REVIEW_HANDOFFS.has(row.phase) || row.reviewHandoff && PHASES.includes(row.phase)));
+        if (ready.length !== 1) return;
+        const [[unit, row]] = ready;
+        const action = reviewHandoffAction(frame, unit, row);
+        if (!action) return;
+        const observed = await ctx.sessionQuery.observeSession(agent.id, { signal });
+        let cursor;
+        try {
+          cursor = observed.cursor;
+          if (observed.projections?.values?.userQuestions?.active?.length) return;
+          const latest = latestConversationUser(observed.events, observed.inheritedEventCount);
+          const end = observed.events.findLast(event => event.type === "turn/end" && event.seq >= observed.inheritedEventCount);
+          if (end?.seq > (latest?.seq ?? -1) && end.data?.reason?.kind === "aborted" && end.data.reason.reason?.kind === "user") return;
+          if (latest?.owner && /^(?:请)?(?:先)?(?:暂停|停止|停一下|别继续|先别做)(?:[。！! ]|$)/u.test(latest.text)) return;
+        } finally { observed[Symbol.dispose](); }
+        const permitted = () => !signal.aborted && reviewHandoffIdle(agent) && agent.session.seq === cursor + 1;
+        if (!permitted()) return;
+        if (action === "recover") await recoverReviewHandoff(frame, unit, row, permitted, signal);
+        else await advance({ unit }, { agent, signal, reviewHandoff: { phase: row.phase, serial: row.serial, permitted } });
+      } catch (error) {
+        if (!reviewHandoffStop.signal.aborted && !lacksProjectAccess(error)) {
+          ctx.logger.warn("building-loop 自动审核交接未完成：" + error.message);
+        }
+      } finally {
+        checkingReviews.delete(agent);
+        // A new human turn can finish while the previous snapshot is being
+        // read. Its idle event must get a fresh pass after the old cursor fails.
+        if (currentCheck.again) scheduleReviewHandoff(agent);
+      }
+    });
   }
 
   /** Reconcile a completed coordinator turn with the confirmed opening. Only
@@ -722,7 +774,7 @@ export function apply(ctx, config = {}) {
     try {
       const frame = scope(agent, { inspection: true });
       const unit = firstDispatchUnit(frame);
-      if (!unit) return await finishCodeAuditDispatch(frame);
+      if (!unit) return;
       const opening = frame.started.proposal.id;
       if (frame.state.dispatchRecovery?.openingId === opening && frame.state.dispatchRecovery.status === "blocked") return;
       if (!await openingStillConfirmed(frame)) return;
@@ -1675,6 +1727,8 @@ export function apply(ctx, config = {}) {
     } catch {
       // A subsequent coordinator status/prepare still sees the committed stage.
       return { ...result, notified: false };
+    } finally {
+      if (REVIEW_HANDOFFS.has(result.phase)) scheduleReviewHandoff(ctx.agents.get(parent));
     }
   }
 
@@ -2044,17 +2098,25 @@ export function apply(ctx, config = {}) {
     const id = resolveBoundUnit(initial, args.unit);
     await recoverOrphanedActivation(initial, exec.signal, id);
     const spec = unitOf(initial, id), active = initial.state.units[id];
+    const automatic = exec.reviewHandoff;
+    if (automatic && (!automatic.permitted() || reviewHandoffAction(initial, id, active) !== "dispatch" ||
+        active.phase !== automatic.phase || active.serial !== automatic.serial)) return;
     if (initial.role === "coordinator" && (!active || active.owner === agent.id) &&
       engineeringArchitectureLinkIssues(initial, spec, undefined, active).length) {
       return change(agent, frame => routeArchitectureLinks(frame, id, frame.state.units[id], unitOf(frame, id)), { requestedUnit: id })
         ?? { unit: id, status: "superseded", next: { tool: WORKFLOW, action: "advance", unit: id } };
     }
     const prepared = prepare(scope(agent), id);
+    if (automatic && prepared.phase !== BEGIN[automatic.phase]) return;
+    const handoffId = automatic && randomUUID();
     const resident = prepared.reusable && ctx.agents.get(prepared.reusable);
     if (resident) await waitIdle(resident, exec.signal);
     exec.signal.throwIfAborted();
     const childId = prepared.reusable ?? randomUUID();
     const next = change(agent, frame => {
+      const current = frame.state.units[id];
+      if (automatic && (!automatic.permitted() || reviewHandoffAction(frame, id, current) !== "dispatch" ||
+          current.phase !== automatic.phase || current.serial !== automatic.serial)) return;
       const plan = prepare(frame, id);
       if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable ||
         plan.regressionRetry !== prepared.regressionRetry || plan.stallId !== prepared.stallId ||
@@ -2177,6 +2239,7 @@ export function apply(ctx, config = {}) {
         record.rejected = rejectedClaims(frame.root, spec, lineList(candidate),
           record.unsupported.map(id => ({ id })), spec.phases.supplement.read);
       }
+      delete record.reviewHandoff;
       frame.state.units[id] = record;
       trackUnit(frame, id, record);
       frame.changed = true;
@@ -2202,25 +2265,17 @@ export function apply(ctx, config = {}) {
           : args.note===undefined?"":"\n本次任务要求 "+requireText(args.note,"任务说明"))
         + (plan.role === "executor" && record.codeIntake ? "\n" + CODE_COMMENT_RULE : "")
         + (plan.role === "executor" && spec.architecture ? "\n架构由总控维护。当前架构是 " + spec.architecture.file + "，按授权只读，不要尝试改写。" : "");
+      if (automatic) record.reviewHandoff = { id: handoffId, brief, reused: Boolean(prepared.reusable) };
       return { workspace: frame.root, phase: plan.phase, serial: plan.serial, brief };
     }, { requestedUnit: id });
-    const content = [{ type: "text", text: next.brief }];
+    if (!next) return;
     try {
-      if (prepared.reusable) {
-        await ctx.subagents.sendMessage(agent, childId, content, { signal: exec.signal });
-      } else {
-        const selection = agent.model.current();
-        await ctx.subagents.startActivation({
-          provider: "spawn", childId, label: id + " " + next.phase,
-          delivery: "parent", signal: exec.signal,
-          request: {
-            parent: agent, cwd: next.workspace, agentPreset: presetId, prompt: content, maxDepth: 1,
-            ...(selection ? { agentOptions: selection } : {}),
-          },
-        });
-      }
+      await deliverStage(agent, id, childId, next, prepared.reusable, handoffId, exec.signal);
     } catch (error) {
-      change(agent, frame => {
+      // Native launch can fail after admission. Preserve the exact actor and
+      // handoff number until a later native observation settles that boundary.
+      if (automatic) retryReviewDelivery(agent, id, handoffId);
+      else change(agent, frame => {
         const record = frame.state.units[id];
         if (record?.actor === childId && record.phase === next.phase && record.serial === next.serial) {
           if (prepared.prior) frame.state.units[id] = prepared.prior;
@@ -2239,6 +2294,97 @@ export function apply(ctx, config = {}) {
     return { unit: id, phase: next.phase, childId, reused: Boolean(prepared.reusable),
       ...(prepared.rotate?{rotation:{from:prepared.prior.executor,to:childId,cacheReadTokens:prepared.used,
         threshold:prepared.threshold,reason:"cache-read-threshold"}}:{}) };
+  }
+
+  async function deliverStage(agent, unit, childId, next, reuse, handoff, signal) {
+    const content = [{ type: "text", text: next.brief }];
+    if (handoff) content.push({ type: "text", text: handoffMarker(handoff) });
+    if (reuse) {
+      await ctx.subagents.sendMessage(agent, childId, content, { signal });
+    } else {
+      const selection = agent.model.current();
+      await ctx.subagents.startActivation({
+        provider: "spawn", childId, label: unit + " " + next.phase, delivery: "parent", signal,
+        request: { parent: agent, cwd: next.workspace, agentPreset: presetId, prompt: content, maxDepth: 1,
+          ...(selection ? { agentOptions: selection } : {}) },
+      });
+    }
+  }
+
+  function handoffMarker(id) { return "Building-loop 交接编号：" + id; }
+
+  /** Allow one bounded retry after an uncertain native send. The same
+   * persisted inbox check is required even when the first call threw. */
+  function retryReviewDelivery(agent, unit, handoffId) {
+    const retry = change(agent, frame => {
+      const row = frame.state.units[unit];
+      if (row?.owner !== agent.id || row.reviewHandoff?.id !== handoffId || row.reviewHandoff.retry) return false;
+      row.reviewHandoff.retry = "scheduled";
+      frame.changed = true;
+      return true;
+    }, { claim: false });
+    if (retry) scheduleReviewHandoff(agent);
+  }
+
+  /** Reconcile the Building-loop commit with the native inbox log. Once the
+   * original brief was accepted, only resume the same assignment and role. */
+  async function recoverReviewHandoff(frame, unit, row, permitted, signal) {
+    const { agent } = frame;
+    const persistence = ctx.get?.("sessionPersistence");
+    if (typeof persistence?.stat !== "function") return;
+    const resident = ctx.agents.get(row.actor);
+    const cold = previousActivationHost(row.activationHost) === "dead";
+    if (resident && cold) return;
+    const stored = resident ? {} : await persistence.stat(row.actor, { signal });
+    let accepted, continuable, empty;
+    if (stored !== undefined) {
+      const observed = await ctx.sessionQuery.observeSession(row.actor, { projectionMode: "none", signal });
+      try {
+        if (observed.header.id !== row.actor || observed.header.parentSession !== agent.id) return;
+        const own = observed.events.slice(observed.inheritedEventCount);
+        const marker = handoffMarker(row.reviewHandoff.id);
+        accepted = own.some(event => {
+          const messages = event.type === "agent/inbox/spliced" ? event.data.inserted : event.type === "user/message" ? [event.data] : [];
+          return messages?.some(message => message.content?.some(block => block.type === "text" && block.text === marker));
+        });
+        continuable = own.some(event => event.type === "subagent/descriptor");
+        empty = !own.some(event => ["agent/inbox/spliced", "user/message", "turn/start"].includes(event.type));
+      } finally { observed[Symbol.dispose](); }
+      if (!continuable && (!empty || row.reviewHandoff.reused)) return;
+    } else if (row.reviewHandoff.reused) return;
+    if (!permitted()) return;
+    // A crash during native session creation can leave a header alone. Only
+    // a new, provably unused header with exact lineage can be replaced.
+    const actor = stored !== undefined && !continuable ? randomUUID() : row.actor;
+    const claimed = change(agent, locked => {
+      const current = locked.state.units[unit];
+      if (!permitted() || reviewHandoffAction(locked, unit, current) !== "recover" ||
+          current.reviewHandoff.id !== row.reviewHandoff.id || current.serial !== row.serial ||
+          current.actor !== row.actor || ctx.agents.get(row.actor) !== resident ||
+          JSON.stringify(current.materialBinding) !== JSON.stringify(checkpointBinding(locked, unitOf(locked, unit)))) return;
+      const role = isAudit(row.phase) ? "auditor" : "reviewer";
+      if (actor !== row.actor) current.actor = current[role] = actor;
+      current.activationHost = activationHost;
+      if (!cold) current.reviewHandoff.retry = "used";
+      else delete current.reviewHandoff.retry;
+      locked.changed = true;
+      return row.reviewHandoff;
+    }, { requestedUnit: unit, claim: false });
+    if (!claimed) return;
+    try {
+      if (!accepted) {
+        await deliverStage(agent, unit, actor, { workspace: frame.root, phase: row.phase, brief: claimed.brief },
+          continuable, claimed.id, signal);
+      } else if (cold) {
+        // The old inbox entry may be queued or already consumed. Waking its
+        // session continues the persisted review without a second work order.
+        await ctx.subagents.sendMessage(agent, actor, [{ type: "text", text:
+          "宿主恢复了原审核会话。先用 prepare 继续当前核验阶段，沿用已登记的本角色证据与当前版本。" }], { signal });
+      }
+    } catch (error) {
+      if (cold) retryReviewDelivery(agent, unit, claimed.id);
+      throw error;
+    }
   }
 
   /** 中断保留原阶段，恢复时续回同一个子会话。 */
@@ -2274,6 +2420,7 @@ export function apply(ctx, config = {}) {
     if (typeof persistence?.open !== "function") return;
     const { agent } = frame;
     const eligible = active => active?.owner === agent.id && typeof active.actor === "string" &&
+      (!active.reviewHandoff || active.goal?.sha256 !== goalSnapshot(frame).sha256) &&
       PHASES.includes(active.phase) && !ctx.agents.get(active.actor) &&
       ["dead", "legacy"].includes(previousActivationHost(active.activationHost));
     const found = Object.entries(frame.state.units).find(([id, active]) =>
@@ -3349,6 +3496,13 @@ export function apply(ctx, config = {}) {
     return { ...decision, ...(startsSeries ? { startsRequestSeries: true } : {}),
       messages: decision.messages.filter(message => message.source?.kind !== "agent-instructions") };
   });
+  ctx.on("agent/status", ({ agent, status }) => {
+    if (status === "idle") scheduleReviewHandoff(isChild(agent) ? ctx.agents.get(agent.session.header.parentSession) : agent);
+  });
+  ctx.on("agent/created", ({ agent, source }) => {
+    if (source === "resume" && !isChild(agent)) scheduleReviewHandoff(agent);
+  });
+
   ctx.on("session/event", (session, event) => {
     if (event.type === "assistant/message") {
       const agent=ctx.agents.get(session.id),{turn,step,usage}=event.data??{};
@@ -3382,7 +3536,10 @@ export function apply(ctx, config = {}) {
     const agent = ctx.agents.get(session.id);
     if (agent?.session !== session) return;
     if (!isChild(agent)) {
-      if (event.data.reason.kind === "completed") return finishConfirmedOpening(agent);
+      if (event.data.reason.kind === "completed") {
+        scheduleReviewHandoff(agent);
+        return finishConfirmedOpening(agent);
+      }
       return;
     }
     if (session.header.parentSession === undefined) return;

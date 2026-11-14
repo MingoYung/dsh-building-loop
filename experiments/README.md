@@ -19,6 +19,7 @@
 | 0.7.29 同模型难题自然完成三组对照 | [G3/G4 与 H1/H2 同模型三组冻结盲评](results-0.7.29-hard-completion.md) |
 | 0.7.30 同模型难题自然完成三组复验 | [G3/G4 与 H1/H2 三组复验](results-0.7.30-hard-completion.md) |
 | 0.7.31 Building-loop 自身缺陷 | [Windows 深路径、架构实证与目标覆盖回归](results-0.7.31-own-defects.md) |
+| 0.7.39 无人值守补派审核 | [两处漏派、真实等待和三个 Windows 强退时点](results-0.7.39-unattended-handoff.md) |
 | 0.7.38 数值限定、资料换版和强退恢复 | [正反回归、Windows 强退和真实单跑](results-0.7.38-proof-recovery.md) |
 | 0.7.37 宿主填入数值与依据 | [正反回归、Windows 实测与原会话续做](results-0.7.37-host-results.md) |
 | 0.7.36 审核参数与等待用户澄清 | [真实失败归因、回放和原会话续做](results-0.7.36-clarification.md) |

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { test } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 import { codeRegressionArtifacts, codeRegressionSigningBytes } from "../governance/code-intake.mjs";
 import { inspectArchitectureImports, isCodeReviewUnit, signedAnnotationCandidates, unreadAnnotationCandidates } from "../governance/code-review.mjs";
 import { decideConversationStart, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
@@ -67,7 +68,7 @@ function prepareProject(root, write, { evidence = false, proseEdit = false, part
     { goal: "实现批次上限", deliverable: "代码和真实测试", scope: "SPEC 和授权代码" });
   decideConversationStart(process.env.DSH_HOME, "root", current, proposal.id, "start",
     () => ({ kind: "workspace", root }), { typed: true });
-  const harness = host(root, { automaticCoverage: false, nativeOpening });
+  const harness = host(root, { automaticCoverage: false, nativeOpening, nativeLifecycle: nativeOpening });
   if (nativeOpening) harness.setOwner("root", 12, opening);
   async function qualify(actor, runId = "tested-current") {
     const ready = await harness.flow(actor, "prepare");
@@ -116,6 +117,7 @@ async function prepareReview(harness, actor) {
 
 test("signed code review uses actual changed lines and an independent receipt before ledger closure", () => fixture(async (root, write) => {
   const { harness, qualify } = prepareProject(root, write, { nativeOpening: true });
+  harness.running("root", true);
   const executor = (await harness.flow("root", "advance")).childId;
   write(worker, update);
   assert.equal((await qualify(executor)).phase, "review-ready");
@@ -181,9 +183,14 @@ test("signed code review uses actual changed lines and an independent receipt be
   await assert.rejects(harness.ledger("root", "review", { decisions: [] }), /复核阶段/);
   harness.setOwner("root", 13, "先停一下。");
   await harness.finish("root");
+  harness.running("root", false);
+  await delay(60);
   assert.equal(harness.activations.length, 2);
-  harness.setOwner("root", 12, "开始建设：按 SPEC.md 实现批次上限并保住旧行为");
+  harness.running("root", true);
+  harness.setOwner("root", 14, "继续执行项目的独立审核。");
   await Promise.all([harness.finish("root"), harness.finish("root")]);
+  harness.running("root", false);
+  for (let i = 0; harness.activations.length < 3 && i < 80; i++) await delay(25);
   assert.equal(harness.activations.length, 3);
   const auditor = harness.activations.at(-1).childId;
   assert.notEqual(auditor, reviewer);

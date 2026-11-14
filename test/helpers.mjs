@@ -58,7 +58,8 @@ async function fixture(run) {
 }
 
 /** Exercise the registered production handlers with real files and host identities. */
-function host(root, { automaticCoverage = true, failNotifications = false, toolTimeoutMs = 3000, nativeOpening = false, activate } = {}) {
+function host(root, { automaticCoverage = true, failNotifications = false, toolTimeoutMs = 3000,
+  nativeOpening = false, nativeLifecycle = false, activate } = {}) {
   const live = new Map();
   const tools = new Map();
   const admissions = new Map(), restrictions = new Map(), concluded = [];
@@ -70,7 +71,21 @@ function host(root, { automaticCoverage = true, failNotifications = false, toolT
   const ownerEvents = new Map(), followups = [];
   const warnings = [];
   function agent(id, parentSession) {
-    live.set(id, { id, session: { header: { cwd: root, parentSession } },
+    const cursor = () => ownerEvents.get(id)?.at(-1)?.seq ?? -1;
+    let idle = Promise.resolve(), settle;
+    const activity = nativeLifecycle ? {
+      get status() { return settle ? "running" : "idle"; }, inbox: { hasPending: false },
+      whenIdle: () => idle,
+      running(value) {
+        if (value && !settle) idle = new Promise(resolve => { settle = resolve; });
+        if (!value && settle) {
+          settle();
+          settle = undefined;
+          listeners.get("agent/status")?.({ agent: live.get(id), status: "idle" });
+        }
+      },
+    } : {};
+    live.set(id, { id, session: { header: { cwd: root, parentSession }, get seq() { return cursor() + 1; } },
       followup: message => followups.push({ id, message }),
       whenIdle: async () => {}, model: { current: () => null }, ctx: {tools:{
         view:()=>{
@@ -79,13 +94,15 @@ function host(root, { automaticCoverage = true, failNotifications = false, toolT
           return { restrictableNames: new Set(names), visible: new Map(allowed.map(name => [name, tools.get(name)])) };
         },
         restrict:value=>{ restrictions.set(id,value);return ()=>restrictions.delete(id); },
-      }} });
+      }}, ...activity });
   }
   agent("root");
   apply({
-    agents: { get: id => live.get(id) },
-    ...(nativeOpening ? { sessionQuery: { observeSession: async id => ({ events: ownerEvents.get(id) ?? [],
-      inheritedEventCount: 0, [Symbol.dispose]() {} }) } } : {}),
+    agents: { get: id => live.get(id), list: () => [...live.values()] },
+    ...(nativeOpening ? { sessionQuery: { observeSession: async id => {
+      const events = ownerEvents.get(id) ?? [];
+      return { events, cursor: events.at(-1)?.seq ?? -1, inheritedEventCount: 0, [Symbol.dispose]() {} };
+    } } } : {}),
     subagents: {
       startActivation: async args => { await activate?.(args); activations.push(args);agent(args.childId, args.request.parent.id); },
       sendMessage: async (sender, target, content) => {
@@ -166,6 +183,7 @@ function host(root, { automaticCoverage = true, failNotifications = false, toolT
     setOwner: (id, seq, text) => ownerEvents.set(id, [{ type: "user/message", seq,
       data: { source: { kind: "user" }, content: [{ type: "text", text }] } }]),
     warnings,
+    running: (id, value) => live.get(id).running(value),
     coordinator: id => agent(id),
     restoreChild: (id, parent) => agent(id, parent),
     detachChild: id => live.delete(id),
