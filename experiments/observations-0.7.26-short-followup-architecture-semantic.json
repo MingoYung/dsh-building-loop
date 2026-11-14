@@ -1,0 +1,172 @@
+{
+  "spec": "building-loop-short-frozen-architecture-audit/1",
+  "scope": "Concrete source/document mismatches in pinned accepted Building-loop drafts; checks selected claims.",
+  "architectureMismatches": 8,
+  "runs": [
+    {
+      "run": "r-AWu8XL",
+      "stage": "g1",
+      "terminal": "closed",
+      "carry": "same-frozen-seed",
+      "architectureMismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 5,
+            "end": 5,
+            "sha256": "95431f86cc78605278750e6ef435347f4dd8e99cc978bfb676b401f460dc2634",
+            "text": "工作区当前只有 SPEC.md 等规格文档，没有 `release.py`、policy、journal、planner 的源码；G1 的实现按 SPEC.md 从零建立，四个模块的名称与导入方向由本稿固定。"
+          },
+          "detail": "The document says the four sources were absent. Exact before-stage baseline has all four.",
+          "baselineSourcePins": {
+            "journal.py": "5ccb579a824491a691f378fd6a123c4a20addeab590ed9247dd7bebd3fb7b8ef",
+            "planner.py": "d34a5b3f8f5e28de648dc9709b0dd7a8b06b6cfe41a01d8177734eb6c2095680",
+            "policy.py": "49a0389723a3d0f52750b45e880a60855bab53865517fce6894b759431bb412d",
+            "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+          }
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 9,
+            "end": 9,
+            "sha256": "95431f86cc78605278750e6ef435347f4dd8e99cc978bfb676b401f460dc2634",
+            "text": "- `journal.py`：负责输入校验、身份与重放。校验顶层请求形状（`invalid-request`）、变更记录字段（`invalid-change`）、依赖与 `applied` 的数组成员是否均为非空字符串（`invalid-change`），以及动作是否属于 `plan`/`rollback`（`unsupported-action`，是否允许由 policy 判断）；对变更做去重：相同 `id` 且 `component`、`units`、依赖集合全部一致则折叠为一条，否则 `conflicting-change`；对 `applied` 做规范化集合处理并提供“已应用”查询。"
+          },
+          "detail": "The document assigns supported-action validation to journal, while policy raises unsupported-action.",
+          "source": {
+            "file": "policy.py",
+            "start": 36,
+            "end": 37,
+            "sha256": "058c6197f326b29fa0ca9f96294bb5a53570533fb8239db0e00352ec8eab8837",
+            "text": "    if action not in SUPPORTED_ACTIONS:\n        raise PolicyError(\"unsupported-action\")"
+          }
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 12,
+            "end": 12,
+            "sha256": "95431f86cc78605278750e6ef435347f4dd8e99cc978bfb676b401f460dc2634",
+            "text": "导入方向固定为：`release.py` → `journal.py` / `policy.py` / `planner.py`；`planner.py` → `journal.py`、`policy.py`；`journal.py` 与 `policy.py` 互不导入，也不反向导入 `release.py` 或 `planner.py`。只使用标准库。"
+          },
+          "detail": "Prose lists direct release imports for all three modules. The entrypoint only imports planner; its generated static block already reflects that.",
+          "source": {
+            "file": "release.py",
+            "start": 11,
+            "end": 11,
+            "sha256": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7",
+            "text": "from planner import plan"
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-AWu8XL",
+      "stage": "g2",
+      "terminal": "closed",
+      "carry": "same-workspace-new-session",
+      "architectureMismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 5,
+            "end": 5,
+            "sha256": "145b618a34fef6f55e1cd4cdc24451dac99fa0c5cc17d4ca5f4c2312d7a45a08",
+            "text": "工作区当前只有 SPEC.md、CHANGE-G2.md 等规格文档，没有 `release.py`、policy、journal、planner 的源码；实现按 SPEC.md + CHANGE-G2.md 建立，四个模块的名称与导入方向由本稿固定。G2 只改语义，不改分工与调用方向。"
+          },
+          "detail": "The document says the four sources were absent. Exact before-stage baseline has all four.",
+          "baselineSourcePins": {
+            "journal.py": "658b3780d130added9f8bb6d1b698dfa31e1e01632f2fe33e7474b5f13324272",
+            "planner.py": "edfb792f17d78bf4ab9a6291126d94f3d05e6a54bf000b0bba1d428e232430d1",
+            "policy.py": "058c6197f326b29fa0ca9f96294bb5a53570533fb8239db0e00352ec8eab8837",
+            "release.py": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7"
+          }
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 11,
+            "end": 11,
+            "sha256": "145b618a34fef6f55e1cd4cdc24451dac99fa0c5cc17d4ca5f4c2312d7a45a08",
+            "text": "- `journal.py`：负责输入校验、身份与重放。校验顶层请求形状（`invalid-request`）、变更记录字段（`invalid-change`）、依赖与 `applied` 的数组成员是否均为非空字符串（`invalid-change`），以及动作是否属于 `plan`/`rollback`（`unsupported-action`，是否允许由 policy 判断）；对变更做去重：相同 `id` 且 `component`、`units`、依赖集合全部一致则折叠为一条，否则 `conflicting-change`；对 `applied` 做规范化集合处理并提供“已应用”查询。**G2 起另外负责 `retain` 的形状校验：缺省为空数组，非数组、含非字符串项、重复外的畸形或列出未在 `applied` 中的 ID 均返回 `invalid-retain`；`retain` 只在 `rollback` 生效。**"
+          },
+          "detail": "The document assigns supported-action validation to journal, while policy raises unsupported-action.",
+          "source": {
+            "file": "policy.py",
+            "start": 50,
+            "end": 51,
+            "sha256": "862d1d64392867af4b7fe70f58574acbd90a85302f86f7262b4c8471f08bc7a7",
+            "text": "    if action not in SUPPORTED_ACTIONS:\n        raise PolicyError(\"unsupported-action\")"
+          }
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 15,
+            "end": 15,
+            "sha256": "145b618a34fef6f55e1cd4cdc24451dac99fa0c5cc17d4ca5f4c2312d7a45a08",
+            "text": "导入方向固定为：`release.py` → `journal.py` / `policy.py` / `planner.py`；`planner.py` → `journal.py`、`policy.py`；`journal.py` 与 `policy.py` 互不导入，也不反向导入 `release.py` 或 `planner.py`。只使用标准库。"
+          },
+          "detail": "Prose lists direct release imports for all three modules. The entrypoint only imports planner; its generated static block already reflects that.",
+          "source": {
+            "file": "release.py",
+            "start": 11,
+            "end": 11,
+            "sha256": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7",
+            "text": "from planner import plan"
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g1",
+      "terminal": "closed",
+      "carry": "same-frozen-seed",
+      "architectureMismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 10,
+            "end": 10,
+            "sha256": "22edf7effd0ccb129911c4c51e4e5f584ee31fcec2cdc3ca90c8774b1b48f6a0",
+            "text": "导入方向固定：`release.py` → `policy.py` / `journal.py` / `planner.py`，后三者之间只允许 `planner.py` 依赖 `journal.py`/`policy.py` 的数据结构，不得反向或循环。仅用标准库。"
+          },
+          "detail": "Prose lists direct release imports for all three modules. The entrypoint only imports planner; its generated static block already reflects that.",
+          "source": {
+            "file": "release.py",
+            "start": 5,
+            "end": 5,
+            "sha256": "d187137b48c5ca84239f4326f3c2952ad85ed01f1600a9198d6fe746d87756bc",
+            "text": "from planner import failure, plan"
+          }
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "22edf7effd0ccb129911c4c51e4e5f584ee31fcec2cdc3ca90c8774b1b48f6a0",
+            "text": "- `policy.py`（策略）：校验并规范化 `environment`（`staging`/`production`）与 `action`（G1 两个环境均支持 `plan`/`rollback`）；校验 `budget`（非负整数、排除布尔）；对 `plan` 判定预算上限（超出→`budget-exceeded`），对 `rollback` 只校验预算字段但不设上限。错误码：`invalid-environment`、`invalid-budget`、`unsupported-action`。"
+          },
+          "detail": "Prose assigns the emitted units ceiling decision to policy. Planner performs the comparison and creates the failure.",
+          "source": {
+            "file": "planner.py",
+            "start": 83,
+            "end": 86,
+            "sha256": "7b118e290bad849619e2c66255a0de528a47086b8d54a0350cdaaaec0e957cae",
+            "text": "        emitted = [node for node in order if node not in applied]\n        units = sum(changes[node].units for node in emitted)\n        if units > budget:\n            return failure(\"budget-exceeded\")"
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g2",
+      "terminal": "closed",
+      "carry": "same-workspace-new-session",
+      "architectureMismatches": []
+    }
+  ]
+}

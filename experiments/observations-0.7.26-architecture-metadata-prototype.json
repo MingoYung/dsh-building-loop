@@ -1,0 +1,374 @@
+{
+  "spec": "building-loop-detached-architecture-metadata-replay/1",
+  "modelCalls": 0,
+  "packageUnderTestSha256": "08cf5f0dcc04ff6b41418d7f87c71187b51ba8c58a7de277688f9e3a25ba2829",
+  "prototype": {
+    "patchSha256": "fdbb26984bf8eeea02995e1157cb0595899f1168564ba7d61df2e597c236f744",
+    "targetedTests": {
+      "passed": 23,
+      "failed": 0
+    }
+  },
+  "byCategory": {
+    "source-presence": {
+      "known": 2,
+      "previousDetected": 0,
+      "newDetected": 2
+    },
+    "action-owner": {
+      "known": 2,
+      "previousDetected": 0,
+      "newDetected": 2
+    },
+    "direct-import": {
+      "known": 3,
+      "previousDetected": 0,
+      "newDetected": 3
+    },
+    "budget-owner": {
+      "known": 1,
+      "previousDetected": 0,
+      "newDetected": 1
+    }
+  },
+  "perDraft": [
+    {
+      "run": "r-AWu8XL",
+      "stage": "g1",
+      "architectureSha256": "95431f86cc78605278750e6ef435347f4dd8e99cc978bfb676b401f460dc2634",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "658b3780d130added9f8bb6d1b698dfa31e1e01632f2fe33e7474b5f13324272"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "edfb792f17d78bf4ab9a6291126d94f3d05e6a54bf000b0bba1d428e232430d1"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "058c6197f326b29fa0ca9f96294bb5a53570533fb8239db0e00352ec8eab8837"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7"
+        }
+      ],
+      "known": [
+        {
+          "category": "source-presence",
+          "documentLine": 5,
+          "previousDetected": false,
+          "newDetected": true
+        },
+        {
+          "category": "action-owner",
+          "documentLine": 9,
+          "sourceFile": "policy.py",
+          "sourceStart": 36,
+          "sourceEnd": 37,
+          "previousDetected": false,
+          "newDetected": true
+        },
+        {
+          "category": "direct-import",
+          "documentLine": 12,
+          "sourceFile": "release.py",
+          "sourceStart": 11,
+          "sourceEnd": 11,
+          "previousDetected": false,
+          "newDetected": true
+        }
+      ],
+      "conflicts": [
+        {
+          "line": 9,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "unsupported-action",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "check_environment_and_action",
+              "code": "unsupported-action",
+              "line": 37
+            }
+          ]
+        },
+        {
+          "line": 12,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 11
+            }
+          ]
+        },
+        {
+          "line": 12,
+          "from": "release.py",
+          "to": "policy.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 11
+            }
+          ]
+        },
+        {
+          "line": 5,
+          "relation": "source-presence",
+          "actual": [
+            {
+              "file": "release.py"
+            },
+            {
+              "file": "policy.py"
+            },
+            {
+              "file": "journal.py"
+            },
+            {
+              "file": "planner.py"
+            }
+          ]
+        }
+      ],
+      "positiveControlCount": 8,
+      "falseRetreats": 0
+    },
+    {
+      "run": "r-AWu8XL",
+      "stage": "g2",
+      "architectureSha256": "145b618a34fef6f55e1cd4cdc24451dac99fa0c5cc17d4ca5f4c2312d7a45a08",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "a59f95607b4f7f9b673284ed147838265b68b832558bf14da8079076fa3a7590"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "84c19ef571dc5e0b05b2dae266c079829f21a2f119cb166c2fe2b4f36a10477a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "862d1d64392867af4b7fe70f58574acbd90a85302f86f7262b4c8471f08bc7a7"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7"
+        }
+      ],
+      "known": [
+        {
+          "category": "source-presence",
+          "documentLine": 5,
+          "previousDetected": false,
+          "newDetected": true
+        },
+        {
+          "category": "action-owner",
+          "documentLine": 11,
+          "sourceFile": "policy.py",
+          "sourceStart": 50,
+          "sourceEnd": 51,
+          "previousDetected": false,
+          "newDetected": true
+        },
+        {
+          "category": "direct-import",
+          "documentLine": 15,
+          "sourceFile": "release.py",
+          "sourceStart": 11,
+          "sourceEnd": 11,
+          "previousDetected": false,
+          "newDetected": true
+        }
+      ],
+      "conflicts": [
+        {
+          "line": 11,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "unsupported-action",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "check_environment_and_action",
+              "code": "unsupported-action",
+              "line": 51
+            }
+          ]
+        },
+        {
+          "line": 15,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 11
+            }
+          ]
+        },
+        {
+          "line": 15,
+          "from": "release.py",
+          "to": "policy.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 11
+            }
+          ]
+        },
+        {
+          "line": 5,
+          "relation": "source-presence",
+          "actual": [
+            {
+              "file": "release.py"
+            },
+            {
+              "file": "policy.py"
+            },
+            {
+              "file": "journal.py"
+            },
+            {
+              "file": "planner.py"
+            }
+          ]
+        }
+      ],
+      "positiveControlCount": 8,
+      "falseRetreats": 0
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g1",
+      "architectureSha256": "22edf7effd0ccb129911c4c51e4e5f584ee31fcec2cdc3ca90c8774b1b48f6a0",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "9e7c9119294f56cfdda92c986c80fd029ef18bfdf46e2af65098a8ac5fa3e0c3"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "7b118e290bad849619e2c66255a0de528a47086b8d54a0350cdaaaec0e957cae"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "46c03edcce122c58c2f1e2d4cac1fd4e20fc49a5ea17ed17bdd8d16a08a50b43"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d187137b48c5ca84239f4326f3c2952ad85ed01f1600a9198d6fe746d87756bc"
+        }
+      ],
+      "known": [
+        {
+          "category": "direct-import",
+          "documentLine": 10,
+          "sourceFile": "release.py",
+          "sourceStart": 5,
+          "sourceEnd": 5,
+          "previousDetected": false,
+          "newDetected": true
+        },
+        {
+          "category": "budget-owner",
+          "documentLine": 6,
+          "sourceFile": "planner.py",
+          "sourceStart": 83,
+          "sourceEnd": 86,
+          "previousDetected": false,
+          "newDetected": true
+        }
+      ],
+      "conflicts": [
+        {
+          "line": 6,
+          "from": "policy.py",
+          "relation": "decision",
+          "code": "budget-exceeded",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "budget-exceeded",
+              "line": 86
+            }
+          ]
+        },
+        {
+          "line": 10,
+          "from": "release.py",
+          "to": "policy.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "line": 10,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 5
+            }
+          ]
+        }
+      ],
+      "positiveControlCount": 8,
+      "falseRetreats": 0
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g2",
+      "architectureSha256": "e0ca9cf7b678b57465fd3ef65bad7f7b62f2b26bd6a1ffbcd7c25df95bbca7bf",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "52c83b5c3815d8c4af3b983120f7a9ee201cd9c854fb0238ba5888f1dccde72c"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "b25b7a7f0de37d15f577f44ec7d9acf0432d022d201bde90673614327e2fad44"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6029ecf9337574bf4ef1ed0041f4a8bc0b7799fa3cff53a85907541ab3fb4b8b"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d187137b48c5ca84239f4326f3c2952ad85ed01f1600a9198d6fe746d87756bc"
+        }
+      ],
+      "known": [],
+      "conflicts": [],
+      "positiveControlCount": 8,
+      "falseRetreats": 0
+    }
+  ],
+  "earlierCohort": {
+    "detected": 7,
+    "known": 7,
+    "controls": 32,
+    "falseRetreats": 0
+  },
+  "hostContract": "Only the authorized architecture coordinator receives registered source names, existence and complete direct local imports in prepare. The source read whitelist stays separate.",
+  "status": "detached-prototype"
+}

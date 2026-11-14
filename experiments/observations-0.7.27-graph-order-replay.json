@@ -1,0 +1,3851 @@
+{
+  "spec": "building-loop-isolated-graph-and-failure-order-replay/1",
+  "scope": "Exact prior archived source bytes copied under isolated QA. Focused scratch repairs illustrate graph deduplication and per-item failure precedence. Public examples and fixed checks only.",
+  "modelCalls": 0,
+  "source": {
+    "sandboxRunnerSha256": "a3ec3ab0fc754b2bdb1a68d81880554f46fccea7ea3f566ea69326d3ad353841",
+    "replaySha256": "d66fe525f7777a5b7a8d1b25f7b0167f118fa358b192ec5b5dd4f84f8f69c9f4"
+  },
+  "results": [
+    {
+      "run": "r-kBFuLn",
+      "stage": "G3",
+      "isolatedChanges": [
+        "graph",
+        "g3-order"
+      ],
+      "separatePositiveControl": [],
+      "archivedHashesPreserved": true,
+      "outcomes": [
+        {
+          "label": "archived-copy",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "d30368621db729e15ca023986bc06736e690e14f709b938e9bf184d2260be786"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "e79d8a9cf6a22ab7a67b6444b8b66f9ba75aabe9d20491accc6c91c9142e98b0"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 37.3,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "2cb78cd1a9e1a4d3ea8c68892e713b47d36d234c9f93f6e157df89da79a16079"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "timeout",
+              "elapsedMs": 3003.95,
+              "exitCode": null,
+              "error": "wall timeout at evaluator 3s",
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": null,
+              "inputSha256": "15e5406d0b880db9a065f11f8aeaa2a4c8ad8a8077bf40c42131ff15b265f524"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "timeout",
+              "elapsedMs": 3004.35,
+              "exitCode": null,
+              "error": "wall timeout at evaluator 3s",
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": null,
+              "inputSha256": "b97d8ada067bb11db9aa549d74eb83120c4a4d0415ff6d48e82f52e4e9255107"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 45.09,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "cd187634394c2eec0635bdf5e7d5cf15a88fe92757bf0763a69a42ffb08c84b1"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "failed",
+              "elapsedMs": 35.05,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "a58831fb03c8b5ec3f3651396406ba6fc2073b6e6e904e2c7ed59dda70097c7b"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "failed",
+              "elapsedMs": 30.81,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "aeb64d5acae69da876455a9764eb6e0201453d1d931a69242ad946f1371b3706"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 32.54,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "6334925c014f950465c7826aca43118499e96e8cdbd5f296910104c3cd22a87c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 39.92,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "03178581559aae2e2eb21a8cbd1bd0aba3e5334a38cb045c7f095d461e5e485c"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 36.22,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "26ad71a79d277a71acfcb695e28f7e45405f9768844a208a1d42b57e3476ad03"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 34.89,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "590681c56821bc80c4d68b2996679ea9181257990ee3f7ae5afecb1b66b1e4bc"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 12,
+              "total": 13,
+              "failed": [
+                "earlier-domain-before-later-shape"
+              ]
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_batch_item",
+                "read_changes",
+                "read_retain"
+              ],
+              "lineCount": 94
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_execute",
+                "_first_bad_item",
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 181
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 25
+            }
+          }
+        },
+        {
+          "label": "focused-repair",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "d30368621db729e15ca023986bc06736e690e14f709b938e9bf184d2260be786"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "6e6f1eb29914f1bd7e120d998bbef6aa902e9ee8cb57d0c61cb6b62787acd33b"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 33.68,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "2cb78cd1a9e1a4d3ea8c68892e713b47d36d234c9f93f6e157df89da79a16079"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "passed",
+              "elapsedMs": 35.84,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "15e5406d0b880db9a065f11f8aeaa2a4c8ad8a8077bf40c42131ff15b265f524"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "passed",
+              "elapsedMs": 36.68,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "b97d8ada067bb11db9aa549d74eb83120c4a4d0415ff6d48e82f52e4e9255107"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 40.82,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "cd187634394c2eec0635bdf5e7d5cf15a88fe92757bf0763a69a42ffb08c84b1"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "passed",
+              "elapsedMs": 32.87,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "a58831fb03c8b5ec3f3651396406ba6fc2073b6e6e904e2c7ed59dda70097c7b"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "passed",
+              "elapsedMs": 33.94,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "aeb64d5acae69da876455a9764eb6e0201453d1d931a69242ad946f1371b3706"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 31.23,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "6334925c014f950465c7826aca43118499e96e8cdbd5f296910104c3cd22a87c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 34.22,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "03178581559aae2e2eb21a8cbd1bd0aba3e5334a38cb045c7f095d461e5e485c"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 35.61,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "26ad71a79d277a71acfcb695e28f7e45405f9768844a208a1d42b57e3476ad03"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 32.66,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "590681c56821bc80c4d68b2996679ea9181257990ee3f7ae5afecb1b66b1e4bc"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 13,
+              "total": 13,
+              "failed": []
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_batch_item",
+                "read_changes",
+                "read_retain"
+              ],
+              "lineCount": 94
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_execute",
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 177
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 25
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-kBFuLn",
+      "stage": "G4",
+      "isolatedChanges": [
+        "graph"
+      ],
+      "separatePositiveControl": [
+        "g4-retry-output"
+      ],
+      "archivedHashesPreserved": true,
+      "outcomes": [
+        {
+          "label": "archived-copy",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "47539a6410123aefd0a26b8ec58e8ddb690578a2f816e30e5e94a8d652ea0301"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "150a22e968c122637dcc8d92e0ddff78bc7a78ecb73f30c876c09327d97e1a8f"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 41.64,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "fb0bb4d8cbf87a0cae2a30eb06ad3a3ad3f69ad4e6de01a4a6d3d3d6660e281b"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "timeout",
+              "elapsedMs": 3003.88,
+              "exitCode": null,
+              "error": "wall timeout at evaluator 3s",
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": null,
+              "inputSha256": "f60f1325ae3911e064bff798f548d68d27f51daf282464e977118e428614072a"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "timeout",
+              "elapsedMs": 3005.02,
+              "exitCode": null,
+              "error": "wall timeout at evaluator 3s",
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": null,
+              "inputSha256": "84024b5ed82103b0129c772b159146af861204186a29aaf6f0f552d5a698d8a1"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 51.82,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "6a5f4a9c7a8a349795fcf0fbc9e86a6a986345861e92de6154b5d1c451102579"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "passed",
+              "elapsedMs": 43.3,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "ce2f2f80840e0899d5206438361a37a8b2aa4a80f1ffd4a94e7f89e0097a4373"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "passed",
+              "elapsedMs": 40.79,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "80501307b324ae929976a87ec6a58c1c8c76fbf197d2ad878a148a7e240b590c"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 34.96,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "0a3ba3fc5d6b5614438e61debc2e1b20930832f66e18f7e306e1c8916fd39c6c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 36.96,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "20f277675610bc0b9a80a731fb8bc0b0503150a7927ccdb2420138fb88e440b8"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 37.34,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d87514e8e7fff4cabbbcf65f9db4f4f3f429e33061b80a0016e3676aab65265f"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 40.52,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "2d377fde0739aa11347686e4635976fe16882b73cda1e37ff481b70d20f8937d"
+            },
+            {
+              "case": "operation-id-is-a-per-item-structure-check",
+              "status": "passed",
+              "elapsedMs": 45.64,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "b2611ad9e311c158e2ffa5bbca966b8351af42e9ea438bddb666bcc7d3e9706a"
+            },
+            {
+              "case": "earlier-conflict-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 39.95,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "1f7e0b123911b0045cb452384e97284665ffa6f143f921000bbb04637f65e8ca"
+            },
+            {
+              "case": "later-domain-before-batch-quota",
+              "status": "passed",
+              "elapsedMs": 37.67,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "c4ca6961e2140c7e642d32c2a0c7145a2c9734b1a2f31b93ed8f2c0947cc5f9e"
+            },
+            {
+              "case": "all-valid-then-batch-quota",
+              "status": "passed",
+              "elapsedMs": 39.54,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "f5eae5b7abfcbfc35292714533609962da70f2fe32f9fc8b856591f41b030e9b"
+            },
+            {
+              "case": "exact-retry-ignores-top-and-nested-object-key-order",
+              "status": "failed",
+              "elapsedMs": 34.05,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "inputSha256": "d7ca5bd983a8a1abe180227e8e2eb48fab4582030d19ef515aa45c9cbe3022c4"
+            },
+            {
+              "case": "operation-id-does-not-ignore-array-order",
+              "status": "passed",
+              "elapsedMs": 33.9,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "025717920cafb46c7c6c670b416c2a3ec5a54f9461a43acfc4e1038098ff0e4b"
+            },
+            {
+              "case": "operation-id-distinguishes-booleans-and-numbers",
+              "status": "passed",
+              "elapsedMs": 41.28,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d74fc70a555571150e5c000dd63693febccb835c584502e965ffbbc5394ce977"
+            },
+            {
+              "case": "distinct-operation-ids-with-equal-payloads-remain-independent",
+              "status": "passed",
+              "elapsedMs": 42.95,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "operationId": "second",
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "8f2217435897d4f9e5446bebdb15239209b7e54633f36dfb0b565c4383fb32f5"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 19,
+              "total": 20,
+              "failed": [
+                "object-key-order-does-not-charge-twice"
+              ]
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_batch_item",
+                "read_changes",
+                "read_operation_id",
+                "read_retain"
+              ],
+              "lineCount": 131
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_canonical",
+                "_execute",
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 237
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 25
+            }
+          }
+        },
+        {
+          "label": "focused-repair",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "47539a6410123aefd0a26b8ec58e8ddb690578a2f816e30e5e94a8d652ea0301"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "fdf2e69fddfef543668fa5a697c3b9c45fa14b03b4c12654f4ac53369868fd81"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 36.24,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "fb0bb4d8cbf87a0cae2a30eb06ad3a3ad3f69ad4e6de01a4a6d3d3d6660e281b"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "passed",
+              "elapsedMs": 41.91,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "f60f1325ae3911e064bff798f548d68d27f51daf282464e977118e428614072a"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "passed",
+              "elapsedMs": 45.46,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "84024b5ed82103b0129c772b159146af861204186a29aaf6f0f552d5a698d8a1"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 43.31,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "6a5f4a9c7a8a349795fcf0fbc9e86a6a986345861e92de6154b5d1c451102579"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "passed",
+              "elapsedMs": 36.66,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "ce2f2f80840e0899d5206438361a37a8b2aa4a80f1ffd4a94e7f89e0097a4373"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "passed",
+              "elapsedMs": 36.61,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "80501307b324ae929976a87ec6a58c1c8c76fbf197d2ad878a148a7e240b590c"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 38.59,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "0a3ba3fc5d6b5614438e61debc2e1b20930832f66e18f7e306e1c8916fd39c6c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 46.04,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "20f277675610bc0b9a80a731fb8bc0b0503150a7927ccdb2420138fb88e440b8"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 46.63,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d87514e8e7fff4cabbbcf65f9db4f4f3f429e33061b80a0016e3676aab65265f"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 40.65,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "2d377fde0739aa11347686e4635976fe16882b73cda1e37ff481b70d20f8937d"
+            },
+            {
+              "case": "operation-id-is-a-per-item-structure-check",
+              "status": "passed",
+              "elapsedMs": 36.2,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "b2611ad9e311c158e2ffa5bbca966b8351af42e9ea438bddb666bcc7d3e9706a"
+            },
+            {
+              "case": "earlier-conflict-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 35.04,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "1f7e0b123911b0045cb452384e97284665ffa6f143f921000bbb04637f65e8ca"
+            },
+            {
+              "case": "later-domain-before-batch-quota",
+              "status": "passed",
+              "elapsedMs": 37.27,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "c4ca6961e2140c7e642d32c2a0c7145a2c9734b1a2f31b93ed8f2c0947cc5f9e"
+            },
+            {
+              "case": "all-valid-then-batch-quota",
+              "status": "passed",
+              "elapsedMs": 32.37,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "f5eae5b7abfcbfc35292714533609962da70f2fe32f9fc8b856591f41b030e9b"
+            },
+            {
+              "case": "exact-retry-ignores-top-and-nested-object-key-order",
+              "status": "failed",
+              "elapsedMs": 34.12,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "inputSha256": "d7ca5bd983a8a1abe180227e8e2eb48fab4582030d19ef515aa45c9cbe3022c4"
+            },
+            {
+              "case": "operation-id-does-not-ignore-array-order",
+              "status": "passed",
+              "elapsedMs": 33.71,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "025717920cafb46c7c6c670b416c2a3ec5a54f9461a43acfc4e1038098ff0e4b"
+            },
+            {
+              "case": "operation-id-distinguishes-booleans-and-numbers",
+              "status": "passed",
+              "elapsedMs": 36.28,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d74fc70a555571150e5c000dd63693febccb835c584502e965ffbbc5394ce977"
+            },
+            {
+              "case": "distinct-operation-ids-with-equal-payloads-remain-independent",
+              "status": "passed",
+              "elapsedMs": 35.78,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "operationId": "second",
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "8f2217435897d4f9e5446bebdb15239209b7e54633f36dfb0b565c4383fb32f5"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 19,
+              "total": 20,
+              "failed": [
+                "object-key-order-does-not-charge-twice"
+              ]
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_batch_item",
+                "read_changes",
+                "read_operation_id",
+                "read_retain"
+              ],
+              "lineCount": 131
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_canonical",
+                "_execute",
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 241
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 25
+            }
+          }
+        },
+        {
+          "label": "identity-control",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "47539a6410123aefd0a26b8ec58e8ddb690578a2f816e30e5e94a8d652ea0301"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "405cbbcec7b6b06724b291b2cf5ce90e1bbf92926750157a42785526fc571f29"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "b3a9c3add99794b0f6b83d7ac8291d16420126b10a126a108e1d58dc4a50f4a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 33.34,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "fb0bb4d8cbf87a0cae2a30eb06ad3a3ad3f69ad4e6de01a4a6d3d3d6660e281b"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "passed",
+              "elapsedMs": 32.86,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "f60f1325ae3911e064bff798f548d68d27f51daf282464e977118e428614072a"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "passed",
+              "elapsedMs": 41.26,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "84024b5ed82103b0129c772b159146af861204186a29aaf6f0f552d5a698d8a1"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 43.17,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "6a5f4a9c7a8a349795fcf0fbc9e86a6a986345861e92de6154b5d1c451102579"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "passed",
+              "elapsedMs": 34.02,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "ce2f2f80840e0899d5206438361a37a8b2aa4a80f1ffd4a94e7f89e0097a4373"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "passed",
+              "elapsedMs": 34.4,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "80501307b324ae929976a87ec6a58c1c8c76fbf197d2ad878a148a7e240b590c"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 43.6,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "0a3ba3fc5d6b5614438e61debc2e1b20930832f66e18f7e306e1c8916fd39c6c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 37.23,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "20f277675610bc0b9a80a731fb8bc0b0503150a7927ccdb2420138fb88e440b8"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 36.45,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d87514e8e7fff4cabbbcf65f9db4f4f3f429e33061b80a0016e3676aab65265f"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 38.61,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "2d377fde0739aa11347686e4635976fe16882b73cda1e37ff481b70d20f8937d"
+            },
+            {
+              "case": "operation-id-is-a-per-item-structure-check",
+              "status": "passed",
+              "elapsedMs": 38.6,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "b2611ad9e311c158e2ffa5bbca966b8351af42e9ea438bddb666bcc7d3e9706a"
+            },
+            {
+              "case": "earlier-conflict-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 33.94,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "1f7e0b123911b0045cb452384e97284665ffa6f143f921000bbb04637f65e8ca"
+            },
+            {
+              "case": "later-domain-before-batch-quota",
+              "status": "passed",
+              "elapsedMs": 35.11,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "c4ca6961e2140c7e642d32c2a0c7145a2c9734b1a2f31b93ed8f2c0947cc5f9e"
+            },
+            {
+              "case": "all-valid-then-batch-quota",
+              "status": "passed",
+              "elapsedMs": 32.89,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "f5eae5b7abfcbfc35292714533609962da70f2fe32f9fc8b856591f41b030e9b"
+            },
+            {
+              "case": "exact-retry-ignores-top-and-nested-object-key-order",
+              "status": "passed",
+              "elapsedMs": 34.44,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "inputSha256": "d7ca5bd983a8a1abe180227e8e2eb48fab4582030d19ef515aa45c9cbe3022c4"
+            },
+            {
+              "case": "operation-id-does-not-ignore-array-order",
+              "status": "passed",
+              "elapsedMs": 48.64,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "025717920cafb46c7c6c670b416c2a3ec5a54f9461a43acfc4e1038098ff0e4b"
+            },
+            {
+              "case": "operation-id-distinguishes-booleans-and-numbers",
+              "status": "passed",
+              "elapsedMs": 45.3,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d74fc70a555571150e5c000dd63693febccb835c584502e965ffbbc5394ce977"
+            },
+            {
+              "case": "distinct-operation-ids-with-equal-payloads-remain-independent",
+              "status": "passed",
+              "elapsedMs": 33.38,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "operationId": "second",
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "8f2217435897d4f9e5446bebdb15239209b7e54633f36dfb0b565c4383fb32f5"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 20,
+              "total": 20,
+              "failed": []
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_id_list",
+                "_read_dependencies",
+                "read_applied",
+                "read_batch_item",
+                "read_changes",
+                "read_operation_id",
+                "read_retain"
+              ],
+              "lineCount": 131
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_canonical",
+                "_execute",
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "retained_closure",
+                "rollback_actions",
+                "topological_order"
+              ],
+              "lineCount": 237
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 25
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-j5sGRU",
+      "stage": "G4",
+      "isolatedChanges": [
+        "g4-order"
+      ],
+      "separatePositiveControl": [],
+      "archivedHashesPreserved": true,
+      "outcomes": [
+        {
+          "label": "archived-copy",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "b6462ce634ca87ea56120bd80ec3dffde80267cbdad0b88df3123efd99f72a6a"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "b783b81c953add7666e0762e9cb3647553f06f92be5f9e07c18fea3f1d14a394"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 33.89,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "fb0bb4d8cbf87a0cae2a30eb06ad3a3ad3f69ad4e6de01a4a6d3d3d6660e281b"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "passed",
+              "elapsedMs": 36.14,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "f60f1325ae3911e064bff798f548d68d27f51daf282464e977118e428614072a"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "passed",
+              "elapsedMs": 51.71,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "84024b5ed82103b0129c772b159146af861204186a29aaf6f0f552d5a698d8a1"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 43.54,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "6a5f4a9c7a8a349795fcf0fbc9e86a6a986345861e92de6154b5d1c451102579"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "failed",
+              "elapsedMs": 31.85,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "ce2f2f80840e0899d5206438361a37a8b2aa4a80f1ffd4a94e7f89e0097a4373"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "failed",
+              "elapsedMs": 31.75,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "80501307b324ae929976a87ec6a58c1c8c76fbf197d2ad878a148a7e240b590c"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 35.43,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "0a3ba3fc5d6b5614438e61debc2e1b20930832f66e18f7e306e1c8916fd39c6c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 36.33,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "20f277675610bc0b9a80a731fb8bc0b0503150a7927ccdb2420138fb88e440b8"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 37.87,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d87514e8e7fff4cabbbcf65f9db4f4f3f429e33061b80a0016e3676aab65265f"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 40.67,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "2d377fde0739aa11347686e4635976fe16882b73cda1e37ff481b70d20f8937d"
+            },
+            {
+              "case": "operation-id-is-a-per-item-structure-check",
+              "status": "failed",
+              "elapsedMs": 36.28,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "b2611ad9e311c158e2ffa5bbca966b8351af42e9ea438bddb666bcc7d3e9706a"
+            },
+            {
+              "case": "earlier-conflict-before-later-structural-error",
+              "status": "failed",
+              "elapsedMs": 35.77,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 2,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "1f7e0b123911b0045cb452384e97284665ffa6f143f921000bbb04637f65e8ca"
+            },
+            {
+              "case": "later-domain-before-batch-quota",
+              "status": "passed",
+              "elapsedMs": 34.04,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "c4ca6961e2140c7e642d32c2a0c7145a2c9734b1a2f31b93ed8f2c0947cc5f9e"
+            },
+            {
+              "case": "all-valid-then-batch-quota",
+              "status": "passed",
+              "elapsedMs": 34.22,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "f5eae5b7abfcbfc35292714533609962da70f2fe32f9fc8b856591f41b030e9b"
+            },
+            {
+              "case": "exact-retry-ignores-top-and-nested-object-key-order",
+              "status": "passed",
+              "elapsedMs": 38.84,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "inputSha256": "d7ca5bd983a8a1abe180227e8e2eb48fab4582030d19ef515aa45c9cbe3022c4"
+            },
+            {
+              "case": "operation-id-does-not-ignore-array-order",
+              "status": "passed",
+              "elapsedMs": 39.64,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "025717920cafb46c7c6c670b416c2a3ec5a54f9461a43acfc4e1038098ff0e4b"
+            },
+            {
+              "case": "operation-id-distinguishes-booleans-and-numbers",
+              "status": "passed",
+              "elapsedMs": 40.38,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d74fc70a555571150e5c000dd63693febccb835c584502e965ffbbc5394ce977"
+            },
+            {
+              "case": "distinct-operation-ids-with-equal-payloads-remain-independent",
+              "status": "passed",
+              "elapsedMs": 35.69,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "operationId": "second",
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "8f2217435897d4f9e5446bebdb15239209b7e54633f36dfb0b565c4383fb32f5"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 19,
+              "total": 20,
+              "failed": [
+                "earlier-domain-before-later-shape"
+              ]
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "_change_identity",
+                "_comparable",
+                "_id_list",
+                "_read_dependencies",
+                "_read_limit",
+                "_read_operation_id",
+                "is_batch_request",
+                "read_applied",
+                "read_batch",
+                "read_changes",
+                "read_retain",
+                "request_identity"
+              ],
+              "lineCount": 271
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "resolve_item",
+                "retained_closure",
+                "rollback_actions",
+                "run_rollback_item",
+                "topological_order"
+              ],
+              "lineCount": 199
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 19
+            }
+          }
+        },
+        {
+          "label": "focused-repair",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "b79ac0161b3dfd1730a5d7ba7f2b2118819c62f12762e8dce6edf892121118c1"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "69655e730157204f7971cc4c69b82b73b325eee5ad2bbe5cda28a644149a5107"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "checks": [
+            {
+              "case": "retention-small",
+              "nodes": 4,
+              "status": "passed",
+              "elapsedMs": 34.3,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "fb0bb4d8cbf87a0cae2a30eb06ad3a3ad3f69ad4e6de01a4a6d3d3d6660e281b"
+            },
+            {
+              "case": "retention-shared-unapplied-dag",
+              "nodes": 55,
+              "status": "passed",
+              "elapsedMs": 34.32,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "f60f1325ae3911e064bff798f548d68d27f51daf282464e977118e428614072a"
+            },
+            {
+              "case": "retention-shared-unapplied-dag-2001",
+              "nodes": 2001,
+              "status": "passed",
+              "elapsedMs": 53.24,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "84024b5ed82103b0129c772b159146af861204186a29aaf6f0f552d5a698d8a1"
+            },
+            {
+              "case": "retention-linear-2000",
+              "nodes": 2000,
+              "status": "passed",
+              "elapsedMs": 45.51,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "op-0"
+                  }
+                ],
+                "units": 3
+              },
+              "inputSha256": "6a5f4a9c7a8a349795fcf0fbc9e86a6a986345861e92de6154b5d1c451102579"
+            },
+            {
+              "case": "earlier-domain-before-later-null-item",
+              "status": "passed",
+              "elapsedMs": 34.73,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "ce2f2f80840e0899d5206438361a37a8b2aa4a80f1ffd4a94e7f89e0097a4373"
+            },
+            {
+              "case": "earlier-domain-before-later-forbidden-key",
+              "status": "passed",
+              "elapsedMs": 32.62,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "80501307b324ae929976a87ec6a58c1c8c76fbf197d2ad878a148a7e240b590c"
+            },
+            {
+              "case": "first-valid-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 32.02,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "0a3ba3fc5d6b5614438e61debc2e1b20930832f66e18f7e306e1c8916fd39c6c"
+            },
+            {
+              "case": "earlier-structural-before-later-domain-error",
+              "status": "passed",
+              "elapsedMs": 35.47,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "20f277675610bc0b9a80a731fb8bc0b0503150a7927ccdb2420138fb88e440b8"
+            },
+            {
+              "case": "envelope-validated-before-any-item",
+              "status": "passed",
+              "elapsedMs": 37.24,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d87514e8e7fff4cabbbcf65f9db4f4f3f429e33061b80a0016e3676aab65265f"
+            },
+            {
+              "case": "all-valid-in-order-and-independent",
+              "status": "passed",
+              "elapsedMs": 39.95,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "second"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "2d377fde0739aa11347686e4635976fe16882b73cda1e37ff481b70d20f8937d"
+            },
+            {
+              "case": "operation-id-is-a-per-item-structure-check",
+              "status": "passed",
+              "elapsedMs": 42.75,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "b2611ad9e311c158e2ffa5bbca966b8351af42e9ea438bddb666bcc7d3e9706a"
+            },
+            {
+              "case": "earlier-conflict-before-later-structural-error",
+              "status": "passed",
+              "elapsedMs": 41.54,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "1f7e0b123911b0045cb452384e97284665ffa6f143f921000bbb04637f65e8ca"
+            },
+            {
+              "case": "later-domain-before-batch-quota",
+              "status": "passed",
+              "elapsedMs": 38.99,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "c4ca6961e2140c7e642d32c2a0c7145a2c9734b1a2f31b93ed8f2c0947cc5f9e"
+            },
+            {
+              "case": "all-valid-then-batch-quota",
+              "status": "passed",
+              "elapsedMs": 35.57,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "f5eae5b7abfcbfc35292714533609962da70f2fe32f9fc8b856591f41b030e9b"
+            },
+            {
+              "case": "exact-retry-ignores-top-and-nested-object-key-order",
+              "status": "passed",
+              "elapsedMs": 39.71,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  }
+                ],
+                "units": 2
+              },
+              "inputSha256": "d7ca5bd983a8a1abe180227e8e2eb48fab4582030d19ef515aa45c9cbe3022c4"
+            },
+            {
+              "case": "operation-id-does-not-ignore-array-order",
+              "status": "passed",
+              "elapsedMs": 41.33,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "025717920cafb46c7c6c670b416c2a3ec5a54f9461a43acfc4e1038098ff0e4b"
+            },
+            {
+              "case": "operation-id-distinguishes-booleans-and-numbers",
+              "status": "passed",
+              "elapsedMs": 41.09,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "inputSha256": "d74fc70a555571150e5c000dd63693febccb835c584502e965ffbbc5394ce977"
+            },
+            {
+              "case": "distinct-operation-ids-with-equal-payloads-remain-independent",
+              "status": "passed",
+              "elapsedMs": 37.78,
+              "exitCode": 0,
+              "error": null,
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "operationId": "second",
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "first"
+                  },
+                  {
+                    "actions": [
+                      "first"
+                    ],
+                    "units": 2,
+                    "operationId": "second"
+                  }
+                ],
+                "units": 4
+              },
+              "inputSha256": "8f2217435897d4f9e5446bebdb15239209b7e54633f36dfb0b565c4383fb32f5"
+            }
+          ],
+          "fixedScore": {
+            "legacy": {
+              "passed": 21,
+              "total": 21,
+              "failed": []
+            },
+            "public": {
+              "passed": 20,
+              "total": 20,
+              "failed": []
+            }
+          },
+          "architecture": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "_change_identity",
+                "_comparable",
+                "_id_list",
+                "_read_dependencies",
+                "_read_limit",
+                "_read_operation_id",
+                "is_batch_request",
+                "read_applied",
+                "read_batch",
+                "read_batch_item",
+                "read_changes",
+                "read_retain",
+                "request_identity"
+              ],
+              "lineCount": 247
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "batch_failure",
+                "build_graph",
+                "failure",
+                "plan",
+                "plan_batch",
+                "resolve_item",
+                "retained_closure",
+                "rollback_actions",
+                "run_rollback_item",
+                "topological_order"
+              ],
+              "lineCount": 198
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "__init__",
+                "limit_for"
+              ],
+              "lineCount": 63
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 19
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+{
+  "spec": "building-loop-short-frozen-architecture-audit/1",
+  "scope": "Independent human comparison of four Building-loop frozen snapshots; exact source and document pins verified.",
+  "architectureMismatches": 8,
+  "runs": [
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g1",
+      "terminal": "closed",
+      "phase": "closed",
+      "carry": "same-frozen-seed",
+      "architectureMismatchCount": 2,
+      "mismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 6,
+            "end": 6,
+            "text": "- `policy.py`：环境与预算。校验 `environment`（`staging`/`production`），校验 `action`（本目标 G1 两个环境都支持 `plan` 与 `rollback`），校验 `budget`（非负整数，排除布尔），并在 plan 时以已发出的 units 合计对照预算给出 `budget-exceeded`。",
+            "sha256": "16a5f9e84b6e2799d3c85643a238cad232269476a3dc28a4b0a2b11120c57db6"
+          },
+          "source": {
+            "file": "planner.py",
+            "start": 78,
+            "end": 79,
+            "text": "    if units > budget:\n        return failure(\"budget-exceeded\")",
+            "sha256": "e821b0e664cd65db65696d9e61e1fe1a64da94372708e9cc12a60e2bd5ff5d6b"
+          },
+          "discrepancy": "The document assigns the emitted-units comparison to policy. Planner compares units against the authorized limit and constructs the failure."
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 7,
+            "end": 7,
+            "text": "- `journal.py`：输入校验、身份与回放。校验请求形态（`invalid-request`）与每条 change（`invalid-change`），对重复记录做折叠与冲突判定（`conflicting-change`），解析 `applied` 日志（非数组或非字符串视为 `invalid-change`），产出规范化后的 change 映射与已应用集合。",
+            "sha256": "16a5f9e84b6e2799d3c85643a238cad232269476a3dc28a4b0a2b11120c57db6"
+          },
+          "source": {
+            "file": "planner.py",
+            "start": 54,
+            "end": 56,
+            "text": "def plan(request):\n    if not isinstance(request, dict):\n        return failure(\"invalid-request\")",
+            "sha256": "e821b0e664cd65db65696d9e61e1fe1a64da94372708e9cc12a60e2bd5ff5d6b"
+          },
+          "discrepancy": "The document assigns the top-level object guard to journal. Planner rejects the request before invoking journal."
+        }
+      ]
+    },
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g2",
+      "terminal": "closed",
+      "phase": "closed",
+      "carry": "same-workspace-new-session",
+      "architectureMismatchCount": 1,
+      "mismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 7,
+            "end": 7,
+            "text": "- `journal.py`：输入校验、身份与回放。校验请求形态（`invalid-request`）与每条 change（`invalid-change`），对重复记录做折叠与冲突判定（`conflicting-change`），解析 `applied` 日志（非数组或非字符串视为 `invalid-change`），产出规范化后的 change 映射与已应用集合。G2 追加：对 staging rollback 解析 `retain`（缺省空数组），非数组、含非字符串/空串、重复、或含非已应用 ID 一律 `invalid-retain`；仅 rollback 生效，plan 忽略该字段。",
+            "sha256": "4349bf3d0d4cb391087d79a5357fb5222bba919f154ef8ea136147130cd74d22"
+          },
+          "source": {
+            "file": "planner.py",
+            "start": 79,
+            "end": 81,
+            "text": "def plan(request):\n    if not isinstance(request, dict):\n        return failure(\"invalid-request\")",
+            "sha256": "4b054b16ac97d8406e83dd6807bc2377ec62c9ad65884fffb7387ceba426d655"
+          },
+          "discrepancy": "Planner still owns the top-level object guard after the G2 revision."
+        }
+      ]
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g1",
+      "terminal": "completion-cap",
+      "phase": "ledger-review",
+      "carry": "same-frozen-seed",
+      "architectureMismatchCount": 2,
+      "mismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 7,
+            "end": 7,
+            "text": "- `release.py`（入口，只管传输）：读 stdin 原文 → `json.loads`，解析失败返回 `invalid-json`；调用下游拿到结果对象后序列化打印。不做领域校验。",
+            "sha256": "5bb1eb95e82a1372039715bc0684e8de3d68f2cb6d5a41891a796642054121ee"
+          },
+          "source": {
+            "file": "release.py",
+            "start": 8,
+            "end": 11,
+            "text": "def main():\n    try:\n        request = json.load(sys.stdin)\n    except (ValueError, TypeError):",
+            "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+          },
+          "discrepancy": "Transport correctly owns JSON decoding, but the source decodes the stream directly using json.load rather than the specified two-step implementation."
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 9,
+            "end": 9,
+            "text": "- `journal.py`（输入校验/身份/回放）：校验请求形状（`invalid-request`）与 `changes` 记录（`id`/`component` 非空字符串、`units` 正整数、`depends_on` 默认 `[]`、`applied` 默认 `[]`，非数组或畸形 → `invalid-change`）；对相同记录去重（相等含 id、component、units 与依赖集合），同 id 不同内容 → `conflicting-change`；产出 `applied` 集合供回放。",
+            "sha256": "5bb1eb95e82a1372039715bc0684e8de3d68f2cb6d5a41891a796642054121ee"
+          },
+          "source": {
+            "file": "planner.py",
+            "start": 64,
+            "end": 66,
+            "text": "def plan(request):\n    if not isinstance(request, dict):\n        return failure(\"invalid-request\")",
+            "sha256": "36a4958bc776baebfc9887ccb50b2e0f916c49c6f8c4d78fee60456cd9e2e531"
+          },
+          "discrepancy": "The document assigns the top-level object guard to journal. Planner rejects the request first."
+        }
+      ]
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g2",
+      "terminal": "closed",
+      "phase": "closed",
+      "carry": "frozen-workspace-continuation-after-timeout",
+      "architectureMismatchCount": 3,
+      "mismatches": [
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 9,
+            "end": 9,
+            "text": "- `release.py`（入口，只管传输）：读 stdin 原文并 `json.loads`，解析失败返回 `invalid-json`；调用下游拿到结果对象后序列化打印。不做领域校验。",
+            "sha256": "4aee1aede1221c7664a154bf52ea4d7cb11cb2d02627bb32efab9949b966fddc"
+          },
+          "source": {
+            "file": "release.py",
+            "start": 8,
+            "end": 11,
+            "text": "def main():\n    try:\n        request = json.load(sys.stdin)\n    except (ValueError, TypeError):",
+            "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+          },
+          "discrepancy": "Transport still decodes the stream directly using json.load after the G2 revision."
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 11,
+            "end": 11,
+            "text": "- `journal.py`（输入校验/身份/回放）：校验请求形状（`invalid-request`）与 `changes` 记录（`id`、`component` 非空字符串，`units` 正整数，`depends_on` 默认空数组，`applied` 默认空数组，非数组或畸形返回 `invalid-change`）；相同记录去重（相等含 id、component、units 与依赖集合），同 id 不同内容返回 `conflicting-change`；产出 applied 集合供回放。G2 新增 `retain` 格式校验，仅 rollback 生效：默认空数组，必须是数组且元素为非空字符串，否则返回 `invalid-retain`；是否 applied 的语义判定交给 planner。",
+            "sha256": "4aee1aede1221c7664a154bf52ea4d7cb11cb2d02627bb32efab9949b966fddc"
+          },
+          "source": {
+            "file": "planner.py",
+            "start": 92,
+            "end": 94,
+            "text": "def plan(request):\n    if not isinstance(request, dict):\n        return failure(\"invalid-request\")",
+            "sha256": "d24ef43be3d560f21511fa05a2e75624f4093a5cd57e88ce39929a91778bb6ac"
+          },
+          "discrepancy": "Planner still owns the top-level object guard after the G2 revision."
+        },
+        {
+          "document": {
+            "file": "modules/architecture.md",
+            "start": 14,
+            "end": 14,
+            "text": "错误码集合：成功 `{\"status\":\"ok\",\"actions\":[...],\"units\":n}`，失败 `{\"status\":\"error\",\"error\":code,\"actions\":[],\"units\":0}`。原有码为 `invalid-json`、`invalid-request`、`invalid-environment`、`invalid-budget`、`invalid-change`、`unsupported-action`、`conflicting-change`、`unknown-dependency`、`dependency-cycle`、`budget-exceeded`，G2 新增 `production-frozen` 与 `invalid-retain`。判定优先级：JSON 解析、请求形状、环境、动作、预算格式、`changes` 与 `applied` 与 `retain` 格式、去重冲突、图与 applied 目标、环、预算配额，最后输出。G1 既有用例必须保持原结果。",
+            "sha256": "4aee1aede1221c7664a154bf52ea4d7cb11cb2d02627bb32efab9949b966fddc"
+          },
+          "source": {
+            "file": "planner.py",
+            "start": 96,
+            "end": 100,
+            "text": "        budget = limit_for(request)\n        action = request[\"action\"]\n        changes = read_changes(request.get(\"changes\"))\n        applied = read_applied(request)\n        retain = read_retain(request, action)",
+            "sha256": "d24ef43be3d560f21511fa05a2e75624f4093a5cd57e88ce39929a91778bb6ac"
+          },
+          "discrepancy": "The prose puts retain validation before a duplicate conflict. Planner calls read_changes before read_retain, and read_changes raises conflicting-change."
+        }
+      ],
+      "publicOrderingReplay": {
+        "source": {
+          "file": "journal.py",
+          "start": 61,
+          "end": 65,
+          "text": "        elif (known[\"component\"] != component or known[\"units\"] != units\n                or known[\"depends_on\"] != depends_on):\n            # Same id, different content: we cannot tell which version the\n            # caller meant, so refuse instead of silently picking one.\n            raise JournalError(\"conflicting-change\")",
+          "sha256": "3806d2cf1fa6a9eff7fa60e3db925b1c333ad2bb3f10e0fa089003098d5120b4"
+        },
+        "input": {
+          "environment": "staging",
+          "action": "rollback",
+          "budget": 5,
+          "changes": [
+            {
+              "id": "same",
+              "component": "api",
+              "units": 1,
+              "depends_on": []
+            },
+            {
+              "id": "same",
+              "component": "api",
+              "units": 2,
+              "depends_on": []
+            }
+          ],
+          "applied": [
+            "same"
+          ],
+          "retain": null
+        },
+        "documentOrderWouldReturn": "invalid-retain",
+        "observed": {
+          "status": "error",
+          "error": "conflicting-change",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "scope": "This replay checks the architecture prose order. The short owner specification does not set precedence between these two malformed inputs."
+      }
+    }
+  ]
+}

@@ -1,88 +1,34 @@
 - insert:
+    - id: building-loop-project-settings
+      name: 'dsh-building-loop'
+
     - id: preset-building-loop
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: building-loop
         name: building-loop
-        description: '派单协作模式——派单方下任务单→接单会话执行→回帖交付与验收。文件即事实源：身份与职责来自工作区
-          AGENTS.md，按当前步骤按需装填技能与指令，盲区必先查证不瞎说。'
+        description: >-
+          面向项目建设、深度研究和跨多轮会话的长任务。用三级文件与原始证据保持项目现状，
+          让总控只管全貌与进度，执行和核验各用授权子会话，减少主会话的细节污染和重复交接。
+          同一单元默认续做，补查逐条核退回项，数字按原始数据复算，来源核验绑定实际读取和版本。
+          每轮验收后强制读任务账本，结合最新项目现状处置后续、临时和搁置事项，再继续长期任务。
         order: 9
         plugins:
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
               prefix: >-
-                You are an agent working in building-loop (dispatch mode). Working
-                directory: {{cwd}}. Core discipline — files are the single
-                source of truth: your identity and duties come from the
-                workspace AGENTS.md and the files it points to, never from
-                memory. Iron rules: 1) On session start, read the workspace
-                AGENTS.md first. 2) Load skills/instruction files for the
-                current step on demand (环节装填); on knowledge gaps, search/verify
-                first — never confidently state unverified claims (不瞎说铁律). 3)
-                Delivery format: one compact report with
-                position+change+measured evidence; resolve pending items
-                immediately (挂账最少化 — no accumulating backlog) — stop and ask the
-                user only for direction-choice questions, with a recommendation
-                attached. 4) Scope clause: do not touch files outside your
-                assigned scope; report errors to the coordinator instead of
-                fixing them on the side. 5) Context survival: before reading
-                large files, estimate their total size against the session
-                budget and read them in batches, summarising each batch to key
-                points before the next; compress proactively (compress tool)
-                rather than waiting for forced truncation; keep single-turn
-                thinking+output inside a hard budget. 6) Acceptance must be
-                runnable: state the exact command and its expected output, and
-                prefer runnable checks over descriptive ones; self-verification
-                means actually running every runnable check and attaching the
-                real output — "confirmed/done" is not evidence; when you are on
-                the receiving side, re-run a sample of the deterministic checks
-                and compare, and treat a mismatch as an automatic rejection. 7)
-                Never self-select your own audit sample: samples come from the
-                dispatching side or from physical randomness (e.g. a random line
-                of an artifact list), never from the party being checked —
-                selection bias is where corruption starts. 8) Bound the blast
-                radius: land a rollback point before modifying anything and
-                record where it is; when a unit fails, roll back only that unit,
-                never redo or roll back neighbouring units to compensate. 9) Do
-                not let verification share the author's blind spots: for
-                high-impact or irreversible deliveries, re-check with a
-                different origin — a differently-sourced model, or a
-                deterministic tool deriving the key numbers independently —
-                rather than another instance of the same lineage. 10) Load
-                `dispatch-protocol` when writing, executing, or accepting a task
-                slip. Record the ledger path in the slip and ask if the project
-                has not specified one. Use workspace-root DISPATCH.md for the
-                project's dispatch conventions. Load `project-index` when the
-                workspace uses an index or the user asks to maintain one. For
-                an indexed workspace, read its top-level file and change list
-                before acting. 11) One
-                message, one deliverable: finish the unit you opened — its
-                change, its evidence, its report — before opening the next,
-                instead of starting several and landing none. If the output
-                limit cuts you off, stop at a boundary between units and say
-                what is still owed; a half-written unit is not a delivery. 12)
-                Establish your role before choosing an execution path. An
-                executor who receives a slip completes the assigned unit and
-                delegates only when the slip explicitly allows it. A dispatcher
-                defines each unit's scope, inputs, output, and acceptance checks
-                before sending independent work to available agents. A small unit
-                or a serial step can run in the current session. If available
-                capacity is unknown, send at most one child at a time and wait
-                for its receipt before sending the next.
+                你在 building-loop 模式。按用户的目标和已授权范围行动，有实质歧义先问清。
+                宿主阶段为 unconfigured 或 disabled 时按当前会话判断普通问答、讨论或可开工的项目。按宿主注入规则提议，确认后进入建设。
+                工作区以文件和原始证据为准。开工先从总纲定位分块，按需读正文和更新记录。
+                使用 building_loop 与 building_loop_file。每步依据宿主注入的角色和阶段规则。
+                总控维护全貌和进度，调查与修订交给执行方，验收方独立查证。
+                后续计划、临时需求与中断事项通过 building_loop_ledger 维护，验收后结合当前项目逐项复盘。
+                追查原因和边界，复查反例、替代方案、数据和遗漏。回复分清事实、推测与未知，
+                最后用具体证据和大白话说明结果。
 
-          - id: agent-instructions
-            name: '@deepseek-ai/dsh-agent-instructions'
-            config:
-              maxBytes: 65536
-              # Mode-specific extra candidate: a project root may carry a DISPATCH.md
-              # to bind its own dispatch conventions (process names, tiering, id scheme,
-              # ledger location). It is injected alongside AGENTS.md, in the same
-              # ancestor chain. Projects without one are unaffected.
-              instructionFileCandidates:
-                - AGENTS.md
-                - CLAUDE.md
-                - DISPATCH.md
+          - id: building-loop-governance
+            name: 'dsh-building-loop/governance'
 
           # ── shell ───────────────────────────────────────────────────────────────────
 
@@ -136,8 +82,18 @@
             name: '@deepseek-ai/dsh-skill-filesystem'
             config:
               customSkillDirs:
-                - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
-              agentsHome: !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills-disabled/', baseUrl))"
+                - !!js >-
+                  process.getBuiltinModule('node:path').join(
+                    process.getBuiltinModule('node:path').dirname(
+                      process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-building-loop/package.json')
+                    ), 'skills'
+                  )
+              agentsHome: !!js >-
+                process.getBuiltinModule('node:path').join(
+                  process.getBuiltinModule('node:path').dirname(
+                    process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-building-loop/package.json')
+                  ), 'skills-disabled'
+                )
 
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
@@ -310,12 +266,10 @@
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
 
-          # 机制：回合被输出上限截断时自动续写。
-          # 本模式的一个回合 = 一件交付；输出撞上 token 上限就会停在半路，
-          # 剩下那一半要人打一句「继续」才动。这个插件把那一句接过去。
-          # 四条边界写在源码注释里：source 显式标 plugin、连轮有上限、
-          # 非截断清零、只管根代理。续轮插件从本包的导出入口加载。
+          # 根会话撞上输出上限时，以明确的插件身份限次续轮。
+          # 根和子会话遇到已丢弃的 DeepSeek 坏工具参数时，限次重生成原步骤。
+          # 两条恢复路径共用本包的导出入口，预算与触发条件分别处理。
           - id: building-loop-turn-resume
-            name: 'building-loop/turn-resume'
+            name: 'dsh-building-loop/turn-resume'
             config:
               maxConsecutive: 3

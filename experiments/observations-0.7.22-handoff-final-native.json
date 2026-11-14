@@ -1,0 +1,399 @@
+{
+  "status": "passed",
+  "carrier": "Windows DSH NEXT native Web CLI with deterministic loopback model",
+  "archiveSha256": "f3435c4515fac97c6aa3e519087633f8fc0b4cd507434878f66c28cea751fd17",
+  "requests": [
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 1,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 2,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "child",
+      "stage": "G1",
+      "prior": 0,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "stage": "G1",
+      "prior": 1,
+      "action": "block",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 1,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 2,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 3,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 4,
+      "action": "read",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 5,
+      "action": "read",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 6,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 7,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 8,
+      "action": "advance",
+      "offered": true
+    }
+  ],
+  "scope": "Synthetic signed baselines are fixture inputs. The probe validates the native authorization, ownership and ledger transitions.",
+  "installedHandoffSha256": "674e422e3a005b1b111e91416da026d01119465da5a305189e0784da111e0da3",
+  "native": {
+    "rows": [
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 17,
+        "error": false,
+        "unit": "K01",
+        "status": "started"
+      },
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 26,
+        "error": false,
+        "unit": "K01",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K01",
+          "goalSha256": "6d5d8bf859947c22c217c61b5b9fc872f204aa2516da4afcb40325a5d27ac44f",
+          "policySha256": "12adce0db69438ccd6e85372868925fe238684940c8e16d179c1c45e894e00d0",
+          "advance": {
+            "action": "advance",
+            "unit": "K01"
+          }
+        },
+        "packet": {
+          "files": [
+            {
+              "path": "SPEC.md",
+              "count": 3,
+              "start": 1,
+              "end": 3,
+              "total": 3
+            },
+            {
+              "path": "RULES.md",
+              "count": 250,
+              "start": 1,
+              "end": 250,
+              "total": 400
+            }
+          ],
+          "pending": [
+            {
+              "path": "RULES.md",
+              "start": 251,
+              "next": "再次 prepare 或按行 read"
+            }
+          ]
+        }
+      },
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 34,
+        "error": false,
+        "unit": "K01",
+        "phase": "intake"
+      },
+      {
+        "stage": "G1",
+        "role": "child",
+        "seq": 21,
+        "error": true,
+        "text": "Error: 已确认的工程目标或授权版本已变化，请在新的主会话按当前目标和单元重新确认开工"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 17,
+        "error": false,
+        "unit": "K02",
+        "status": "started"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 26,
+        "error": true,
+        "text": "Error: 所有者已确认工作单元 K02；当前调用不能推进 K01"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 32,
+        "error": true,
+        "text": "Error: 原工作单元仍未退出可写阶段或已关单；只有已阻塞的未完成单元可以替换"
+      },
+      {
+        "stage": "G1",
+        "role": "child",
+        "seq": 27,
+        "error": false,
+        "unit": "K01",
+        "phase": "blocked"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 38,
+        "error": false,
+        "unit": "K02",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K02",
+          "goalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+          "policySha256": "12adce0db69438ccd6e85372868925fe238684940c8e16d179c1c45e894e00d0",
+          "replaceUnit": "K01",
+          "advance": {
+            "action": "advance",
+            "unit": "K02"
+          }
+        },
+        "packet": {
+          "files": [
+            {
+              "path": "SPEC.md",
+              "count": 3,
+              "start": 1,
+              "end": 3,
+              "total": 3
+            },
+            {
+              "path": "RULES.md",
+              "count": 250,
+              "start": 1,
+              "end": 250,
+              "total": 400
+            }
+          ],
+          "pending": [
+            {
+              "path": "RULES.md",
+              "start": 251,
+              "next": "再次 prepare 或按行 read"
+            }
+          ]
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 45,
+        "error": false,
+        "explicit": {
+          "path": "K01-first.json",
+          "count": 175,
+          "start": 751,
+          "end": 925,
+          "total": 925
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 51,
+        "error": false,
+        "explicit": {
+          "path": "RULES.md",
+          "count": 25,
+          "start": 301,
+          "end": 325,
+          "total": 400
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 57,
+        "error": false,
+        "unit": "K02",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K02",
+          "goalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+          "policySha256": "12adce0db69438ccd6e85372868925fe238684940c8e16d179c1c45e894e00d0",
+          "replaceUnit": "K01",
+          "advance": {
+            "action": "advance",
+            "unit": "K02"
+          }
+        },
+        "packet": {
+          "files": [
+            {
+              "path": "RULES.md",
+              "count": 125,
+              "start": 251,
+              "end": 400,
+              "total": 400,
+              "missing": [
+                301,
+                302,
+                303,
+                304,
+                305,
+                306,
+                307,
+                308,
+                309,
+                310,
+                311,
+                312,
+                313,
+                314,
+                315,
+                316,
+                317,
+                318,
+                319,
+                320,
+                321,
+                322,
+                323,
+                324,
+                325
+              ]
+            }
+          ],
+          "pending": []
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 63,
+        "error": false,
+        "unit": "K02",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K02",
+          "goalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+          "policySha256": "12adce0db69438ccd6e85372868925fe238684940c8e16d179c1c45e894e00d0",
+          "replaceUnit": "K01",
+          "advance": {
+            "action": "advance",
+            "unit": "K02"
+          }
+        },
+        "packet": {
+          "files": [],
+          "pending": []
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 70,
+        "error": false,
+        "unit": "K02",
+        "phase": "intake"
+      }
+    ],
+    "phases": {
+      "K01": "retired",
+      "K02": "intake"
+    },
+    "distinctCoordinators": true,
+    "sameWorkspaceState": true,
+    "historicalOwnerPreserved": true,
+    "oldLedgerStatus": "superseded",
+    "oldAcceptance": false,
+    "replacement": {
+      "outcome": "superseded",
+      "oldGoalSha256": "6d5d8bf859947c22c217c61b5b9fc872f204aa2516da4afcb40325a5d27ac44f",
+      "newGoalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+      "previousPhase": "intake",
+      "newUnit": "K02",
+      "userEvent": 9,
+      "userSha256": "03c4b92102d099a6a4de4a41ebe1693a9c8a4e0abe8e78d15cd54d0c6a7e6bff"
+    }
+  },
+  "formalProfileUnchanged": true
+}

@@ -1,0 +1,3221 @@
+{
+  "scope": "Independent public exact-type probes across all frozen arms, outside signed and blind scores.",
+  "runs": [
+    {
+      "run": "r-K7uKAM",
+      "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+      "observations": [
+        {
+          "mode": "standard",
+          "stage": "g1",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "6e84bfcd9b7d1d23f40ba42f53e9cecf46d75a4ad42dd458ec6d1a45c05b20bf"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "ef8249377e10572752483a904f18b5ccfab86f988243d34f9fb6d90f22c321af"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "50d002d435aadcf1f90e7f36a556fd5fe6380b14bca3b9408828c335bfe8d38f"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "standard",
+          "stage": "g2",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "f872e1febb5c6069eeef1e314acc29b4ffb26b75588b5a41ab65833a66b9f20b"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "16891e7654c1d60d45ca392427384c44352a75dcb30aa385cbb0b45374adb2d5"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "0c3242582624192eed615041b78d056da2aa8c3fbc5aa0e3483c7e21ebcf03f4"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "standard-checklist",
+          "stage": "g1",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "465a2eab1b247977ca2dcc7ee073c3c599a22ad103f13dfdefd13fdd30cde7c7"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "e755a79297cb41847baae186b238bb38dcba795f56c603810bb2cbe0c04b07fa"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "82e301d524b07484d17e693bbcdcf318484ab988a0a23c68c5273affefd07962"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "standard-checklist",
+          "stage": "g2",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "1e8c0b61a25eeb621e73120f082e59f452e3b5ae828d7133b88d12f9ed08854f"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "050b4e7c791c10e0c230099e1a38a430615d61665ac63c10cc5a9cac1246e5d4"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "1506a0d3c31c96d6df3e69ba996daf2b6eb26edce7ab449678ee7fc1aecc95e9"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "building-loop",
+          "stage": "g1",
+          "terminal": "completion-cap",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "6ce694fa1dc0ea0ddddd3f13f12abdbbb0056cec205396f70d30731062b89b07"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "134a454bb46a8501eb4f0967608173cd6d2c079fde6e60b30a511db32b154afc"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "05c80b3fdc2b3374d78d4d5f7aecb51ccd103b165606f9b109538550d187ad36"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "building-loop",
+          "stage": "g2",
+          "terminal": "closed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "7202f6a09bb82d670fa72d7de95c81730eb66cd22cf34dc4ace6e7aa852d1980"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "fcd0205ce0f7940876dee5703ffe2b64385a62a2a57d45d304e8a3b6ebd7a3d8"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "c844edce2db00fb3d41be8eac0be2d4323372b8ee7a7567a0acd6442db75b54c"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        }
+      ]
+    },
+    {
+      "run": "r-A6f7Fu",
+      "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+      "observations": [
+        {
+          "mode": "standard",
+          "stage": "g1",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "bfc35cf9fbdd05d5734b193b1c821c91d30e3cc3368485b5dcd53fc53b6102f6"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "490f9ee3520465021a7161f0d9569ebc3bf7e1ce71f86a4066d6fa5981d722eb"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "dbfcb68edbdb35b61ec529ac09b154885e9e164f855e7a45803cc657c7b37710"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "standard",
+          "stage": "g2",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "0e8aefe77cab05299bde0f5811474c1b39c58b079cf55c20eb8e81073bf8572c"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "ba5a6b7f4f69e7c11fbcdf8eff45a4b6535981cffa84aaeff0a789d56fbb4c16"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "3263045e4d3956566ec81b3adc62abdbc19f8ba01744eb193406e3e08790fae8"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "standard-checklist",
+          "stage": "g1",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "91d6295c26840b83772b778113bcee8e544608cf161e4c4972fe4e0d9162e48d"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "2d08eeade7a3cd1c99d774a7fe4c213446f8b18d2988d88763d217dc233b11e2"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "6ab516cbc8dcd5468fd2053305700147fa580bdc0b3927410c6270308f27de22"
+            },
+            {
+              "path": "release.py",
+              "sha256": "eec8daa7dbc35a22db6353d44fb812dd4a4d5ba1ad1cbb8ea68556cbec42df55"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "standard-checklist",
+          "stage": "g2",
+          "terminal": "completed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "d59247fca162dc29795df15d9c81c4c33a30ed89a8230df5fa1ebdc3e72e65f3"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "b229a580f0474bd127ac83ae1ad94056403800ed31f419e2217d3a945f3629c3"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "543ea1cd7f203c6caeebb8eafde4a2805e4ed7da440a665acc529453f01fba8b"
+            },
+            {
+              "path": "release.py",
+              "sha256": "eec8daa7dbc35a22db6353d44fb812dd4a4d5ba1ad1cbb8ea68556cbec42df55"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "building-loop",
+          "stage": "g1",
+          "terminal": "closed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "67ea6458e8a1c1d359e2d92e1b396195ffebb94d2d99f5d979bdffc3216fdf52"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "205a57ef6b0bef2870840ae6336bc3f9ea1aff27b0d1ce88e14b045c3b573f60"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "fff5568dd8fd03b920daed1b142ca3f64664f417a8992a24fe763dcf2b3a3e4c"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        },
+        {
+          "mode": "building-loop",
+          "stage": "g2",
+          "terminal": "closed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "14f244750654f2c8c4283797220ea5f7d90d49e4e59586599651e64cdcb7f5f9"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "e67f604e4864ad3a1315e724a20eabc5e7721537cb55ee79b7481fee3ba1200b"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722"
+            },
+            {
+              "path": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ],
+          "cases": [
+            {
+              "id": "nonobject-list",
+              "input": [],
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-NoneType",
+              "input": null,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-int",
+              "input": 19,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "nonobject-bool",
+              "input": true,
+              "expected": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-environment",
+              "input": {
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-action",
+              "input": {
+                "environment": "staging",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "unsupported-action",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-budget",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-budget",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "missing-changes",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-change",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "malformed",
+              "input": "{",
+              "expected": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-json",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "id": "success-control",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "public-boundary",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "public-boundary"
+                ],
+                "units": 1
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ],
+          "passCount": 10
+        }
+      ]
+    }
+  ]
+}

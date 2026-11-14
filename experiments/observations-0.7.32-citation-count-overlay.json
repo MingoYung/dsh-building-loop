@@ -1,0 +1,183 @@
+{
+  "archive": "native-2FtXiP",
+  "reviewerPrepareSeq": 399,
+  "rejectedNativeResultSeq": 417,
+  "observedCandidate": "ace05eb35d75b9dc027c66b5086b3c0db852cdea98eeddd55546157afb90fc01",
+  "observedBlock": "B16-6bc9b17e",
+  "rawJournalPrefixSha256": "6083456aafb0d42e2b5d156e15564fe911ed7d8dc80cda43567468bd98f17318",
+  "rawJournalSha256AtCapture": "1795b33ce3b0f7424ee166c411c5c703fab8321d43d50132ed561970f5f42cd2",
+  "lanes": {
+    "installed-shared-source": {
+      "original": {
+        "sha256": "ace05eb35d75b9dc027c66b5086b3c0db852cdea98eeddd55546157afb90fc01",
+        "block": "B16-6bc9b17e",
+        "sibling": "B17-8c97f531",
+        "siblingStillPending": true,
+        "error": {
+          "category": "parameter",
+          "message": "带行号表的 citation-count 只核明确稿件计数句；请拆开外部行号、标记或其他独立断言，保留作者原文",
+          "templates": [
+            {
+              "kind": "candidate",
+              "check": "citation-count",
+              "source": "sources/regional-register.md",
+              "expected": 3
+            },
+            {
+              "kind": "candidate",
+              "check": "citations-marked",
+              "source": "sources/regional-register.md",
+              "marker": "原句声明的确切标记"
+            },
+            {
+              "kind": "candidate",
+              "check": "citations-leading-marked",
+              "source": "sources/regional-register.md",
+              "marker": "原句声明的确切行首标记"
+            }
+          ],
+          "next": "只按原句选择一个模板并替换示例值；删除其他模板的字段，再提交同一块。不要为参数错误改作者正文。",
+          "manuscript": "只核本稿引用数量或明确逐处标记时，优先用 inventory 的 objectCheckHint。没有提示时，只有原句明确给出同一已授权来源路径及可复算的数量或标记，才可按模板填写。",
+          "mixedClaims": "把稿内覆盖声明与其中的事实分段核验，外部事实用各自获授权原文。仅有作者自报、来源代号或格式提示，且找不到可绑定的核验依据时，给实际原句的 uncertain、sourceRelation=insufficient 和具体 finding。不要把候选稿改作 evidence 或把未证明内容归为 nonfactual。",
+          "parameterRules": [
+            "candidate 不支持 count：用 citation-count；source 是本句引用目标，不能填候选文件 modules/eligibility.md，也没有 sources 数组字段。",
+            "expected 必须是原句明确声称的数量；示例0不是实测值。registered-excerpts/count 统计已登记摘录条目，结论类别或举例数量不能当摘录总数。",
+            "file 与 source 按模板二选一；line-range 用 start/end/mode，按 inventory 原样填写。快照行范围与外部事实或另一来源分别核验。",
+            "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 核明确的全称含标记；原句限定行首则用 citations-leading-marked，两者都不能替数量、未全标或完全没标作证。",
+            "若 inventory 给出 objectCheckHint，按块原样传入；citation-profile 由宿主从原句绑定并复算数量、完整行号和同源标记子集。"
+          ],
+          "countForms": [
+            "本稿有6行带 sources/regional-register.md 的行号定位（第2、4-8行）",
+            "本稿对 sources/regional-register.md 有2行可识别同行引用（第2、4行）"
+          ]
+        }
+      }
+    },
+    "overlay": {
+      "original": {
+        "sha256": "ace05eb35d75b9dc027c66b5086b3c0db852cdea98eeddd55546157afb90fc01",
+        "block": "B16-6bc9b17e",
+        "hint": {
+          "kind": "candidate",
+          "check": "citation-count",
+          "source": "sources/regional-register.md",
+          "expected": 3
+        },
+        "sibling": "B17-8c97f531",
+        "siblingStillPending": true,
+        "proof": {
+          "check": "citation-count",
+          "expected": 3,
+          "kind": "candidate",
+          "source": "sources/regional-register.md",
+          "assertion": {
+            "line": 24,
+            "start": 7,
+            "end": 65,
+            "quoteSha256": "c8647a8772db3eabd1c3436d34ad3aedbd1ec378a9573f36488c33a4d1c1f4e9"
+          },
+          "candidateSha256": "ace05eb35d75b9dc027c66b5086b3c0db852cdea98eeddd55546157afb90fc01",
+          "sources": [],
+          "result": {
+            "matches": true,
+            "actual": 3,
+            "unit": "candidate-citation-lines",
+            "lines": [
+              16,
+              17,
+              18
+            ],
+            "claimedLines": [
+              16,
+              17,
+              18
+            ],
+            "lineListMatches": true,
+            "missingLines": [],
+            "missingCount": 0,
+            "extraLines": [],
+            "extraCount": 0,
+            "duplicateLines": []
+          }
+        }
+      },
+      "wrongLines": {
+        "sha256": "6486c6167e517fff03a8c29addb919ec0fe348b2bc09aaae8af383f135e0c152",
+        "block": "B16-2b6350fa",
+        "hint": {
+          "kind": "candidate",
+          "check": "citation-count",
+          "source": "sources/regional-register.md",
+          "expected": 3
+        },
+        "sibling": "B17-8c97f531",
+        "siblingStillPending": true,
+        "error": {
+          "category": "parameter",
+          "message": "提交的 supported 与对象实测谓词冲突；先核对参数和原句范围。确属事实错误时另提交 unsupported 与实际 finding，宿主不代作者造退回项",
+          "matches": false,
+          "actual": 3,
+          "unit": "candidate-citation-lines",
+          "lines": [
+            16,
+            17,
+            18
+          ],
+          "claimedLines": [
+            16,
+            17,
+            19
+          ],
+          "lineListMatches": false,
+          "missingLines": [
+            18
+          ],
+          "missingCount": 1,
+          "extraLines": [
+            19
+          ],
+          "extraCount": 1,
+          "duplicateLines": [],
+          "next": "核对 source 是否为原句引用目标，并按实际物理引用行数复核；有完整行号表时还须逐项核对 claimedLines、missingLines、extraLines、duplicateLines。若只是填错参数，改参数；若原句精确数量或行号表确错，提交 unsupported 与指向实际错处的 finding，保留此 objectCheck 作反证。"
+        }
+      },
+      "wrongCount": {
+        "sha256": "fb101b6d9172815b14c31ca930e071fbd1a912a87f5887cc8786dd509e787922",
+        "block": "B16-d4dba872",
+        "hint": {
+          "kind": "candidate",
+          "check": "citation-count",
+          "source": "sources/regional-register.md",
+          "expected": 4
+        },
+        "sibling": "B17-8c97f531",
+        "siblingStillPending": true,
+        "error": {
+          "category": "parameter",
+          "message": "提交的 supported 与对象实测谓词冲突；先核对参数和原句范围。确属事实错误时另提交 unsupported 与实际 finding，宿主不代作者造退回项",
+          "matches": false,
+          "actual": 3,
+          "unit": "candidate-citation-lines",
+          "lines": [
+            16,
+            17,
+            18
+          ],
+          "claimedLines": [
+            16,
+            17,
+            18
+          ],
+          "lineListMatches": false,
+          "missingLines": [],
+          "missingCount": 0,
+          "extraLines": [],
+          "extraCount": 0,
+          "duplicateLines": [],
+          "next": "核对 source 是否为原句引用目标，并按实际物理引用行数复核；有完整行号表时还须逐项核对 claimedLines、missingLines、extraLines、duplicateLines。若只是填错参数，改参数；若原句精确数量或行号表确错，提交 unsupported 与指向实际错处的 finding，保留此 objectCheck 作反证。"
+        }
+      }
+    }
+  },
+  "scope": "Source-version-checked isolated coverage replay only; no model rerun."
+}

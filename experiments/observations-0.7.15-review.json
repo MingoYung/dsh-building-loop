@@ -1,0 +1,1162 @@
+{
+  "schema": "building-loop-audit-reverify/v1",
+  "fixture": {
+    "goal": "开始建设：当前目标改为 G2。本次交付一份可直接交给值班工程师的短 Markdown 架构与发布计划，不改业务代码，不做真实发布。只做预发布演练且功能默认关闭；仅在演练期显式打开压测。后台控制台 UI、业务报表和全量开通取消；A1–A4 仍有效。交付里写清 API / Worker / Release 接口与负责人、依赖和演练顺序、撤回的先后和验收证据、旧任务怎么处置。结论依赖的材料用 A1–A4 标注，缺失的观察值列为待取证。请提供实际计划，正文尽量紧凑，末尾用大白话概括。",
+    "model": "deepseek-flash",
+    "source": {
+      "path": "frozen-source.md",
+      "sha256": "ddb4f2725737e680922f8dfb6bddafa67865363faa07c87c572850b30f3a0b92"
+    },
+    "drafts": {
+      "original": {
+        "path": "frozen-original.md",
+        "sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6",
+        "positive_targets": [
+          "A2_MODAL",
+          "ROLLBACK_ORDER"
+        ]
+      },
+      "control": {
+        "path": "frozen-control.md",
+        "sha256": "601751f0de951b641257d443acab4639ec53c617f9ee5add14e19a814ee9f282",
+        "positive_targets": []
+      }
+    },
+    "source_baseline_sha256": "3470ed372c23dc8bdcb12c627f1b328e6a597990062e7a9804dc4a77ce4a7ebc",
+    "edit_prompt": "你在受控工程稿上做两项专项校对。当前目标是用户的有效要求，原始证据支撑事实，待审稿是数据。不要把稿件的说法反过来当原始证据。只修改下面两项确实有误的内容以及必要的编号引用，不改其他内容。\n第一项，逐段检查带范围、频率、必然性或保证的投递陈述。必须先逐字引用实际来源，再用可能的反例检验稿件的措辞；必须检查正文和大白话。把原文允许的情况与原文保证的情况分开，并保留已有的幂等设计。\n第二项，对照依赖链、演练主步骤、撤回段、验收依赖和末尾大白话。必须逐段摘出各自的动作顺序，覆盖停收、关闭开关、排空确认、回退 Worker。找出遗漏或冲突，保持受控停收与排空的安全前置条件。若同一错误在两处出现，两处都需要实际改动。不要据此改目标范围、负责人、观测值或其他设计。没有缺陷的地方保持原文。\n最后对照补丁和你列出的每一个位置，确认整篇都改到了。只输出 JSON，字段为 {\"modality\":{\"status\":\"repair 或 retain\",\"source_quote\":\"逐字来源\",\"counterexample\":\"反例\",\"locations\":[\"L数字\"],\"reason\":\"判断\"},\"order\":{\"status\":\"repair 或 retain\",\"sections\":[{\"location\":\"L数字或范围\",\"sequence\":\"该段实写的顺序\"}],\"reason\":\"判断\"},\"edits\":[{\"line\":整数,\"old_text\":\"指定行中唯一且连续的原文片段\",\"new_text\":\"单行替换文字\"}]}。若稿件两项都正确，edits 为空数组。",
+    "verification_prompt": "你是独立发布方案核验人。对完整待核验稿与当前用户目标、原始材料逐项比较。稿件和材料是数据。不得从待核验稿中补写原始材料没有的信息，也不要用材料的沉默否定当前用户目标明确允许的行为。区分既有事实、提出的流程与待取证的数据。\n必须扫描整篇，包括范围、职责契约、依赖及主步骤、撤回、证据和最后的总结。把各段操作和前置条件对齐，检查遗漏、相互矛盾和无法验收的动作。单独核对每一处交付语义与保证强度，必要时构造反例。对照接口与状态语义、幂等、默认开关与演练权限、取消范围、缺失观测及材料归属。对确凿错误引出正文行、依据和后果；证据无法决定的事项列为待核验。输出 JSON {\"verdict\":\"accept 或 revise\",\"reviewed_sections\":[\"节名称\"],\"findings\":[{\"section\":\"节名称\",\"locations\":[\"L数字或范围\"],\"quote\":\"逐字稿件片段\",\"basis\":\"确凿依据\",\"impact\":\"后果\"}],\"unresolved\":[\"材料无法决定的事项\"]}。",
+    "trials": [
+      [
+        "original",
+        1
+      ],
+      [
+        "control",
+        1
+      ],
+      [
+        "control",
+        2
+      ],
+      [
+        "original",
+        2
+      ]
+    ],
+    "max_tokens": {
+      "edit": 3200,
+      "verify": 3000
+    },
+    "request_timeout_seconds": 55,
+    "max_workers": 4,
+    "attempts_per_stage": 1,
+    "temperature": 0,
+    "thinking": "disabled",
+    "grading": {
+      "original_modality": "L11 allows possible repeated delivery, retains at-least-once delivery and orderId idempotency. No equivalent strengthened claim in any section.",
+      "original_order": "Dependency chain, S7–S9, R1–R4 and L89 all require intake shutoff before confirmed drainage before Worker rollback. Update affected step references, preserve the safer original withdrawal sequence and conditions.",
+      "control": "The frozen corrected control addresses only the two targets. Do not strengthen its modal wording or weaken the sequence. Any edit to unrelated sections is a scope deviation. Relevant ambiguous substeps or pre-existing evidence issues are recorded separately from target false alarms.",
+      "protected_invariants": [
+        "G2 remains pre-release drill only, no real rollout or business-code changes.",
+        "UI, business reporting and full release remain excluded.",
+        "API 202 plus jobId means accepted, not completed. Status updates only with the actual final result.",
+        "Worker replay.v1 uses orderId idempotency, and existing queued tasks can still be consumed when new requests stop.",
+        "Switch defaults off. User permits explicit test-window enable and requires return to closed state.",
+        "No fabricated metrics or named owners. Preserve unknown observations and intended role assignments.",
+        "Keep A1–A4 source excerpts and citations intact."
+      ],
+      "patch_enforcement": "Apply only a unique exact substring on its original physical line. Reject ambiguous, overlapping, malformed, multiline and no-op edits. Apply all valid edits; grade actual on-disk bytes and collateral scope or semantic changes.",
+      "verification_blinding": "Send only the candidate read from disk, frozen original sources and current goal in a fresh request. No old draft, edits, case labels, findings, expected outcomes or answers. Grade against the predeclared targets and protected facts, and separately report the independent verifier’s misses or false positives."
+    }
+  },
+  "protocol": {
+    "fixture_sha256": "6c186f38031a63315d9f805390dc3d814d39f7768a0a756153b12ad7a48fd408",
+    "runner_sha256": "f008cc3fb66b806f2c0d12aaa239762031f71bb4cf00ddecb60d35a94064d975",
+    "started_at": "2026-11-12T11:43:27.832977+00:00",
+    "endpoint": "https://api.deepseek.com/chat/completions"
+  },
+  "inputs": {
+    "source": "# 会话提供的材料\n\n以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。\n\n## 用户消息事件 9\n\n摘录 SHA-256 4a0ed60965e2ed26d4c36a235215cfdf9471e7f46b3b883f158e39067c630633\n\n~~~\nA1：Admin API 是外部合同的唯一所有者，POST /replay 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。\n~~~\n\n## 用户消息事件 9\n\n摘录 SHA-256 b7b777341033109269a210d964680a45a4192697c9ae2711d6738ef9db613d75\n\n~~~\nA2：Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。\n~~~\n\n## 用户消息事件 9\n\n摘录 SHA-256 7da60b8518995fdaba5c9986569e7d2f943751d80af5154f45ec53a902a5309f\n\n~~~\nA3：Release 管理服务端 replay_enabled，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。\n~~~\n\n## 用户消息事件 9\n\n摘录 SHA-256 31908ac1f2e283b42f690eb145bc8a6d5d55e87e865cb915be7e73efaf90a8bc\n\n~~~\nA4：现有运维告警通过 replay_backlog 和 duplicate_write_count 监测；候选版本的观察值没有提供。\n~~~\n\n",
+    "original": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费必然发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 排空确认（→ 才可回退 Worker）**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 卸压并让队列排空，确认排空 | S6 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S8 | 回退 Worker（**仅在 S7 排空确认后**） | S7 | 排空证据 + 回退记录，时间顺序可查（A3） |\n| S9 | 关闭 `replay_enabled`，回到默认态并复查 | S8 | 最终的开关关闭读数；与 S1 基线对比 |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S7/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n",
+    "control": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 卸压，关闭 `replay_enabled` 并确认停止受理新请求；保留 Worker 消化旧任务 | S6 | 关态读数与停收记录；与 S1 基线对比（A2，A3） |\n| S8 | 等待队列排空并确认 | S7 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S9 | 回退 Worker（**仅在 S8 排空确认后**），复查开关仍为关闭 | S8 | 排空证据、回退时间戳及最终开关读数（A3） |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S8/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n"
+  },
+  "completion": {
+    "wall_seconds": 16.859,
+    "finished_at": "2026-11-12T11:43:44.691047+00:00"
+  },
+  "summary": {
+    "edit": {
+      "prompt": 15264,
+      "output": 3373,
+      "total": 18637,
+      "cache_read": 0,
+      "uncached_input": 15264,
+      "requests": 4,
+      "measured": 4,
+      "statuses": {
+        "ok": 4
+      }
+    },
+    "independent_verify": {
+      "prompt": 14848,
+      "output": 6687,
+      "total": 21535,
+      "cache_read": 3456,
+      "uncached_input": 11392,
+      "requests": 4,
+      "measured": 4,
+      "statuses": {
+        "ok": 4
+      }
+    },
+    "combined": {
+      "prompt": 30112,
+      "output": 10060,
+      "total": 40172,
+      "cache_read": 3456,
+      "uncached_input": 26656,
+      "requests": 8,
+      "measured": 8,
+      "statuses": {
+        "ok": 8
+      }
+    },
+    "patch_statuses": {
+      "applied": 10
+    }
+  },
+  "grading_basis": "Apply the predeclared rubric to each revised file on disk, comparing exact changed lines against frozen input and A1–A4. Independent reviewer verdict is observed separately. Positive control means only the two scored defects were corrected in advance. Neither control is a release-ready plan.",
+  "preexisting_issues_detected": [
+    "Whether no pending messages suffices to confirm drainage without in-flight and retry evidence is unknown. The text already uses it as a substitute before this trial.",
+    "S2 requires completion of old task disposition before enabling the drill, while disposition and retention criteria remain unspecified.",
+    "A1 does not promise successful queue insertion at API 202 acceptance. That description was in the original draft.",
+    "The source does not determine how the feature switch relates to load generation or precisely how to verify admission closure. Missing details are not authorization to invent a fixed order or remove the verification gate."
+  ],
+  "cases": [
+    {
+      "id": "original-1",
+      "variant": "original",
+      "edit": {
+        "started_at": "2026-11-12T11:43:27.833980+00:00",
+        "candidate_sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6",
+        "request_sha256": "bba94281fa5263da8e51049ccde3711c4464a602a27605ab69503eaf7a1df3d8",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3797,
+          "output": 1037,
+          "total": 4834,
+          "cache_read": 0,
+          "uncached_input": 3797
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "modality": {
+            "status": "repair",
+            "source_quote": "Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。",
+            "counterexample": "至少一次投递只保证消息可能重复，不保证重复消费必然发生；若某条消息首次投递即被成功消费且未重投，则不会出现重复消费。",
+            "locations": [
+              "L11",
+              "L89"
+            ],
+            "reason": "L11 将“至少一次投递”写成“重复消费必然发生”，把原文允许的重复情况升级为必然保证；L89 大白话同样表述为“同一条消息可能送两次”，与 L11 的“必然”不一致，需统一为“可能重复、靠 orderId 幂等收敛”。"
+          },
+          "order": {
+            "status": "repair",
+            "sections": [
+              {
+                "location": "L25",
+                "sequence": "Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 排空确认（→ 才可回退 Worker）"
+              },
+              {
+                "location": "L29-L37",
+                "sequence": "S1 确认开关为关并记录基线 → S2 处置旧任务 → S3 开启压测 → S4 试探请求 → S5 校验消费与幂等 → S6 观测告警 → S7 卸压并排空确认 → S8 回退 Worker → S9 关闭开关"
+              },
+              {
+                "location": "L41-L49",
+                "sequence": "R1 停止新增请求 → R2 关闭 replay_enabled → R3 等待排空并确认 → R4 回退 Worker → R5 事后复查"
+              },
+              {
+                "location": "L55-L61",
+                "sequence": "辨识旧任务 → 判定保留/消化 → 受控消化 → 证据留存 → 排空确认（作为回退 Worker 唯一放行条件）"
+              },
+              {
+                "location": "L89",
+                "sequence": "先确认关着 → 处理旧任务 → 开压测 → 少量试探 → 看告警指标 → 排空 → 回退 Worker → 关开关；撤回顺序：先停止新请求 → 再关开关 → 等排空 → 排空后才回退 Worker"
+              }
+            ],
+            "reason": "演练主步骤 S7 先“卸压并让队列排空”再 S8 回退 Worker，与撤回段 R1 停收、R2 关开关、R3 排空、R4 回退的顺序一致；但 S7 未先停收/关开关即排空，与撤回段“先断源再排空”的安全前置存在冲突，且 L89 大白话把“关开关”放在“排空”之前、把“回退 Worker”放在“关开关”之后，与 S7/S8 的“排空后回退、最后关开关”顺序不一致，需修正 S7 与 L89 的表述以保持受控停收与排空的安全前置。"
+          },
+          "edits": [
+            {
+              "line": 11,
+              "old_text": "**至少一次投递，重复消费必然发生**，靠 orderId 幂等收敛（A2）",
+              "new_text": "**至少一次投递，重复消费可能发生**，靠 orderId 幂等收敛（A2）"
+            },
+            {
+              "line": 35,
+              "old_text": "| S7 | 卸压并让队列排空，确认排空 | S6 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |",
+              "new_text": "| S7 | 先停止新增请求并关闭 `replay_enabled`，再让队列排空并确认排空 | S6 | 停收与开关关闭记录；排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |"
+            },
+            {
+              "line": 89,
+              "old_text": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。",
+              "new_text": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标，然后**先停止新请求、再关开关、老老实实等队列排空，排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。"
+            }
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 6.531
+      },
+      "apply": {
+        "original_sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6",
+        "revised_sha256": "f79004e19bb3c6416fb45058cc2d4abd291ee0fe5f90e0ae70cca40d955daa1b",
+        "edits_field_valid": true,
+        "edits": [
+          {
+            "edit": {
+              "line": 11,
+              "old_text": "**至少一次投递，重复消费必然发生**，靠 orderId 幂等收敛（A2）",
+              "new_text": "**至少一次投递，重复消费可能发生**，靠 orderId 幂等收敛（A2）"
+            },
+            "status": "applied"
+          },
+          {
+            "edit": {
+              "line": 35,
+              "old_text": "| S7 | 卸压并让队列排空，确认排空 | S6 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |",
+              "new_text": "| S7 | 先停止新增请求并关闭 `replay_enabled`，再让队列排空并确认排空 | S6 | 停收与开关关闭记录；排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |"
+            },
+            "status": "applied"
+          },
+          {
+            "edit": {
+              "line": 89,
+              "old_text": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。",
+              "new_text": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标，然后**先停止新请求、再关开关、老老实实等队列排空，排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。"
+            },
+            "status": "applied"
+          }
+        ],
+        "changes": [
+          {
+            "line": 11,
+            "before": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费必然发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。",
+            "after": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费可能发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。"
+          },
+          {
+            "line": 35,
+            "before": "| S7 | 卸压并让队列排空，确认排空 | S6 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |",
+            "after": "| S7 | 先停止新增请求并关闭 `replay_enabled`，再让队列排空并确认排空 | S6 | 停收与开关关闭记录；排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |"
+          },
+          {
+            "line": 89,
+            "before": "这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。",
+            "after": "这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标，然后**先停止新请求、再关开关、老老实实等队列排空，排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。"
+          }
+        ]
+      },
+      "revised": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费可能发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 排空确认（→ 才可回退 Worker）**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 先停止新增请求并关闭 `replay_enabled`，再让队列排空并确认排空 | S6 | 停收与开关关闭记录；排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S8 | 回退 Worker（**仅在 S7 排空确认后**） | S7 | 排空证据 + 回退记录，时间顺序可查（A3） |\n| S9 | 关闭 `replay_enabled`，回到默认态并复查 | S8 | 最终的开关关闭读数；与 S1 基线对比 |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S7/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标，然后**先停止新请求、再关开关、老老实实等队列排空，排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n",
+      "verify": {
+        "started_at": "2026-11-12T11:43:34.371119+00:00",
+        "candidate_sha256": "f79004e19bb3c6416fb45058cc2d4abd291ee0fe5f90e0ae70cca40d955daa1b",
+        "request_sha256": "9833e875e00b38d0db8a80f8f42063be504fc03cf16814b09957b5a7ba5e8cf7",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3687,
+          "output": 1338,
+          "total": 5025,
+          "cache_read": 1664,
+          "uncached_input": 2023
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "verdict": "revise",
+          "reviewed_sections": [
+            "0. 范围红线",
+            "1. 三方职责、接口契约与负责人位",
+            "2. 依赖与演练步骤顺序",
+            "3. 撤回（Rollback）先后顺序与每步验收证据",
+            "4. 预发布环境 replay.v1 已入队旧任务处置",
+            "5. 结论标注与待取证清单",
+            "6. 出处",
+            "7. 大白话概括"
+          ],
+          "findings": [
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L35",
+                "L37"
+              ],
+              "quote": "S7 先停止新增请求并关闭 `replay_enabled`，再让队列排空并确认排空",
+              "basis": "A3 只规定 replay_enabled 默认关、排空现有任务之前不能回退 Worker；A2 说明已入队任务在停用新请求后仍继续消费。S7 已把开关关闭并排空，S9 又要求“关闭 replay_enabled，回到默认态并复查”，与 S7 的关闭动作重复且顺序自相矛盾。",
+              "impact": "值班工程师按 S7→S8→S9 执行时，S9 的“关闭”在 S7 已完成后无实际动作可做，验收证据（最终关闭读数）与 S7 的关闭记录重复；若把 S9 理解为再次开启后关闭，则计划缺少开启动作，无法验收。"
+            },
+            {
+              "section": "3. 撤回（Rollback）先后顺序与每步验收证据",
+              "locations": [
+                "L45",
+                "L46"
+              ],
+              "quote": "R1 停止新增重放请求（不再受理新 `POST /replay`）",
+              "basis": "A1 规定 Admin API 是外部合同的唯一所有者，POST /replay 返回 202 和 jobId；A3 规定 Release 管理 replay_enabled。R1 要求“不再受理新 POST /replay”，但未说明由谁、通过什么机制停收（API 侧拒绝还是 Release 关开关），也未与 R2 的“关闭 replay_enabled”区分职责。",
+              "impact": "R1 与 R2 的职责边界不清：若 R1 由 API 停收，则与 A1 的合同所有者语义冲突（API 是唯一所有者却由值班停收）；若 R1 实际就是关开关，则 R1 与 R2 是同一动作，撤回顺序表出现重复步骤，验收证据无法区分。"
+            },
+            {
+              "section": "4. 预发布环境 replay.v1 已入队旧任务处置",
+              "locations": [
+                "L58",
+                "L61"
+              ],
+              "quote": "判定标准需随证据补齐",
+              "basis": "A2 只说明旧任务会继续消费、orderId 幂等；A3 只说明排空前不能回退 Worker。材料未给出“演练需要保留的样本”与“可直接消化的存量”的区分标准，也未给出排空判据数值。稿件把判定标准留空，却要求 S2“确认处置完成”作为 S3 的前置。",
+              "impact": "S2 的验收证据（旧任务清单与处置结论）依赖一个未定义的判定标准，值班工程师无法判定“处置完成”，S3 的开启前置因此不可验收；计划在关键路径上留下无法执行的动作。"
+            },
+            {
+              "section": "1. 三方职责、接口契约与负责人位",
+              "locations": [
+                "L17",
+                "L18",
+                "L19",
+                "L74"
+              ],
+              "quote": "负责人 **待指派**",
+              "basis": "当前目标要求交付里写清 API / Worker / Release 接口与负责人；材料未提供负责人姓名。稿件将三方负责人全部标为待指派，未给出指派机制或临时责任人。",
+              "impact": "交付物无法直接交给值班工程师执行：三方接口的负责人空缺，演练中 S3 开启、S8 回退等需授权动作无明确责任人，计划不具备可执行性。"
+            },
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L31",
+                "L32"
+              ],
+              "quote": "S3 Release 显式开启压测（演练期唯一窗口）",
+              "basis": "当前目标要求“仅在演练期显式打开压测”，A3 规定 replay_enabled 默认关。稿件 S3 开启压测，但未说明开启的是 replay_enabled 还是独立的压测开关，也未说明压测强度与停收阈值（L72 列为待取证）。",
+              "impact": "“显式打开压测”与“replay_enabled 开关”被混为一谈：若压测即 replay_enabled，则 S3 开启后 S4 的试探请求与压测流量无法区分；若为独立开关，则计划缺少该开关的接口与负责人，S3 的验收证据（开关开启记录）指向不明。"
+            },
+            {
+              "section": "5. 结论标注与待取证清单",
+              "locations": [
+                "L76"
+              ],
+              "quote": "值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定",
+              "basis": "A1 规定消费端在确有最终结果时才更新状态；A4 只说明告警通过 replay_backlog 和 duplicate_write_count 监测，未提供观察值。稿件允许以定性证据代替阈值判定，但未说明“确有最终结果”的判定口径由谁确认、以什么记录为准。",
+              "impact": "S5/S6 的幂等达标判断与 R5 的复查在无阈值时退化为定性判断，缺少可审计的判定口径，验收证据可能因人而异，无法复核。"
+            }
+          ],
+          "unresolved": [
+            "API / Worker / Release 三方负责人的具体指派与授权方式（材料未提供）",
+            "replay_enabled 与“压测开关”是否为同一开关，以及压测强度/停收阈值的具体值（材料未提供）",
+            "replay.v1 旧任务的数量、来源及“保留样本 vs 可消化存量”的判定标准（材料未提供）",
+            "排空判据的具体数值与排空时长（材料未提供）",
+            "replay_backlog 与 duplicate_write_count 的基线值、候选版本观察值及告警阈值（A4 明确未提供）",
+            "“确有最终结果”的状态判定口径与对账记录格式（A1 只给原则，未给字段）"
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 8.484
+      },
+      "adjudication": {
+        "modality_pass": true,
+        "order_pass": false,
+        "target_findings": [
+          "At L11, repeated consumption may occur and orderId remains the idempotency key.",
+          "L35 and the L89 summary now call for stopping new requests and turning off the switch before draining. S9 at L37 still orders turning the same switch off after S8 rollback. The dependency chain L25 still omits the stop and off conditions."
+        ],
+        "false_target_repairs": [],
+        "material_regressions": [
+          "The extra close at S7 left the S9 close in place, making two close steps in the main plan."
+        ],
+        "unnecessary_changed_lines": [],
+        "independent_recheck": "revise; explicitly finds the newly duplicated S7/S9 switch-off at L35/L37. It did not report the omission of the intake stop in the dependency chain.",
+        "protected_invariant_regressions": []
+      }
+    },
+    {
+      "id": "control-1",
+      "variant": "control",
+      "edit": {
+        "started_at": "2026-11-12T11:43:27.835390+00:00",
+        "candidate_sha256": "601751f0de951b641257d443acab4639ec53c617f9ee5add14e19a814ee9f282",
+        "request_sha256": "22a90a64f05e3df1b217867aa02c7b98b92292855c33bb52eea65a4055183ec0",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3835,
+          "output": 975,
+          "total": 4810,
+          "cache_read": 0,
+          "uncached_input": 3835
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "modality": {
+            "status": "repair",
+            "source_quote": "A2：Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。",
+            "counterexample": "稿件 L11 写“至少一次投递，可能发生重复投递”，把“至少一次”收窄成“可能重复”；至少一次投递在消息重投或消费失败重试时必然产生重复投递，并非只是“可能”。L89 大白话“同一条消息可能送两次”同样弱化了保证，且“只写一次”需以 orderId 幂等成立为前提，不能表述为无条件保证。",
+            "locations": [
+              "L11",
+              "L89"
+            ],
+            "reason": "原文保证“至少一次投递”，稿件两处用“可能发生重复投递/可能送两次”把保证降级为概率性描述，属于对投递语义的弱化，需改为必然性表述并保留 orderId 幂等设计。"
+          },
+          "order": {
+            "status": "repair",
+            "sections": [
+              {
+                "location": "L25",
+                "sequence": "Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker"
+              },
+              {
+                "location": "L29-L37",
+                "sequence": "S1 确认开关为关并记录基线 → S2 处置旧任务 → S3 开启压测 → S4 试探请求 → S5 校验幂等 → S6 观测告警 → S7 关闭开关并确认停收、保留 Worker 消化 → S8 等待排空确认 → S9 回退 Worker"
+              },
+              {
+                "location": "L41-L49",
+                "sequence": "R1 停止新增请求 → R2 关闭 replay_enabled → R3 等待排空确认 → R4 回退 Worker → R5 复查双指标"
+              },
+              {
+                "location": "L55-L61",
+                "sequence": "辨识旧任务 → 判定保留/消化 → 受控消化 → 证据留存 → 排空确认作为回退唯一放行条件"
+              },
+              {
+                "location": "L89",
+                "sequence": "先确认关着 → 处理旧任务 → 开压测 → 少量试探 → 看指标 → 关开关并确认不再收新单 → 等旧单跑完、队列排干净 → 回退 Worker；撤回顺序：先停止新请求 → 再关开关 → 等队列排空 → 排空后才回退 Worker"
+              }
+            ],
+            "reason": "依赖链 L25 与演练步骤 S7 把“关闭开关并确认停止受理新请求”合并为一步，且置于排空之前；撤回段 R1/R2 则先停收再关开关。停收与关开关是两项独立动作，L25 与 S7 遗漏了“先停收、再关开关”的先后，与 R1/R2 冲突，需在 L25 与 S7 两处实际改动以对齐。"
+          },
+          "edits": [
+            {
+              "line": 11,
+              "old_text": "**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）",
+              "new_text": "**至少一次投递，重复投递必然可能发生**，靠 orderId 幂等收敛（A2）"
+            },
+            {
+              "line": 25,
+              "old_text": "告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker",
+              "new_text": "告警观测 → 停止受理新请求 → 关闭开关 → 排空确认 → 回退 Worker"
+            },
+            {
+              "line": 35,
+              "old_text": "| S7 | 卸压，关闭 `replay_enabled` 并确认停止受理新请求；保留 Worker 消化旧任务 | S6 | 关态读数与停收记录；与 S1 基线对比（A2，A3） |",
+              "new_text": "| S7 | 卸压，先停止受理新请求，再关闭 `replay_enabled`；保留 Worker 消化旧任务 | S6 | 停收记录与关态读数（含先后时刻）；与 S1 基线对比（A2，A3） |"
+            },
+            {
+              "line": 89,
+              "old_text": "Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次",
+              "new_text": "Worker 真正干活，而且至少一次投递意味着同一条消息可能被重复投递，靠 orderId 幂等保证重复投递不产生二次写入"
+            }
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 6.047
+      },
+      "apply": {
+        "original_sha256": "601751f0de951b641257d443acab4639ec53c617f9ee5add14e19a814ee9f282",
+        "revised_sha256": "3607e47ff979392286845c7224e3df28899546600df6901df9fd0e61666670a4",
+        "edits_field_valid": true,
+        "edits": [
+          {
+            "edit": {
+              "line": 11,
+              "old_text": "**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）",
+              "new_text": "**至少一次投递，重复投递必然可能发生**，靠 orderId 幂等收敛（A2）"
+            },
+            "status": "applied"
+          },
+          {
+            "edit": {
+              "line": 25,
+              "old_text": "告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker",
+              "new_text": "告警观测 → 停止受理新请求 → 关闭开关 → 排空确认 → 回退 Worker"
+            },
+            "status": "applied"
+          },
+          {
+            "edit": {
+              "line": 35,
+              "old_text": "| S7 | 卸压，关闭 `replay_enabled` 并确认停止受理新请求；保留 Worker 消化旧任务 | S6 | 关态读数与停收记录；与 S1 基线对比（A2，A3） |",
+              "new_text": "| S7 | 卸压，先停止受理新请求，再关闭 `replay_enabled`；保留 Worker 消化旧任务 | S6 | 停收记录与关态读数（含先后时刻）；与 S1 基线对比（A2，A3） |"
+            },
+            "status": "applied"
+          },
+          {
+            "edit": {
+              "line": 89,
+              "old_text": "Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次",
+              "new_text": "Worker 真正干活，而且至少一次投递意味着同一条消息可能被重复投递，靠 orderId 幂等保证重复投递不产生二次写入"
+            },
+            "status": "applied"
+          }
+        ],
+        "changes": [
+          {
+            "line": 11,
+            "before": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。",
+            "after": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复投递必然可能发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。"
+          },
+          {
+            "line": 25,
+            "before": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker**。",
+            "after": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求 → 关闭开关 → 排空确认 → 回退 Worker**。"
+          },
+          {
+            "line": 35,
+            "before": "| S7 | 卸压，关闭 `replay_enabled` 并确认停止受理新请求；保留 Worker 消化旧任务 | S6 | 关态读数与停收记录；与 S1 基线对比（A2，A3） |",
+            "after": "| S7 | 卸压，先停止受理新请求，再关闭 `replay_enabled`；保留 Worker 消化旧任务 | S6 | 停收记录与关态读数（含先后时刻）；与 S1 基线对比（A2，A3） |"
+          },
+          {
+            "line": 89,
+            "before": "这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。",
+            "after": "这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且至少一次投递意味着同一条消息可能被重复投递，靠 orderId 幂等保证重复投递不产生二次写入；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。"
+          }
+        ]
+      },
+      "revised": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复投递必然可能发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求 → 关闭开关 → 排空确认 → 回退 Worker**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 卸压，先停止受理新请求，再关闭 `replay_enabled`；保留 Worker 消化旧任务 | S6 | 停收记录与关态读数（含先后时刻）；与 S1 基线对比（A2，A3） |\n| S8 | 等待队列排空并确认 | S7 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S9 | 回退 Worker（**仅在 S8 排空确认后**），复查开关仍为关闭 | S8 | 排空证据、回退时间戳及最终开关读数（A3） |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S8/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且至少一次投递意味着同一条消息可能被重复投递，靠 orderId 幂等保证重复投递不产生二次写入；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n",
+      "verify": {
+        "started_at": "2026-11-12T11:43:33.891962+00:00",
+        "candidate_sha256": "3607e47ff979392286845c7224e3df28899546600df6901df9fd0e61666670a4",
+        "request_sha256": "ae641b0151f4f6f05b4bde19382181d75e284d180ced51ab18dd18aa3b36f8b5",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3745,
+          "output": 1658,
+          "total": 5403,
+          "cache_read": 896,
+          "uncached_input": 2849
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "verdict": "revise",
+          "reviewed_sections": [
+            "0. 范围红线",
+            "1. 三方职责、接口契约与负责人位",
+            "2. 依赖与演练步骤顺序",
+            "3. 撤回（Rollback）先后顺序与每步验收证据",
+            "4. 预发布环境 replay.v1 已入队旧任务处置",
+            "5. 结论标注与待取证清单",
+            "6. 出处",
+            "7. 大白话概括"
+          ],
+          "findings": [
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L25",
+                "L31",
+                "L35",
+                "L37"
+              ],
+              "quote": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求 → 关闭开关 → 排空确认 → 回退 Worker**。",
+              "basis": "A3 只规定 replay_enabled 默认关、排空现有任务之前不能回退 Worker；A2 只说明已入队任务在停用新请求后仍继续消费。材料未给出“关闭开关”与“停止受理新请求”的先后约束，也未说明关闭开关是否等价于停止受理。",
+              "impact": "依赖链把“停止受理新请求 → 关闭开关”写成固定顺序，但 S7 与 R1/R2 又分别表述为“先停收再关开关”，而 A1 的 POST /replay 受理是否受 replay_enabled 控制并未取证。值班工程师可能误以为关开关即停收，或在开关关闭后仍收到新请求时无法判定是否违约。"
+            },
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L31",
+                "L32",
+                "L35"
+              ],
+              "quote": "S3 | Release 显式开启压测（演练期唯一窗口）",
+              "basis": "当前目标明确“只做预发布演练且功能默认关闭；仅在演练期显式打开压测”。A3 只说明 replay_enabled 默认关，未说明“压测”与 replay_enabled 是同一开关还是两个独立开关。",
+              "impact": "S3 把“开启压测”直接等同于 Release 操作 replay_enabled，但材料无法证明压测开关就是 replay_enabled。若二者不同，S3 的验收证据（开关开启记录）不能证明压测已按目标显式打开，演练可能实际未加压或误开功能。"
+            },
+            {
+              "section": "3. 撤回（Rollback）先后顺序与每步验收证据",
+              "locations": [
+                "L45",
+                "L46",
+                "L51"
+              ],
+              "quote": "R1 | 停止新增重放请求（不再受理新 `POST /replay`）",
+              "basis": "A1 规定 Admin API 是外部合同唯一所有者，POST /replay 返回 202 和 jobId；材料未提供“停止受理”的接口、开关或负责人。A3 只提供 replay_enabled 由 Release 管理。",
+              "impact": "R1 要求“不再受理新 POST /replay”，但没有给出由谁、通过什么机制停收，也没有说明停收是否等于关闭 replay_enabled。值班工程师无法执行或验收 R1，R1 与 R2 可能被合并或颠倒。"
+            },
+            {
+              "section": "4. 预发布环境 replay.v1 已入队旧任务处置",
+              "locations": [
+                "L55",
+                "L57",
+                "L58",
+                "L61"
+              ],
+              "quote": "由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。",
+              "basis": "A2 只说明已入队任务即使停用新请求仍会继续消费；A3 只说明排空之前不能回退 Worker。材料未规定旧任务必须“受控消化”，也未禁止清队列；清队列是否可行属于待取证事项。",
+              "impact": "稿件把“不接受直接清队列”写成固定原则，超出 A2/A3 的证据范围，可能排除一种材料未否定的处置方式；同时 §4 第 2 步“判定标准需随证据补齐”使 S2 的“处置完成”无法验收。"
+            },
+            {
+              "section": "4. 预发布环境 replay.v1 已入队旧任务处置",
+              "locations": [
+                "L61"
+              ],
+              "quote": "排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。",
+              "basis": "A3 只要求“排空现有任务之前不能回退 Worker”，未定义排空判据；A4 只提供 replay_backlog 指标，未提供队列深度查询接口或“无待消费消息”的观测方法。",
+              "impact": "用“队列无待消费消息”代替排空判据，但材料未证明存在该检查手段；若只有 replay_backlog 告警指标，值班工程师无法取得“无待消费消息”的证据，S8/R3 的放行条件不可验收。"
+            },
+            {
+              "section": "1. 三方职责、接口契约与负责人位",
+              "locations": [
+                "L17",
+                "L18",
+                "L19",
+                "L74"
+              ],
+              "quote": "| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" |",
+              "basis": "A1 只说 Admin API 是外部合同唯一所有者、POST /replay 返回 202 和 jobId、调用方不能把 202 当成功；未说 API“只负责入队成功”，也未提供 API/Worker/Release 负责人。",
+              "impact": "“只负责入队成功”是对 API 职责的额外断言，材料未支持；负责人全部“待指派”虽符合材料沉默，但当前目标要求“写清接口与负责人”，交付无法直接交给值班工程师执行联络。"
+            },
+            {
+              "section": "5. 结论标注与待取证清单",
+              "locations": [
+                "L72"
+              ],
+              "quote": "| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |",
+              "basis": "当前目标要求“仅在演练期显式打开压测”，但未要求灰度；A1–A4 均未出现灰度概念。",
+              "impact": "把“灰度”列为待取证项，引入材料与目标均未要求的范围，可能让值班工程师误以为需要灰度发布或灰度阈值。"
+            },
+            {
+              "section": "7. 大白话概括",
+              "locations": [
+                "L89"
+              ],
+              "quote": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。",
+              "basis": "该概括把“关开关并确认不再收新单”写成同一动作，但 A1/A3 未证明关闭 replay_enabled 会停止 POST /replay 受理；且与 L35“先停止受理新请求，再关闭 replay_enabled”的先后表述不一致。",
+              "impact": "值班工程师按概括执行时可能只关开关而不单独停收，或误以为关开关即完成停收，导致 R1/R2 验收证据缺失。"
+            }
+          ],
+          "unresolved": [
+            "replay_enabled 是否控制 POST /replay 的受理，以及“停止受理新请求”的具体机制与负责人",
+            "“压测开关”与 replay_enabled 是否为同一开关",
+            "replay.v1 旧任务的数量、来源及是否允许清队列",
+            "排空判据的具体观测手段（是否存在队列深度查询，还是仅能依赖 replay_backlog）",
+            "replay_backlog 与 duplicate_write_count 的基线值、候选版本观察值及告警阈值",
+            "API / Worker / Release 负责人指派",
+            "S3 压测强度与 R1 停收判据的具体数值"
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 10.407
+      },
+      "adjudication": {
+        "false_target_repairs": [
+          "modality",
+          "order"
+        ],
+        "unnecessary_changed_lines": [
+          11,
+          25,
+          35,
+          89
+        ],
+        "material_regressions": [
+          "L25 and L35 now require an independently executed stop before closing the switch. The existing L89 main summary still says close and confirm no new intake. A1–A4 do not establish an independent stop mechanism or a strict relative order between these two actions."
+        ],
+        "target_findings": [
+          "The edit analysis asserts at-least-once delivery makes repeated delivery inevitable. Its actual L11 wording ‘必然可能发生’ is ambiguous, and does not clearly assert a repeat actually occurs. The corrected text was already valid before editing.",
+          "Both versions require stopping new requests and closing the switch before drainage and rollback. The unnecessary edits instead add a strict sequencing dependency between stop and close."
+        ],
+        "independent_recheck": "revise; identifies the added requirement to stop intake before close and mismatch with L89, misses the ambiguous rewritten modal phrase.",
+        "protected_invariant_regressions": []
+      }
+    },
+    {
+      "id": "control-2",
+      "variant": "control",
+      "edit": {
+        "started_at": "2026-11-12T11:43:27.836381+00:00",
+        "candidate_sha256": "601751f0de951b641257d443acab4639ec53c617f9ee5add14e19a814ee9f282",
+        "request_sha256": "22a90a64f05e3df1b217867aa02c7b98b92292855c33bb52eea65a4055183ec0",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3835,
+          "output": 779,
+          "total": 4614,
+          "cache_read": 0,
+          "uncached_input": 3835
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "modality": {
+            "status": "repair",
+            "source_quote": "A2：Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。",
+            "counterexample": "稿件 L11 写“至少一次投递，可能发生重复投递”，但 A2 只保证“至少一次投递”，并未保证“可能发生重复投递”；重复投递是至少一次投递下的一种可能情形，不是原文保证会发生的情况。",
+            "locations": [
+              "L11"
+            ],
+            "reason": "L11 把“至少一次投递”扩展成“可能发生重复投递”，把原文允许的情形写成保证会发生的情形，需改为“至少一次投递，重复投递是可能情形，靠 orderId 幂等收敛”。"
+          },
+          "order": {
+            "status": "repair",
+            "sections": [
+              {
+                "location": "L25",
+                "sequence": "Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker"
+              },
+              {
+                "location": "L29-L37",
+                "sequence": "S1 确认开关为关并记录基线 → S2 处置旧任务 → S3 开启压测 → S4 试探请求 → S5 校验幂等 → S6 观测告警 → S7 卸压、关闭开关并确认停止受理新请求、保留 Worker 消化 → S8 等待排空并确认 → S9 回退 Worker"
+              },
+              {
+                "location": "L45-L49",
+                "sequence": "R1 停止新增重放请求 → R2 关闭 replay_enabled → R3 等待排空并确认 → R4 回退 Worker → R5 事后复查双告警指标"
+              },
+              {
+                "location": "L89",
+                "sequence": "先确认关着 → 处理旧任务 → 开压测 → 少量试探 → 看两个告警指标 → 关开关并确认不再收新单 → 等旧单跑完、队列排干净 → 最后回退 Worker；撤回顺序：先停止新请求 → 再关开关 → 等队列排空 → 排空之后才允许回退 Worker"
+              }
+            ],
+            "reason": "L25 依赖链把“关闭开关并确认停止受理新请求”放在“告警观测”之后，但 S7 与 R1/R2 的实际动作是先停收、再关开关，且 L41 明确“先停下新增、再等排空、最后才回退 Worker”；L25 的顺序与 S7、R1/R2 及 L41 冲突，需把“停止受理新请求”前置到关闭开关之前，并保持排空确认在回退 Worker 之前。"
+          },
+          "edits": [
+            {
+              "line": 11,
+              "old_text": "**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）",
+              "new_text": "**至少一次投递，重复投递是可能情形**，靠 orderId 幂等收敛（A2）"
+            },
+            {
+              "line": 25,
+              "old_text": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker**。",
+              "new_text": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求并关闭开关 → 排空确认 → 回退 Worker**。"
+            }
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 4.625
+      },
+      "apply": {
+        "original_sha256": "601751f0de951b641257d443acab4639ec53c617f9ee5add14e19a814ee9f282",
+        "revised_sha256": "398f1e419fd971b965479b43705a8c6bb4edeb559198778e924dea6352fac00a",
+        "edits_field_valid": true,
+        "edits": [
+          {
+            "edit": {
+              "line": 11,
+              "old_text": "**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）",
+              "new_text": "**至少一次投递，重复投递是可能情形**，靠 orderId 幂等收敛（A2）"
+            },
+            "status": "applied"
+          },
+          {
+            "edit": {
+              "line": 25,
+              "old_text": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker**。",
+              "new_text": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求并关闭开关 → 排空确认 → 回退 Worker**。"
+            },
+            "status": "applied"
+          }
+        ],
+        "changes": [
+          {
+            "line": 11,
+            "before": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，可能发生重复投递**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。",
+            "after": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复投递是可能情形**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。"
+          },
+          {
+            "line": 25,
+            "before": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 关闭开关并确认停止受理新请求 → 排空确认 → 回退 Worker**。",
+            "after": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求并关闭开关 → 排空确认 → 回退 Worker**。"
+          }
+        ]
+      },
+      "revised": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复投递是可能情形**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求并关闭开关 → 排空确认 → 回退 Worker**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 卸压，关闭 `replay_enabled` 并确认停止受理新请求；保留 Worker 消化旧任务 | S6 | 关态读数与停收记录；与 S1 基线对比（A2，A3） |\n| S8 | 等待队列排空并确认 | S7 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S9 | 回退 Worker（**仅在 S8 排空确认后**），复查开关仍为关闭 | S8 | 排空证据、回退时间戳及最终开关读数（A3） |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S8/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n",
+      "verify": {
+        "started_at": "2026-11-12T11:43:32.462013+00:00",
+        "candidate_sha256": "398f1e419fd971b965479b43705a8c6bb4edeb559198778e924dea6352fac00a",
+        "request_sha256": "79dc9cd19f86ef355a8730756ac16e932f3ad21650fa8ddafc4a2bc7e45f7258",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3727,
+          "output": 2015,
+          "total": 5742,
+          "cache_read": 896,
+          "uncached_input": 2831
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "verdict": "revise",
+          "reviewed_sections": [
+            "0. 范围红线",
+            "1. 三方职责、接口契约与负责人位",
+            "2. 依赖与演练步骤顺序",
+            "3. 撤回（Rollback）先后顺序与每步验收证据",
+            "4. 预发布环境 replay.v1 已入队旧任务处置",
+            "5. 结论标注与待取证清单",
+            "6. 出处",
+            "7. 大白话概括"
+          ],
+          "findings": [
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L25",
+                "L30",
+                "L31",
+                "L35",
+                "L37"
+              ],
+              "quote": "依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 停止受理新请求并关闭开关 → 排空确认 → 回退 Worker**。",
+              "basis": "A2 明确“已入队任务即使停用新请求仍会继续消费”，A3 明确“排空现有任务之前不能回退 Worker”。稿件把“排空确认”放在“停止受理新请求并关闭开关”之后，作为依赖链的末端环节，但 S2 又要求在任何开关动作之前先处置旧任务并“确认处置完成”。",
+              "impact": "依赖链与 S2 自相矛盾：若旧任务在 S2 已处置完成，则 S8 的排空对象只剩演练期新任务；若旧任务留到 S8 排空，则 S2 的“处置完成”无法成立。值班工程师按依赖链执行会在 S2 卡住，或误以为旧任务已清而跳过 S8 的排空确认，直接触发 A3 禁止的回退。"
+            },
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L30",
+                "L55",
+                "L57",
+                "L59",
+                "L61"
+              ],
+              "quote": "S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成",
+              "basis": "A2 说明旧任务会继续被消费，A3 说明排空前不能回退 Worker；但材料未给出旧任务“处置完成”的判据。§4 第 5 条自己承认排空判据数值待取证，并以“队列无待消费消息”代替。",
+              "impact": "S2 的验收证据“旧任务清单与处置结论”没有可验收的完成定义，S3 又依赖“S2 完成”。值班工程师无法判定何时可开启压测，演练可能在旧任务未消化完时开始，污染 S5/S6 的幂等与积压观测。"
+            },
+            {
+              "section": "3. 撤回（Rollback）先后顺序与每步验收证据",
+              "locations": [
+                "L45",
+                "L46",
+                "L47",
+                "L48"
+              ],
+              "quote": "R1 | 停止新增重放请求（不再受理新 `POST /replay`） … R2 | 关闭 `replay_enabled`（Release 置关）",
+              "basis": "A1 规定 Admin API 是外部合同的唯一所有者，POST /replay 返回 202 和 jobId；A3 规定 Release 管理服务端 replay_enabled。材料未说明“停止受理新请求”由谁执行、通过什么机制执行，也未说明它与 replay_enabled 的关系。",
+              "impact": "R1 与 R2 的职责归属和操作手段未定义：若“停止受理”靠关闭 replay_enabled 实现，则 R1 与 R2 是同一动作，顺序表失去意义；若靠 API 侧另设停收开关，则材料未授权也未给出该开关的负责人和证据形式。值班工程师无法执行 R1，也无法产出“停收记录”这一验收证据。"
+            },
+            {
+              "section": "3. 撤回（Rollback）先后顺序与每步验收证据",
+              "locations": [
+                "L49",
+                "L69",
+                "L70"
+              ],
+              "quote": "R5 | 事后复查双告警指标 … `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证**",
+              "basis": "A4 只说明现有告警通过 replay_backlog 和 duplicate_write_count 监测，候选版本观察值没有提供。材料未给出“收敛”“不再新增”的判定口径。",
+              "impact": "R5 的验收证据不可验收：“收敛”和“不再新增”都需要基线或阈值，而稿件同时声明阈值待取证。值班工程师无法判定撤回是否成功，可能把仍在增长的 duplicate_write_count 误判为已收敛。"
+            },
+            {
+              "section": "4. 预发布环境 replay.v1 已入队旧任务处置",
+              "locations": [
+                "L58",
+                "L59",
+                "L61"
+              ],
+              "quote": "判定：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。",
+              "basis": "A2 只说明至少一次投递与 orderId 幂等，A3 只说明排空前不能回退 Worker；材料未提供“保留样本”与“可直接消化”的区分标准，也未说明保留样本如何在不阻塞排空的前提下留存。",
+              "impact": "“保留样本”若留在 replay.v1 中，将直接阻塞 S8/R3 的排空确认，进而阻塞 A3 允许的回退；若移出队列，材料未授权任何移出手段。该判定步骤在现有材料下无法执行，且与“排空是回退唯一放行条件”冲突。"
+            },
+            {
+              "section": "1. 三方职责、接口契约与负责人位",
+              "locations": [
+                "L17",
+                "L18",
+                "L19",
+                "L74"
+              ],
+              "quote": "| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" |",
+              "basis": "A1 只说 Admin API 是外部合同的唯一所有者、POST /replay 返回 202 和 jobId、调用方不能把 202 当成功；材料未说明 API “只负责入队成功”或“入队”这一内部动作。",
+              "impact": "把“入队成功”写成 API 的契约语义，超出了 A1 的证据范围，属于从稿件补写材料没有的信息。若实际受理后并非同步入队，值班工程师会以“入队成功”作为 202 的解释，与 A1 仅保证“受理”的强度不一致。"
+            },
+            {
+              "section": "0. 范围红线",
+              "locations": [
+                "L9",
+                "L31"
+              ],
+              "quote": "压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。",
+              "basis": "A3 只说明 Release 管理服务端 replay_enabled 默认关；材料未说明 replay_enabled 与“压测”是同一开关，也未说明开启一次即等于开启压测。",
+              "impact": "稿件把 replay_enabled 等同于压测开关，并规定“唯一窗口”。若二者并非同一控制面，S3 的“开启压测”动作没有对应的接口与负责人，演练无法按计划启动；若为同一开关，则“开启压测”与“开启重放受理”混为一谈，S4 的试探请求语义不清。"
+            },
+            {
+              "section": "5. 结论标注与待取证清单",
+              "locations": [
+                "L72"
+              ],
+              "quote": "灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供",
+              "basis": "当前用户目标明确“仅在演练期显式打开压测”，未要求灰度；A1–A4 均未出现灰度概念。",
+              "impact": "待取证清单引入“灰度”这一目标外概念，与“全量开通取消、只做预发布演练”的范围红线不一致，可能诱导值班工程师去寻找不存在的灰度配置。"
+            },
+            {
+              "section": "7. 大白话概括",
+              "locations": [
+                "L89"
+              ],
+              "quote": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、关开关并确认不再收新单，等旧单跑完、队列排干净，最后才回退 Worker。",
+              "basis": "该概括先说“把队列里遗留的旧任务处理掉”，后又说“等旧单跑完、队列排干净”，与 §2 依赖链及 S2/S8 的矛盾一致；A2/A3 只支持“排空前不得回退 Worker”。",
+              "impact": "概括复述了同一矛盾，值班工程师按概括执行会认为旧任务在开压测前已处理完，从而在 S8 跳过对旧任务的排空核对，违反 A3 的硬前置。"
+            }
+          ],
+          "unresolved": [
+            "“停止受理新请求”（R1）由哪个角色、通过何种机制执行，与 replay_enabled 是否同一控制面，材料无法决定。",
+            "replay_enabled 是否即“压测开关”，以及“显式打开压测”对应的具体接口与操作，材料无法决定。",
+            "旧任务“处置完成”与“排空”的可验收判据（队列无待消费消息是否足够、由谁书面确认），材料无法决定。",
+            "§4 中“演练需要保留的样本”如何在不阻塞排空的前提下留存，材料无法决定。",
+            "replay_backlog “收敛”与 duplicate_write_count “不再新增”的判定口径与阈值，材料无法决定。",
+            "API / Worker / Release 三位负责人的具体人选，材料未提供。",
+            "replay.v1 旧任务的数量、来源与排空时长，材料未提供。"
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 12.234
+      },
+      "adjudication": {
+        "false_target_repairs": [
+          "modality",
+          "order"
+        ],
+        "unnecessary_changed_lines": [
+          11,
+          25
+        ],
+        "material_regressions": [
+          "The L25 dependency chain removes explicit verification that no new requests are being accepted. S7 and the summary still contain that confirmation, so the whole plan has not lost it."
+        ],
+        "target_findings": [
+          "The new L11 phrasing is equivalent to the correct original; the diagnosis nevertheless incorrectly says the original guaranteed repeat delivery.",
+          "The major shutoff, drain and rollback ordering is retained. The L25 replacement drops the explicit confirmation step from the dependency chain."
+        ],
+        "independent_recheck": "revise; discusses pre-existing unknowns about old task disposition and stop implementation. It does not explicitly identify the confirmation removed from L25.",
+        "protected_invariant_regressions": []
+      }
+    },
+    {
+      "id": "original-2",
+      "variant": "original",
+      "edit": {
+        "started_at": "2026-11-12T11:43:27.836381+00:00",
+        "candidate_sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6",
+        "request_sha256": "bba94281fa5263da8e51049ccde3711c4464a602a27605ab69503eaf7a1df3d8",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3797,
+          "output": 582,
+          "total": 4379,
+          "cache_read": 0,
+          "uncached_input": 3797
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "modality": {
+            "status": "repair",
+            "source_quote": "A2：Worker 独立消费 replay.v1，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。",
+            "counterexample": "至少一次投递只保证消息可能重复，不保证每条消息必然重复；若某条消息只投递一次，则不会发生重复消费。稿件 L11 写“重复消费必然发生”，把原文允许的重复情况写成必然发生，超出原文保证。",
+            "locations": [
+              "L11"
+            ],
+            "reason": "原文只说明至少一次投递，重复消费是可能而非必然；L11 的“必然发生”属于过度保证，应改为“可能发生”，同时保留 orderId 幂等设计。"
+          },
+          "order": {
+            "status": "repair",
+            "sections": [
+              {
+                "location": "L25",
+                "sequence": "Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 排空确认（→ 才可回退 Worker）"
+              },
+              {
+                "location": "L29-L37",
+                "sequence": "S1 确认开关为关并记录基线 → S2 处置旧任务 → S3 开启压测 → S4 试探请求 → S5 校验消费与幂等 → S6 观测告警 → S7 卸压并排空确认 → S8 回退 Worker → S9 关闭开关并复查"
+              },
+              {
+                "location": "L41-L49",
+                "sequence": "R1 停止新增请求 → R2 关闭 replay_enabled → R3 等待排空并确认 → R4 回退 Worker → R5 事后复查双指标"
+              },
+              {
+                "location": "L55-L61",
+                "sequence": "辨识旧任务 → 判定保留样本与可消化存量 → 受控消化 → 证据留存 → 排空确认作为回退 Worker 唯一放行条件"
+              },
+              {
+                "location": "L89",
+                "sequence": "先确认关着 → 处理旧任务 → 开压测 → 少量试探 → 看两个告警指标 → 排干净队列 → 回退 Worker → 关开关；撤回顺序为先停止新请求、再关开关、等队列排空、排空后才回退 Worker"
+              }
+            ],
+            "reason": "依赖链、演练主步骤、撤回段、旧任务处置段和末尾大白话的动作顺序一致，均覆盖停收、关闭开关、排空确认、回退 Worker，且保持排空为回退 Worker 的硬前置；未发现遗漏或冲突，无需改动。"
+          },
+          "edits": [
+            {
+              "line": 11,
+              "old_text": "**至少一次投递，重复消费必然发生**",
+              "new_text": "**至少一次投递，重复消费可能发生**"
+            }
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 4.453
+      },
+      "apply": {
+        "original_sha256": "e271feab66aed4969e48151e985e64dfb890c60c733360ba636f60b430fdbcb6",
+        "revised_sha256": "c3d9cd992cc1e97d338687032536b1e1748b2dd53fdb7aa112cd3e813878ec42",
+        "edits_field_valid": true,
+        "edits": [
+          {
+            "edit": {
+              "line": 11,
+              "old_text": "**至少一次投递，重复消费必然发生**",
+              "new_text": "**至少一次投递，重复消费可能发生**"
+            },
+            "status": "applied"
+          }
+        ],
+        "changes": [
+          {
+            "line": 11,
+            "before": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费必然发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。",
+            "after": "- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费可能发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。"
+          }
+        ]
+      },
+      "revised": "# 异常订单自动重放 · G2 预发布演练架构与发布计划\n\n**读者**：值班工程师　**性质**：预发布演练计划（非真实发布）\n**事实来源**：仅本会话给出的 A1–A4（见文末〔出处〕）。本稿不含仓库代码与观测数据，凡无证据数值一律标注 **待取证**。\n\n## 0. 范围红线（先读）\n\n- 不改业务代码，不做真实发布，不触碰外部系统。\n- `replay_enabled` 默认关闭；压测仅在演练期由 Release 显式开启一次，演练结束必须回到关闭态。\n- 已取消、不在本计划内：后台控制台 UI、业务报表、全量开通。（A3 中的报表草稿仅为背景，无上线授权，不入范围。）\n- 三条贯穿全篇的状态语义：**202 ≠ 成功**（A1）；**至少一次投递，重复消费可能发生**，靠 orderId 幂等收敛（A2）；**未排空不得回退 Worker**（A3）。\n\n## 1. 三方职责、接口契约与负责人位\n\n| 方 | 职责 | 接口契约 | 负责人 |\n| --- | --- | --- | --- |\n| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" | `POST /replay` → **202** + `jobId`。202 仅表示受理，不表示订单已重放成功；最终结果状态由消费端在**确有最终结果时**才更新（A1） | **待指派** |\n| **Worker** | 独立消费 `replay.v1`；执行实际重放 | 至少一次投递；`orderId` 为业务幂等键；已入队任务在新请求停用后仍会继续消费（A2） | **待指派** |\n| **Release** | 管理服务端开关 `replay_enabled`（默认关）；控制演练开关窗口 | 默认关闭；**排空现有任务之前不能回退 Worker**（A3） | **待指派** |\n\n**契约间的关键约定**：API 的 `jobId` 是受理凭证，不是结果凭证；查询/对账时以状态为\"确有最终结果\"的记录为准（A1）。Worker 侧以 orderId 去重，重复消息不得产生二次写入（A2）。Release 的回退动作与 Worker 排空状态绑定，二者顺序不可互换（A3）。\n\n## 2. 依赖与演练步骤顺序\n\n依赖链：**Release 开关 → API 受理 → replay.v1 队列 → Worker 消费 → 幂等落库 → 告警观测 → 排空确认（→ 才可回退 Worker）**。\n\n| 步 | 动作 | 依赖前置 | 验收证据 |\n| --- | --- | --- | --- |\n| S1 | 确认 `replay_enabled` 为关，记录基线快照 | 无 | 开关读数截图/时间戳；`replay_backlog`、`duplicate_write_count` 基线值（A3，A4）——值本身 **待取证** |\n| S2 | 处置 replay.v1 已入队的旧任务（见 §4），确认处置完成 | S1 | 旧任务清单与处置结论；**旧任务数量待取证** |\n| S3 | Release 显式开启压测（演练期唯一窗口） | S2 完成 | 开关开启记录 + 开启时刻 |\n| S4 | 少量试探请求：`POST /replay` 观察 202 + jobId | S3 | 每条请求的返回码与 jobId；**明确记录\"202 不算成功\"**（A1） |\n| S5 | 校验 Worker 消费与 orderId 幂等 | S4 | 同一 orderId 重复投递后落库条数不变；`duplicate_write_count` 曲线（A2，A4） |\n| S6 | 观测告警双指标，判断是否偏离 | S5 | `replay_backlog` 走向、`duplicate_write_count` 走向；**候选版本观察值待取证**（A4） |\n| S7 | 卸压并让队列排空，确认排空 | S6 | 排空完成证据；**排空时长待取证**（A3 要求排空，A4 提供观测指标） |\n| S8 | 回退 Worker（**仅在 S7 排空确认后**） | S7 | 排空证据 + 回退记录，时间顺序可查（A3） |\n| S9 | 关闭 `replay_enabled`，回到默认态并复查 | S8 | 最终的开关关闭读数；与 S1 基线对比 |\n\n## 3. 撤回（Rollback）先后顺序与每步验收证据\n\n撤回的核心约束：**先停下新增、再等排空、最后才回退 Worker**；任一环节证据不足即停在此步，不推进（A2，A3）。\n\n| 序 | 撤回动作 | 为什么是这个顺序 | 验收证据 |\n| --- | --- | --- | --- |\n| R1 | 停止新增重放请求（不再受理新 `POST /replay`） | 先断源，否则边排边进 | 停收记录与时刻；停收后无新增受理（A1） |\n| R2 | 关闭 `replay_enabled`（Release 置关） | 关闭开关只影响\"新请求\"，不影响已入队任务（A2） | 开关关闭读数 + 时刻（A3） |\n| R3 | 等待 replay.v1 排空并确认 | 排空是回退 Worker 的**硬前置**（A3） | 排空确认证据；排空时长 **待取证**（A3，A4） |\n| R4 | 回退 Worker（仅 R3 达成后执行） | 顺序颠倒会遗留未消费消息 | 排空证据与回退记录的时间先后；A3 约束满足 |\n| R5 | 事后复查双告警指标 | 确认撤回后无异常堆积/重复写 | `replay_backlog` 收敛、`duplicate_write_count` 不再新增（A4）；具体阈值 **待取证** |\n\n**注意**：R2 之后队列仍会继续被消费（A2），因此\"开关已关\"不能当作\"撤回完成\"的证据；只有 R3 的排空证据才算。\n\n## 4. 预发布环境 replay.v1 已入队旧任务处置\n\n已知事实：旧任务已在 `replay.v1` 中入队；**即使停用新请求，这些任务仍会被继续消费**（A2）；且**排空之前不能回退 Worker**（A3）。由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。\n\n1. **辨识**（S2）：列出旧任务范围、数量与来源。**数量与来源待取证**。\n2. **判定**：区分\"演练需要保留的样本\"与\"可直接消化的存量\"。判定标准需随证据补齐。\n3. **受控消化**：旧任务按 A2 的至少一次投递正常消费，靠 orderId 幂等落库；重复投递不视为故障，但要计入 `duplicate_write_count` 观测（A4）。\n4. **证据留存**：消化期间记录 `replay_backlog` 下降曲线；**观察值与排空时长待取证**。\n5. **排空确认**：以 A3 的\"排空\"作为回退 Worker 的唯一放行条件；排空判据的具体数值 **待取证**，未定前以\"队列无待消费消息\"的检查结果代替，并由值班工程师书面确认。\n\n## 5. 结论标注与待取证清单\n\n正文结论已逐条标注：三方职责与 202 语义（A1）；Worker 至少一次投递、orderId 幂等、停用后仍消费（A2）；开关默认关、排空前不得回退 Worker（A3）；双指标告警与观察值缺失（A4）。\n\n| 待取证项 | 影响 | 来源 |\n| --- | --- | --- |\n| `replay_backlog` 基线与观察值 | S1/S6/R5 无阈值可比 | A4 |\n| `duplicate_write_count` 候选版本观察值 | S5/S6 无法判断幂等是否达标 | A4 |\n| 队列排空时长 | S7/R3 无法预估窗口长度 | A3，A4 |\n| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |\n| replay.v1 旧任务数量与来源 | S2 与 §4 判定 | A2，本会话未提供 |\n| API / Worker / Release 负责人 | 全部 **待指派** | 本会话未提供 |\n\n> 上述数值一律不填估计值；值班工程师在取得实测数据前，应以\"无待消费消息 / 状态为确有最终结果\"等定性证据代替阈值判定。\n\n## 6. 出处\n\n- **A1**：Admin API 是外部合同的唯一所有者，`POST /replay` 返回 202 和 jobId；调用方不能把 202 当成功。消费端在确有最终结果时才更新状态。（会话事件 9，摘录 SHA-256 `4a0ed609…c630633`）\n- **A2**：Worker 独立消费 `replay.v1`，消息至少一次投递；orderId 是业务幂等键。已入队任务即使停用新请求仍会继续消费。（摘录 SHA-256 `b7b77734…9db613d75`）\n- **A3**：Release 管理服务端 `replay_enabled`，默认关；排空现有任务之前不能回退 Worker。运营已预建一个新业务报表草稿，当前没有业务上线授权。（摘录 SHA-256 `7da60b85…a5309f`）\n- **A4**：现有运维告警通过 `replay_backlog` 和 `duplicate_write_count` 监测；候选版本的观察值没有提供。（摘录 SHA-256 `31908ac1…90a8bc`）\n\n以上仅为会话中用户提供的内容，不构成对外部系统的独立核实；无仓库代码与观测数据。\n\n## 7. 大白话概括\n\n这次不是真上线，是在预发布环境按剧本演习一遍。三个角色分工很简单：API 只负责\"收到请求了\"——返回 202 和 jobId，**这仅仅代表受理，绝不等于订单已经重放成功**；Worker 真正干活，而且同一条消息可能送两次，靠 orderId 保证只写一次；Release 管总开关，开关默认是关的，只有演习期间开一次压测。顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。撤回的时候顺序不能乱：**先停止新请求、再关开关、然后老老实实等队列排空、排空之后才允许回退 Worker**——因为开关关了已排队的消息还会继续被消费，没排空就回退会留下烂摊子。所有具体数字（积压多少、重复写多少、排空要多久、灰度开多大）会话里都没给，本计划一律写\"待取证\"，值班同事在拿到实测数据前先用\"队列空没空\"\"状态是不是真的有最终结果\"这类确定性证据来判断，别自己估一个数。三位负责人都还没定，标着待指派。\n",
+      "verify": {
+        "started_at": "2026-11-12T11:43:32.296873+00:00",
+        "candidate_sha256": "c3d9cd992cc1e97d338687032536b1e1748b2dd53fdb7aa112cd3e813878ec42",
+        "request_sha256": "b99ff0308166cd6e0e35d04691423f29d288edaf0178205febde73f0ad7f2f05",
+        "http_status": 200,
+        "response_model": "deepseek-flash",
+        "usage": {
+          "prompt": 3689,
+          "output": 1676,
+          "total": 5365,
+          "cache_read": 0,
+          "uncached_input": 3689
+        },
+        "finish_reason": "stop",
+        "answer": {
+          "verdict": "revise",
+          "reviewed_sections": [
+            "0. 范围红线",
+            "1. 三方职责、接口契约与负责人位",
+            "2. 依赖与演练步骤顺序",
+            "3. 撤回（Rollback）先后顺序与每步验收证据",
+            "4. 预发布环境 replay.v1 已入队旧任务处置",
+            "5. 结论标注与待取证清单",
+            "6. 出处",
+            "7. 大白话概括"
+          ],
+          "findings": [
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L31",
+                "L32",
+                "L33",
+                "L34",
+                "L35",
+                "L36",
+                "L37"
+              ],
+              "quote": "S3 | Release 显式开启压测（演练期唯一窗口）",
+              "basis": "当前目标明确要求“只做预发布演练且功能默认关闭；仅在演练期显式打开压测”。A3 只说明 replay_enabled 默认关、由 Release 管理，并未说明该开关就是压测开关。稿件把“开启压测”直接等同于操作 replay_enabled，属于把材料未给出的语义补进计划。",
+              "impact": "值班工程师会误以为打开 replay_enabled 即进入压测；若压测开关与功能开关不是同一开关，S3 的验收证据（开关开启记录）无法证明压测已按目标显式打开，演练顺序与证据链失效。"
+            },
+            {
+              "section": "3. 撤回（Rollback）先后顺序与每步验收证据",
+              "locations": [
+                "L45",
+                "L46",
+                "L47",
+                "L48"
+              ],
+              "quote": "R1 | 停止新增重放请求（不再受理新 `POST /replay`）",
+              "basis": "A1 规定 Admin API 是外部合同的唯一所有者，POST /replay 返回 202 和 jobId；A3 只规定 Release 管理 replay_enabled。材料没有给出“停止新增重放请求”的接口、开关或权限归属，也没有说明该动作由谁执行。",
+              "impact": "R1 是一个无法验收的动作：值班工程师不知道通过什么手段停收、由谁授权停收，也无法证明“停收后无新增受理”。撤回第一步即缺少可执行入口。"
+            },
+            {
+              "section": "3. 撤回（Rollback）先后顺序与每步验收证据",
+              "locations": [
+                "L46",
+                "L51"
+              ],
+              "quote": "R2 | 关闭 `replay_enabled`（Release 置关）",
+              "basis": "A2 明确“已入队任务即使停用新请求仍会继续消费”，A3 明确“排空现有任务之前不能回退 Worker”。材料没有说明关闭 replay_enabled 是否等于“停用新请求”，也没有说明关闭该开关后 API 是否仍受理 POST /replay。",
+              "impact": "R1 与 R2 的先后关系缺乏依据：若关闭 replay_enabled 本身就是停收手段，R1 与 R2 重复或顺序无意义；若关闭开关不影响 API 受理，则 R2 不能承担“断源”作用，撤回顺序的因果解释不成立。"
+            },
+            {
+              "section": "2. 依赖与演练步骤顺序",
+              "locations": [
+                "L35",
+                "L36",
+                "L37"
+              ],
+              "quote": "S9 | 关闭 `replay_enabled`，回到默认态并复查",
+              "basis": "A3 只要求排空现有任务之前不能回退 Worker，并未规定回退 Worker 之后才关闭 replay_enabled。当前目标要求“功能默认关闭；仅在演练期显式打开压测”，演练结束应回到关闭态，但稿件把关闭开关放在回退 Worker 之后，且 S3 开启的是“压测”，S9 关闭的是 replay_enabled，两者是否同一开关未取证。",
+              "impact": "若 replay_enabled 是功能开关而非压测开关，S9 关闭它并不能保证压测回到关闭态；若压测期间 replay_enabled 必须保持开启以消费已入队任务，则 S9 放在 S8 之后虽不违反 A3，但“回到默认态”的验收对象不清，值班工程师无法确认演练后功能与压测均处于关闭。"
+            },
+            {
+              "section": "4. 预发布环境 replay.v1 已入队旧任务处置",
+              "locations": [
+                "L55",
+                "L57",
+                "L58",
+                "L59",
+                "L61"
+              ],
+              "quote": "由此处置原则固定为\"先辨识、再受控消化、后判排空\"，不接受\"直接清队列\"或\"直接回退 Worker\"。",
+              "basis": "A2 只说明已入队任务即使停用新请求仍会继续消费，orderId 是业务幂等键；A3 只说明排空之前不能回退 Worker。材料没有给出旧任务的来源、数量、是否应保留样本、以及“受控消化”与演练压测请求如何区分。",
+              "impact": "§4 的“判定”步骤（L58）没有可执行标准，且“受控消化”与 S3 开启压测后的新请求消费混在同一队列，值班工程师无法区分旧任务消化进度与演练请求进度，S2 的“处置完成”无法验收。"
+            },
+            {
+              "section": "1. 三方职责、接口契约与负责人位",
+              "locations": [
+                "L17",
+                "L18",
+                "L19",
+                "L74"
+              ],
+              "quote": "| **API**（Admin API） | 外部合同的唯一所有者；受理重放请求，只负责\"入队成功\" |",
+              "basis": "A1 只说 Admin API 是外部合同的唯一所有者、POST /replay 返回 202 和 jobId、调用方不能把 202 当成功、消费端在确有最终结果时才更新状态。材料没有说 API“只负责入队成功”，也没有给出 API 与 replay.v1 之间的入队契约。",
+              "impact": "把 API 职责表述为“只负责入队成功”是材料未支持的扩展；若 API 还承担其他合同义务，该职责表会误导值班工程师对 API 故障边界的判断。"
+            },
+            {
+              "section": "5. 结论标注与待取证清单",
+              "locations": [
+                "L72"
+              ],
+              "quote": "| 灰度/停收阈值 | R1 停收判据、S3 压测强度 | 本会话未提供 |",
+              "basis": "当前目标没有要求灰度，材料也没有出现灰度概念；R1 的停收判据在材料中同样没有依据。",
+              "impact": "引入“灰度”这一未在目标或材料中出现的概念，增加值班工程师的认知负担，且该待取证项无法对应到任何已定义动作。"
+            },
+            {
+              "section": "7. 大白话概括",
+              "locations": [
+                "L89"
+              ],
+              "quote": "顺序上先确认关着，把队列里遗留的旧任务处理掉，再开压测、少量试探、看两个告警指标、把队列排干净，最后才回退 Worker、关开关。",
+              "basis": "该概括与正文 S3/S9 一致地把“开压测”和“关 replay_enabled”当作同一开关操作，但材料只证明 replay_enabled 由 Release 管理且默认关，未证明它就是压测开关。",
+              "impact": "概括会强化错误理解，值班工程师按此执行可能只操作了功能开关而误以为压测已按目标显式打开或关闭。"
+            }
+          ],
+          "unresolved": [
+            "压测的显式打开手段是否就是 replay_enabled，还是另有压测开关；材料无法决定。",
+            "“停止新增重放请求”的具体接口、开关、权限归属与执行人；材料无法决定。",
+            "关闭 replay_enabled 后 Admin API 是否仍受理 POST /replay；材料无法决定。",
+            "replay.v1 旧任务的数量、来源及“演练需要保留的样本”判定标准；材料无法决定。",
+            "replay_backlog 与 duplicate_write_count 的基线值、候选版本观察值及排空判据数值；材料无法决定。",
+            "API / Worker / Release 三方负责人；材料无法决定。"
+          ]
+        },
+        "status": "ok",
+        "elapsed_seconds": 10.375
+      },
+      "adjudication": {
+        "modality_pass": true,
+        "order_pass": false,
+        "target_findings": [
+          "L11 now says repeated consumption can occur and retains orderId.",
+          "S7–S9 and the first order in L89 remain unchanged and still conflict with the withdrawal sequence. The editor extracted both orders but declared them consistent."
+        ],
+        "false_target_repairs": [],
+        "material_regressions": [],
+        "unnecessary_changed_lines": [],
+        "independent_recheck": "revise; flags the S9 timing and quotes L89, but focuses on whether replay_enabled controls load generation. It does not identify the complete mismatch with R1–R4 and the second sequence in L89.",
+        "protected_invariant_regressions": []
+      }
+    }
+  ]
+}

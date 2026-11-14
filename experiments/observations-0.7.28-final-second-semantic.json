@@ -1,0 +1,1684 @@
+{
+  "archiveSha256": "ae3152d06ed4740b6da3ba6e89f20fc87bf7d948444071507bc7884bafa3df8a",
+  "scope": "Independent line-level semantic comparison against signed frozen sources and black-box public boundaries. These checks are outside the blind score.",
+  "observations": [
+    {
+      "run": "r-J3dUWi",
+      "stage": "g1",
+      "terminal": "closed",
+      "manualHeadingsRead": [
+        "实施顺序",
+        "回退顺序",
+        "关键验证"
+      ],
+      "reviewed": true,
+      "closed": true,
+      "proof": {
+        "version": 1,
+        "policySha256": "a004dddab6e124baee6a91439e132a8d85f560e43aa5d2f5272b843def427cfa",
+        "artifactsSha256": "47934024592f78237d0ea2108d1dc97f13437838c0781d8bb1066641d41bde4a",
+        "rows": [
+          {
+            "id": "nonobject-request",
+            "exampleId": "public-architecture-responsibility:example:nonobject-request",
+            "mode": "business",
+            "trigger": {
+              "kind": "input-type",
+              "argument": 0,
+              "type": "object",
+              "test": "not"
+            },
+            "clause": {
+              "file": "SPEC.md",
+              "start": 5,
+              "end": 5,
+              "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+              "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+            },
+            "status": "passed",
+            "actual": {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+              "line": 72,
+              "end": 72,
+              "conditionLine": 71,
+              "code": "invalid-request"
+            },
+            "response": {
+              "id": "public-architecture-responsibility:example:nonobject-request",
+              "snapshotSha256": "a1fe5bf0c518ddaa00e9aa599f1820bf559000be66289267a5bc73774d588082",
+              "exitCode": 0,
+              "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+              "json": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              }
+            },
+            "traceSha256": "8aa6abdbbe012f7aa46e97a834efb26bd5fa407fbb5b84c455348006eb8370cb"
+          }
+        ]
+      },
+      "document": {
+        "file": "modules/architecture.md",
+        "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+      },
+      "signedSources": {
+        "journal.py": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+        "planner.py": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+        "policy.py": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb",
+        "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+      },
+      "acceptedArchitectureReceipts": [
+        {
+          "file": "K01-first.json",
+          "sha256": "830afcfed24d56baba6f1e5f87ef0a87ff934aad8ef711743046179576946064",
+          "role": "reviewer",
+          "status": "pass",
+          "sections": [
+            {
+              "heading": "实施顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 13,
+                "end": 21,
+                "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+              },
+              "basis": "实施顺序 1-6（先基线、再 journal/planner/policy、release 最后、逐条回归）与当前实现与导入方向一致。",
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 1,
+                  "end": 5,
+                  "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+                  "relation": "supports",
+                  "excerptSha256": "613a0efd37c22d15c3848e13910a4b358c0a379e76d99ee4b79222e6999e5817"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 64,
+                  "end": 97,
+                  "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+                  "relation": "supports",
+                  "excerptSha256": "d7970540a1448d3cceae4febe33c20f135d87c1b662e04a10ab0ec54e087c7ce"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "回退顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 22,
+                "end": 28,
+                "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+              },
+              "basis": "回退顺序按模块独立回退且 release.py 最后改动，与静态导入 journal→policy→planner→release 及实际职责边界吻合。",
+              "evidence": [
+                {
+                  "file": "policy.py",
+                  "start": 1,
+                  "end": 6,
+                  "sha256": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb",
+                  "relation": "supports",
+                  "excerptSha256": "4e2ce31613df9cce3ce779a35edc78dbf83015ef694a258a3bdf7c56642f60df"
+                },
+                {
+                  "file": "journal.py",
+                  "start": 1,
+                  "end": 5,
+                  "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+                  "relation": "supports",
+                  "excerptSha256": "7b7dc9a6453a993aa0bda903e9eb5a4f639324872a691f3d86c9bf6a7ce3e29d"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "关键验证",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 29,
+                "end": 39,
+                "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+              },
+              "basis": "关键验证覆盖的传输、校验、图、排序、plan/rollback、去重条目在源码路径上均能对应，探针结果与之一致。",
+              "evidence": [
+                {
+                  "file": "journal.py",
+                  "start": 35,
+                  "end": 83,
+                  "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+                  "relation": "supports",
+                  "excerptSha256": "aa88beded3fc1048919aff1413746654d606299771bc1ffaa164eb2c60c35093"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 16,
+                  "end": 63,
+                  "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+                  "relation": "supports",
+                  "excerptSha256": "16e78d08afff20765c3e5a443ceff178392ab8bf0c79b2853e8a8800e8c55626"
+                }
+              ],
+              "status": "pass"
+            }
+          ],
+          "findings": 0
+        },
+        {
+          "file": "K01-first.json",
+          "sha256": "830afcfed24d56baba6f1e5f87ef0a87ff934aad8ef711743046179576946064",
+          "role": "auditor",
+          "status": "pass",
+          "sections": [
+            {
+              "heading": "实施顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 13,
+                "end": 21,
+                "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+              },
+              "basis": "实施顺序与现有模块职责、导入方向一致，第 5 条要求 release.py 只输出单行 JSON，与源码相符",
+              "evidence": [
+                {
+                  "file": "SPEC.md",
+                  "start": 3,
+                  "end": 3,
+                  "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                  "relation": "supports",
+                  "excerptSha256": "82f2c113ec6e861a98537e0aff5c4733a5c6f0910495b6f23605ca6da8a18edc"
+                },
+                {
+                  "file": "release.py",
+                  "start": 8,
+                  "end": 15,
+                  "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                  "relation": "supports",
+                  "excerptSha256": "31a52b5e8a07a2ea970fc4a03234e025d56cbb00a527df477eb6d58949f0620b"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "关键验证",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 29,
+                "end": 39,
+                "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+              },
+              "basis": "关键验证条目与源码校验点对应：invalid-change 列出的单位/依赖形状、去重、rollback 预算不封顶等均由 journal/policy/planner 实现",
+              "evidence": [
+                {
+                  "file": "journal.py",
+                  "start": 49,
+                  "end": 52,
+                  "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+                  "relation": "supports",
+                  "excerptSha256": "90315bf807b4d335ce5086737fac059fe96b88a971666bb73ccaa04532a61881"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 42,
+                  "end": 42,
+                  "sha256": "b760df7b7d63592f4747a4f55e9a0ef70c689c1c197081dcedc4c5be7928d3fb",
+                  "relation": "supports",
+                  "excerptSha256": "0e56ef3cdedc32e0c2a2b40257dc6c2dfa05c9d15051149d036a5706606b93d0"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 94,
+                  "end": 95,
+                  "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+                  "relation": "supports",
+                  "excerptSha256": "2a3356ad9910a323293eb245ab66a1a59c5b96b3a4dc6e62830a1bb006b5dbff"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "回退顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 22,
+                "end": 28,
+                "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb"
+              },
+              "basis": "四文件独立回退且保持导入方向，与源码一致",
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 9,
+                  "end": 10,
+                  "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+                  "relation": "supports",
+                  "excerptSha256": "8b2a35005770f6383caef29eba2ef608838f10d314dbdb4134f6f18b5e81bfa8"
+                },
+                {
+                  "file": "release.py",
+                  "start": 5,
+                  "end": 5,
+                  "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                  "relation": "supports",
+                  "excerptSha256": "8b69d4da645035baa083ea7077524ec4be08355dd5f45d0f2eef5dc970749020"
+                }
+              ],
+              "status": "pass"
+            }
+          ],
+          "findings": 0
+        }
+      ],
+      "contradictions": [],
+      "ambiguities": [
+        {
+          "id": "future-plan-bundles-two-existence-checks",
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb",
+            "lines": [
+              {
+                "line": 16,
+                "text": "2. journal.py：补齐结构校验、去重与冲突判定、依赖与 applied 的存在性校验，保持原函数签名不变。"
+              }
+            ]
+          },
+          "reason": "This is implementation-plan language. Journal validates dependency list shape and checks whether applied IDs exist. Planner separately checks whether dependency targets exist. The compact plan does not distinguish these uses of existence, so it merits clarification rather than an actual current factual contradiction.",
+          "sources": [
+            {
+              "file": "planner.py",
+              "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+              "lines": [
+                {
+                  "line": 35,
+                  "text": "    for row in changes:"
+                },
+                {
+                  "line": 36,
+                  "text": "        for dep in set(row[\"depends_on\"]):"
+                },
+                {
+                  "line": 39,
+                  "text": "            if dep not in units:"
+                },
+                {
+                  "line": 40,
+                  "text": "                raise JournalError(\"unknown-dependency\")"
+                },
+                {
+                  "line": 74,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 75,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 76,
+                  "text": "        applied = read_applied(request, changes)"
+                },
+                {
+                  "line": 77,
+                  "text": "        order, units = _topological_order(changes)"
+                }
+              ]
+            },
+            {
+              "file": "journal.py",
+              "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+              "lines": [
+                {
+                  "line": 35,
+                  "text": "def read_changes(records):"
+                },
+                {
+                  "line": 44,
+                  "text": "    if not isinstance(records, list):"
+                },
+                {
+                  "line": 49,
+                  "text": "        if (not isinstance(row, dict) or not isinstance(row.get(\"id\"), str) or not row[\"id\"]"
+                },
+                {
+                  "line": 52,
+                  "text": "            raise _invalid()"
+                },
+                {
+                  "line": 53,
+                  "text": "        deps = _id_list(row, \"depends_on\")"
+                },
+                {
+                  "line": 68,
+                  "text": "def read_applied(request, changes):"
+                },
+                {
+                  "line": 76,
+                  "text": "    applied = _id_list(request, \"applied\")"
+                },
+                {
+                  "line": 77,
+                  "text": "    known = {row[\"id\"] for row in changes}"
+                },
+                {
+                  "line": 78,
+                  "text": "    for change_id in applied:"
+                },
+                {
+                  "line": 79,
+                  "text": "        if change_id not in known:"
+                },
+                {
+                  "line": 80,
+                  "text": "            raise _invalid(\"unknown-dependency\")"
+                }
+              ]
+            }
+          ],
+          "boundaryIds": []
+        }
+      ],
+      "verifiedControls": [
+        {
+          "id": "transport-outcomes-do-not-claim-business-ownership",
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "920fb5e02eb724afc17a759c053646829b4634cad9199f3381dfba2db0fd8ebb",
+            "lines": [
+              {
+                "line": 19,
+                "text": "5. release.py：确保所有错误码（含 invalid-json、invalid-request 等）均以单行 JSON 正常退出，不产生非 JSON 输出。"
+              },
+              {
+                "line": 31,
+                "text": "- 传输层：非 JSON、空输入 → invalid-json；非对象请求 → invalid-request；坏 environment/budget/action → 对应错误码；所有错误 exit code 为 0 且输出恰为失败对象。"
+              }
+            ]
+          },
+          "reason": "The implementation and verification are about the external CLI response and exit behavior. The entry decodes or forwards then prints. Planner owns the business shape decision, consistent with the generated section.",
+          "sources": [
+            {
+              "file": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "lines": [
+                {
+                  "line": 8,
+                  "text": "def main():"
+                },
+                {
+                  "line": 9,
+                  "text": "    try:"
+                },
+                {
+                  "line": 10,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 11,
+                  "text": "    except (ValueError, TypeError):"
+                },
+                {
+                  "line": 12,
+                  "text": "        result = {\"status\": \"error\", \"error\": \"invalid-json\", \"actions\": [], \"units\": 0}"
+                },
+                {
+                  "line": 13,
+                  "text": "    else:"
+                },
+                {
+                  "line": 14,
+                  "text": "        result = plan(request)"
+                },
+                {
+                  "line": 15,
+                  "text": "    print(json.dumps(result, separators=(\",\", \":\")))"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "3e8312050f47fe7e6556a125bb5475eb262ad89fd14f2c4404329ae474ecc0eb",
+              "lines": [
+                {
+                  "line": 64,
+                  "text": "def plan(request):"
+                },
+                {
+                  "line": 71,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 72,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 74,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 75,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 76,
+                  "text": "        applied = read_applied(request, changes)"
+                },
+                {
+                  "line": 77,
+                  "text": "        order, units = _topological_order(changes)"
+                },
+                {
+                  "line": 78,
+                  "text": "    except (PolicyError, JournalError) as exc:"
+                },
+                {
+                  "line": 79,
+                  "text": "        return failure(str(exc))"
+                }
+              ]
+            }
+          ],
+          "boundaryIds": [
+            "top-level-nonobject",
+            "missing-environment",
+            "missing-budget",
+            "unsupported-action"
+          ]
+        }
+      ],
+      "observedBoundaryResponses": [
+        {
+          "id": "top-level-nonobject",
+          "input": [],
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "extra-field",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "extra_owner_probe": true
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-environment",
+          "input": {
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-action",
+          "input": {
+            "environment": "staging",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-budget",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-budget",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-changes",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "unsupported-action",
+          "input": {
+            "environment": "staging",
+            "action": "deploy",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "rollback-bad-budget",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": true,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-budget",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "staging-invalid-action-and-budget",
+          "input": {
+            "environment": "staging",
+            "action": "deploy",
+            "budget": true,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "production-invalid-budget-and-change",
+          "input": {
+            "environment": "production",
+            "action": "plan",
+            "budget": true,
+            "changes": [
+              null
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-budget",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "production-unsupported-action",
+          "input": {
+            "environment": "production",
+            "action": "deploy",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "production-malformed-change",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "staging-plan-malformed-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "retain": null
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "staging-malformed-changes-and-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              null
+            ],
+            "retain": null
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        }
+      ]
+    },
+    {
+      "run": "r-J3dUWi",
+      "stage": "g2",
+      "terminal": "closed",
+      "manualHeadingsRead": [
+        "实施顺序",
+        "回退顺序",
+        "关键验证"
+      ],
+      "reviewed": true,
+      "closed": true,
+      "proof": {
+        "version": 1,
+        "policySha256": "a004dddab6e124baee6a91439e132a8d85f560e43aa5d2f5272b843def427cfa",
+        "artifactsSha256": "b93d7143ed623167c127698372b18619887efff476a78e7b64151b84d5f8938b",
+        "rows": [
+          {
+            "id": "nonobject-request",
+            "exampleId": "public-architecture-responsibility:example:nonobject-request",
+            "mode": "business",
+            "trigger": {
+              "kind": "input-type",
+              "argument": 0,
+              "type": "object",
+              "test": "not"
+            },
+            "clause": {
+              "file": "SPEC.md",
+              "start": 5,
+              "end": 5,
+              "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+              "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+            },
+            "status": "passed",
+            "actual": {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+              "line": 110,
+              "end": 110,
+              "conditionLine": 109,
+              "code": "invalid-request"
+            },
+            "response": {
+              "id": "public-architecture-responsibility:example:nonobject-request",
+              "snapshotSha256": "5d07bd675d5eab878d6abb5e4e387334f1619bec078c9f540352ed0da52c8cc6",
+              "exitCode": 0,
+              "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+              "json": {
+                "status": "error",
+                "error": "invalid-request",
+                "actions": [],
+                "units": 0
+              }
+            },
+            "traceSha256": "e9fe10fd53f0d5b0b6e0be9f9fdd2f7b799d4bd49c68eb78a085cb2bfa9881ff"
+          }
+        ]
+      },
+      "document": {
+        "file": "modules/architecture.md",
+        "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+      },
+      "signedSources": {
+        "journal.py": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+        "planner.py": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+        "policy.py": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+        "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+      },
+      "acceptedArchitectureReceipts": [
+        {
+          "file": "K02-first.json",
+          "sha256": "4915bc37b190e2c561c2e353d2e5ac0e2b6228ff72f6e2948c688f0bbc3d0739",
+          "role": "reviewer",
+          "status": "pass",
+          "sections": [
+            {
+              "heading": "实施顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 23,
+                "end": 31,
+                "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+              },
+              "basis": "该节模块分工与实际源码一致：release.py 只管传输（S4:8-15），policy.py 负责 environment/freeze/有效预算（S3:45-74），journal.py 负责校验与已去重依赖映射（S1:35-83），planner.py 负责图序与发射并说明 rollback 在逆序前做 invalid-retain 与闭包（S2:120-131）。",
+              "evidence": [
+                {
+                  "file": "release.py",
+                  "start": 8,
+                  "end": 15,
+                  "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+                  "relation": "supports",
+                  "excerptSha256": "31a52b5e8a07a2ea970fc4a03234e025d56cbb00a527df477eb6d58949f0620b"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 45,
+                  "end": 74,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "8c6e290c2bea496e463f8685bdac5b55d6c342caa62d0875442f19b0e0b95e62"
+                },
+                {
+                  "file": "journal.py",
+                  "start": 35,
+                  "end": 83,
+                  "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+                  "relation": "supports",
+                  "excerptSha256": "aa88beded3fc1048919aff1413746654d606299771bc1ffaa164eb2c60c35093"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 120,
+                  "end": 131,
+                  "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+                  "relation": "supports",
+                  "excerptSha256": "62fa0c0a51f35d6d5748717bdb7a18f37bc62210ce301ab1071488691c199285"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "关键验证",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 40,
+                "end": 53,
+                "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+              },
+              "basis": "该节所列预期经实测均一致：冻结先于图校验（探针 fd59cb88 得 production-frozen）、budget=10 合计 4 为 budget-exceeded（探针 0b838725）、retain 闭包仅发 c（探针 b6c3f4ec）、未 applied retain 为 invalid-retain（探针 de453168）、plan 畸形 retain 不影响（探针 1948b8ad）、budget 极小 rollback 成功（探针 1aacf732）。",
+              "evidence": [
+                {
+                  "file": "journal.py",
+                  "start": 68,
+                  "end": 83,
+                  "sha256": "7a5bf816c67aef17b0245037d39f76f3f5adaff759d66db4b1acb7a0264d2703",
+                  "relation": "supports",
+                  "excerptSha256": "302a1933ba6a0b1671c94c3144c236ee1db9ed9c26feddc682d03043ef123d32"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 100,
+                  "end": 143,
+                  "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+                  "relation": "supports",
+                  "excerptSha256": "cfcfcce12b7ae9ba34e59cacc9071e93cd087e726b7869abb7d6516e9755e11b"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 31,
+                  "end": 76,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "79ac08e070b69d75b920f48452e7186a6a3f40773a5c2bd00e1d0107b5028dfc"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "回退顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 32,
+                "end": 39,
+                "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+              },
+              "basis": "该节逐模块给出回退目标，并拆出 G2 三项可独立回退分支：policy 冻结分支（S3:20, S3:45-46）、staging 有效预算（S3:73-74）、retain 解析与闭包（S2:64-97），与当前模块边界一致。",
+              "evidence": [
+                {
+                  "file": "policy.py",
+                  "start": 20,
+                  "end": 20,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "72c0a128c49c0cbc02383ee910fefff22d0e08a822005d1e4aeaca971ee24e58"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 45,
+                  "end": 46,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "ab1b85277facf6d2ffca2f6fd7fda4450372758204a7a7e3fe64cfadb397639a"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 73,
+                  "end": 74,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "5b6dadc81761df25d34ead3009f445853021d76e518b95a1d8f8232c01dadb0b"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 64,
+                  "end": 97,
+                  "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+                  "relation": "supports",
+                  "excerptSha256": "31d4524cd86ecd86e299283c1f6d8032022690dd26d407b822fbf1d82577ab0e"
+                }
+              ],
+              "status": "pass"
+            }
+          ],
+          "findings": 0
+        },
+        {
+          "file": "K02-first.json",
+          "sha256": "4915bc37b190e2c561c2e353d2e5ac0e2b6228ff72f6e2948c688f0bbc3d0739",
+          "role": "auditor",
+          "status": "pass",
+          "sections": [
+            {
+              "heading": "实施顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 23,
+                "end": 31,
+                "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+              },
+              "basis": "实施顺序与实际模块归属一致：freeze/上限在 policy，retain 闭包与排序在 planner，release 只做传输。",
+              "evidence": [
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 7,
+                  "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+                  "relation": "supports",
+                  "excerptSha256": "23e1dc5a79c2f0d28928c703b18e36dec5158561f88aaa68af52fde31281a4b4"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 39,
+                  "end": 47,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "ab09ffc6805cac15e4e45e0ae1e4e50207f1700fd037a70a3af72fc75635cb4c"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 126,
+                  "end": 131,
+                  "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+                  "relation": "supports",
+                  "excerptSha256": "b34bed1bf09f6b9773cfeefa39d97e17bf74eb21d6b1c14e8a2b67a7cde4517f"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "回退顺序",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 32,
+                "end": 39,
+                "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+              },
+              "basis": "回退顺序与实际分层一致：G2 三项可分别从 policy 冻结分支、staging 上限、planner retain 删除，互不牵连。",
+              "evidence": [
+                {
+                  "file": "PROJECT-GOAL.md",
+                  "start": 3,
+                  "end": 3,
+                  "sha256": "d82c30db1286a6fe6897c84a59843e10f7097e24eb1a6e7d559269ae565f1b16",
+                  "relation": "supports",
+                  "excerptSha256": "f0ed665a5f9a997a9d8eb4a7a3e05c0cc34afbd38b3866669d993f37bb605ad8"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 20,
+                  "end": 24,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "4dd46bce617d15973164b40c9430858a88d28e035eaa530ced0abb67d43de086"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 64,
+                  "end": 99,
+                  "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+                  "relation": "supports",
+                  "excerptSha256": "4c96c9294cfb5e538b476b34a4e61dc5608bad40c092eab0f5c8152b4df2f3c0"
+                }
+              ],
+              "status": "pass"
+            },
+            {
+              "heading": "关键验证",
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 40,
+                "end": 53,
+                "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd"
+              },
+              "basis": "关键验证条目与实际行为对照成立：冻结先于图校验、有效预算 3、retain 闭包与 invalid-retain 均有 runtime 复现支持。",
+              "evidence": [
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 7,
+                  "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+                  "relation": "supports",
+                  "excerptSha256": "23e1dc5a79c2f0d28928c703b18e36dec5158561f88aaa68af52fde31281a4b4"
+                },
+                {
+                  "file": "planner.py",
+                  "start": 86,
+                  "end": 97,
+                  "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+                  "relation": "supports",
+                  "excerptSha256": "069901c5b84b3ec6b19a6362480f2efc5cf9f32a1c89156c29386071e8960c8a"
+                },
+                {
+                  "file": "policy.py",
+                  "start": 73,
+                  "end": 74,
+                  "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+                  "relation": "supports",
+                  "excerptSha256": "5b6dadc81761df25d34ead3009f445853021d76e518b95a1d8f8232c01dadb0b"
+                }
+              ],
+              "status": "pass"
+            }
+          ],
+          "findings": 0
+        }
+      ],
+      "contradictions": [
+        {
+          "id": "documented-selective-freeze-revert-fails",
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd",
+            "lines": [
+              {
+                "line": 38,
+                "text": "5. G2 三项可各自独立回退：冻结判定退回 G1「两环境均支持」时只删 policy 的冻结分支与 planner 的透传；预算上限退回 G1 时只删 staging 有效预算；保留集退回 G1 时删 retain 解析与闭包，回到「全量 applied 逆序」。"
+              }
+            ]
+          },
+          "reason": "The architecture says removing only the policy freeze guard and planner forwarding restores G1 production eligibility. Planner has no dedicated forwarding to remove, and the production action allowlist remains empty. Literal rollback returns unsupported-action for production plan and rollback. Restoring both production actions and removing the guard is the positive selective control; exact G1 is the full-revert control. See short-r72-final-rollback-plan.json.",
+          "sources": [
+            {
+              "file": "policy.py",
+              "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+              "lines": [
+                {
+                  "line": 9,
+                  "text": "# G2 is staging-only: production is frozen for every action, so it intentionally"
+                },
+                {
+                  "line": 12,
+                  "text": "ALLOWED_ACTIONS = {"
+                },
+                {
+                  "line": 13,
+                  "text": "    \"staging\": frozenset({\"plan\", \"rollback\"}),"
+                },
+                {
+                  "line": 14,
+                  "text": "    \"production\": frozenset(),"
+                },
+                {
+                  "line": 15,
+                  "text": "}"
+                },
+                {
+                  "line": 20,
+                  "text": "FROZEN_ENVIRONMENTS = frozenset({\"production\"})"
+                },
+                {
+                  "line": 43,
+                  "text": "    if not isinstance(environment, str) or environment not in ALLOWED_ACTIONS:"
+                },
+                {
+                  "line": 44,
+                  "text": "        raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 45,
+                  "text": "    if environment in FROZEN_ENVIRONMENTS:"
+                },
+                {
+                  "line": 46,
+                  "text": "        raise PolicyError(\"production-frozen\")"
+                },
+                {
+                  "line": 59,
+                  "text": "    environment = check_environment(request)"
+                },
+                {
+                  "line": 62,
+                  "text": "    # Same unhashable guard as above for non-string actions."
+                },
+                {
+                  "line": 64,
+                  "text": "    if not isinstance(action, str) or action not in ALLOWED_ACTIONS[environment]:"
+                },
+                {
+                  "line": 65,
+                  "text": "        raise PolicyError(\"unsupported-action\")"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+              "lines": [
+                {
+                  "line": 109,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 110,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 111,
+                  "text": "    try:"
+                },
+                {
+                  "line": 112,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 113,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 114,
+                  "text": "        applied = read_applied(request, changes)"
+                },
+                {
+                  "line": 115,
+                  "text": "        order, units = _topological_order(changes)"
+                },
+                {
+                  "line": 116,
+                  "text": "    except (PolicyError, JournalError) as exc:"
+                },
+                {
+                  "line": 117,
+                  "text": "        return failure(str(exc))"
+                }
+              ]
+            }
+          ],
+          "boundaryIds": [
+            "production-unsupported-action"
+          ]
+        }
+      ],
+      "ambiguities": [
+        {
+          "id": "business-error-listed-under-cli",
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd",
+            "lines": [
+              {
+                "line": 21,
+                "text": "判定顺序（在既有错误优先级之上插入新增项）：transport（invalid-json / invalid-request）→ environment（invalid-environment）→ **production-frozen** → action（unsupported-action）→ budget（invalid-budget）→ 变更结构（invalid-change）→ 去重冲突（conflicting-change）→ 图存在性/环（unknown-dependency / dependency-cycle）→ **invalid-retain**（仅 rollback）→ 预算（budget-exceeded）→ ok。"
+              },
+              {
+                "line": 42,
+                "text": "- 传输层：非 JSON、空输入 → invalid-json；非对象请求 → invalid-request（职责 `nonobject-request`，SPEC.md:5）；坏 environment/budget/action → 对应错误码；所有错误 exit code 为 0 且输出恰为失败对象。"
+              }
+            ]
+          },
+          "reason": "These lines describe the CLI's externally observable sequence and verification outputs; the owner is explicit in the generated section and no different Python module is assigned the decision. The transport label could be clearer but is not a contrary source claim.",
+          "sources": [
+            {
+              "file": "release.py",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "lines": [
+                {
+                  "line": 8,
+                  "text": "def main():"
+                },
+                {
+                  "line": 10,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 11,
+                  "text": "    except (ValueError, TypeError):"
+                },
+                {
+                  "line": 12,
+                  "text": "        result = {\"status\": \"error\", \"error\": \"invalid-json\", \"actions\": [], \"units\": 0}"
+                },
+                {
+                  "line": 13,
+                  "text": "    else:"
+                },
+                {
+                  "line": 14,
+                  "text": "        result = plan(request)"
+                },
+                {
+                  "line": 15,
+                  "text": "    print(json.dumps(result, separators=(\",\", \":\")))"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+              "lines": [
+                {
+                  "line": 100,
+                  "text": "def plan(request):"
+                },
+                {
+                  "line": 109,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 110,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 112,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 113,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                }
+              ]
+            }
+          ],
+          "boundaryIds": []
+        }
+      ],
+      "verifiedControls": [
+        {
+          "id": "g2-manual-updates-and-actual-precedence",
+          "claim": {
+            "file": "modules/architecture.md",
+            "sha256": "ea49d1c6a33c739635e61e6663eb46f98b1cedc6c83cbdcfc70b3344066286dd",
+            "lines": [
+              {
+                "line": 15,
+                "text": "现行目标为 G2。CHANGE-G2.md 只覆盖三处：生产环境可用性、staging plan 预算上限、rollback 保留集；其余传输、图、日志与兼容要求以 SPEC.md 为基线继续有效。"
+              },
+              {
+                "line": 17,
+                "text": "1. 冻结：`environment == \"production\"` 时，无论 action 是 plan 还是 rollback、无论 changes/applied 是否畸形，都在图构建与变更校验之前返回 `production-frozen`（错误对象形状不变，不输出部分动作）。"
+              },
+              {
+                "line": 18,
+                "text": "2. 预算：仅 staging plan 时有效预算 `effective = min(request.budget, 3)`；实际发射 units 之和超过 effective 即为 `budget-exceeded`。replay、去重、排序规则与 G1 一致；rollback 仍只校验 budget 整数、不作为上限。"
+              },
+              {
+                "line": 19,
+                "text": "3. 保留：仅 staging rollback 读取 `retain`，缺省为空数组；非数组、含非字符串、含空字符串或含未 applied 的 ID → `invalid-retain`。保留集 = retain ∪（retain 中每个变更的、已 applied 的传递依赖）。其余 applied 变更按全量确定性拓扑序的逆序发射。plan 请求中的 retain 不参与判定。"
+              },
+              {
+                "line": 27,
+                "text": "3. planner.py：补齐拓扑排序（字典序打破平局）、环检测、plan 过滤与预算校验、rollback 逆序输出；依赖 policy 的环境/预算与 journal 的校验结果，不改导入方向。G2 增量：plan 改用 policy 给出的 staging 有效预算上限；rollback 在逆序发射前对 retain 做 `invalid-retain` 校验并计算保留闭包。"
+              },
+              {
+                "line": 28,
+                "text": "4. policy.py：补齐 environment/budget/action 校验，确保整数排除布尔。G2 增量是导出「环境是否冻结」与「有效预算上限」两个判定：production 直接给 `production-frozen`，staging plan 的预算上限为 3。"
+              },
+              {
+                "line": 50,
+                "text": "- G2 冻结：production + plan/rollback 均返回 production-frozen；production + 畸形 changes 或成环图仍返回 production-frozen（先于图校验）；错误对象无部分动作。"
+              },
+              {
+                "line": 51,
+                "text": "- G2 预算：staging plan 请求 budget=10 但合计 units 为 4 → budget-exceeded；合计恰为 3 → ok；budget=2 且合计 3 → budget-exceeded；已 applied 不计入上限。"
+              },
+              {
+                "line": 52,
+                "text": "- G2 保留：retain 命中已 applied 且带传递依赖时，保留闭包不发射；其余 applied 保持逆序；retain 含未 applied ID / 非数组 / 含非字符串 / 空串 → invalid-retain；plan 携带畸形 retain 不影响结果；rollback 中 retain 为空仍等价 G1。"
+              }
+            ]
+          },
+          "reason": "The current manual architecture describes G2 freeze-before-malformed checks, staging effective quota, and rollback-only retention. Their responsible modules, observed external behavior, and source branches agree.",
+          "sources": [
+            {
+              "file": "policy.py",
+              "sha256": "03df3bb1f0cbf740d899bf8b8b2c8a58736851e3b10c0a9ba6fd8a991c9e1b05",
+              "lines": [
+                {
+                  "line": 31,
+                  "text": "def check_environment(request):"
+                },
+                {
+                  "line": 43,
+                  "text": "    if not isinstance(environment, str) or environment not in ALLOWED_ACTIONS:"
+                },
+                {
+                  "line": 45,
+                  "text": "    if environment in FROZEN_ENVIRONMENTS:"
+                },
+                {
+                  "line": 46,
+                  "text": "        raise PolicyError(\"production-frozen\")"
+                },
+                {
+                  "line": 59,
+                  "text": "    environment = check_environment(request)"
+                },
+                {
+                  "line": 64,
+                  "text": "    if not isinstance(action, str) or action not in ALLOWED_ACTIONS[environment]:"
+                },
+                {
+                  "line": 65,
+                  "text": "        raise PolicyError(\"unsupported-action\")"
+                },
+                {
+                  "line": 68,
+                  "text": "    if type(budget) is not int or budget < 0:"
+                },
+                {
+                  "line": 69,
+                  "text": "        raise PolicyError(\"invalid-budget\")"
+                },
+                {
+                  "line": 74,
+                  "text": "        return min(budget, STAGING_PLAN_CAP)"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "28e4509c32021f03ae10d3cdc6695693688ca488c89648490ce281b386ae295a",
+              "lines": [
+                {
+                  "line": 64,
+                  "text": "def _retained(changes, applied_set, request):"
+                },
+                {
+                  "line": 78,
+                  "text": "    retain = request.get(\"retain\", [])"
+                },
+                {
+                  "line": 79,
+                  "text": "    if not isinstance(retain, list):"
+                },
+                {
+                  "line": 86,
+                  "text": "    for change_id in retain:"
+                },
+                {
+                  "line": 87,
+                  "text": "        if not isinstance(change_id, str) or not change_id or change_id not in applied_set:"
+                },
+                {
+                  "line": 88,
+                  "text": "            raise JournalError(\"invalid-retain\")"
+                },
+                {
+                  "line": 109,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 110,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 112,
+                  "text": "        budget = limit_for(request)"
+                },
+                {
+                  "line": 113,
+                  "text": "        changes = read_changes(request.get(\"changes\"))"
+                },
+                {
+                  "line": 125,
+                  "text": "        applied_set = set(applied)"
+                },
+                {
+                  "line": 127,
+                  "text": "            kept = _retained(changes, applied_set, request)"
+                },
+                {
+                  "line": 134,
+                  "text": "    # plan: applied entries already satisfy their dependencies and cost nothing, so"
+                },
+                {
+                  "line": 135,
+                  "text": "    # they are skipped both as output and in the budget sum decided below. `retain`"
+                },
+                {
+                  "line": 136,
+                  "text": "    # is a rollback-only field (CHANGE-G2), so a malformed retain is ignored here."
+                },
+                {
+                  "line": 140,
+                  "text": "    if emitted > budget:"
+                },
+                {
+                  "line": 141,
+                  "text": "        return failure(\"budget-exceeded\")"
+                }
+              ]
+            }
+          ],
+          "boundaryIds": [
+            "production-malformed-change",
+            "production-invalid-budget-and-change",
+            "staging-plan-malformed-retain"
+          ]
+        }
+      ],
+      "observedBoundaryResponses": [
+        {
+          "id": "top-level-nonobject",
+          "input": [],
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "extra-field",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "extra_owner_probe": true
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-environment",
+          "input": {
+            "action": "plan",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-environment",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-action",
+          "input": {
+            "environment": "staging",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-budget",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-budget",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "missing-changes",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "unsupported-action",
+          "input": {
+            "environment": "staging",
+            "action": "deploy",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "rollback-bad-budget",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": true,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-budget",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "staging-invalid-action-and-budget",
+          "input": {
+            "environment": "staging",
+            "action": "deploy",
+            "budget": true,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "production-invalid-budget-and-change",
+          "input": {
+            "environment": "production",
+            "action": "plan",
+            "budget": true,
+            "changes": [
+              null
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "production-unsupported-action",
+          "input": {
+            "environment": "production",
+            "action": "deploy",
+            "budget": 5,
+            "changes": []
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "production-malformed-change",
+          "input": {
+            "environment": "production",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "actual": {
+            "status": "error",
+            "error": "production-frozen",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "staging-plan-malformed-retain",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "retain": null
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        },
+        {
+          "id": "staging-malformed-changes-and-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              null
+            ],
+            "retain": null
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null
+        }
+      ]
+    }
+  ],
+  "missing": []
+}

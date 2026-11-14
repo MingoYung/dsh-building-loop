@@ -1,0 +1,786 @@
+{
+  "sourceRuns": [
+    {
+      "run": "r-Ku113T",
+      "observed": "observed",
+      "phases": [
+        {
+          "stage": "g1",
+          "terminal": "closed",
+          "phase": "closed",
+          "carry": "same-frozen-seed",
+          "passed": 18,
+          "total": 18
+        },
+        {
+          "stage": "g2",
+          "terminal": "closed",
+          "phase": "closed",
+          "carry": "same-workspace-new-session",
+          "passed": 21,
+          "total": 21
+        }
+      ],
+      "complete": true,
+      "supplemental": [
+        {
+          "run": "r-Ku113T",
+          "mode": "building-loop",
+          "stage": "g1",
+          "session": "ae8aa11b5029",
+          "terminal": "closed",
+          "nativePhase": "closed",
+          "carry": "same-frozen-seed",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "7a60ed773b8a1074f37f82fc05a66f87fcbd3191866ed866ae681919ffa3d35f"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "648b5ff5bb179e5273c3fe8b4b1a8a74964dab0fa4d472a6527d92c49a8cd006"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "cdefbb929bce393505b1ff3e5cbe7ae89ade6df30d6af048cd32798543e2c166"
+            },
+            {
+              "path": "release.py",
+              "sha256": "99d49f02c008f580da11dae6d9ad9cd5428bbda939a7621b5beb789ceb3955cf"
+            }
+          ],
+          "astBoundary": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_normalize",
+                "_string_array",
+                "read_applied",
+                "read_changes"
+              ],
+              "lineCount": 81
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_emit",
+                "failure",
+                "plan",
+                "topological_order"
+              ],
+              "lineCount": 96
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "limit_for"
+              ],
+              "lineCount": 38
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 28
+            }
+          },
+          "sourceInspection": {
+            "journal.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 13,
+                  "end": 24,
+                  "name": "_string_array",
+                  "docstring": "数组字段必须是字符串数组；空字符串不算合法 ID。\n\n成立条件：`depends_on`/`applied` 允许缺省（调用方已用缺省值填空数组），\n但只要出现，就必须是 list 且元素为非空 str，否则统一 `invalid-change`。"
+                },
+                {
+                  "line": 27,
+                  "end": 43,
+                  "name": "_normalize",
+                  "docstring": "校验单条变更并产出规范化记录。\n\n依赖去重排序后存储：SPEC 规定重复记录的相等性看“依赖集合”，所以集合语义\n必须在折叠前统一，后续相等性比较与图构建都基于这一规范化形式。"
+                },
+                {
+                  "line": 46,
+                  "end": 62,
+                  "name": "read_changes",
+                  "docstring": "校验并折叠变更记录，按首次出现顺序返回规范化记录列表。"
+                },
+                {
+                  "line": 65,
+                  "end": 81,
+                  "name": "read_applied",
+                  "docstring": "校验持久化 applied 日志，并确认其 ID 都能在本批 changes 中找到。\n\n跨模块状态：`applied` 是调用方给出的“已执行发布”事实，不是本服务写出的数据，\n本服务只读不写。未知 ID 说明日志与变更清单不一致，按 `unknown-dependency` 拒绝，\n避免把无法追溯的记录当成已应用而跳过（那会漏发依赖或误回滚）。\n成立条件：changes 已通过 read_changes 校验，ID 唯一。"
+                }
+              ],
+              "comments": [
+                [
+                  59,
+                  "# 同 ID 不同内容：无法判断哪一个代表真实发布内容，拒绝而不是任选其一。"
+                ],
+                [
+                  61,
+                  "# 完全相同的重复记录：静默折叠，不得重复计入 units。"
+                ]
+              ],
+              "moduleNote": "Normalize release records at the input boundary.\n\n职责边界（见 modules/architecture.md）：本模块负责字段校验、变更身份、完全重复记录\n折叠、冲突 ID 识别、`depends_on` 与持久化 `applied` 的类型校验，以及 `applied` 中的 ID\n是否存在于本次 changes。图构建、环检测与拓扑序归 planner；本模块只判断依赖指向的\nID 是否存在，不判断是否存在环。"
+            },
+            "planner.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 14,
+                  "end": 16,
+                  "name": "failure",
+                  "docstring": "失败结果严格四键；SPEC 要求任何拒绝都不带部分动作。"
+                },
+                {
+                  "line": 19,
+                  "end": 56,
+                  "name": "topological_order",
+                  "docstring": "返回确定的拓扑序；缺失依赖目标或存在环时抛 JournalError。\n\n次序规则：每步在“当前可进入”集合中取字典序最小的 ID，用最小堆实现。\n这样拓扑序只取决于变更内容（与输入顺序无关），plan 与 rollback 共享同一全序，\nrollback 才能可靠地用“反转全序”表达逆序撤销。\n\n成立条件：变更 ID 已由 journal 去重且唯一；依赖集合已规范化。\n反例提醒：不能先整体排序再逐个输出——那会在“先小字母但暂不可进入”的\n节点上过早阻塞，导致序次不确定。"
+                },
+                {
+                  "line": 59,
+                  "end": 65,
+                  "name": "_emit",
+                  "docstring": "组装成功结果；units 等于实际发出动作的单位总和（已应用项不计）。"
+                },
+                {
+                  "line": 68,
+                  "end": 96,
+                  "name": "plan",
+                  "docstring": "校验整单并按 action 计算动作集合。\n\n判定次序：请求形状 → 策略（环境/动作/预算）→ journal（变更/日志）→ 图。\n该次序保持既有错误码优先级不变（例如坏环境仍然先于坏 changes 报出）。"
+                }
+              ],
+              "comments": [
+                [
+                  35,
+                  "# 依赖指向未声明的变更：无法判断何时才可执行，宁拒不错序。"
+                ],
+                [
+                  50,
+                  "# 仅在入度归零时推进，保证每个变更都在其全部依赖之后才被入选。"
+                ],
+                [
+                  54,
+                  "# 有环：环上节点入度永远不归零；环可能在未应用部分，故对全图检测。"
+                ],
+                [
+                  85,
+                  "# 回滚语义：逆全序撤销，但只退已应用项；依赖尚未应用的变更绝不能回滚。"
+                ],
+                [
+                  86,
+                  "# 预算已由 policy 校验但按 SPEC 不封顶回滚，因此这里不再做 budget-exceeded 判定。"
+                ],
+                [
+                  90,
+                  "# plan：只发未应用项；已应用项已满足依赖且不占预算，所以预算只对发出项合计校验。"
+                ]
+              ],
+              "moduleNote": "Compose policy and journal data into a plan.\n\n职责边界（见 modules/architecture.md）：本模块构建依赖图、做缺失目标/环检测、\n产出确定性拓扑序，选定 plan/rollback 的动作集合，并组装最终结果。\n所有整单字段校验与回放归 journal，环境/动作/预算归 policy；\n本模块不重新判定那些规则，只把它们的拒绝转成统一的错误结果。"
+            },
+            "policy.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 20,
+                  "end": 38,
+                  "name": "limit_for",
+                  "docstring": "校验环境/动作/预算，返回 (action, budget)。\n\n次序固定：环境 → 动作 → 预算。这样既保证旧错误码优先级不变，\n也保证“先婉拒不支持的动作”先于报告预算细节。"
+                }
+              ],
+              "comments": [
+                [
+                  12,
+                  "# G1 动作矩阵：staging 与 production 都允许 plan 与 rollback。"
+                ],
+                [
+                  13,
+                  "# 新增环境/动作前必须同时确认预算语义（plan 封顶、rollback 不封顶）。"
+                ],
+                [
+                  27,
+                  "# 先判 str：list/dict 等不可哈希的 JSON 值直接进 in 会抛 TypeError，"
+                ],
+                [
+                  28,
+                  "# 逃出错误码契约；非字符串一律归为 invalid-environment。"
+                ],
+                [
+                  34,
+                  "# bool 是 int 子类，SPEC 要求整数不含布尔，故用 type 严格判定。"
+                ]
+              ],
+              "moduleNote": "Validate release policy before computing actions.\n\n职责边界（见 modules/architecture.md）：环境合法性、动作许可矩阵与预算数值校验；\n只做判定，不构建图也不决定动作集合。任何拒绝都在此阶段报错，保证 planner\n不会输出部分动作。"
+            },
+            "release.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 13,
+                  "end": 24,
+                  "name": "main",
+                  "docstring": null
+                }
+              ],
+              "comments": [
+                [
+                  15,
+                  "# 单次读取：不重试、不缓存 stdin，保证调用方一次请求一次应答。"
+                ],
+                [
+                  18,
+                  "# ValueError 覆盖 JSON 语法错误与 UnicodeDecodeError；TypeError 覆盖"
+                ],
+                [
+                  19,
+                  "# 非文本流。两者一律归为传输错误 `invalid-json`，进程正常退出。"
+                ],
+                [
+                  23,
+                  "# 紧凑输出：一次调用只输出一行 JSON，调用方按行解析。"
+                ]
+              ],
+              "moduleNote": "JSON transport for the release planner.\n\n职责边界（见 modules/architecture.md）：本模块只做传输——从 stdin 读一次原始文本、\nJSON 解码、把一个结果对象打印到 stdout。不建文件、不联网、不执行部署；\n任何业务判定都在 journal/policy/planner 里，这里只把解码失败翻译成 `invalid-json`。"
+            }
+          },
+          "authoredDocumentPins": [
+            {
+              "path": "modules/architecture.md",
+              "sha256": "6146b162e7e3d6c47d555281e036635dfe5100cab7af95f3a378dd9457b765a0"
+            }
+          ],
+          "supplemental": [
+            {
+              "case": "malformed-environment-list",
+              "input": {
+                "environment": [],
+                "action": "plan",
+                "budget": 5,
+                "changes": []
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "case": "self-cycle-in-applied",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "a",
+                    "component": "api",
+                    "units": 1,
+                    "depends_on": [
+                      "a"
+                    ]
+                  }
+                ],
+                "applied": [
+                  "a"
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "dependency-cycle",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "dependency-cycle",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ]
+        },
+        {
+          "run": "r-Ku113T",
+          "mode": "building-loop",
+          "stage": "g2",
+          "session": "a95efb138232",
+          "terminal": "closed",
+          "nativePhase": "closed",
+          "carry": "same-workspace-new-session",
+          "sourcePins": [
+            {
+              "path": "journal.py",
+              "sha256": "4aa75ac3d734c56ac83bdd918d0bb8838bd7de1561f9751681679bcf5b354990"
+            },
+            {
+              "path": "planner.py",
+              "sha256": "55f35bf94f8c0767728645a2666fa5c083c0d1cf968a9afd79d039990ca7b2b5"
+            },
+            {
+              "path": "policy.py",
+              "sha256": "0a71951694d87660910046667be41f757f956f04b8f54b6e2fac580600ca181d"
+            },
+            {
+              "path": "release.py",
+              "sha256": "99d49f02c008f580da11dae6d9ad9cd5428bbda939a7621b5beb789ceb3955cf"
+            }
+          ],
+          "astBoundary": {
+            "journal": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_normalize",
+                "_string_array",
+                "read_applied",
+                "read_changes",
+                "read_retain"
+              ],
+              "lineCount": 113
+            },
+            "planner": {
+              "parse": true,
+              "moduleImports": [
+                "journal",
+                "policy"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "_emit",
+                "failure",
+                "plan",
+                "retained_closure",
+                "topological_order"
+              ],
+              "lineCount": 138
+            },
+            "policy": {
+              "parse": true,
+              "moduleImports": [],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "limit_for"
+              ],
+              "lineCount": 60
+            },
+            "release": {
+              "parse": true,
+              "moduleImports": [
+                "planner"
+              ],
+              "boundaryOk": true,
+              "transportOnlyIO": true,
+              "functions": [
+                "main"
+              ],
+              "lineCount": 28
+            }
+          },
+          "sourceInspection": {
+            "journal.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 13,
+                  "end": 24,
+                  "name": "_string_array",
+                  "docstring": "数组字段必须是字符串数组；空字符串不算合法 ID。\n\n成立条件：`depends_on`/`applied` 允许缺省（调用方已用缺省值填空数组），\n但只要出现，就必须是 list 且元素为非空 str，否则统一 `invalid-change`。"
+                },
+                {
+                  "line": 27,
+                  "end": 43,
+                  "name": "_normalize",
+                  "docstring": "校验单条变更并产出规范化记录。\n\n依赖去重排序后存储：SPEC 规定重复记录的相等性看“依赖集合”，所以集合语义\n必须在折叠前统一，后续相等性比较与图构建都基于这一规范化形式。"
+                },
+                {
+                  "line": 46,
+                  "end": 62,
+                  "name": "read_changes",
+                  "docstring": "校验并折叠变更记录，按首次出现顺序返回规范化记录列表。"
+                },
+                {
+                  "line": 65,
+                  "end": 81,
+                  "name": "read_applied",
+                  "docstring": "校验持久化 applied 日志，并确认其 ID 都能在本批 changes 中找到。\n\n跨模块状态：`applied` 是调用方给出的“已执行发布”事实，不是本服务写出的数据，\n本服务只读不写。未知 ID 说明日志与变更清单不一致，按 `unknown-dependency` 拒绝，\n避免把无法追溯的记录当成已应用而跳过（那会漏发依赖或误回滚）。\n成立条件：changes 已通过 read_changes 校验，ID 唯一。"
+                },
+                {
+                  "line": 84,
+                  "end": 113,
+                  "name": "read_retain",
+                  "docstring": "校验 G2 的 `retain` 列表，返回去重后的保留项（保持首次出现顺序）。\n\n只在调用方确认是 staging rollback 时调用：CHANGE-G2 明确 retain 仅对 rollback 生效，\nplan 请求即使带了 retain 也必须忽略（不校验、不参与配额），所以“何时读取”这一侧\n交给 planner 控制，本函数只负责类型与存在性。\n\n拒绝条件（统一 `invalid-retain`，与 `invalid-change` 分开以便调用方定位来源）：\n- 非数组（包括缺省以外的任何非 list，如 null/字符串/对象）；\n- 含非字符串项或空字符串项；\n- ID 未出现在本次 applied 日志里——保留一个未应用的变更没有意义，\n  且会让“保留闭包只能在 applied 集合内传递”的成立条件失守。\n\n成立条件：`applied` 已由 read_applied 校验（均为本批已知 ID）。"
+                }
+              ],
+              "comments": [
+                [
+                  59,
+                  "# 同 ID 不同内容：无法判断哪一个代表真实发布内容，拒绝而不是任选其一。"
+                ],
+                [
+                  61,
+                  "# 完全相同的重复记录：静默折叠，不得重复计入 units。"
+                ],
+                [
+                  105,
+                  "# 空字符串不是合法 ID（与 _string_array 口径一致），也不能被当成“任意变更”"
+                ],
+                [
+                  106,
+                  "# 而静默保留整张图。"
+                ]
+              ],
+              "moduleNote": "Normalize release records at the input boundary.\n\n职责边界（见 modules/architecture.md）：本模块负责字段校验、变更身份、完全重复记录\n折叠、冲突 ID 识别、`depends_on` 与持久化 `applied` 的类型校验、`applied` ID 存在性，\n以及 G2 的 `retain` 列表校验。图构建、环检测、拓扑序与保留闭包归 planner；本模块只判断\n依赖指向的 ID 是否存在，不判断是否存在环，也不计算哪些保留项依赖哪些项。"
+            },
+            "planner.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 14,
+                  "end": 16,
+                  "name": "failure",
+                  "docstring": "失败结果严格四键；SPEC 要求任何拒绝都不带部分动作。"
+                },
+                {
+                  "line": 19,
+                  "end": 56,
+                  "name": "topological_order",
+                  "docstring": "返回确定的拓扑序；缺失依赖目标或存在环时抛 JournalError。\n\n次序规则：每步在“当前可进入”集合中取字典序最小的 ID，用最小堆实现。\n这样拓扑序只取决于变更内容（与输入顺序无关），plan 与 rollback 共享同一全序，\nrollback 才能可靠地用“反转全序”表达逆序撤销。\n\n成立条件：变更 ID 已由 journal 去重且唯一；依赖集合已规范化。\n反例提醒：不能先整体排序再逐个输出——那会在“先小字母但暂不可进入”的\n节点上过早阻塞，导致序次不确定。"
+                },
+                {
+                  "line": 59,
+                  "end": 83,
+                  "name": "retained_closure",
+                  "docstring": "计算 G2 保留闭包：retain 自身 + 在 applied 集合内沿 depends_on 传递可达的依赖。\n\n为什么要限制在 applied 集合内：回滚只处理已应用项，未应用的依赖无法被“保留”。\n若保留集合里出现非已应用 ID，它既不会出现在回滚输出里也不会消耗配额，\n所以把边界固定在已应用集合上，闭包与回滚动作集合语义才一致。\n\n成立条件：拓扑序已确认无环，因此这里的可达遍历必然终止（但仍用显式 visited\n防御重复入栈，避免同一依赖被多次展开）。\n注意：这不是简单取与 retain 相关的全部依赖，而是按“逆全序发出”时需要同时保留的\n对象——先发生（更靠前）的依赖必须在保留时一起留下，否则回滚会拆掉仍在用的基础件。"
+                },
+                {
+                  "line": 86,
+                  "end": 92,
+                  "name": "_emit",
+                  "docstring": "组装成功结果；units 等于实际发出动作的单位总和（已应用项不计）。"
+                },
+                {
+                  "line": 95,
+                  "end": 138,
+                  "name": "plan",
+                  "docstring": "校验整单并按 action 计算动作集合。\n\n判定次序：请求形状 → 策略（环境→生产冻结→动作→预算数值）→ journal（变更/日志）→ 图\n→ （仅 staging rollback）`retain` → 配额。该次序保持既有错误码优先级不变\n（坏环境先于坏 changes，生产冻结先于图与变更记录），并满足 CHANGE-G2：\n冻结在任何 changes/图读取之前返回，不给部分动作。\n\n预算只有一个口径：`budget` 是 policy 返回的“有效值”（staging plan 已取 min(…, 3)），\n本函数不再对原始 request budget 取值、也不再取 min，避免两处口径分叉。"
+                }
+              ],
+              "comments": [
+                [
+                  35,
+                  "# 依赖指向未声明的变更：无法判断何时才可执行，宁拒不错序。"
+                ],
+                [
+                  50,
+                  "# 仅在入度归零时推进，保证每个变更都在其全部依赖之后才被入选。"
+                ],
+                [
+                  54,
+                  "# 有环：环上节点入度永远不归零；环可能在未应用部分，故对全图检测。"
+                ],
+                [
+                  113,
+                  "# retain 仅在 staging rollback 上生效：plan 即使携带 retain 也必须忽略。"
+                ],
+                [
+                  114,
+                  "# 放在图校验之后，是为了让 G1 已有的图错误码（unknown-dependency/"
+                ],
+                [
+                  115,
+                  "# dependency-cycle）继续优先于无效的 retain 报告；此时 applied 已确认均属本批。"
+                ],
+                [
+                  121,
+                  "# 回滚语义：逆全序撤销，但只退已应用项；依赖尚未应用的变更绝不能回滚。"
+                ],
+                [
+                  122,
+                  "# 预算已由 policy 校验但按 SPEC 不封顶回滚，因此这里不再做 budget-exceeded 判定。"
+                ],
+                [
+                  131,
+                  "# plan：只发未应用项；已应用项已满足依赖且不占预算，所以预算只对发出项合计校验。"
+                ],
+                [
+                  136,
+                  "# 配额拒绝必须整体失败：不发任何部分动作（actions 为空、units 为 0）。"
+                ]
+              ],
+              "moduleNote": "Compose policy and journal data into a plan.\n\n职责边界（见 modules/architecture.md）：本模块构建依赖图、做缺失目标/环检测、\n产出确定性拓扑序，选定 plan/rollback 的动作集合（含 G2 的保留闭包），并组装最终结果。\n所有整单字段校验、回放与 `retain` 校验归 journal，环境/动作/预算与冻结归 policy；\n本模块不重新判定那些规则，只把它们的拒绝转成统一的错误结果。"
+            },
+            "policy.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 29,
+                  "end": 60,
+                  "name": "limit_for",
+                  "docstring": "校验环境/动作/预算，返回 (action, effective_budget)。\n\n次序固定：环境 → 生产冻结 → 动作 → 预算。\n冻结必须早于 journal 的 changes/`applied` 校验与 planner 的图构建：CHANGE-G2 要求\n畸形图、未知依赖、环在 production 下都返回 `production-frozen`，plan 与 rollback\n同等冻结，且永不输出部分动作。\n\n第二个返回值是“有效预算”：staging plan 为 min(请求 budget, STAGING_PLAN_CAP)，\nstaging rollback 原样为请求 budget。调用方不得再自行取 min，配额只有这一处口径。"
+                }
+              ],
+              "comments": [
+                [
+                  12,
+                  "# G2 动作矩阵：production 在下方被单独短路为 `production-frozen`；仍列在此映射里的"
+                ],
+                [
+                  13,
+                  "# 唯一用途是让“未知环境 → invalid-environment”的判定与 G1 保持一致"
+                ],
+                [
+                  14,
+                  "# （环境合法性先于冻结判断）。新增环境/动作前必须同时确认预算语义"
+                ],
+                [
+                  15,
+                  "# （staging plan 有效预算封顶、rollback 不封顶）。"
+                ],
+                [
+                  21,
+                  "# CHANGE-G2 第 2 条：staging plan 有效预算 = min(请求 budget, 3)。"
+                ],
+                [
+                  22,
+                  "# 之所以做成模块级常量并由 policy 统一取 min：planner 的最终配额判定必须拿到"
+                ],
+                [
+                  23,
+                  "# 同一个“有效值”，不能各算一遍——否则 precheck 按 3 放行、最终按请求值判定"
+                ],
+                [
+                  24,
+                  "# （或反之）会让规则口径分叉，出现本应拒绝却被通过的行动集合。"
+                ],
+                [
+                  25,
+                  "# 成立条件：只作用于 staging plan；staging rollback 仅校验数值、不封顶。"
+                ],
+                [
+                  41,
+                  "# 先判 str：list/dict 等不可哈希的 JSON 值直接进 in 会抛 TypeError，"
+                ],
+                [
+                  42,
+                  "# 逃出错误码契约；非字符串一律归为 invalid-environment。"
+                ],
+                [
+                  45,
+                  "# 生产冻结短路：在读取 changes/applied、构图的全部代码之前发生（planner 先调本函数），"
+                ],
+                [
+                  46,
+                  "# 因此不依赖请求其余部分的形状；只看 environment，保证冻结结论与动作、预算无关。"
+                ],
+                [
+                  52,
+                  "# bool 是 int 子类，SPEC 要求整数不含布尔，故用 type 严格判定。"
+                ],
+                [
+                  53,
+                  "# 必须先按原始值校验通过再取 min：否则非法 budget（如字符串、bool）会在 min()"
+                ],
+                [
+                  54,
+                  "# 里抛 TypeError 或错误地被夹到上限，绕过 `invalid-budget`。"
+                ]
+              ],
+              "moduleNote": "Validate release policy before computing actions.\n\n职责边界（见 modules/architecture.md）：环境合法性、动作许可矩阵与预算数值校验；\n只做判定，不构建图也不决定动作集合。任何拒绝都在此阶段报错，保证 planner\n不会输出部分动作。"
+            },
+            "release.py": {
+              "parse": true,
+              "routines": [
+                {
+                  "line": 13,
+                  "end": 24,
+                  "name": "main",
+                  "docstring": null
+                }
+              ],
+              "comments": [
+                [
+                  15,
+                  "# 单次读取：不重试、不缓存 stdin，保证调用方一次请求一次应答。"
+                ],
+                [
+                  18,
+                  "# ValueError 覆盖 JSON 语法错误与 UnicodeDecodeError；TypeError 覆盖"
+                ],
+                [
+                  19,
+                  "# 非文本流。两者一律归为传输错误 `invalid-json`，进程正常退出。"
+                ],
+                [
+                  23,
+                  "# 紧凑输出：一次调用只输出一行 JSON，调用方按行解析。"
+                ]
+              ],
+              "moduleNote": "JSON transport for the release planner.\n\n职责边界（见 modules/architecture.md）：本模块只做传输——从 stdin 读一次原始文本、\nJSON 解码、把一个结果对象打印到 stdout。不建文件、不联网、不执行部署；\n任何业务判定都在 journal/policy/planner 里，这里只把解码失败翻译成 `invalid-json`。"
+            }
+          },
+          "authoredDocumentPins": [
+            {
+              "path": "modules/architecture.md",
+              "sha256": "08630255cc8551964cd90730010907325dbed561d9e0722a4e266d49ba2257dc"
+            }
+          ],
+          "supplemental": [
+            {
+              "case": "malformed-environment-list",
+              "input": {
+                "environment": [],
+                "action": "plan",
+                "budget": 5,
+                "changes": []
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-environment",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "case": "plan-ignores-rollback-retain",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 5,
+                "changes": [
+                  {
+                    "id": "a",
+                    "component": "api",
+                    "units": 2,
+                    "depends_on": []
+                  }
+                ],
+                "retain": [
+                  "absent"
+                ]
+              },
+              "expected": {
+                "status": "ok",
+                "actions": [
+                  "a"
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "actions": [
+                  "a"
+                ],
+                "units": 2
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            },
+            {
+              "case": "staging-denied-after-replay",
+              "input": {
+                "environment": "staging",
+                "action": "plan",
+                "budget": 3,
+                "changes": [
+                  {
+                    "id": "a",
+                    "component": "api",
+                    "units": 5,
+                    "depends_on": []
+                  },
+                  {
+                    "id": "b",
+                    "component": "api",
+                    "units": 5,
+                    "depends_on": []
+                  }
+                ],
+                "applied": [
+                  "a"
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "budget-exceeded",
+                "actions": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "budget-exceeded",
+                "actions": [],
+                "units": 0
+              },
+              "exitCode": 0,
+              "failure": null,
+              "passed": true
+            }
+          ]
+        }
+      ],
+      "transport": [
+        {
+          "stage": "g1",
+          "passed": 19,
+          "total": 19,
+          "failed": []
+        },
+        {
+          "stage": "g2",
+          "passed": 24,
+          "total": 24,
+          "failed": []
+        }
+      ]
+    }
+  ],
+  "prerequisiteForHard": true
+}

@@ -1,0 +1,70 @@
+{
+  "scope": "actual current or frozen native stage artifacts, unchanged; conflict check from present workspace candidate source",
+  "run": "r-NybUSh",
+  "mode": "building-loop",
+  "stage": "g1",
+  "frozen": true,
+  "architectureSha256": "60200a197ed3f4cbcf7d5e2f85771e634019601256aa857fb2b46b8a73e63f0a",
+  "artifacts": [
+    {
+      "path": "journal.py",
+      "sha256": "c1298d6ba45958416666515543ca39e6a991baa07d326b87455aa66495b35b24"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "96e958897abf23c6a7d3997ee5175eba8bf120391505b109a1499b85e61a0ab0"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "2ba6d4acccaca4b25c3d369df0f7c967a00579b232f9d042866ea8dbd1971981"
+    },
+    {
+      "path": "release.py",
+      "sha256": "f4bc3a6ff12546b4563202e77f0a4f917faa8aa52034b14ba90c93a31efd783c"
+    }
+  ],
+  "sourceImports": [
+    {
+      "file": "planner.py",
+      "line": 9,
+      "imports": [
+        "journal.py"
+      ]
+    },
+    {
+      "file": "planner.py",
+      "line": 10,
+      "imports": [
+        "policy.py"
+      ]
+    },
+    {
+      "file": "release.py",
+      "line": 11,
+      "imports": [
+        "planner.py"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "line": 12,
+      "from": "release.py",
+      "to": "policy.py",
+      "relation": "import",
+      "actual": [
+        {
+          "file": "planner.py",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "line": 12,
+      "from": "policy.py",
+      "to": "planner.py",
+      "relation": "import",
+      "actual": []
+    }
+  ]
+}

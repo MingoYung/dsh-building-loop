@@ -1,0 +1,196 @@
+{
+  "carrier": "Installed Windows DSH NEXT native Web CLI, isolated profile and deterministic loopback provider",
+  "archiveSha256": "6480f219246660800dd6f49538660ba640e2a5310eeaa83ca1698a1f203e7dcd",
+  "requests": [
+    {
+      "role": "owner",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "owner",
+      "prior": 1,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "owner",
+      "prior": 2,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "owner",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "child",
+      "prior": 0,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "prior": 1,
+      "action": "submit",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "prior": 2,
+      "action": "submit",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "prior": 3,
+      "action": "submit",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "prior": 4,
+      "offered": false
+    },
+    {
+      "role": "owner",
+      "prior": 3,
+      "offered": false
+    }
+  ],
+  "tests": {
+    "previousSuiteSha256": "b16f442fcd4bbcbfd4e2225133f71f055f23fa9d7b9f1000c7ca0affc5da25cf",
+    "suiteSha256": "39b62900e2d59840e9490f14e55ecd9b6aa95a0e0232476b4b56f4c798b037e1",
+    "requiredCases": [
+      "trim-outer-spaces"
+    ],
+    "previous": {
+      "command": "python -m pytest -v --color=no -p no:cacheprovider test_checkpoint.py",
+      "pytestVersion": "9.1.1",
+      "exitCode": 0,
+      "passedCases": [
+        "lowercase"
+      ]
+    },
+    "current": {
+      "command": "python -m pytest -v --color=no -p no:cacheprovider test_checkpoint.py",
+      "pytestVersion": "9.1.1",
+      "exitCode": 0,
+      "passedCases": [
+        "lowercase",
+        "trim-outer-spaces"
+      ]
+    }
+  },
+  "fixtures": {
+    "oldCases": [
+      {
+        "id": "lowercase",
+        "input": "ABC",
+        "expected": "abc"
+      }
+    ],
+    "newCases": [
+      {
+        "id": "lowercase",
+        "input": "ABC",
+        "expected": "abc"
+      },
+      {
+        "id": "trim-outer-spaces",
+        "input": " ABC ",
+        "expected": "abc"
+      }
+    ],
+    "sourceSha256": "ba41e733aade08724d345ac841856c8a1154581d34bf2db17d88caa2a721a964",
+    "specSha256": "2c86109aa8d4aa76a8cfee73566b93f7d1f4420b7f7be9274c2b93a02b96eccb",
+    "runnerCodeSha256": "70e93a33c31c4c505e9c19a515d6668b3cea936ec0ae6e558b15c739a776b942"
+  },
+  "installedCodeIntakeSha256": "903dec56b46b4811a31f994b3034e216596b9005fa86816b4cb514f0118ba879",
+  "native": {
+    "phase": "review-ready",
+    "qualification": {
+      "kind": "trusted-tests",
+      "receiptSha256": "c70117afbde4f5e12d56dfcfca33e5435c296393de5da4e22961f9065bc756fe",
+      "previousSuiteSha256": "b16f442fcd4bbcbfd4e2225133f71f055f23fa9d7b9f1000c7ca0affc5da25cf",
+      "suiteSha256": "39b62900e2d59840e9490f14e55ecd9b6aa95a0e0232476b4b56f4c798b037e1",
+      "goalSha256": "6e922e9d1ad58ba31a13812b8f564d0b322d64e4c76e3d9c20da82bf431a216d",
+      "runId": "native-r53-pytest",
+      "passedCases": [
+        "trim-outer-spaces"
+      ],
+      "artifacts": [
+        {
+          "path": "solution.py",
+          "sha256": "ba41e733aade08724d345ac841856c8a1154581d34bf2db17d88caa2a721a964"
+        }
+      ]
+    },
+    "rows": [
+      {
+        "role": "owner",
+        "event": "tool/result",
+        "seq": 17,
+        "error": false,
+        "status": "started"
+      },
+      {
+        "role": "owner",
+        "event": "tool/result",
+        "seq": 26,
+        "error": false,
+        "phase": "dispatch"
+      },
+      {
+        "role": "owner",
+        "event": "tool/result",
+        "seq": 34,
+        "error": false,
+        "phase": "intake"
+      },
+      {
+        "role": "owner",
+        "event": "turn/end",
+        "reason": "completed"
+      },
+      {
+        "role": "child",
+        "event": "tool/result",
+        "seq": 21,
+        "error": false,
+        "phase": "intake"
+      },
+      {
+        "role": "child",
+        "event": "tool/result",
+        "seq": 27,
+        "error": true,
+        "text": "Error: 未发现实现结构变更或本次开工的受信测试回执"
+      },
+      {
+        "role": "child",
+        "event": "tool/result",
+        "seq": 33,
+        "error": true,
+        "text": "Error: 受信测试回执不符：需验证当前目标、测试套件、全部必测用例和实际测试过的交付字节"
+      },
+      {
+        "role": "child",
+        "event": "tool/result",
+        "seq": 39,
+        "error": false,
+        "phase": "review-ready"
+      },
+      {
+        "role": "child",
+        "event": "turn/end",
+        "reason": "completed"
+      }
+    ]
+  },
+  "sourceUnchanged": true,
+  "status": "passed",
+  "formalDesktopProfileUnchanged": true
+}

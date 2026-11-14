@@ -1,0 +1,176 @@
+{
+  "spec": "building-loop/g4-shared-semantic-false-approval/1",
+  "archiveSha256": "aceea1bde63ce45d825b9df027b6a5f13a4381668323ccb25d22410f6a85a996",
+  "blindCodeJudgmentsSha256": "4c06b6ada4536cd4d37cbcb2437e2341b5fe59c9aa1970ee733e9707a2eb8bbf",
+  "blindDocJudgmentsSha256": "6fc9775c6007226adc76e6e84ea244592883746188c5e88b4b1fe44f5e4a241c",
+  "rule": "CHANGE-G2.md:5–7. Only return the first result. Process items in order; first actual item failure wins.",
+  "mechanism": "The authored wording was inventoried, evidence-bound and approved twice. The typed host fact in this fixture addresses rejection of decoded non-object inputs, not replay row multiplicity or batch error precedence.",
+  "rows": [
+    {
+      "rep": 1,
+      "stage": "G4",
+      "architectureSha256": "70b4155a1cd5bfde03528505e7a19ece9272d98816fa033ccece52d3bbad15d7",
+      "receipt": "K02-first.json",
+      "receiptSha256": "6cce1a78f039371084281df258fcd4f198bf9cd4f0abaa47b7eb311e96eb1571",
+      "receiptDecision": "accept",
+      "roles": [
+        {
+          "role": "reviewer",
+          "decision": "pass",
+          "architecture": "pass",
+          "coverageBlocks": 12,
+          "findings": 0,
+          "affected": [
+            {
+              "line": 35,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 37,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            }
+          ]
+        },
+        {
+          "role": "auditor",
+          "decision": "pass",
+          "architecture": "pass",
+          "coverageBlocks": 12,
+          "findings": 0,
+          "affected": [
+            {
+              "line": 35,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 37,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 3
+            }
+          ]
+        }
+      ],
+      "lines": [
+        35,
+        37
+      ],
+      "source": "planner.py:180-218",
+      "wrong": "The retry keeps a result slot, so output rows follow all input rows.",
+      "actual": "The identical retry skips append and charge. The two equivalent inputs return one result.",
+      "contrasts": [
+        "object-key-order-does-not-charge-twice"
+      ]
+    },
+    {
+      "rep": 2,
+      "stage": "G4",
+      "architectureSha256": "4bcec5f630a90e5d41f3ed35515b13761479938b6d6c6c1dbd4e097055b25fd4",
+      "receipt": "K02-final.json",
+      "receiptSha256": "e24940704f789c782b37ad8bca0f5181b9e6c5b1b6425eebb335f6ec12f26969",
+      "receiptDecision": "accept",
+      "roles": [
+        {
+          "role": "reviewer",
+          "decision": "pass",
+          "architecture": "pass",
+          "coverageBlocks": 23,
+          "findings": 0,
+          "affected": [
+            {
+              "line": 21,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 23,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 25,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 1
+            },
+            {
+              "line": 29,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 42,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 5
+            }
+          ]
+        },
+        {
+          "role": "auditor",
+          "decision": "pass",
+          "architecture": "pass",
+          "coverageBlocks": 23,
+          "findings": 0,
+          "affected": [
+            {
+              "line": 21,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 1
+            },
+            {
+              "line": 23,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 25,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 1
+            },
+            {
+              "line": 29,
+              "classification": "consistent",
+              "factIds": [],
+              "evidenceCount": 2
+            },
+            {
+              "line": 42,
+              "classification": "consistent",
+              "factIds": [
+                "nonobject-request"
+              ],
+              "evidenceCount": 1
+            }
+          ]
+        }
+      ],
+      "lines": [
+        21,
+        23,
+        25,
+        29,
+        42
+      ],
+      "source": "planner.py:205-239",
+      "wrong": "The whole batch passes shape and identity scans before any business, and retries repeat the first result row.",
+      "actual": "Each item runs shape, identity, then business in one loop. A retry continues without appending. A domain failure at item 0 wins against an invalid item 1.",
+      "contrasts": [
+        "earlier-domain-before-later-shape",
+        "object-key-order-does-not-charge-twice"
+      ]
+    }
+  ]
+}

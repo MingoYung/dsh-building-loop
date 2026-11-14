@@ -1,0 +1,926 @@
+{
+  "spec": "building-loop-native-short-summary/1",
+  "runs": [
+    {
+      "run": "r-1G8kmp",
+      "status": "observed",
+      "archiveSha256": "b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5",
+      "outcome": {
+        "error": null,
+        "preflight": null,
+        "laneErrors": []
+      },
+      "stages": [
+        {
+          "stage": "g1",
+          "mode": "standard",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-frozen-seed",
+          "elapsedMs": 80775,
+          "firstGreenMs": 26030,
+          "score": {
+            "retained": 8,
+            "protected": 8,
+            "newPass": 10,
+            "newTotal": 10,
+            "allPass": 18,
+            "allTotal": 18,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 227969,
+          "cacheAll": 96.6991
+        },
+        {
+          "stage": "g2",
+          "mode": "standard",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-workspace-new-session",
+          "elapsedMs": 175295,
+          "firstGreenMs": 34950,
+          "score": {
+            "retained": 16,
+            "protected": 16,
+            "newPass": 5,
+            "newTotal": 5,
+            "allPass": 21,
+            "allTotal": 21,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 705433,
+          "cacheAll": 97.6802
+        },
+        {
+          "stage": "g1",
+          "mode": "standard-checklist",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-frozen-seed",
+          "elapsedMs": 194551,
+          "firstGreenMs": 49499,
+          "score": {
+            "retained": 8,
+            "protected": 8,
+            "newPass": 10,
+            "newTotal": 10,
+            "allPass": 18,
+            "allTotal": 18,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 1098978,
+          "cacheAll": 98.5604
+        },
+        {
+          "stage": "g2",
+          "mode": "standard-checklist",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-workspace-new-session",
+          "elapsedMs": 225380,
+          "firstGreenMs": 83953,
+          "score": {
+            "retained": 16,
+            "protected": 16,
+            "newPass": 5,
+            "newTotal": 5,
+            "allPass": 21,
+            "allTotal": 21,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 2085400,
+          "cacheAll": 98.5083
+        },
+        {
+          "stage": "g1",
+          "mode": "building-loop",
+          "terminal": "closed",
+          "phase": "closed",
+          "carry": "same-frozen-seed",
+          "elapsedMs": 364900,
+          "firstGreenMs": 185531,
+          "score": {
+            "retained": 8,
+            "protected": 8,
+            "newPass": 10,
+            "newTotal": 10,
+            "allPass": 18,
+            "allTotal": 18,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 2492701,
+          "cacheAll": 93.2075
+        },
+        {
+          "stage": "g2",
+          "mode": "building-loop",
+          "terminal": "completion-cap",
+          "phase": "first-audit",
+          "carry": "same-workspace-new-session",
+          "elapsedMs": 420118,
+          "firstGreenMs": 104679,
+          "score": {
+            "retained": 16,
+            "protected": 16,
+            "newPass": 5,
+            "newTotal": 5,
+            "allPass": 21,
+            "allTotal": 21,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 3163434,
+          "cacheAll": 96.0257
+        }
+      ],
+      "usage": {
+        "standard": {
+          "inputTokens": 23318,
+          "cacheReadTokens": 889088,
+          "cacheWriteTokens": 0,
+          "outputTokens": 20996,
+          "totalTokens": 933402,
+          "known": 42,
+          "missing": 0,
+          "cachePct": 97.4443,
+          "totalInput": 912406
+        },
+        "standard-checklist": {
+          "inputTokens": 46256,
+          "cacheReadTokens": 3092352,
+          "cacheWriteTokens": 0,
+          "outputTokens": 45770,
+          "totalTokens": 3184378,
+          "known": 92,
+          "missing": 0,
+          "cachePct": 98.5262,
+          "totalInput": 3138608
+        },
+        "building-loop": {
+          "inputTokens": 290540,
+          "cacheReadTokens": 5281024,
+          "cacheWriteTokens": 0,
+          "outputTokens": 84571,
+          "totalTokens": 5656135,
+          "known": 207,
+          "missing": 1,
+          "cachePct": 94.7853,
+          "totalInput": 5571564
+        }
+      },
+      "diagnostics": [
+        {
+          "run": "r-1G8kmp",
+          "stage": "g1",
+          "statusChanges": [
+            {
+              "elapsedMs": 62176,
+              "status": "needs-triage",
+              "suggestedLayer": "parameters",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 67233,
+              "status": "triaged",
+              "suggestedLayer": "parameters",
+              "layer": "syntax",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 70325,
+              "status": "investigating",
+              "suggestedLayer": "parameters",
+              "layer": "syntax",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 85653,
+              "status": "needs-triage",
+              "suggestedLayer": "parameters",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 88121,
+              "status": "triaged",
+              "suggestedLayer": "parameters",
+              "layer": "behavior",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 92750,
+              "status": "investigating",
+              "suggestedLayer": "parameters",
+              "layer": "behavior",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 141676,
+              "status": "needs-verification",
+              "suggestedLayer": "parameters",
+              "layer": "behavior",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 145499,
+              "status": "verified",
+              "suggestedLayer": "parameters",
+              "layer": "behavior",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            },
+            {
+              "elapsedMs": 150373,
+              "status": "resolved",
+              "suggestedLayer": "parameters",
+              "layer": "behavior",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "trigger": "repeated-failure",
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab"
+            }
+          ],
+          "proofIds": [
+            "stall-proof-6c2089658524f81c5c9805e0bd015e3e21b0c4df7d175b61c5c93d1788327477",
+            "stall-proof-bd2ff151e81cef41c56a6af2055a6c8567584c00c4773bc55a7cb370c6c05f1b"
+          ],
+          "typedToolOutcomes": {
+            "invalid-input/args": 5,
+            "invalid-input/files": 1
+          },
+          "usage": {
+            "inputTokens": 15086,
+            "cacheReadTokens": 238976,
+            "cacheWriteTokens": 0,
+            "outputTokens": 6172,
+            "totalTokens": 260234,
+            "known": 19,
+            "missing": 0
+          },
+          "cache": 94.0621,
+          "nativeAssignmentAndProofTimes": [
+            {
+              "elapsedMs": 30669,
+              "role": "coordinator",
+              "phase": "intake",
+              "assignment": {
+                "reused": false,
+                "child": "4b2bf9088f67"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 70325,
+              "role": "coordinator",
+              "phase": "diagnosis",
+              "assignment": {
+                "reused": false,
+                "child": "bfe288a00d5f"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 80433,
+              "role": "diagnostician",
+              "phase": null,
+              "assignment": null,
+              "proofId": "stall-proof-bd2ff151e81cef41c56a6af2055a6c8567584c00c4773bc55a7cb370c6c05f1b"
+            },
+            {
+              "elapsedMs": 92750,
+              "role": "coordinator",
+              "phase": "diagnosis",
+              "assignment": {
+                "reused": true,
+                "child": "bfe288a00d5f"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 110011,
+              "role": "diagnostician",
+              "phase": null,
+              "assignment": null,
+              "proofId": "stall-proof-6c2089658524f81c5c9805e0bd015e3e21b0c4df7d175b61c5c93d1788327477"
+            },
+            {
+              "elapsedMs": 150373,
+              "role": "coordinator",
+              "phase": "intake",
+              "assignment": {
+                "reused": true,
+                "child": "4b2bf9088f67"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 232833,
+              "role": "coordinator",
+              "phase": "first-review",
+              "assignment": {
+                "reused": false,
+                "child": "cdcbf5a87dc8"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 294418,
+              "role": "coordinator",
+              "phase": "first-audit",
+              "assignment": {
+                "reused": false,
+                "child": "43e7b873c9c0"
+              },
+              "proofId": null
+            }
+          ],
+          "diagnosticToolErrors": [
+            {
+              "role": "diagnostician",
+              "detail": "Error: 需要原执行方的定点修法或解阻条件",
+              "count": 4
+            },
+            {
+              "role": "diagnostician",
+              "detail": "Error: 复现 argv 参数过多、过长或含控制字符",
+              "count": 2
+            },
+            {
+              "role": "diagnostician",
+              "detail": "Error: 复现样例路径与交付工件冲突",
+              "count": 1
+            },
+            {
+              "role": "diagnostician",
+              "detail": "Error: 同一层的复现须用 submit",
+              "count": 1
+            },
+            {
+              "role": "executor",
+              "detail": "Error: 复现 argv 参数过多、过长或含控制字符",
+              "count": 1
+            }
+          ],
+          "submittedEvidence": [
+            {
+              "status": "needs-verification",
+              "layer": "behavior",
+              "suggestedLayer": "parameters",
+              "trigger": "repeated-failure",
+              "failureKind": "invalid-input",
+              "repeatCount": 3,
+              "artifactSha256": "bb29ca34e31324f63f0b8ff5c172e718bfd8ba85bcae30c36655eb52394a51ab",
+              "source": {
+                "file": "planner.py",
+                "start": 18,
+                "end": 21,
+                "sha256": "d34a5b3f8f5e28de648dc9709b0dd7a8b06b6cfe41a01d8177734eb6c2095680"
+              },
+              "requirement": {
+                "file": "SPEC.md",
+                "start": 13,
+                "end": 13,
+                "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                "quoteHash": "d93e4e16a96c"
+              },
+              "proofId": "stall-proof-6c2089658524f81c5c9805e0bd015e3e21b0c4df7d175b61c5c93d1788327477",
+              "snapshotSha256": "e7145edcc3e5eb08efd1913195c42b419522d3f91a67c045bcacbd75d48ace26"
+            }
+          ]
+        },
+        {
+          "run": "r-1G8kmp",
+          "stage": "g2",
+          "statusChanges": [],
+          "proofIds": [],
+          "typedToolOutcomes": {
+            "invalid-input/args": 1
+          },
+          "usage": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cache": null,
+          "nativeAssignmentAndProofTimes": [
+            {
+              "elapsedMs": 38696,
+              "role": "coordinator",
+              "phase": "intake",
+              "assignment": {
+                "reused": false,
+                "child": "910c1a4bb3e3"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 209711,
+              "role": "coordinator",
+              "phase": "first-review",
+              "assignment": {
+                "reused": false,
+                "child": "4abee07fb0ef"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 347465,
+              "role": "coordinator",
+              "phase": "first-audit",
+              "assignment": {
+                "reused": false,
+                "child": "0f211284ba48"
+              },
+              "proofId": null
+            }
+          ],
+          "diagnosticToolErrors": [],
+          "submittedEvidence": []
+        }
+      ]
+    },
+    {
+      "run": "r-Y6e2M4",
+      "status": "observed",
+      "archiveSha256": "b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5",
+      "outcome": {
+        "error": null,
+        "preflight": null,
+        "laneErrors": []
+      },
+      "stages": [
+        {
+          "stage": "g1",
+          "mode": "standard",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-frozen-seed",
+          "elapsedMs": 103853,
+          "firstGreenMs": null,
+          "score": {
+            "retained": 8,
+            "protected": 8,
+            "newPass": 9,
+            "newTotal": 10,
+            "allPass": 17,
+            "allTotal": 18,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 319364,
+          "cacheAll": 97.7967
+        },
+        {
+          "stage": "g2",
+          "mode": "standard",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-workspace-new-session",
+          "elapsedMs": 118309,
+          "firstGreenMs": null,
+          "score": {
+            "retained": 15,
+            "protected": 15,
+            "newPass": 5,
+            "newTotal": 5,
+            "allPass": 20,
+            "allTotal": 21,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 405071,
+          "cacheAll": 97.9917
+        },
+        {
+          "stage": "g1",
+          "mode": "standard-checklist",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-frozen-seed",
+          "elapsedMs": 117608,
+          "firstGreenMs": 36692,
+          "score": {
+            "retained": 8,
+            "protected": 8,
+            "newPass": 10,
+            "newTotal": 10,
+            "allPass": 18,
+            "allTotal": 18,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 512371,
+          "cacheAll": 98.0937
+        },
+        {
+          "stage": "g2",
+          "mode": "standard-checklist",
+          "terminal": "completed",
+          "phase": null,
+          "carry": "same-workspace-new-session",
+          "elapsedMs": 195735,
+          "firstGreenMs": 44947,
+          "score": {
+            "retained": 16,
+            "protected": 16,
+            "newPass": 5,
+            "newTotal": 5,
+            "allPass": 21,
+            "allTotal": 21,
+            "architectureEdges": 3,
+            "architectureIO": 4
+          },
+          "tokenAll": 1655714,
+          "cacheAll": 98.3625
+        },
+        {
+          "stage": "g1",
+          "mode": "building-loop",
+          "terminal": "closed",
+          "phase": "closed",
+          "carry": "same-frozen-seed",
+          "elapsedMs": 352314,
+          "firstGreenMs": 74109,
+          "score": {
+            "retained": 8,
+            "protected": 8,
+            "newPass": 10,
+            "newTotal": 10,
+            "allPass": 18,
+            "allTotal": 18,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 2431323,
+          "cacheAll": 95.2853
+        },
+        {
+          "stage": "g2",
+          "mode": "building-loop",
+          "terminal": "closed",
+          "phase": "closed",
+          "carry": "same-workspace-new-session",
+          "elapsedMs": 235278,
+          "firstGreenMs": 61847,
+          "score": {
+            "retained": 16,
+            "protected": 16,
+            "newPass": 5,
+            "newTotal": 5,
+            "allPass": 21,
+            "allTotal": 21,
+            "architectureEdges": 4,
+            "architectureIO": 4
+          },
+          "tokenAll": 1497469,
+          "cacheAll": 92.9038
+        }
+      ],
+      "usage": {
+        "standard": {
+          "inputTokens": 14667,
+          "cacheReadTokens": 685568,
+          "cacheWriteTokens": 0,
+          "outputTokens": 24200,
+          "totalTokens": 724435,
+          "known": 39,
+          "missing": 0,
+          "cachePct": 97.9054,
+          "totalInput": 700235
+        },
+        "standard-checklist": {
+          "inputTokens": 36146,
+          "cacheReadTokens": 2089472,
+          "cacheWriteTokens": 0,
+          "outputTokens": 42467,
+          "totalTokens": 2168085,
+          "known": 66,
+          "missing": 0,
+          "cachePct": 98.2995,
+          "totalInput": 2125618
+        },
+        "building-loop": {
+          "inputTokens": 217633,
+          "cacheReadTokens": 3652992,
+          "cacheWriteTokens": 0,
+          "outputTokens": 58167,
+          "totalTokens": 3928792,
+          "known": 162,
+          "missing": 0,
+          "cachePct": 94.3773,
+          "totalInput": 3870625
+        }
+      },
+      "diagnostics": [
+        {
+          "run": "r-Y6e2M4",
+          "stage": "g1",
+          "statusChanges": [],
+          "proofIds": [],
+          "typedToolOutcomes": {},
+          "usage": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cache": null,
+          "nativeAssignmentAndProofTimes": [
+            {
+              "elapsedMs": 30170,
+              "role": "coordinator",
+              "phase": "intake",
+              "assignment": {
+                "reused": false,
+                "child": "3b537fa72999"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 119758,
+              "role": "coordinator",
+              "phase": "first-review",
+              "assignment": {
+                "reused": false,
+                "child": "9ac02a2590b6"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 221339,
+              "role": "coordinator",
+              "phase": "first-audit",
+              "assignment": {
+                "reused": false,
+                "child": "4bdbc3b16bcd"
+              },
+              "proofId": null
+            }
+          ],
+          "diagnosticToolErrors": [
+            {
+              "role": "executor",
+              "detail": "Error: 复现 argv 参数过多、过长或含控制字符",
+              "count": 1
+            }
+          ],
+          "submittedEvidence": []
+        },
+        {
+          "run": "r-Y6e2M4",
+          "stage": "g2",
+          "statusChanges": [],
+          "proofIds": [],
+          "typedToolOutcomes": {},
+          "usage": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cache": null,
+          "nativeAssignmentAndProofTimes": [
+            {
+              "elapsedMs": 32312,
+              "role": "coordinator",
+              "phase": "intake",
+              "assignment": {
+                "reused": false,
+                "child": "459f40689dea"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 87417,
+              "role": "coordinator",
+              "phase": "first-review",
+              "assignment": {
+                "reused": false,
+                "child": "a1c7ac0a0cfb"
+              },
+              "proofId": null
+            },
+            {
+              "elapsedMs": 133396,
+              "role": "coordinator",
+              "phase": "first-audit",
+              "assignment": {
+                "reused": false,
+                "child": "6e6f62a01548"
+              },
+              "proofId": null
+            }
+          ],
+          "diagnosticToolErrors": [],
+          "submittedEvidence": []
+        }
+      ]
+    }
+  ],
+  "totals": [
+    {
+      "mode": "standard",
+      "token210": 1657837,
+      "cache210": 97.6445,
+      "tokenAll": 1657837,
+      "cacheAll": 97.6445,
+      "usage": {
+        "comparison": {
+          "inputTokens": 37985,
+          "cacheReadTokens": 1574656,
+          "cacheWriteTokens": 0,
+          "outputTokens": 45196,
+          "totalTokens": 1657837,
+          "known": 81,
+          "missing": 0
+        },
+        "extension": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 0
+        },
+        "cleanup": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 0
+        },
+        "persisted": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 0
+        }
+      },
+      "totalUsage": {
+        "inputTokens": 37985,
+        "cacheReadTokens": 1574656,
+        "cacheWriteTokens": 0,
+        "outputTokens": 45196,
+        "totalTokens": 1657837,
+        "known": 81,
+        "missing": 0
+      },
+      "totalInput": 1612641
+    },
+    {
+      "mode": "standard-checklist",
+      "token210": 5121591,
+      "cache210": 98.3786,
+      "tokenAll": 5352463,
+      "cacheAll": 98.4347,
+      "usage": {
+        "comparison": {
+          "inputTokens": 81640,
+          "cacheReadTokens": 4953472,
+          "cacheWriteTokens": 0,
+          "outputTokens": 86479,
+          "totalTokens": 5121591,
+          "known": 154,
+          "missing": 0
+        },
+        "extension": {
+          "inputTokens": 762,
+          "cacheReadTokens": 228352,
+          "cacheWriteTokens": 0,
+          "outputTokens": 1758,
+          "totalTokens": 230872,
+          "known": 4,
+          "missing": 0
+        },
+        "cleanup": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 0
+        },
+        "persisted": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 0
+        }
+      },
+      "totalUsage": {
+        "inputTokens": 82402,
+        "cacheReadTokens": 5181824,
+        "cacheWriteTokens": 0,
+        "outputTokens": 88237,
+        "totalTokens": 5352463,
+        "known": 158,
+        "missing": 0
+      },
+      "totalInput": 5264226
+    },
+    {
+      "mode": "building-loop",
+      "token210": 4563190,
+      "cache210": 93.2459,
+      "tokenAll": 9584927,
+      "cacheAll": 94.6181,
+      "usage": {
+        "comparison": {
+          "inputTokens": 302713,
+          "cacheReadTokens": 4179200,
+          "cacheWriteTokens": 0,
+          "outputTokens": 81277,
+          "totalTokens": 4563190,
+          "known": 219,
+          "missing": 0
+        },
+        "extension": {
+          "inputTokens": 205460,
+          "cacheReadTokens": 4754816,
+          "cacheWriteTokens": 0,
+          "outputTokens": 61461,
+          "totalTokens": 5021737,
+          "known": 150,
+          "missing": 0
+        },
+        "cleanup": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 1
+        },
+        "persisted": {
+          "inputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "known": 0,
+          "missing": 0
+        }
+      },
+      "totalUsage": {
+        "inputTokens": 508173,
+        "cacheReadTokens": 8934016,
+        "cacheWriteTokens": 0,
+        "outputTokens": 142738,
+        "totalTokens": 9584927,
+        "known": 369,
+        "missing": 1
+      },
+      "totalInput": 9442189
+    }
+  ],
+  "persistedUnattributed": 0,
+  "journalReadErrors": 0
+}

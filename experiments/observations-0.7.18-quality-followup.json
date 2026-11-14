@@ -1,0 +1,79 @@
+{
+  "old-pack-and-split": {
+    "lane": "standard",
+    "checkpoint": 4,
+    "code": 0,
+    "stdout": "{\"oldResult\": \"ok\", \"oldEvents\": [], \"newPackSizes\": [5]}\n",
+    "stderr": ""
+  },
+  "missing-module-standard": {
+    "lane": "standard",
+    "checkpoint": 2,
+    "code": 1,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import backup_scheduler\n  File \"/submission/backup_scheduler.py\", line 30, in <module>\n    import strategies\nModuleNotFoundError: No module named 'strategies'\n"
+  },
+  "entrypoint-fragment": {
+    "lane": "building-loop",
+    "checkpoint": 4,
+    "code": 1,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import backup_scheduler\n  File \"/submission/backup_scheduler.py\", line 1\n    if previous is not None and previous[1] == checksum:\nIndentationError: unexpected indent\n"
+  },
+  "destination-boundary-building-loop": {
+    "lane": "building-loop",
+    "checkpoint": 3,
+    "code": 0,
+    "stdout": "{\"exit\": 0, \"secondExit\": 0, \"stateLoaded\": [{\"event\": \"DEST_STATE_LOADED\", \"job_id\": \"job\", \"files_total\": 1}], \"skipped\": [{\"event\": \"FILE_SKIPPED_UNCHANGED\", \"job_id\": \"job\", \"path\": \"one.txt\", \"hash\": \"sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"}], \"changed\": [{\"event\": \"FILE_BACKED_UP\", \"job_id\": \"job\", \"path\": \"one.txt\", \"size\": 3, \"checksum\": \"sha256:3608bca1e44ea6c4d268eb6db02260269892c0b42b86bbf1e77a6fa16c3c9282\"}], \"destBytes\": \"abc\"}\n",
+    "stderr": ""
+  },
+  "parser-only": {
+    "1": {
+      "passed": 4,
+      "failed": 28,
+      "errors": 0,
+      "skipped": 0
+    },
+    "2": {
+      "passed": 1,
+      "failed": 17,
+      "errors": 0,
+      "skipped": 0
+    },
+    "3": {
+      "passed": 13,
+      "failed": 5,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "parser-and-legacy": {
+    "1": {
+      "passed": 21,
+      "failed": 11,
+      "errors": 0,
+      "skipped": 0
+    },
+    "2": {
+      "passed": 13,
+      "failed": 5,
+      "errors": 0,
+      "skipped": 0
+    },
+    "3": {
+      "passed": 13,
+      "failed": 5,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "standard-pack-old-index-probe": {
+    "probe": {
+      "type": "TypeError",
+      "message": "'int' object is not subscriptable"
+    },
+    "events": [
+      "PACK_LOADED"
+    ]
+  }
+}

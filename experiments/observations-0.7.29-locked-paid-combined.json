@@ -1,0 +1,2513 @@
+{
+  "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+  "observations": [
+    {
+      "run": "r-K7uKAM",
+      "native": {
+        "run": "r-K7uKAM",
+        "observed": "observed",
+        "phases": [
+          {
+            "stage": "g1",
+            "terminal": "completion-cap",
+            "phase": "closed",
+            "carry": "same-frozen-seed",
+            "passed": 18,
+            "total": 18
+          },
+          {
+            "stage": "g2",
+            "terminal": "closed",
+            "phase": "closed",
+            "carry": "frozen-workspace-continuation-after-timeout",
+            "passed": 21,
+            "total": 21
+          }
+        ],
+        "complete": false
+      },
+      "independentOwnerBehavior": {
+        "run": "r-K7uKAM",
+        "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+        "modes": [
+          {
+            "mode": "standard",
+            "stage": "g2",
+            "terminal": "completed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "f872e1febb5c6069eeef1e314acc29b4ffb26b75588b5a41ab65833a66b9f20b"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "16891e7654c1d60d45ca392427384c44352a75dcb30aa385cbb0b45374adb2d5"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "0c3242582624192eed615041b78d056da2aa8c3fbc5aa0e3483c7e21ebcf03f4"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "line": 5,
+              "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+              "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+            },
+            "cases": [
+              {
+                "id": "production-bad-change-record",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-changes-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "rollback",
+                  "budget": 5,
+                  "changes": {
+                    "bad": "record"
+                  }
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-dependency-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-change-record",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-dependency-shape",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          },
+          {
+            "mode": "standard-checklist",
+            "stage": "g2",
+            "terminal": "completed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "1e8c0b61a25eeb621e73120f082e59f452e3b5ae828d7133b88d12f9ed08854f"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "050b4e7c791c10e0c230099e1a38a430615d61665ac63c10cc5a9cac1246e5d4"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "1506a0d3c31c96d6df3e69ba996daf2b6eb26edce7ab449678ee7fc1aecc95e9"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "line": 5,
+              "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+              "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+            },
+            "cases": [
+              {
+                "id": "production-bad-change-record",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-changes-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "rollback",
+                  "budget": 5,
+                  "changes": {
+                    "bad": "record"
+                  }
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-dependency-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-change-record",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-dependency-shape",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          },
+          {
+            "mode": "building-loop",
+            "stage": "g2",
+            "terminal": "closed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "7202f6a09bb82d670fa72d7de95c81730eb66cd22cf34dc4ace6e7aa852d1980"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "fcd0205ce0f7940876dee5703ffe2b64385a62a2a57d45d304e8a3b6ebd7a3d8"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "c844edce2db00fb3d41be8eac0be2d4323372b8ee7a7567a0acd6442db75b54c"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "line": 5,
+              "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+              "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+            },
+            "cases": [
+              {
+                "id": "production-bad-change-record",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-changes-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "rollback",
+                  "budget": 5,
+                  "changes": {
+                    "bad": "record"
+                  }
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-dependency-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-change-record",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-dependency-shape",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          }
+        ]
+      },
+      "architectureBoundaries": [
+        {
+          "stage": "g1",
+          "releaseLocalImports": [
+            "planner"
+          ],
+          "allFixedBoundaries": true
+        },
+        {
+          "stage": "g2",
+          "releaseLocalImports": [
+            "planner"
+          ],
+          "allFixedBoundaries": true
+        }
+      ],
+      "generatedResponsibilities": [
+        {
+          "stage": "g1",
+          "passed": true,
+          "proof": {
+            "version": 1,
+            "policySha256": "67a6e667ea2e4c6e827f6e99e37b15746eb3d9f0c71e7578e6eff8a58a355fcf",
+            "artifactsSha256": "4cc678d71491e1235cb37fee0b2deabcb5bc6c1735f1948d1d1460844d2ee4cd",
+            "rows": [
+              {
+                "id": "nonobject-request",
+                "exampleId": "public-architecture-responsibility:example:nonobject-request",
+                "mode": "business",
+                "trigger": {
+                  "kind": "input-type",
+                  "argument": 0,
+                  "type": "object",
+                  "test": "not"
+                },
+                "clause": {
+                  "file": "SPEC.md",
+                  "start": 5,
+                  "end": 5,
+                  "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                  "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+                },
+                "status": "passed",
+                "actual": {
+                  "file": "planner.py",
+                  "symbol": "plan",
+                  "mode": "business",
+                  "sha256": "134a454bb46a8501eb4f0967608173cd6d2c079fde6e60b30a511db32b154afc",
+                  "line": 64,
+                  "end": 64,
+                  "conditionLine": 63,
+                  "code": "invalid-request"
+                },
+                "response": {
+                  "id": "public-architecture-responsibility:example:nonobject-request",
+                  "snapshotSha256": "455ebd6ee8dc1c8f2e90844bb6d2edb3cc004537e1eb1c4af0cc05170978dc7e",
+                  "exitCode": 0,
+                  "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+                  "json": {
+                    "status": "error",
+                    "error": "invalid-request",
+                    "actions": [],
+                    "units": 0
+                  }
+                },
+                "traceSha256": "e2cc97503f1978926d9a73370475450a3ade31eabe4446ab2da5815090a541a2"
+              }
+            ]
+          }
+        },
+        {
+          "stage": "g2",
+          "passed": true,
+          "proof": {
+            "version": 1,
+            "policySha256": "67a6e667ea2e4c6e827f6e99e37b15746eb3d9f0c71e7578e6eff8a58a355fcf",
+            "artifactsSha256": "a85ecbd4a219fb69231bf7a1501684aa54244d1b65f48192d0cb4244a1538470",
+            "rows": [
+              {
+                "id": "nonobject-request",
+                "exampleId": "public-architecture-responsibility:example:nonobject-request",
+                "mode": "business",
+                "trigger": {
+                  "kind": "input-type",
+                  "argument": 0,
+                  "type": "object",
+                  "test": "not"
+                },
+                "clause": {
+                  "file": "SPEC.md",
+                  "start": 5,
+                  "end": 5,
+                  "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                  "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+                },
+                "status": "passed",
+                "actual": {
+                  "file": "planner.py",
+                  "symbol": "plan",
+                  "mode": "business",
+                  "sha256": "fcd0205ce0f7940876dee5703ffe2b64385a62a2a57d45d304e8a3b6ebd7a3d8",
+                  "line": 93,
+                  "end": 93,
+                  "conditionLine": 92,
+                  "code": "invalid-request"
+                },
+                "response": {
+                  "id": "public-architecture-responsibility:example:nonobject-request",
+                  "snapshotSha256": "b833215c8c3017fb94b04cc8c7c301c54eca293ac898d0f0608c69b1b0ee6b2c",
+                  "exitCode": 0,
+                  "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+                  "json": {
+                    "status": "error",
+                    "error": "invalid-request",
+                    "actions": [],
+                    "units": 0
+                  }
+                },
+                "traceSha256": "fefe9a8b12610182b17f20c1f1d9fedd822f57f6f73c7781155a307f0352c1e5"
+              }
+            ]
+          }
+        }
+      ],
+      "rollbackRehearsal": {
+        "status": "passed",
+        "passed": true,
+        "hostProof": {
+          "version": 1,
+          "status": "passed",
+          "binding": {
+            "policySha256": "67a6e667ea2e4c6e827f6e99e37b15746eb3d9f0c71e7578e6eff8a58a355fcf",
+            "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+            "receiptSha256": "3985b4a39edd7137c5bfe0023a59dfc9ccaaacf81bbd901422083c9751dd43c2",
+            "originalArtifactsSha256": "a85ecbd4a219fb69231bf7a1501684aa54244d1b65f48192d0cb4244a1538470",
+            "rehearsalArtifactsSha256": "eab312ce68dae9998b87d036d14e262173d368670528b0f4f09e1dacfea500eb",
+            "architectureSha256": "fff35d25061d38a1f0bf526d424802fda0724044583e32fb096adb21793de08e",
+            "rollbackSha256": "fdd466d651007ccfb5f61c5771ef84b6169f465ecc97885fb44f71c92342f986",
+            "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1",
+            "proposalId": "rollback-451e4e0ff209c67aafd642d0c6d3522c82a50881c31dfb34539b81c4f0a7251d"
+          },
+          "changed": [
+            {
+              "file": "policy.py",
+              "beforeSha256": "c844edce2db00fb3d41be8eac0be2d4323372b8ee7a7567a0acd6442db75b54c",
+              "afterSha256": "2ea05a4c23f49b940dd7e19506bfae52556b0f7b190b8623cd998e9114cac206"
+            }
+          ],
+          "total": 4,
+          "passed": 4,
+          "receipts": [
+            {
+              "id": "public-release-reopen-production:example:restored-production-plan",
+              "snapshotSha256": "0a4accc7a48672c9f2ea2f5de8088eba025ac640f3063adbb7676a3ce16cd96b"
+            },
+            {
+              "id": "public-release-reopen-production:example:restored-production-rollback",
+              "snapshotSha256": "8d97ad615f2e160d8e7c3618e9d3bec8b618be8fb7f87bcf04ff2e630c0a0315"
+            },
+            {
+              "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+              "snapshotSha256": "a2ac59118081e5f94d015d4e3e08f561aa9e39f17d9e82ac095b4c825d0170cc"
+            },
+            {
+              "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+              "snapshotSha256": "3deca49c83413bb3f5bc82d87b0d32ce6e7c18a0fb9876d74cdeed91ab5fd287"
+            }
+          ],
+          "failures": []
+        },
+        "replayed": [
+          {
+            "case": "restored-production-plan",
+            "input": {
+              "environment": "production",
+              "action": "plan",
+              "budget": 5,
+              "changes": [
+                {
+                  "id": "rollback-item",
+                  "component": "api",
+                  "units": 1,
+                  "depends_on": []
+                }
+              ]
+            },
+            "expected": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "actual": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          },
+          {
+            "case": "restored-production-rollback",
+            "input": {
+              "environment": "production",
+              "action": "rollback",
+              "budget": 0,
+              "changes": [
+                {
+                  "id": "rollback-item",
+                  "component": "api",
+                  "units": 1,
+                  "depends_on": []
+                }
+              ],
+              "applied": [
+                "rollback-item"
+              ]
+            },
+            "expected": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "actual": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          },
+          {
+            "case": "staging-plan-quota-preserved",
+            "input": {
+              "environment": "staging",
+              "action": "plan",
+              "budget": 9,
+              "changes": [
+                {
+                  "id": "quota-item",
+                  "component": "api",
+                  "units": 4,
+                  "depends_on": []
+                }
+              ]
+            },
+            "expected": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            },
+            "actual": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          },
+          {
+            "case": "staging-rollback-retention-preserved",
+            "input": {
+              "environment": "staging",
+              "action": "rollback",
+              "budget": 0,
+              "changes": [
+                {
+                  "id": "rollback-item",
+                  "component": "api",
+                  "units": 1,
+                  "depends_on": []
+                }
+              ],
+              "applied": [
+                "rollback-item"
+              ],
+              "retain": [
+                "rollback-item"
+              ]
+            },
+            "expected": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "actual": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          }
+        ]
+      },
+      "functionAndBoundaryQualified": false
+    },
+    {
+      "run": "r-A6f7Fu",
+      "native": {
+        "run": "r-A6f7Fu",
+        "observed": "observed",
+        "phases": [
+          {
+            "stage": "g1",
+            "terminal": "closed",
+            "phase": "closed",
+            "carry": "same-frozen-seed",
+            "passed": 18,
+            "total": 18
+          },
+          {
+            "stage": "g2",
+            "terminal": "closed",
+            "phase": "closed",
+            "carry": "same-workspace-new-session",
+            "passed": 21,
+            "total": 21
+          }
+        ],
+        "complete": true,
+        "supplemental": [
+          {
+            "run": "r-A6f7Fu",
+            "mode": "building-loop",
+            "stage": "g1",
+            "session": "8354df316e9d",
+            "terminal": "closed",
+            "nativePhase": "closed",
+            "carry": "same-frozen-seed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "67ea6458e8a1c1d359e2d92e1b396195ffebb94d2d99f5d979bdffc3216fdf52"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "205a57ef6b0bef2870840ae6336bc3f9ea1aff27b0d1ce88e14b045c3b573f60"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "fff5568dd8fd03b920daed1b142ca3f64664f417a8992a24fe763dcf2b3a3e4c"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "astBoundary": {
+              "journal": {
+                "parse": true,
+                "moduleImports": [],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "_missing_targets",
+                  "_string_list",
+                  "graph_order",
+                  "read_applied",
+                  "read_changes"
+                ],
+                "lineCount": 138
+              },
+              "planner": {
+                "parse": true,
+                "moduleImports": [
+                  "journal",
+                  "policy"
+                ],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "failure",
+                  "plan",
+                  "success"
+                ],
+                "lineCount": 55
+              },
+              "policy": {
+                "parse": true,
+                "moduleImports": [],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "admits",
+                  "authorize"
+                ],
+                "lineCount": 53
+              },
+              "release": {
+                "parse": true,
+                "moduleImports": [
+                  "planner"
+                ],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "main"
+                ],
+                "lineCount": 19
+              }
+            },
+            "sourceInspection": {
+              "journal.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 16,
+                    "end": 28,
+                    "name": "_string_list",
+                    "docstring": "Return a list of change IDs, or raise invalid-change.\n\nA non-array value or a non-string/empty element is malformed dependency or\njournal input (SPEC.md:12); JSON numbers, nulls and nested arrays are all\nrejected the same way."
+                  },
+                  {
+                    "line": 31,
+                    "end": 66,
+                    "name": "read_changes",
+                    "docstring": "Validate change records and fold identical duplicates.\n\nReturns {id, component, units, depends_on} rows with depends_on as a sorted\ntuple, i.e. set semantics: dependency order is not identity. Folding happens\nhere, before graph construction and accounting, so plan and rollback see one\nentry per ID. Same ID with a different component/units/dependency set fails\nconflicting-change (SPEC.md:11)."
+                  },
+                  {
+                    "line": 69,
+                    "end": 79,
+                    "name": "read_applied",
+                    "docstring": "Validate the persisted release journal: already applied change IDs.\n\nCallers pass request.get(\"applied\", []) so an absent field means no prior\nrelease (SPEC.md:5). An explicit null is malformed input and is rejected by\n_string_list as invalid-change (SPEC.md:12), the same as any other\nnon-array; only a missing field gets the empty default.\nUnknown IDs are not detectable here because the graph is not built yet;\ngraph_order raises unknown-dependency for them."
+                  },
+                  {
+                    "line": 82,
+                    "end": 85,
+                    "name": "_missing_targets",
+                    "docstring": "True when some dependency names an ID absent from the folded graph."
+                  },
+                  {
+                    "line": 88,
+                    "end": 138,
+                    "name": "graph_order",
+                    "docstring": "Validate the dependency graph and return the full deterministic order.\n\nOrder rule: among currently eligible changes (all dependencies already\nemitted) pick the lexicographically smallest ID. heapq over ID strings gives\nthat tie-break cheaply, and the result does not depend on input order, so\nplanner.py reuses one order for plan (filtered) and rollback (reversed).\n\nThe order is built from every dependency edge, never from\ndepends_on-minus-applied: applied IDs must still constrain their consumers.\nIf they were dropped, a consumer and its already applied prerequisite would\nbecome eligible together and only lexical order would decide, so the reverse\nused by rollback would put the consumer before its prerequisite and break\nSPEC.md:14. `applied` is used here only to validate unknown IDs; plan\nfiltering and budget accounting happen in planner.py.\n\nGraph errors are raised before returning anything, so a rejected request can\nnever yield partial actions: a missing dependency target, or an applied ID\nabsent from the graph, means unknown-dependency; leftover nodes after the\nsweep mean a cycle anywhere in the graph, reported as dependency-cycle\n(SPEC.md:12)."
+                  }
+                ],
+                "comments": [
+                  [
+                    51,
+                    "# type() rather than isinstance: bool is an int subclass and"
+                  ],
+                  [
+                    52,
+                    "# SPEC excludes booleans from integer fields."
+                  ],
+                  [
+                    122,
+                    "# Eligible = no unmet dependency at all. Applied changes are ordinary nodes"
+                  ],
+                  [
+                    123,
+                    "# here; treating them as pre-satisfied would only matter for plan filtering,"
+                  ],
+                  [
+                    124,
+                    "# which planner.py already handles by dropping applied IDs from the output."
+                  ]
+                ],
+                "moduleNote": "Validate, fold and replay release journal records.\n\nThis module owns input validation, change identity and replay state. It is\nimported only by planner.py (the fixed direction release -> planner ->\njournal / policy), so it must not import either of them: graph facts come back\nas plain data and every rejection is a JournalError whose message is the exact\nSPEC error code."
+              },
+              "planner.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 14,
+                    "end": 16,
+                    "name": "failure",
+                    "docstring": "Exact failure envelope: a rejected request reports no partial actions."
+                  },
+                  {
+                    "line": 19,
+                    "end": 20,
+                    "name": "success",
+                    "docstring": null
+                  },
+                  {
+                    "line": 23,
+                    "end": 51,
+                    "name": "plan",
+                    "docstring": null
+                  }
+                ],
+                "comments": [
+                  [
+                    29,
+                    "# Fold duplicates before anything is counted or ordered, so identity,"
+                  ],
+                  [
+                    30,
+                    "# conflicting-change detection and units accounting all see one row per ID."
+                  ],
+                  [
+                    39,
+                    "# Reverse the full deterministic order first, then keep the applied"
+                  ],
+                  [
+                    40,
+                    "# IDs: that is literally SPEC.md:14 and it fixes the positions of the"
+                  ],
+                  [
+                    41,
+                    "# emitted subset. Filtering first and reversing afterwards would give"
+                  ],
+                  [
+                    42,
+                    "# a different order whenever an unapplied change sorts into the list."
+                  ],
+                  [
+                    49,
+                    "# The success body is built only after every check passed, so a rejected"
+                  ],
+                  [
+                    50,
+                    "# operation can never emit a subset of actions."
+                  ],
+                  [
+                    54,
+                    "# Kept under the old name: release.py and any caller already importing plan()"
+                  ],
+                  [
+                    55,
+                    "# keep working; the body now handles both actions via the request itself."
+                  ]
+                ],
+                "moduleNote": "Compose policy and journal data into the final result object.\n\nImport direction is fixed: release.py -> planner.py -> journal.py / policy.py.\nThis module owns assembly only: policy decides whether the request is allowed,\njournal owns record identity, replay state and graph order, and the body below\njust turns that deterministic order into plan or rollback actions."
+              },
+              "policy.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 19,
+                    "end": 40,
+                    "name": "authorize",
+                    "docstring": "Check environment and action, then the budget format; return the budget.\n\nOrder matters for deterministic error codes: an unknown environment is\nreported before an unsupported action, and both before an invalid budget.\nThe budget is only format-checked here (nonnegative integer, booleans\nexcluded). Whether it caps the work is a per-action question answered by\nadmits(), because rollback is not capped in G1."
+                  },
+                  {
+                    "line": 43,
+                    "end": 53,
+                    "name": "admits",
+                    "docstring": "True when an action of `units` may run under `budget`.\n\nOnly plan spends budget (SPEC.md:13): the caller passes the units actually\nemitted after folding and replay, so already applied changes never count.\nRollback is never capped, which is why this is a separate function rather\nthan a check inside authorize()."
+                  }
+                ],
+                "comments": [
+                  [
+                    8,
+                    "# G1 authorizes both environments for plan and rollback (SPEC.md:14). G2-style"
+                  ],
+                  [
+                    9,
+                    "# restrictions belong in this table, not in planner.py."
+                  ],
+                  [
+                    28,
+                    "# isinstance(str) is checked before membership: an array or object value is"
+                  ],
+                  [
+                    29,
+                    "# unhashable, and `value in set` would raise TypeError and abort the process"
+                  ],
+                  [
+                    30,
+                    "# instead of returning the coded error with exit code 0."
+                  ]
+                ],
+                "moduleNote": "Validate release environment, action and budget before computing actions.\n\nImported only by planner.py (fixed direction release -> planner -> journal /\npolicy). This module decides what the caller is allowed to request; it never\nbuilds actions, so a rejection here cannot leave partial output behind."
+              },
+              "release.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 8,
+                    "end": 15,
+                    "name": "main",
+                    "docstring": null
+                  }
+                ],
+                "comments": [],
+                "moduleNote": "JSON transport for the release planner."
+              }
+            },
+            "authoredDocumentPins": [
+              {
+                "path": "modules/architecture.md",
+                "sha256": "4609c477fbe7fef61882f9331a160f69dc7b4e660ac7c1554e01601ae17b9bbf"
+              }
+            ],
+            "supplemental": [
+              {
+                "case": "malformed-environment-list",
+                "input": {
+                  "environment": [],
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": []
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-environment",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-environment",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "case": "self-cycle-in-applied",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "a",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": [
+                        "a"
+                      ]
+                    }
+                  ],
+                  "applied": [
+                    "a"
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "dependency-cycle",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "dependency-cycle",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          },
+          {
+            "run": "r-A6f7Fu",
+            "mode": "building-loop",
+            "stage": "g2",
+            "session": "7802b9ba4422",
+            "terminal": "closed",
+            "nativePhase": "closed",
+            "carry": "same-workspace-new-session",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "14f244750654f2c8c4283797220ea5f7d90d49e4e59586599651e64cdcb7f5f9"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "e67f604e4864ad3a1315e724a20eabc5e7721537cb55ee79b7481fee3ba1200b"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "astBoundary": {
+              "journal": {
+                "parse": true,
+                "moduleImports": [],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "_missing_targets",
+                  "_string_list",
+                  "graph_order",
+                  "read_applied",
+                  "read_changes",
+                  "read_retain"
+                ],
+                "lineCount": 162
+              },
+              "planner": {
+                "parse": true,
+                "moduleImports": [
+                  "journal",
+                  "policy"
+                ],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "failure",
+                  "plan",
+                  "retained_for",
+                  "success"
+                ],
+                "lineCount": 98
+              },
+              "policy": {
+                "parse": true,
+                "moduleImports": [],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "admits",
+                  "authorize"
+                ],
+                "lineCount": 78
+              },
+              "release": {
+                "parse": true,
+                "moduleImports": [
+                  "planner"
+                ],
+                "boundaryOk": true,
+                "transportOnlyIO": true,
+                "functions": [
+                  "main"
+                ],
+                "lineCount": 19
+              }
+            },
+            "sourceInspection": {
+              "journal.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 16,
+                    "end": 28,
+                    "name": "_string_list",
+                    "docstring": "Return a list of change IDs, or raise invalid-change.\n\nA non-array value or a non-string/empty element is malformed dependency or\njournal input (SPEC.md:12); JSON numbers, nulls and nested arrays are all\nrejected the same way."
+                  },
+                  {
+                    "line": 31,
+                    "end": 66,
+                    "name": "read_changes",
+                    "docstring": "Validate change records and fold identical duplicates.\n\nReturns {id, component, units, depends_on} rows with depends_on as a sorted\ntuple, i.e. set semantics: dependency order is not identity. Folding happens\nhere, before graph construction and accounting, so plan and rollback see one\nentry per ID. Same ID with a different component/units/dependency set fails\nconflicting-change (SPEC.md:11)."
+                  },
+                  {
+                    "line": 69,
+                    "end": 79,
+                    "name": "read_applied",
+                    "docstring": "Validate the persisted release journal: already applied change IDs.\n\nCallers pass request.get(\"applied\", []) so an absent field means no prior\nrelease (SPEC.md:5). An explicit null is malformed input and is rejected by\n_string_list as invalid-change (SPEC.md:12), the same as any other\nnon-array; only a missing field gets the empty default.\nUnknown IDs are not detectable here because the graph is not built yet;\ngraph_order raises unknown-dependency for them."
+                  },
+                  {
+                    "line": 82,
+                    "end": 103,
+                    "name": "read_retain",
+                    "docstring": "Validate a staging rollback's retain list; return it in request order.\n\nretain is a rollback-only field (CHANGE-G2.md:7): planner.py calls this only\non the rollback path, so a malformed retain on a plan request must never\nraise invalid-retain nor change the plan result. The shape rules mirror the\njournal (non-array, null, empty string or non-string element) but use their\nown code, and a missing field defaults to empty. Membership in `applied` is\nnot checked here because retain's legal values depend on replay state that\nplanner.py holds; if it is not an applied ID, planner.py rejects it.\n\nCallers pass request.get(\"retain\", []) so an absent field means nothing is\nretained (all applied changes roll back, exactly as in G1). Rejections are\nJournalError(\"invalid-retain\") so the request still yields the shared error\nenvelope instead of partial actions."
+                  },
+                  {
+                    "line": 106,
+                    "end": 109,
+                    "name": "_missing_targets",
+                    "docstring": "True when some dependency names an ID absent from the folded graph."
+                  },
+                  {
+                    "line": 112,
+                    "end": 162,
+                    "name": "graph_order",
+                    "docstring": "Validate the dependency graph and return the full deterministic order.\n\nOrder rule: among currently eligible changes (all dependencies already\nemitted) pick the lexicographically smallest ID. heapq over ID strings gives\nthat tie-break cheaply, and the result does not depend on input order, so\nplanner.py reuses one order for plan (filtered) and rollback (reversed).\n\nThe order is built from every dependency edge, never from\ndepends_on-minus-applied: applied IDs must still constrain their consumers.\nIf they were dropped, a consumer and its already applied prerequisite would\nbecome eligible together and only lexical order would decide, so the reverse\nused by rollback would put the consumer before its prerequisite and break\nSPEC.md:14. `applied` is used here only to validate unknown IDs; plan\nfiltering and budget accounting happen in planner.py.\n\nGraph errors are raised before returning anything, so a rejected request can\nnever yield partial actions: a missing dependency target, or an applied ID\nabsent from the graph, means unknown-dependency; leftover nodes after the\nsweep mean a cycle anywhere in the graph, reported as dependency-cycle\n(SPEC.md:12)."
+                  }
+                ],
+                "comments": [
+                  [
+                    51,
+                    "# type() rather than isinstance: bool is an int subclass and"
+                  ],
+                  [
+                    52,
+                    "# SPEC excludes booleans from integer fields."
+                  ],
+                  [
+                    146,
+                    "# Eligible = no unmet dependency at all. Applied changes are ordinary nodes"
+                  ],
+                  [
+                    147,
+                    "# here; treating them as pre-satisfied would only matter for plan filtering,"
+                  ],
+                  [
+                    148,
+                    "# which planner.py already handles by dropping applied IDs from the output."
+                  ]
+                ],
+                "moduleNote": "Validate, fold and replay release journal records.\n\nThis module owns input validation, change identity and replay state. It is\nimported only by planner.py (the fixed direction release -> planner ->\njournal / policy), so it must not import either of them: graph facts come back\nas plain data and every rejection is a JournalError whose message is the exact\nSPEC error code."
+              },
+              "planner.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 15,
+                    "end": 41,
+                    "name": "retained_for",
+                    "docstring": "Return the applied IDs a rollback must keep (CHANGE-G2.md:7).\n\nThe kept set is retain itself plus every prerequisite reachable from it\nthrough the dependency edges, restricted to applied IDs: an already\nretained change without its applied prerequisite would be left running on\ntop of a prerequisite that was just removed. Prerequisites that are not\napplied are dropped silently, not reported: they need no protection because\nnothing is being rolled back for them, and plan already owns the\n\"dependency not yet released\" question. `depends_on` maps every folded\nchange to its dependency tuple, i.e. the same full edge set graph_order\nused, so retention and ordering cannot disagree about edges.\n\nMembership in `applied_ids` is enforced by the caller before this runs, so\nevery retain entry is a known node here."
+                  },
+                  {
+                    "line": 44,
+                    "end": 46,
+                    "name": "failure",
+                    "docstring": "Exact failure envelope: a rejected request reports no partial actions."
+                  },
+                  {
+                    "line": 49,
+                    "end": 50,
+                    "name": "success",
+                    "docstring": null
+                  },
+                  {
+                    "line": 53,
+                    "end": 94,
+                    "name": "plan",
+                    "docstring": null
+                  }
+                ],
+                "comments": [
+                  [
+                    59,
+                    "# Fold duplicates before anything is counted or ordered, so identity,"
+                  ],
+                  [
+                    60,
+                    "# conflicting-change detection and units accounting all see one row per ID."
+                  ],
+                  [
+                    69,
+                    "# rollback only: plan ignores retain entirely, so a malformed retain"
+                  ],
+                  [
+                    70,
+                    "# on a plan request changes nothing (CHANGE-G2.md:7)."
+                  ],
+                  [
+                    73,
+                    "# Malformed and not-applied retain entries intentionally share"
+                  ],
+                  [
+                    74,
+                    "# invalid-retain: both mean \"this rollback cannot be honoured\"."
+                  ],
+                  [
+                    79,
+                    "# Reverse the full deterministic order first, then keep the applied"
+                  ],
+                  [
+                    80,
+                    "# IDs minus the retained ones: that is literally SPEC.md:14 and it"
+                  ],
+                  [
+                    81,
+                    "# fixes the positions of the emitted subset. Filtering first and"
+                  ],
+                  [
+                    82,
+                    "# reversing afterwards would give a different order whenever an"
+                  ],
+                  [
+                    83,
+                    "# unapplied change sorts into the list, and retention must filter"
+                  ],
+                  [
+                    84,
+                    "# the same list rather than re-sort it."
+                  ],
+                  [
+                    92,
+                    "# The success body is built only after every check passed, so a rejected"
+                  ],
+                  [
+                    93,
+                    "# operation can never emit a subset of actions."
+                  ],
+                  [
+                    97,
+                    "# Kept under the old name: release.py and any caller already importing plan()"
+                  ],
+                  [
+                    98,
+                    "# keep working; the body now handles both actions via the request itself."
+                  ]
+                ],
+                "moduleNote": "Compose policy and journal data into the final result object.\n\nImport direction is fixed: release.py -> planner.py -> journal.py / policy.py.\nThis module owns assembly only: policy decides whether the request is allowed,\njournal owns record identity, replay state and graph order, and the body below\njust turns that deterministic order into plan or rollback actions; the one\ngraph-shaped join (rollback retention closure) lives in retained_for()."
+              },
+              "policy.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 27,
+                    "end": 60,
+                    "name": "authorize",
+                    "docstring": "Check environment and action, then the budget format; return the budget.\n\nOrder matters for deterministic error codes: an unknown environment is\nreported before an unsupported action, and both before an invalid budget;\na recognised but frozen environment (production) short-circuits all of them\nwith production-frozen, because the freeze precedes graph and change\nvalidation (CHANGE-G2.md:5).\nThe budget is only format-checked here (nonnegative integer, booleans\nexcluded). Whether it caps the work is a per-action question answered by\nadmits(), because rollback is not capped."
+                  },
+                  {
+                    "line": 63,
+                    "end": 78,
+                    "name": "admits",
+                    "docstring": "True when an action of `units` may run under `budget`.\n\nOnly plan spends budget (SPEC.md:13): the caller passes the units actually\nemitted after folding and replay, so already applied changes never count.\nRollback is never capped, which is why this is a separate function rather\nthan a check inside authorize().\n\nA staging plan is additionally capped at STAGING_PLAN_LIMIT: the effective\nbudget is min(request budget, 3), so budget 10 with 4 units of work still\nfails while exactly 3 units pass (CHANGE-G2.md:6). authorize() has already\nrejected production, so reaching this branch means staging."
+                  }
+                ],
+                "comments": [
+                  [
+                    8,
+                    "# This point release is staging-only (CHANGE-G2.md:5). production stays a"
+                  ],
+                  [
+                    9,
+                    "# *recognised* environment so that it is frozen deliberately instead of falling"
+                  ],
+                  [
+                    10,
+                    "# through to invalid-environment; eligibility, not recognition, is what G2"
+                  ],
+                  [
+                    11,
+                    "# restricts. Environment policy belongs in this table, not in planner.py."
+                  ],
+                  [
+                    17,
+                    "# Ceiling on a staging plan's spending, independent of what the caller allows"
+                  ],
+                  [
+                    18,
+                    "# (CHANGE-G2.md:6). It bounds plan only: rollback is a journal-driven undo and"
+                  ],
+                  [
+                    19,
+                    "# keeps its G1 rule of a format-checked but uncapped budget (SPEC.md:14)."
+                  ],
+                  [
+                    39,
+                    "# isinstance(str) is checked before membership: an array or object value is"
+                  ],
+                  [
+                    40,
+                    "# unhashable, and `value in set` would raise TypeError and abort the process"
+                  ],
+                  [
+                    41,
+                    "# instead of returning the coded error with exit code 0."
+                  ],
+                  [
+                    46,
+                    "# Frozen before action/budget/changes are examined (CHANGE-G2.md:5"
+                  ],
+                  [
+                    47,
+                    "# \"before graph or change validation\"): the freeze has to win over"
+                  ],
+                  [
+                    48,
+                    "# every structural complaint, so a production request with a malformed"
+                  ],
+                  [
+                    49,
+                    "# graph, unknown applied ID or bad budget still gets production-frozen"
+                  ],
+                  [
+                    50,
+                    "# instead of invalid-change/invalid-budget. Keep this ahead of the"
+                  ],
+                  [
+                    51,
+                    "# action and budget checks, and never relocate it into planner.py"
+                  ],
+                  [
+                    52,
+                    "# after read_changes(). Both plan and rollback are frozen here."
+                  ]
+                ],
+                "moduleNote": "Validate release environment, action and budget before computing actions.\n\nImported only by planner.py (fixed direction release -> planner -> journal /\npolicy). This module decides what the caller is allowed to request; it never\nbuilds actions, so a rejection here cannot leave partial output behind."
+              },
+              "release.py": {
+                "parse": true,
+                "routines": [
+                  {
+                    "line": 8,
+                    "end": 15,
+                    "name": "main",
+                    "docstring": null
+                  }
+                ],
+                "comments": [],
+                "moduleNote": "JSON transport for the release planner."
+              }
+            },
+            "authoredDocumentPins": [
+              {
+                "path": "modules/architecture.md",
+                "sha256": "a747fd807402be2f50b298748dd8a4e4dc3a15734abac3e845dc64358c9e020d"
+              }
+            ],
+            "supplemental": [
+              {
+                "case": "malformed-environment-list",
+                "input": {
+                  "environment": [],
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": []
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-environment",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-environment",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "case": "plan-ignores-rollback-retain",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "a",
+                      "component": "api",
+                      "units": 2,
+                      "depends_on": []
+                    }
+                  ],
+                  "retain": [
+                    "absent"
+                  ]
+                },
+                "expected": {
+                  "status": "ok",
+                  "actions": [
+                    "a"
+                  ],
+                  "units": 2
+                },
+                "actual": {
+                  "status": "ok",
+                  "actions": [
+                    "a"
+                  ],
+                  "units": 2
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "case": "staging-denied-after-replay",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 3,
+                  "changes": [
+                    {
+                      "id": "a",
+                      "component": "api",
+                      "units": 5,
+                      "depends_on": []
+                    },
+                    {
+                      "id": "b",
+                      "component": "api",
+                      "units": 5,
+                      "depends_on": []
+                    }
+                  ],
+                  "applied": [
+                    "a"
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "budget-exceeded",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "budget-exceeded",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          }
+        ],
+        "transport": [
+          {
+            "stage": "g1",
+            "passed": 19,
+            "total": 19,
+            "failed": []
+          },
+          {
+            "stage": "g2",
+            "passed": 24,
+            "total": 24,
+            "failed": []
+          }
+        ]
+      },
+      "independentOwnerBehavior": {
+        "run": "r-A6f7Fu",
+        "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+        "modes": [
+          {
+            "mode": "standard",
+            "stage": "g2",
+            "terminal": "completed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "0e8aefe77cab05299bde0f5811474c1b39c58b079cf55c20eb8e81073bf8572c"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "ba5a6b7f4f69e7c11fbcdf8eff45a4b6535981cffa84aaeff0a789d56fbb4c16"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "3263045e4d3956566ec81b3adc62abdbc19f8ba01744eb193406e3e08790fae8"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "line": 5,
+              "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+              "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+            },
+            "cases": [
+              {
+                "id": "production-bad-change-record",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-changes-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "rollback",
+                  "budget": 5,
+                  "changes": {
+                    "bad": "record"
+                  }
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-dependency-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-change-record",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-dependency-shape",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          },
+          {
+            "mode": "standard-checklist",
+            "stage": "g2",
+            "terminal": "completed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "d59247fca162dc29795df15d9c81c4c33a30ed89a8230df5fa1ebdc3e72e65f3"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "b229a580f0474bd127ac83ae1ad94056403800ed31f419e2217d3a945f3629c3"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "543ea1cd7f203c6caeebb8eafde4a2805e4ed7da440a665acc529453f01fba8b"
+              },
+              {
+                "path": "release.py",
+                "sha256": "eec8daa7dbc35a22db6353d44fb812dd4a4d5ba1ad1cbb8ea68556cbec42df55"
+              }
+            ],
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "line": 5,
+              "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+              "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+            },
+            "cases": [
+              {
+                "id": "production-bad-change-record",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-changes-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "rollback",
+                  "budget": 5,
+                  "changes": {
+                    "bad": "record"
+                  }
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-dependency-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-change-record",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-dependency-shape",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          },
+          {
+            "mode": "building-loop",
+            "stage": "g2",
+            "terminal": "closed",
+            "sourcePins": [
+              {
+                "path": "journal.py",
+                "sha256": "14f244750654f2c8c4283797220ea5f7d90d49e4e59586599651e64cdcb7f5f9"
+              },
+              {
+                "path": "planner.py",
+                "sha256": "e67f604e4864ad3a1315e724a20eabc5e7721537cb55ee79b7481fee3ba1200b"
+              },
+              {
+                "path": "policy.py",
+                "sha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722"
+              },
+              {
+                "path": "release.py",
+                "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+              }
+            ],
+            "requirement": {
+              "file": "CHANGE-G2.md",
+              "line": 5,
+              "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+              "text": "1. This release is staging-only. For `environment: production` return the normal error object with `production-frozen` before graph or change validation. Both plan and rollback are frozen, even if the graph is malformed. Never emit partial actions."
+            },
+            "cases": [
+              {
+                "id": "production-bad-change-record",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-changes-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "rollback",
+                  "budget": 5,
+                  "changes": {
+                    "bad": "record"
+                  }
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "production-bad-dependency-shape",
+                "input": {
+                  "environment": "production",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-change-record",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    null
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              },
+              {
+                "id": "staging-bad-dependency-shape",
+                "input": {
+                  "environment": "staging",
+                  "action": "plan",
+                  "budget": 5,
+                  "changes": [
+                    {
+                      "id": "api",
+                      "component": "api",
+                      "units": 1,
+                      "depends_on": "worker"
+                    }
+                  ]
+                },
+                "expected": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "actual": {
+                  "status": "error",
+                  "error": "invalid-change",
+                  "actions": [],
+                  "units": 0
+                },
+                "exitCode": 0,
+                "failure": null,
+                "passed": true
+              }
+            ]
+          }
+        ]
+      },
+      "architectureBoundaries": [
+        {
+          "stage": "g1",
+          "releaseLocalImports": [
+            "planner"
+          ],
+          "allFixedBoundaries": true
+        },
+        {
+          "stage": "g2",
+          "releaseLocalImports": [
+            "planner"
+          ],
+          "allFixedBoundaries": true
+        }
+      ],
+      "generatedResponsibilities": [
+        {
+          "stage": "g1",
+          "passed": true,
+          "proof": {
+            "version": 1,
+            "policySha256": "70f89f17f70b2cf22bc696f605e78e06f1f019155846e926dc6d49299cdf0f83",
+            "artifactsSha256": "5925974ff239b127e7f273bdd07dee111b00ec6f2e0a570a3ea69f46c6b71700",
+            "rows": [
+              {
+                "id": "nonobject-request",
+                "exampleId": "public-architecture-responsibility:example:nonobject-request",
+                "mode": "business",
+                "trigger": {
+                  "kind": "input-type",
+                  "argument": 0,
+                  "type": "object",
+                  "test": "not"
+                },
+                "clause": {
+                  "file": "SPEC.md",
+                  "start": 5,
+                  "end": 5,
+                  "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                  "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+                },
+                "status": "passed",
+                "actual": {
+                  "file": "planner.py",
+                  "symbol": "plan",
+                  "mode": "business",
+                  "sha256": "205a57ef6b0bef2870840ae6336bc3f9ea1aff27b0d1ce88e14b045c3b573f60",
+                  "line": 25,
+                  "end": 25,
+                  "conditionLine": 24,
+                  "code": "invalid-request"
+                },
+                "response": {
+                  "id": "public-architecture-responsibility:example:nonobject-request",
+                  "snapshotSha256": "27b935f39ab4e6325eff86b6607a171773e32b97d9e44886ef7227a1ea1af2d7",
+                  "exitCode": 0,
+                  "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+                  "json": {
+                    "status": "error",
+                    "error": "invalid-request",
+                    "actions": [],
+                    "units": 0
+                  }
+                },
+                "traceSha256": "757a4f14c2e904df8dd6e3863bd91939bac3937a557abd6a1c101094184dbf9b"
+              }
+            ]
+          }
+        },
+        {
+          "stage": "g2",
+          "passed": true,
+          "proof": {
+            "version": 1,
+            "policySha256": "70f89f17f70b2cf22bc696f605e78e06f1f019155846e926dc6d49299cdf0f83",
+            "artifactsSha256": "e6b80d42676e9f45ced4cdf4aaab50410b5bde9b5c6d302fd206f2162977c493",
+            "rows": [
+              {
+                "id": "nonobject-request",
+                "exampleId": "public-architecture-responsibility:example:nonobject-request",
+                "mode": "business",
+                "trigger": {
+                  "kind": "input-type",
+                  "argument": 0,
+                  "type": "object",
+                  "test": "not"
+                },
+                "clause": {
+                  "file": "SPEC.md",
+                  "start": 5,
+                  "end": 5,
+                  "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+                  "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+                },
+                "status": "passed",
+                "actual": {
+                  "file": "planner.py",
+                  "symbol": "plan",
+                  "mode": "business",
+                  "sha256": "e67f604e4864ad3a1315e724a20eabc5e7721537cb55ee79b7481fee3ba1200b",
+                  "line": 55,
+                  "end": 55,
+                  "conditionLine": 54,
+                  "code": "invalid-request"
+                },
+                "response": {
+                  "id": "public-architecture-responsibility:example:nonobject-request",
+                  "snapshotSha256": "f9b91354694cf7f0bada299291d692648a9b4dfede088875c040b33a2772cfc5",
+                  "exitCode": 0,
+                  "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+                  "json": {
+                    "status": "error",
+                    "error": "invalid-request",
+                    "actions": [],
+                    "units": 0
+                  }
+                },
+                "traceSha256": "1f0a51b517d6db476a83857bfef3aad5baa10b9c03473fdf260f39bb106173f9"
+              }
+            ]
+          }
+        }
+      ],
+      "rollbackRehearsal": {
+        "status": "passed",
+        "passed": true,
+        "hostProof": {
+          "version": 1,
+          "status": "passed",
+          "binding": {
+            "policySha256": "70f89f17f70b2cf22bc696f605e78e06f1f019155846e926dc6d49299cdf0f83",
+            "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+            "receiptSha256": "55908bfe11c370c3c1fe7de878d189642d8bfd34bb30cdb5123eb5231447b98c",
+            "originalArtifactsSha256": "e6b80d42676e9f45ced4cdf4aaab50410b5bde9b5c6d302fd206f2162977c493",
+            "rehearsalArtifactsSha256": "3e9c9235dc9ac3628cf7d29072eadc790928dde9aaf3efe3e6cda9d0187d60e5",
+            "architectureSha256": "a747fd807402be2f50b298748dd8a4e4dc3a15734abac3e845dc64358c9e020d",
+            "rollbackSha256": "7001c93c265e375981693f3613cab39d01bc9b027cfc2f45f0b673c2b089f32f",
+            "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1",
+            "proposalId": "rollback-480f03f1ca3bd02987714d6bd14811c2f3ccfc989610b879bb7e280354263fb2"
+          },
+          "changed": [
+            {
+              "file": "policy.py",
+              "beforeSha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722",
+              "afterSha256": "4107809318a514554adc828c86f5681ba4fda0a662dd32d21d8062c0744218e9"
+            }
+          ],
+          "total": 4,
+          "passed": 4,
+          "receipts": [
+            {
+              "id": "public-release-reopen-production:example:restored-production-plan",
+              "snapshotSha256": "47366f9b270c892ad69f14a391b25fb3b681731b0a5bd0b8194a042324b444ae"
+            },
+            {
+              "id": "public-release-reopen-production:example:restored-production-rollback",
+              "snapshotSha256": "9d62e0f8764a11b9980544fb8d058a173c116ed6e36e3cda9963aa86a7d1fbb8"
+            },
+            {
+              "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+              "snapshotSha256": "30b2b13f809bf9231c7a4007e8efe9313061665a6e047168d93ad2fc16685bf4"
+            },
+            {
+              "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+              "snapshotSha256": "4f57c13568046d09c6626a3bfeaacfa88f961da77c4cf51cd13323c32c41e59e"
+            }
+          ],
+          "failures": []
+        },
+        "replayed": [
+          {
+            "case": "restored-production-plan",
+            "input": {
+              "environment": "production",
+              "action": "plan",
+              "budget": 5,
+              "changes": [
+                {
+                  "id": "rollback-item",
+                  "component": "api",
+                  "units": 1,
+                  "depends_on": []
+                }
+              ]
+            },
+            "expected": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "actual": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          },
+          {
+            "case": "restored-production-rollback",
+            "input": {
+              "environment": "production",
+              "action": "rollback",
+              "budget": 0,
+              "changes": [
+                {
+                  "id": "rollback-item",
+                  "component": "api",
+                  "units": 1,
+                  "depends_on": []
+                }
+              ],
+              "applied": [
+                "rollback-item"
+              ]
+            },
+            "expected": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "actual": {
+              "status": "ok",
+              "actions": [
+                "rollback-item"
+              ],
+              "units": 1
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          },
+          {
+            "case": "staging-plan-quota-preserved",
+            "input": {
+              "environment": "staging",
+              "action": "plan",
+              "budget": 9,
+              "changes": [
+                {
+                  "id": "quota-item",
+                  "component": "api",
+                  "units": 4,
+                  "depends_on": []
+                }
+              ]
+            },
+            "expected": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            },
+            "actual": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          },
+          {
+            "case": "staging-rollback-retention-preserved",
+            "input": {
+              "environment": "staging",
+              "action": "rollback",
+              "budget": 0,
+              "changes": [
+                {
+                  "id": "rollback-item",
+                  "component": "api",
+                  "units": 1,
+                  "depends_on": []
+                }
+              ],
+              "applied": [
+                "rollback-item"
+              ],
+              "retain": [
+                "rollback-item"
+              ]
+            },
+            "expected": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "actual": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "error": null,
+            "passed": true
+          }
+        ]
+      },
+      "functionAndBoundaryQualified": true
+    }
+  ],
+  "anyFunctionAndBoundaryQualified": true,
+  "scope": "Exact frozen native qualification, black-box owner behavior, and declared module boundaries. Source-vs-document judgments remain independently read."
+}

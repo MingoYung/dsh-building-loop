@@ -1,0 +1,213 @@
+{
+  "status": "passed",
+  "carrier": "Windows DSH NEXT native Web CLI with deterministic loopback model",
+  "archiveSha256": "b4ab4882eab5b80f0077e21fa3e519ede89f0f7a8ddb706888cb7cb55487b4b2",
+  "requests": [
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 1,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 2,
+      "action": "write",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 1,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 2,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 3,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 4,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "STALE",
+      "prior": 0,
+      "action": "write",
+      "offered": false
+    },
+    {
+      "role": "child",
+      "stage": "G2",
+      "prior": 0,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "STALE",
+      "prior": 1,
+      "offered": false
+    }
+  ],
+  "scope": "Synthetic signed baselines are fixture inputs. The probe validates a goal change before dispatch under the real native host.",
+  "installedHandoffSha256": "63718171fd87de1b6394ae3e9a8fa529ea186603e412fc38e06921815b5676a9",
+  "native": {
+    "rows": [
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 17,
+        "error": false,
+        "unit": "K01",
+        "status": "started"
+      },
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 26,
+        "error": false,
+        "unit": "K01",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K01",
+          "goalSha256": "6d5d8bf859947c22c217c61b5b9fc872f204aa2516da4afcb40325a5d27ac44f",
+          "policySha256": "bf96a2a7fb2aa914576e779eebfdc0a229583844f73a1c9dc1d63157b29e0ce4",
+          "advance": {
+            "action": "advance",
+            "unit": "K01"
+          }
+        },
+        "packet": {
+          "files": [
+            {
+              "path": "SPEC.md",
+              "count": 3,
+              "start": 1,
+              "end": 3,
+              "total": 3
+            }
+          ],
+          "pending": []
+        }
+      },
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 33,
+        "error": false
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 17,
+        "error": false,
+        "unit": "K02",
+        "status": "started"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 26,
+        "error": true,
+        "text": "Error: 所有者已确认工作单元 K02；当前调用不能推进 K01"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 32,
+        "error": false,
+        "unit": "K02",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K02",
+          "goalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+          "policySha256": "bf96a2a7fb2aa914576e779eebfdc0a229583844f73a1c9dc1d63157b29e0ce4",
+          "advance": {
+            "action": "advance",
+            "unit": "K02"
+          }
+        },
+        "packet": {
+          "files": [
+            {
+              "path": "SPEC.md",
+              "count": 3,
+              "start": 1,
+              "end": 3,
+              "total": 3
+            }
+          ],
+          "pending": []
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 40,
+        "error": false,
+        "unit": "K02",
+        "phase": "intake"
+      },
+      {
+        "stage": "STALE",
+        "role": "owner",
+        "seq": 51,
+        "error": true,
+        "text": "Error: unknown tool \"building_loop_file\""
+      }
+    ],
+    "phases": {
+      "K02": "intake"
+    },
+    "distinctCoordinators": true,
+    "sameWorkspaceState": true,
+    "oldLedgerStatus": null,
+    "oldPlanUnchanged": true,
+    "oldOpeningLostTools": true,
+    "oldAttemptRejected": true,
+    "replacement": {
+      "oldGoalSha256": "6d5d8bf859947c22c217c61b5b9fc872f204aa2516da4afcb40325a5d27ac44f",
+      "newGoalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+      "previousUnit": "K01",
+      "newUnit": "K02",
+      "userEvent": 9,
+      "userSha256": "ac5859692784767308d84fb737ccc3d70275eeb7cd6e0136533c4d7575296031"
+    }
+  },
+  "formalProfileUnchanged": true
+}

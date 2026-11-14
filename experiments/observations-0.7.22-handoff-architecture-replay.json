@@ -1,0 +1,125 @@
+{
+  "run": "r-QROtUF",
+  "archiveSha256": "f3435c4515fac97c6aa3e519087633f8fc0b4cd507434878f66c28cea751fd17",
+  "unit": "K02",
+  "nativePhase": "closed",
+  "carry": "same-workspace-new-session",
+  "measurement": "same frozen Python bytes, independent WSL bubblewrap",
+  "sources": {
+    "release.py": "31b5828b351c5a2eea13382131bc6c62d107562408894075407114029aac8821",
+    "planner.py": "5cf20dff484b1f072879d0722138e177495c8897b8bc035303dbe2fca298c56b",
+    "journal.py": "7baaf8686b3c0a14f56dcb99ad19b9de28cb18bff712e1ddafa937a1c383310c",
+    "policy.py": "a4b7681b9607ade8d95b75e29422c5efb99a92467f2704451154e5df7730d9dc"
+  },
+  "frozenSourceMetadata": [
+    {
+      "path": "journal.py",
+      "sha256": "7baaf8686b3c0a14f56dcb99ad19b9de28cb18bff712e1ddafa937a1c383310c"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "5cf20dff484b1f072879d0722138e177495c8897b8bc035303dbe2fca298c56b"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "a4b7681b9607ade8d95b75e29422c5efb99a92467f2704451154e5df7730d9dc"
+    },
+    {
+      "path": "release.py",
+      "sha256": "31b5828b351c5a2eea13382131bc6c62d107562408894075407114029aac8821"
+    }
+  ],
+  "document": {
+    "file": "modules/architecture.md",
+    "sha256": "ff54da1b9ef2b5f8eed122c3c69bffe2735e9fce1d7ce3723ecd037a8c2d8d23",
+    "line": 44,
+    "text": "4. 重放先于预算（`replay-before-budget`）：同上两个变更，其中一个已在 `\"applied\"` 中，`\"budget\": 3` → 仍应成功且 `units` 只计未发布项，证明预算按重放后统计。",
+    "sameStageDependencyLine": {
+      "line": 16,
+      "text": "禁止的依赖方向（与现有方向一致，不得反转）：`release.py → planner.py → journal.py → policy.py`。传输层不得包含策略或图逻辑；`policy.py` 不得知道 `changes` 的存在；`journal.py` 不得做拓扑排序；`planner.py` 不得定义授权规则。任一模块都不得从下游反向导入上游。G2 新增的 retain 闭包计算属于图逻辑，放在 `planner.py`；retain 的形态与“必须已发布”校验属于日志语义，放在 `journal.py`；配额 3 属于策略，放在 `policy.py`。"
+    },
+    "staticImports": {
+      "start": 62,
+      "end": 67,
+      "lines": [
+        "```text",
+        "\"journal.py\" -> []",
+        "\"planner.py\" -> \"journal.py\", \"policy.py\"",
+        "\"policy.py\" -> []",
+        "\"release.py\" -> \"planner.py\"",
+        "```"
+      ]
+    }
+  },
+  "target": {
+    "file": "CHANGE-G2.md",
+    "sha256": "90beb630e7301c3642cea01bfdd38c58947531fea36dd9537520cac058c8357d",
+    "line": 6,
+    "text": "2. For a staging plan, the effective budget is the smaller of the request budget and **3**. A quota violation is `budget-exceeded`, including when the request permits more. Preserve the old rules for replay, deduplication and ordering."
+  },
+  "cases": [
+    {
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 3,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 5
+          },
+          {
+            "id": "b",
+            "component": "api",
+            "units": 5
+          }
+        ],
+        "applied": [
+          "a"
+        ]
+      },
+      "observed": {
+        "status": "error",
+        "error": "budget-exceeded",
+        "actions": [],
+        "units": 0
+      },
+      "exitCode": 0,
+      "matchesDocumentSuccessClaim": false,
+      "matchesG2Requirement": true
+    },
+    {
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 3,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 5
+          },
+          {
+            "id": "b",
+            "component": "api",
+            "units": 3
+          }
+        ],
+        "applied": [
+          "a"
+        ]
+      },
+      "observed": {
+        "status": "ok",
+        "actions": [
+          "b"
+        ],
+        "units": 3
+      },
+      "exitCode": 0,
+      "matchesDocumentSuccessClaim": true,
+      "matchesG2Requirement": true
+    }
+  ]
+}

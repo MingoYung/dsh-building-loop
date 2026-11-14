@@ -1,0 +1,2516 @@
+{
+  "spec": "building-loop-frozen-hard-postflight/1",
+  "seedSha256": "ceb6fcc28b72196906c3f5c02a334bf4b4c46955bbf075061e4a6290f99ea345",
+  "generatorSha256": "e2b053d3c05dcceed7d73ae0c75e4cb07ac21aa647035d5e251836427a9f236e",
+  "proofOfHostExit": {
+    "runIds": [
+      "r-QRyWYi",
+      "r-P5jGT4"
+    ],
+    "remainingOwnedProcesses": [],
+    "scope": "exact launcher PIDs and run directory patterns in DSH NEXT.exe, node.exe, wsl.exe",
+    "result": [
+      {
+        "run": "r-QRyWYi",
+        "status": "observed",
+        "isolatedHostStopped": true,
+        "formalProfileFingerprintsUnchanged": true
+      },
+      {
+        "run": "r-P5jGT4",
+        "status": "observed",
+        "isolatedHostStopped": true,
+        "formalProfileFingerprintsUnchanged": true
+      }
+    ]
+  },
+  "missingFrozenCandidates": [],
+  "stages": [
+    {
+      "run": "r-QRyWYi",
+      "mode": "standard",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "94cb0b2975c7e6b8db84e80516ee948b39c416d12f96c8e6ed3744e6f1d20d87"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c64c734a206b42c643f87be907d61983c0c5d0b8e8121f3cdab6c109141131a4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 9,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 109
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "compute",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 149
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "mode": "standard",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "fd5e8df3079b495f5cf0d410da9db650cd05ddded7b68d5b0609366bff8af4dc"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ef5443c95b43959820cc301b0bcbf63d09c055f9ed74d651004d2d78d3268daa"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 25,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 133
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_normalize",
+            "_signature",
+            "batch_failure",
+            "build_graph",
+            "compute",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 213
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "62827c688f28368b455a",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "4211f1c54912a0d39d1a",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "eb32d7642da000d245ce",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "7359fbf9c5c2f29ac59e",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "410aca7a1339300142ba",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "141d04b5bad0c0bd7dd2",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "886a216aa61cc0f06e80",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "f182df6b13bc1a605224",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "ef6ca8bc635b4cb77c0b",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "9a8753ad31479c1835c6",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "612a42e3ec96481165a4",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "6f2f675393215e1a5ebe",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "f0fb1feff8eeb4fb6457",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "6484a99746a7028b5069",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "b0fda20b3f49e31ea9dd",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        },
+        {
+          "id": "2553fa6a9669efa3d6d6",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "mode": "standard-checklist",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "59328b827c52579af16caf1ffa52875e683814120707c4bf8e1dbaf79ce04a24"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "5e5b84203048ad593000612c88a8bb40c37978626c5eb1143fa59d7fd6ccc462"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "9454c1326580ef3f725e9c239518531bb8e1ce2692c0ecede71c0b8d7f1d0b90"
+        },
+        {
+          "path": "release.py",
+          "sha256": "96c7ddf7660dd57724058e9bb601ce4f397d4b5bec898a21017e6079c296e7b1"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 79
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_failure",
+            "_single_rollback",
+            "_valid_batch",
+            "_valid_item",
+            "build_graph",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "single_result",
+            "topological_order"
+          ],
+          "lineCount": 218
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 66
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 35
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "mode": "standard-checklist",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "889e2178be31a5c78f807b866168fa0bfab45dcf25e8a3f84c6265c91398d9c0"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "5519608fdbe107e40104109198a1b0bad73a0febdbf06e2fdcf0e5381102ea07"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "9454c1326580ef3f725e9c239518531bb8e1ce2692c0ecede71c0b8d7f1d0b90"
+        },
+        {
+          "path": "release.py",
+          "sha256": "96c7ddf7660dd57724058e9bb601ce4f397d4b5bec898a21017e6079c296e7b1"
+        }
+      ],
+      "passed": 16,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_encode_key",
+            "_id_list",
+            "_key_order",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain",
+            "request_fingerprint"
+          ],
+          "lineCount": 184
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_failure",
+            "_single_rollback",
+            "_valid_batch",
+            "_valid_item",
+            "_valid_operation_id",
+            "build_graph",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "single_result",
+            "topological_order"
+          ],
+          "lineCount": 319
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 66
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 35
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "62827c688f28368b455a",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "4211f1c54912a0d39d1a",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "eb32d7642da000d245ce",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "7359fbf9c5c2f29ac59e",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "410aca7a1339300142ba",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "141d04b5bad0c0bd7dd2",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "886a216aa61cc0f06e80",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "f182df6b13bc1a605224",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "ef6ca8bc635b4cb77c0b",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "9a8753ad31479c1835c6",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "612a42e3ec96481165a4",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "6f2f675393215e1a5ebe",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "f0fb1feff8eeb4fb6457",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "6484a99746a7028b5069",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "b0fda20b3f49e31ea9dd",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "2553fa6a9669efa3d6d6",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "mode": "building-loop",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": "closed",
+      "terminal": "closed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "is_valid_item",
+            "item_request",
+            "read_applied",
+            "read_batch_head",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 130
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_result",
+            "topological_order"
+          ],
+          "lineCount": 204
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 23
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "mode": "building-loop",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": "closed",
+      "terminal": "closed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54"
+        }
+      ],
+      "passed": 32,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_canonical",
+            "_id_list",
+            "_read_dependencies",
+            "is_valid_item",
+            "is_valid_limit",
+            "item_request",
+            "operation_request_key",
+            "read_applied",
+            "read_batch_head",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 202
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_result",
+            "topological_order"
+          ],
+          "lineCount": 240
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 23
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "passed"
+        },
+        {
+          "id": "62827c688f28368b455a",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "4211f1c54912a0d39d1a",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "passed"
+        },
+        {
+          "id": "eb32d7642da000d245ce",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "7359fbf9c5c2f29ac59e",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "passed"
+        },
+        {
+          "id": "410aca7a1339300142ba",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "passed"
+        },
+        {
+          "id": "141d04b5bad0c0bd7dd2",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "886a216aa61cc0f06e80",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "f182df6b13bc1a605224",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "passed"
+        },
+        {
+          "id": "ef6ca8bc635b4cb77c0b",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "passed"
+        },
+        {
+          "id": "9a8753ad31479c1835c6",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "612a42e3ec96481165a4",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "passed"
+        },
+        {
+          "id": "6f2f675393215e1a5ebe",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "f0fb1feff8eeb4fb6457",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "6484a99746a7028b5069",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "b0fda20b3f49e31ea9dd",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        },
+        {
+          "id": "2553fa6a9669efa3d6d6",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "mode": "standard",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "0a4ebe0c99ff9621c1b1746871ea187bd3979edae08cd5c37ec186746729029b"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e6a15e4d9626dfb82d8509abed9f59dc7a17555aec12522798145e991626a7e4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "af1848306f4400843e6ab9bc5a1d3ab8351f8afaf5f867afad76b0af79ab726f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "f71dce859fc583496e4629969854eac9e499a5563d2f159fb20a48c8a0beaa32"
+        }
+      ],
+      "passed": 9,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "batch_item",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 122
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "execute",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 136
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 84
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 23
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "mode": "standard",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "99b2bf49f68ba4cbe58d0231abb2a17e2109396dd8e660f275bf28475957c88c"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "642cf7976b5522937a2cb75da7ea7c37b02cf124eb85adb12f42672559256a27"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "9056e2c08654a2889bd6ba0cccb508b9a55f77bb15e8d091f782cc6634d6154e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "f71dce859fc583496e4629969854eac9e499a5563d2f159fb20a48c8a0beaa32"
+        }
+      ],
+      "passed": 16,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_canonical",
+            "_id_list",
+            "_read_dependencies",
+            "batch_item",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_item_shape",
+            "read_retain",
+            "request_data"
+          ],
+          "lineCount": 198
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "execute",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 166
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for",
+            "read_limit",
+            "read_operation_id"
+          ],
+          "lineCount": 121
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 23
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "62827c688f28368b455a",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "4211f1c54912a0d39d1a",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "eb32d7642da000d245ce",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "7359fbf9c5c2f29ac59e",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "410aca7a1339300142ba",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "141d04b5bad0c0bd7dd2",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "886a216aa61cc0f06e80",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "f182df6b13bc1a605224",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "ef6ca8bc635b4cb77c0b",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "9a8753ad31479c1835c6",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "612a42e3ec96481165a4",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "6f2f675393215e1a5ebe",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "f0fb1feff8eeb4fb6457",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "6484a99746a7028b5069",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "b0fda20b3f49e31ea9dd",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results"
+        },
+        {
+          "id": "2553fa6a9669efa3d6d6",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "mode": "standard-checklist",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "0e7c3f29b881bda65b28f748bc9c00fe7839d8c7ed0d93575858639586478634"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "225c32621d4ddfab1d0960352d72c772a583485232d8a8c705e6b43e2beb8624"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "bda5d66e6b6ea22c4519f856bdaaa812988ad7695759e9be7a55748a99254f9d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2290b974902ca8170bf5a0c6695aaa680f51f24af4c9fb17dc26a856dc03315d"
+        }
+      ],
+      "passed": 9,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 95
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_success",
+            "build_graph",
+            "failure",
+            "plan",
+            "resolve",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 183
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "decision_for_rollback",
+            "limit_for",
+            "read_budget",
+            "read_environment"
+          ],
+          "lineCount": 95
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_error",
+            "dispatch",
+            "main"
+          ],
+          "lineCount": 52
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: results, units"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "mode": "standard-checklist",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "error",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "0e7c3f29b881bda65b28f748bc9c00fe7839d8c7ed0d93575858639586478634"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "225c32621d4ddfab1d0960352d72c772a583485232d8a8c705e6b43e2beb8624"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "bda5d66e6b6ea22c4519f856bdaaa812988ad7695759e9be7a55748a99254f9d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2290b974902ca8170bf5a0c6695aaa680f51f24af4c9fb17dc26a856dc03315d"
+        }
+      ],
+      "passed": 0,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 95
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_success",
+            "build_graph",
+            "failure",
+            "plan",
+            "resolve",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 183
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "decision_for_rollback",
+            "limit_for",
+            "read_budget",
+            "read_environment"
+          ],
+          "lineCount": 95
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_error",
+            "dispatch",
+            "main"
+          ],
+          "lineCount": 52
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "62827c688f28368b455a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "4211f1c54912a0d39d1a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "eb32d7642da000d245ce",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "7359fbf9c5c2f29ac59e",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "410aca7a1339300142ba",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "141d04b5bad0c0bd7dd2",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "886a216aa61cc0f06e80",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "f182df6b13bc1a605224",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "ef6ca8bc635b4cb77c0b",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "9a8753ad31479c1835c6",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "612a42e3ec96481165a4",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "6f2f675393215e1a5ebe",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "f0fb1feff8eeb4fb6457",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "6484a99746a7028b5069",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "b0fda20b3f49e31ea9dd",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: status, results, units"
+        },
+        {
+          "id": "2553fa6a9669efa3d6d6",
+          "status": "failed",
+          "exitCode": 0,
+          "failure": "Result differs for fields: error"
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "mode": "building-loop",
+      "stage": "g3",
+      "carry": "same-frozen-seed",
+      "phase": "closed",
+      "terminal": "closed",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "86f4032c73c1ecb9465f88b24596a290cf880db6039d6f0316d91b80f1b4b7e1"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "99ef6be432dc7e93c8ac04f7a8cff34d5d047050c3bf81045eedd6d0cd759349"
+        },
+        {
+          "path": "release.py",
+          "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4"
+        }
+      ],
+      "passed": 16,
+      "total": 16,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_items",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 95
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "solve_rollback",
+            "topological_order"
+          ],
+          "lineCount": 192
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_budget",
+            "limit_for"
+          ],
+          "lineCount": 79
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "planner",
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "dispatch",
+            "error",
+            "main"
+          ],
+          "lineCount": 60
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "mode": "building-loop",
+      "stage": "g4",
+      "carry": "same-workspace-new-session",
+      "phase": "blocked",
+      "terminal": "blocked",
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "6d5046e6d8b406bd6db70266a1daa17c94b3428edccd2ab474accb2f3e70174e"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "9ace5c23e040952b8a3edcc45c2d6fd680ab750e0956b265386c87075abdc4f2"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "bd3203eab7575653029303ec94163c585226d6da4d421427f50453b899c022fd"
+        },
+        {
+          "path": "release.py",
+          "sha256": "83cf2c0155df9d53a0bcd347576c5a286c54878f86d29211cf0ee8f9ecb5ed42"
+        }
+      ],
+      "passed": 32,
+      "total": 32,
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch_items",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 117
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_checked_operation_id",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "request_identity",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "solve_batch_item",
+            "solve_rollback",
+            "topological_order"
+          ],
+          "lineCount": 282
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "batch_limit",
+            "check_budget",
+            "limit_for"
+          ],
+          "lineCount": 93
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "planner",
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "dispatch",
+            "error",
+            "main"
+          ],
+          "lineCount": 64
+        }
+      },
+      "cases": [
+        {
+          "id": "f2f436553dbb33ecbf7c",
+          "status": "passed"
+        },
+        {
+          "id": "62827c688f28368b455a",
+          "status": "passed"
+        },
+        {
+          "id": "61a1c6806b1c8ff0385e",
+          "status": "passed"
+        },
+        {
+          "id": "4211f1c54912a0d39d1a",
+          "status": "passed"
+        },
+        {
+          "id": "921368c032674d4574b9",
+          "status": "passed"
+        },
+        {
+          "id": "eb32d7642da000d245ce",
+          "status": "passed"
+        },
+        {
+          "id": "2d3d879719070a7828bc",
+          "status": "passed"
+        },
+        {
+          "id": "7359fbf9c5c2f29ac59e",
+          "status": "passed"
+        },
+        {
+          "id": "e0c4bf1a7a1e774cb2f8",
+          "status": "passed"
+        },
+        {
+          "id": "410aca7a1339300142ba",
+          "status": "passed"
+        },
+        {
+          "id": "e15a8a89f3264f9b5667",
+          "status": "passed"
+        },
+        {
+          "id": "141d04b5bad0c0bd7dd2",
+          "status": "passed"
+        },
+        {
+          "id": "f0f31be61cfd721efd5d",
+          "status": "passed"
+        },
+        {
+          "id": "886a216aa61cc0f06e80",
+          "status": "passed"
+        },
+        {
+          "id": "832163bf4ca1ba258559",
+          "status": "passed"
+        },
+        {
+          "id": "f182df6b13bc1a605224",
+          "status": "passed"
+        },
+        {
+          "id": "547968609f86cac9123a",
+          "status": "passed"
+        },
+        {
+          "id": "ef6ca8bc635b4cb77c0b",
+          "status": "passed"
+        },
+        {
+          "id": "833b562a07789294d0ad",
+          "status": "passed"
+        },
+        {
+          "id": "9a8753ad31479c1835c6",
+          "status": "passed"
+        },
+        {
+          "id": "a8969aaa2bfc12449eb5",
+          "status": "passed"
+        },
+        {
+          "id": "612a42e3ec96481165a4",
+          "status": "passed"
+        },
+        {
+          "id": "8479f89eded65ecb5641",
+          "status": "passed"
+        },
+        {
+          "id": "6f2f675393215e1a5ebe",
+          "status": "passed"
+        },
+        {
+          "id": "4d1b3c076e6bca2a2d99",
+          "status": "passed"
+        },
+        {
+          "id": "f0fb1feff8eeb4fb6457",
+          "status": "passed"
+        },
+        {
+          "id": "5b19b7f45c361fa2142a",
+          "status": "passed"
+        },
+        {
+          "id": "6484a99746a7028b5069",
+          "status": "passed"
+        },
+        {
+          "id": "371697c54c3a54f3d940",
+          "status": "passed"
+        },
+        {
+          "id": "b0fda20b3f49e31ea9dd",
+          "status": "passed"
+        },
+        {
+          "id": "8f92bdc1c17dee98e851",
+          "status": "passed"
+        },
+        {
+          "id": "2553fa6a9669efa3d6d6",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

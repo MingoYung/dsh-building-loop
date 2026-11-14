@@ -1,0 +1,7227 @@
+{
+  "scope": "Follow-up public transport shape cases on exact frozen native sources in isolated WSL",
+  "records": [
+    {
+      "run": "r-hO1Nzt",
+      "fixture": "short-expanded",
+      "mode": "standard",
+      "stage": "g1",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "44b4fd9cac2cce5db74e9285e073a7328bb01140e571c1b30dfb67e5fddd4e86"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d4f28c04839f9773a477b7467ca2d935d64898e346a0ce4c02c09941d0445e39"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "42f84fb9722d42fce61724b3e5451eaeab5792d4a5b76e83915020da16244f60"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 17,
+      "total": 19,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "pass": false
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "pass": false
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-hO1Nzt",
+      "fixture": "short-expanded",
+      "mode": "standard",
+      "stage": "g2",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "b533d9275bef04152ea22174d1c7bb8f3b9845056a28aad890b8e284ab41278f"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "40dd4327a3de34c36fd137acbafe28e4d7220dafdf4d69162a72695fca98480e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "1f5730f946a5cb65b4da99519984db25422ccfa887077695993c6e0ae2e8543e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 22,
+      "total": 24,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "pass": false
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-array",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "pass": false
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-object",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-null",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-hO1Nzt",
+      "fixture": "short-expanded",
+      "mode": "standard-checklist",
+      "stage": "g1",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "6cd96e38f7627a50e9261866e07e0090690fa0edc9bc7de0569396bafc0a20e0"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "0176619103415829c86b6610f1e1789772d66f3e3b1e9f84912fae2130deb8a9"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "a37f3c9d017b314816c243b3591e0c8b135b898c05399f0d1cc36b8fdb7fde7d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "a7858a117ee73a1616b4b74feea0b1fe3261672532b2634053a9c7b5b7ae8985"
+        }
+      ],
+      "passed": 16,
+      "total": 19,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "pass": false
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "pass": false
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        }
+      ]
+    },
+    {
+      "run": "r-hO1Nzt",
+      "fixture": "short-expanded",
+      "mode": "standard-checklist",
+      "stage": "g2",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "0343cbe6fb4feeffd325c0fb5c4c96c1f8a3c7f621391a1a0fd1d21f12685c1e"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "94e9ad38c30082a50646708ae409585910efdbc4a310bb98db27fee6fe6bb21c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "12d768bdc6668a8ac04be2bcf79041b04111c06d332f42a2295df8b4ebce884f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "a7858a117ee73a1616b4b74feea0b1fe3261672532b2634053a9c7b5b7ae8985"
+        }
+      ],
+      "passed": 20,
+      "total": 24,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "pass": false
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-array",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "pass": false
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-object",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        },
+        {
+          "case": "retain-null",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        },
+        {
+          "case": "valid-missing-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-hO1Nzt",
+      "fixture": "short-expanded",
+      "mode": "building-loop",
+      "stage": "g1",
+      "carry": "same-frozen-seed",
+      "phase": "closed",
+      "terminal": "closed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "9f478d7ea84dbd8f3255a4e912efe6e55fa78273ad2db1406ea7fda60b74d006"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "7fe4298479d7611e212be41d17e696dbc993fa84e66c9151ac808ac79e403528"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "b27ec599dca18716a174dffcf4dceec8b69433de3c342b0e62bebc762775ab22"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 19,
+      "total": 19,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-hO1Nzt",
+      "fixture": "short-expanded",
+      "mode": "building-loop",
+      "stage": "g2",
+      "carry": "same-workspace-new-session",
+      "phase": "closed",
+      "terminal": "closed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "79b501caed0569bc1539952f4b2bcbf5766a25d1e09af0c16eecc9f6b162f708"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d0ddadc04411f7eea0d4a12816c8f5289aa592772b15db36a921eaaf407a803d"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "87e022916f715cf9f45ed0299cbcc9f2cfe18a0824dbeb9031af534c091955d6"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 24,
+      "total": 24,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-array",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-object",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-null",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-oLvANE",
+      "fixture": "short-expanded",
+      "mode": "standard",
+      "stage": "g1",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "4352ca690e2a44dd47daa5cef98885b2815de8a4540b19fb9de71c7487c5080f"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "7080fba000e5fd5d56e2ca7d9688e41770a25518f5d2fc975019093bfe2a780d"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "902b2269f567e5748e9f56d8070ecc8411f9a750311c8624f65d4f89fa09289e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 18,
+      "total": 19,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        }
+      ]
+    },
+    {
+      "run": "r-oLvANE",
+      "fixture": "short-expanded",
+      "mode": "standard",
+      "stage": "g2",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completion-cap",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "6dee78c184a6d2cbe3bdb8dbe023211023032a9e0aa8d8dbbc3b1d9a70fe04a4"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8f4f54286e818a09c27c8f24c7f8f4985f3850ecc7d22197a30bed8d49a2bc6e"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "3cc20d0b74aac5c79968f7b18647acbc4636e0cb83e5ef1b3f71b5aaafe0cd3f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 22,
+      "total": 24,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-array",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-object",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        },
+        {
+          "case": "retain-null",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        },
+        {
+          "case": "valid-missing-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-oLvANE",
+      "fixture": "short-expanded",
+      "mode": "standard-checklist",
+      "stage": "g1",
+      "carry": "same-frozen-seed",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "4980445fe68b175beb3b33a3c0ae00130316d35026b441d5073d012f909832ca"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ac0aa857826826c1350309b5bdad08896786e5c01baec817b20e189589f20d26"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "bdd19f0126a9f679c89514ee570ee444dda6e06448b82d628555bf87de2a4293"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 16,
+      "total": 19,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "pass": false
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "pass": false
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        }
+      ]
+    },
+    {
+      "run": "r-oLvANE",
+      "fixture": "short-expanded",
+      "mode": "standard-checklist",
+      "stage": "g2",
+      "carry": "same-workspace-new-session",
+      "phase": null,
+      "terminal": "completed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "b1e8d1b5f15cbea91b9af851bae0885a332cd6004e33ce52e9372b1214462286"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "da33c68c11e8a57f9926f48e36269d3e49ecd7063cb1fac3338f5992d2f4502b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "4cec465dc3639b1353fe2bb8c76a8424093862b32a3cdaf6582df0e15dc08d69"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "passed": 20,
+      "total": 24,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')",
+          "pass": false
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-array",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": null,
+          "exitCode": 1,
+          "failure": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')",
+          "pass": false
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-object",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        },
+        {
+          "case": "retain-null",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": false
+        },
+        {
+          "case": "valid-missing-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-oLvANE",
+      "fixture": "short-expanded",
+      "mode": "building-loop",
+      "stage": "g1",
+      "carry": "same-frozen-seed",
+      "phase": "first-audit-ready",
+      "terminal": "completion-cap",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "884557b0d81d6da6011e7e025b4d28411a13b88961742c5cb5f3a385ab0e5fc4"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "de5fcc43aa98ec378f5885e67d3d207cf010e96c083720f7ac42901719e65e6a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "9fdb56df267c418a094dc8a0c5b3f4085936adc5b4fa23defd5a7023224c23b5"
+        },
+        {
+          "path": "release.py",
+          "sha256": "535de104de7f63152b586c6c15ad98a123ffa086011b96f6e5d3580d9d2eadf5"
+        }
+      ],
+      "passed": 19,
+      "total": 19,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "run": "r-oLvANE",
+      "fixture": "short-expanded",
+      "mode": "building-loop",
+      "stage": "g2",
+      "carry": "frozen-workspace-continuation-after-timeout",
+      "phase": "closed",
+      "terminal": "closed",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "15ad32b68cc0b2dadd612832bd53ad9bfd8be313cf7398fd36eb8cbda33c8463"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e57de82beacc322655e5a3126f786fb30e3e95f8f3cfee54ede46986273af7d7"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "564f34c8b57c409de773d220b4b08a81d13138131d4eabe05a267f5ddc32b5a6"
+        },
+        {
+          "path": "release.py",
+          "sha256": "535de104de7f63152b586c6c15ad98a123ffa086011b96f6e5d3580d9d2eadf5"
+        }
+      ],
+      "passed": 24,
+      "total": 24,
+      "outcomes": [
+        {
+          "case": "root-null",
+          "input": null,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-bool",
+          "input": false,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-number",
+          "input": 3,
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "root-string",
+          "input": "\"staging\"",
+          "expected": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-malformed-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-depends-on",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": null
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-null-change",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              null
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-bool-units",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": true,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-id",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "graph-empty-component",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-applied",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-array",
+          "input": {
+            "environment": "staging",
+            "action": [],
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-array",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-array",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": []
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-object",
+          "input": {
+            "environment": "staging",
+            "action": {},
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-object",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-object",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": {}
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-boolean",
+          "input": {
+            "environment": "staging",
+            "action": true,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-boolean",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": true
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "action-null",
+          "input": {
+            "environment": "staging",
+            "action": null,
+            "budget": 5,
+            "changes": []
+          },
+          "expected": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "unsupported-action",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "applied-null",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 5,
+            "changes": [],
+            "applied": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-change",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "retain-null",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ],
+            "retain": null
+          },
+          "expected": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "actual": {
+            "status": "error",
+            "error": "invalid-retain",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        },
+        {
+          "case": "valid-missing-retain",
+          "input": {
+            "environment": "staging",
+            "action": "rollback",
+            "budget": 5,
+            "changes": [
+              {
+                "id": "a",
+                "component": "api",
+                "units": 1,
+                "depends_on": []
+              }
+            ],
+            "applied": [
+              "a"
+            ]
+          },
+          "expected": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          },
+          "exitCode": 0,
+          "failure": null,
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "missing": []
+}

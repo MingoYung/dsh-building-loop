@@ -1,0 +1,86 @@
+{
+  "run": "r-h4cllo",
+  "stage": "g1",
+  "architectureSha256": "804dc17ba45b36b67927c6aa3e59fd7b7d54931931a3c054af3052d7de3a8c8a",
+  "correctedSha256": "0d34fd7dd033e2f6086c3c2d727399016478af5ab284084e36711369d61dacac",
+  "sources": [
+    {
+      "path": "journal.py",
+      "sha256": "53bf94936e7a4585656f43b121d0ec6ceae05723978c741647ee043a8d31f4df"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "7edf2d00f6c04e57a8c5b00ddc15e9a5882b2c113225b82a3e7ac81b9fcc9813"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "5e1e65c084efb694b2dd69af526525f3566937c3d86b82b1f94a535d0f556e08"
+    },
+    {
+      "path": "release.py",
+      "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+    }
+  ],
+  "original": [
+    {
+      "line": 17,
+      "from": "release.py",
+      "relation": "json-decoder-call",
+      "symbol": "json.loads",
+      "actual": [
+        {
+          "file": "release.py",
+          "line": 10,
+          "symbol": "json.load"
+        }
+      ]
+    },
+    {
+      "line": 18,
+      "from": "journal.py",
+      "relation": "validation",
+      "field": "environment",
+      "actual": [
+        {
+          "file": "policy.py",
+          "symbol": "read_policy",
+          "field": "environment",
+          "line": 34,
+          "code": "invalid-environment"
+        }
+      ]
+    },
+    {
+      "line": 18,
+      "from": "journal.py",
+      "relation": "validation",
+      "field": "action",
+      "actual": [
+        {
+          "file": "policy.py",
+          "symbol": "read_policy",
+          "field": "action",
+          "line": 39,
+          "code": "unsupported-action"
+        }
+      ]
+    },
+    {
+      "line": 18,
+      "from": "journal.py",
+      "relation": "validation",
+      "field": "budget",
+      "actual": [
+        {
+          "file": "policy.py",
+          "symbol": "read_policy",
+          "field": "budget",
+          "line": 43,
+          "code": "invalid-budget"
+        }
+      ]
+    }
+  ],
+  "correctedCount": 0,
+  "evidence": "Exact captured G1 draft and source graph. The corrected control was built offline without using the model."
+}

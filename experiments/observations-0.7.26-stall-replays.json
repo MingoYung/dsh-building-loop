@@ -1,0 +1,182 @@
+{
+  "spec": "building-loop-stall-replays/1",
+  "date": "2026-11-13",
+  "source": "observations-0.7.25-hard-diagnostics.json",
+  "scope": "Deterministic Windows Node registered handlers and exact archived G3 source snapshots with local WSL/bwrap. No DeepSeek calls or hidden grading input.",
+  "usage": {
+    "modelCalls": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": 0,
+    "cacheHitRate": null
+  },
+  "archivedPublicReplay": {
+    "tool": "0.7.25 owner-registered WSL/bwrap public sandbox",
+    "syntax": {
+      "run": "r-WQrVi1",
+      "sourceSha256": {
+        "journal.py": "7afcad8f0029663efd8d1b5aba8bae70458f9084eea133dfbd772a0f363bcbf4",
+        "planner.py": "02787b1851cdfd591c2fa10f20d688f38b21d1a300287eb6c03ce85c21ff0d4f",
+        "policy.py": "ddf30631df6bc98fdda3f8cc22eb325e5e43c30bfe7873a6035301394f78f5e3",
+        "release.py": "9753bce45dca0be87022ec9af9ac214f8a9080ed0e0482e55cb16df79a6a9ad4"
+      },
+      "defectiveLines": [
+        2,
+        8
+      ],
+      "compiler": {
+        "line": 68,
+        "message": "unterminated triple-quoted string literal (detected at line 97)"
+      },
+      "raw": {
+        "exitCode": 1,
+        "stdout": "{\"status\": \"syntax-error\", \"line\": 68}\n",
+        "stderr": "",
+        "truncated": false
+      },
+      "positiveControl": {
+        "sha256": "153067432e609bc5ccb7b9ca40e271ae4603fb2f7f8b371486b84efd6d468573",
+        "result": {
+          "exitCode": 0,
+          "stdout": "{\"status\":\"parsed\"}\n",
+          "stderr": "",
+          "truncated": false
+        }
+      },
+      "source": "journal.py",
+      "cause": "The delimiter at line 2 prematurely closes the opening docstring; lines 4–7 are bare text and line 8 becomes an opening delimiter.",
+      "isolatedCorrection": "Remove the line 2 closing delimiter so the original line 8 closes the docstring."
+    },
+    "behavior": {
+      "run": "r-1lGpNB",
+      "sourceSha256": {
+        "journal.py": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8",
+        "planner.py": "52d0f72c8c26c687e237bf25292207c854071bad2b016b371af6585e33a7aa27",
+        "policy.py": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+        "release.py": "fbbfea09c483a0fcd09c65b9da80386e63121130f4f0ecd7bdacebd06031024c"
+      },
+      "defectiveLines": [
+        74,
+        77
+      ],
+      "publicRequest": {
+        "action": "rollback-many",
+        "requests": [
+          {
+            "environment": "staging",
+            "budget": 0,
+            "changes": [
+              {
+                "id": "a",
+                "component": "db",
+                "units": 2
+              },
+              {
+                "id": "b",
+                "component": "db",
+                "units": 1,
+                "depends_on": [
+                  "a"
+                ]
+              },
+              {
+                "id": "c",
+                "component": "db",
+                "units": 1,
+                "depends_on": [
+                  "b"
+                ]
+              }
+            ],
+            "applied": [
+              "a",
+              "c"
+            ],
+            "retain": [
+              "c"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "results": [
+          {
+            "actions": [],
+            "units": 0
+          }
+        ],
+        "units": 0
+      },
+      "raw": {
+        "exitCode": 0,
+        "stdout": "{\"status\":\"ok\",\"results\":[{\"actions\":[\"a\"],\"units\":2}],\"units\":2}\n",
+        "stderr": "",
+        "truncated": false
+      },
+      "positiveControl": {
+        "sha256": "09721c1ffebb52fd48ae5e59328caab4af387602669c873cfa71433b2557d4f8",
+        "result": {
+          "exitCode": 0,
+          "stdout": "{\"status\":\"ok\",\"results\":[{\"actions\":[],\"units\":0}],\"units\":0}\n",
+          "stderr": "",
+          "truncated": false
+        }
+      },
+      "source": "planner.py",
+      "cause": "The applied-set guard stops traversal at an unapplied intermediate node and misses its applied ancestors.",
+      "isolatedCorrection": "Track visited nodes separately from the applied retained set and continue traversal through unapplied nodes."
+    },
+    "historicalAdapterMisclassifiedProbeCounts": {
+      "r-WQrVi1": 6,
+      "r-1lGpNB": 6
+    }
+  },
+  "registeredHost": {
+    "test": "test/stall-workflow.test.mjs",
+    "controlBeforeLifecycle": {
+      "tests": 4,
+      "pass": 1,
+      "fail": 3,
+      "finding": "Both stalls and the stale-proof setup remained in intake; expected diagnosis-ready."
+    },
+    "intermediateHandoff": {
+      "tests": 5,
+      "pass": 3,
+      "fail": 2,
+      "skipped": 0,
+      "finding": "Two tests expected source proof inside the resume notification after the host moved proof and replay data to the authorized executor prepare packet. Assertions were updated to require the same executor notification and pin the prepare packet."
+    },
+    "intermediateParameterAssertion": {
+      "tests": 6,
+      "pass": 5,
+      "fail": 1,
+      "skipped": 0,
+      "finding": "The test expected the stored stalledRecipe key on the public tool output. The public field is recipe; rerun then exercised the corrected same-recipe proof and executor handoff."
+    },
+    "current": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "coverage": [
+        "Repeated unchanged syntax check failure and repeated zero-exit probes while the registered behavior check still fails.",
+        "Required phase prompts; coordinator source read, search, write and terminal denied; investigator read-only and exact scope.",
+        "The final host exposes behavior expectations only on the diagnostician's separate tool. The ordinary reproduction schema contains only action and recipe input data.",
+        "Observed source lines and version fingerprints; syntax report can point elsewhere in the same file; behavior proof requires a grounded comparator.",
+        "Forged, rejected and stale proof blocked; source bytes and owner goal changes independently invalidate parked evidence; interrupted investigator resumes under the same identity; source progress and complete green checks reset counters.",
+        "Three malformed same-recipe probes are rejected before network execution. Corrected arguments reach the runner and produce a parameter recovery receipt even when the compiler then reports a distinct syntax failure.",
+        "The same executor receives authorized proof and replay data from prepare; missing signature and signed old-case regression block submission; a distinct first reviewer starts on a qualified submission."
+      ]
+    }
+  },
+  "exactArchivedSourceThroughCurrentHost": {
+    "tests": 2,
+    "pass": 2,
+    "fail": 0,
+    "skipped": 0,
+    "toolContract": "The final split-tool variant uses ordinary building_loop_reproduce for compiler inputs and building_loop_diagnosis_probe for the behavior comparator.",
+    "input": "Verified all four archived implementation SHA-256 pins for each historical run; used the original WSL/bwrap public probes against current host artifact payloads.",
+    "result": "Both cases reached triage, read-only diagnosis, current-version verification and original-executor repair. The isolated syntax correction compiled and the isolated behavior correction produced the expected public result. Regression signing and non-public result statuses in this replay use a local test key and controlled fixture."
+  }
+}

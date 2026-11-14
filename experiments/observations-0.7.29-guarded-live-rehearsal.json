@@ -1,0 +1,186 @@
+{
+  "scope": "Actual isolated Windows DSH session and same signed source. Session identities are hashed and opaque edit literals are not exported.",
+  "run": "r-h4cllo",
+  "stage": "g2",
+  "archiveSha256": "48e0cc57cf63463aff11ecea2478b0302baacddc7c4d6c6eeb73841b55374171",
+  "signedSourceUnchanged": true,
+  "sourcePins": [
+    {
+      "path": "journal.py",
+      "sha256": "688b08603c23c3c8f7b24a091283c28e3f3ac224c9abbf0707031cc59db9b3da"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "a63ad3d840bdce74c9ea0b08f33ee10abb6193162f0857997d1c093f3989361a"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "8c0bc21954bb858e556d223dc6a71dce4342fedacbf9d3732c6b834f74e9903a"
+    },
+    {
+      "path": "release.py",
+      "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+    }
+  ],
+  "timeline": [
+    {
+      "role": "coordinator",
+      "session": "22dbe3ad4695",
+      "seq": 60,
+      "elapsedMs": 23764,
+      "phase": "intake",
+      "assignment": {
+        "reused": false,
+        "child": "f079016a717d"
+      }
+    },
+    {
+      "role": "executor",
+      "session": "f079016a717d",
+      "seq": 101,
+      "elapsedMs": 86503,
+      "phase": "intake",
+      "rollbackProposalRegistered": {
+        "id": "rollback-00a4e769425313bbdebd900185916a1c5583ae531cbac5760baa6e0fbb0026a1",
+        "files": [
+          "policy.py"
+        ]
+      }
+    },
+    {
+      "role": "coordinator",
+      "session": "22dbe3ad4695",
+      "seq": 122,
+      "elapsedMs": 122742,
+      "phase": "architecture-sync",
+      "rollbackRehearsal": {
+        "status": "rollback-failed",
+        "total": 4,
+        "passed": 3,
+        "failures": [
+          {
+            "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+            "outcome": "mismatch",
+            "exitCode": 0,
+            "actualSha256": "a2f91d50dc0d250be1555162141f72444319fc71d613a8038cb4a8c70811e117"
+          }
+        ]
+      }
+    },
+    {
+      "role": "coordinator",
+      "session": "22dbe3ad4695",
+      "seq": 129,
+      "elapsedMs": 127271,
+      "phase": "intake",
+      "assignment": {
+        "reused": true,
+        "child": "f079016a717d"
+      }
+    },
+    {
+      "role": "executor",
+      "session": "f079016a717d",
+      "seq": 122,
+      "elapsedMs": 130518,
+      "phase": "intake",
+      "rollbackRepair": {
+        "id": "981185d7b66469bdd82ebbb7500e74705a9587d0a61347f13530c5782673f128",
+        "proposalId": "rollback-00a4e769425313bbdebd900185916a1c5583ae531cbac5760baa6e0fbb0026a1",
+        "failedChecks": [
+          "public-release-reopen-production:example:staging-plan-quota-preserved"
+        ],
+        "observedChecks": 4
+      }
+    },
+    {
+      "role": "executor",
+      "session": "f079016a717d",
+      "seq": 128,
+      "elapsedMs": 135532,
+      "phase": "architecture-sync",
+      "rollbackProposalRegistered": {
+        "id": "rollback-ef75dcbc88850477d49c19324fbad43b9feea70d9359977e7a7e22f750687e2f",
+        "files": [
+          "policy.py"
+        ]
+      }
+    },
+    {
+      "role": "coordinator",
+      "session": "22dbe3ad4695",
+      "seq": 172,
+      "elapsedMs": 148808,
+      "phase": "review-ready",
+      "rollbackRehearsal": {
+        "status": "passed",
+        "passed": 4,
+        "total": 4,
+        "binding": {
+          "policySha256": "3438d30d61fd300698fe548ce18a5ce69a4b9a0dc14199e7fdc6b0935e56bb46",
+          "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+          "receiptSha256": "ccb9398dfe10dabeb6940aa47729e51e66c4e7592cb4391fd0c59972c95d859f",
+          "originalArtifactsSha256": "e19958f5763ce9c18a36537de56729260f1e520887ba8a34f869218e0a7d2b09",
+          "rehearsalArtifactsSha256": "6ab8d0a1f521876f88193b2ac4ef34e0cf0b3233e55b279476a112019a612241",
+          "architectureSha256": "e24548c0772140b9d9c63ffba8058fd76036674f05cc3ee2415def854b5823d2",
+          "rollbackSha256": "73f5f918288f89cb3b900fd949e3afbe583a4dd2a2fded9694933094bcd6e786",
+          "checksSha256": "bf67cea7874aa9427a1b51cc5cd098d7fdaaad2f430b400b9cab3fe1935407b1",
+          "proposalId": "rollback-ef75dcbc88850477d49c19324fbad43b9feea70d9359977e7a7e22f750687e2f"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "8c0bc21954bb858e556d223dc6a71dce4342fedacbf9d3732c6b834f74e9903a",
+            "afterSha256": "bb170d5b55465792955b4cc3ec287fe2c8db084099ba545e2bd00e82cc721db6"
+          }
+        ],
+        "receipts": [
+          {
+            "id": "public-release-reopen-production:example:restored-production-plan",
+            "snapshotSha256": "b7b0fd3e82243af37fe9fa947912577e1168bba23ac1b5959e81f56078390e9d"
+          },
+          {
+            "id": "public-release-reopen-production:example:restored-production-rollback",
+            "snapshotSha256": "06002e393f84bcc29dc24641b6b4bc4d183af7346027758b980ea751d2846da9"
+          },
+          {
+            "id": "public-release-reopen-production:example:staging-plan-quota-preserved",
+            "snapshotSha256": "6d13b29270b3d04e1e9dd1a153f37e498567f0772d34bdba0d705ee5b4c96dc1"
+          },
+          {
+            "id": "public-release-reopen-production:example:staging-rollback-retention-preserved",
+            "snapshotSha256": "4f7def968b140f352393a7571a2e87eec4f8f3c289d4d04684a84924d008cf97"
+          }
+        ]
+      }
+    }
+  ],
+  "sameExecutor": "f079016a717d",
+  "scopeContradiction": {
+    "file": "modules/architecture.md",
+    "sha256": "e24548c0772140b9d9c63ffba8058fd76036674f05cc3ee2415def854b5823d2",
+    "lines": [
+      {
+        "line": 26,
+        "text": "与实施顺序相反，按 [nonobject-request](#bl-fact-nonobject-request) 所在的传输层不动的前提分步回退，每步都要保住可恢复正常规划。本单元的 G2 改动来自 `policy.py`，回退与恢复都按宿主给出的提议实跑核对："
+      },
+      {
+        "line": 29,
+        "text": "{\"proposal\":\"rollback-ef75dcbc88850477d49c19324fbad43b9feea70d9359977e7a7e22f750687e2f\"}"
+      },
+      {
+        "line": 32,
+        "text": "回退落地后应恢复 `environment: production` 下 `plan`/`rollback` 的正常产出；恢复 G2 后则须重新满足 staging `plan` 的封顶配额与 rollback 的 `retain` 保留行为。"
+      },
+      {
+        "line": 34,
+        "text": "1. 先撤 `policy.py` 的 G2 分支：去掉 `production-frozen` 前置门槛，恢复 G1 下 `staging`/`production` 均可 `plan`/`rollback`，`plan` 预算回到只看请求 `budget`。回退后生产环境 `plan` 与 `rollback` 应各自产出单条动作，staging `plan` 超出 3 时仍按请求预算报 `budget-exceeded`。"
+      },
+      {
+        "line": 35,
+        "text": "2. 再撤 `journal.py` 的 `retain` 校验，并撤 `planner.py` 的保留闭包：`rollback` 回到纯逆序，`retain` 不再被识别（缺省空名单时输出为空）。"
+      }
+    ],
+    "reason": "Passing executable proposal preserves staging quota and retention. Ordinary prose simultaneously says to remove those behaviors. Rehearsal result proves executed plan only."
+  }
+}

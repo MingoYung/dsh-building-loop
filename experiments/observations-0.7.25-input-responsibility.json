@@ -1,0 +1,1049 @@
+{
+  "scope": "Frozen 0.7.24 byte-for-byte replay in existing WSL bubblewrap, plus parser responsibility checks of signed sources and unchanged document.",
+  "rows": [
+    {
+      "run": "r-6bEkhY",
+      "mode": "building-loop",
+      "stage": "g1",
+      "pins": [
+        {
+          "path": "journal.py",
+          "sha256": "cca21cb7824fff253c0140166d4bbf961e890a85c539af483915ac3f6b6d4d07"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "3771e70360c6a439ac1dbcfdfd5f771d682b4fb5cf067346142cac80b737ba9a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "4c56643c5c0eb4345164570d1b5bcaf34d31d6fdc6611c5f9d18326f7936ed62"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2d11408a859e3ac172b20d3b3d1e4d63743ed4fc426556af8fe3b262fc063f17"
+        }
+      ],
+      "architecture": {
+        "file": "modules/architecture.md",
+        "sha256": "7480fafcfba171c587c7199c6264b0c98dca58312a3e81ffa9e81b85e25aaaf8",
+        "conflicts": [
+          {
+            "line": 8,
+            "from": "planner.py",
+            "relation": "validation",
+            "field": "action",
+            "actual": [
+              {
+                "file": "policy.py",
+                "symbol": "limit_for",
+                "field": "action",
+                "line": 26,
+                "code": "unsupported-action"
+              }
+            ]
+          }
+        ],
+        "correctedProseControl": "no-conflict",
+        "sourceModified": false,
+        "signedRunId": "bench-ffde61b28487f6b0e5ec"
+      },
+      "observed": [
+        {
+          "id": "transport-shapes:seed",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:array",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "array"
+          },
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": null,
+            "exitCode": 1,
+            "exception": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')"
+          }
+        },
+        {
+          "id": "transport-shapes:1:object",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "object"
+          },
+          "input": {
+            "environment": {},
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": null,
+            "exitCode": 1,
+            "exception": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')"
+          }
+        },
+        {
+          "id": "transport-shapes:1:null",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "null"
+          },
+          "input": {
+            "environment": null,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:boolean",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "boolean"
+          },
+          "input": {
+            "environment": true,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:number",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "number"
+          },
+          "input": {
+            "environment": 0,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:missing",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "missing"
+          },
+          "input": {
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-6bEkhY",
+      "mode": "building-loop",
+      "stage": "g2",
+      "pins": [
+        {
+          "path": "journal.py",
+          "sha256": "942487b7ec65a114f5cc37bab1cffb619ad66848bcbe391a0c97a0ce58f0bdda"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "9c9435ca53bc9ea196e9e1c5a0038cb5e03f5c249bd25e9097cb9bccb68dacdd"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "1587330dba9e850c9fa75465ee5b9cbd03b56e7e9237f8a1d9f32aa07b5ddccd"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2d11408a859e3ac172b20d3b3d1e4d63743ed4fc426556af8fe3b262fc063f17"
+        }
+      ],
+      "architecture": {
+        "file": "modules/architecture.md",
+        "sha256": "f1051793a2a13ec230175c7d4b254c0e45a9dc1c59f27b66a7051225609b4d30",
+        "conflicts": [
+          {
+            "line": 8,
+            "from": "planner.py",
+            "relation": "validation",
+            "field": "action",
+            "actual": [
+              {
+                "file": "policy.py",
+                "symbol": "limit_for",
+                "field": "action",
+                "line": 42,
+                "code": "unsupported-action"
+              }
+            ]
+          }
+        ],
+        "correctedProseControl": "no-conflict",
+        "sourceModified": false,
+        "signedRunId": "bench-1644da27e18678f25277"
+      },
+      "observed": [
+        {
+          "id": "transport-shapes:seed",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:array",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "array"
+          },
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": null,
+            "exitCode": 1,
+            "exception": "TypeError: cannot use 'list' as a set element (unhashable type: 'list')"
+          }
+        },
+        {
+          "id": "transport-shapes:1:object",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "object"
+          },
+          "input": {
+            "environment": {},
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": null,
+            "exitCode": 1,
+            "exception": "TypeError: cannot use 'dict' as a set element (unhashable type: 'dict')"
+          }
+        },
+        {
+          "id": "transport-shapes:1:null",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "null"
+          },
+          "input": {
+            "environment": null,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:boolean",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "boolean"
+          },
+          "input": {
+            "environment": true,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:number",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "number"
+          },
+          "input": {
+            "environment": 0,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:missing",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "missing"
+          },
+          "input": {
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-6bEkhY",
+      "mode": "standard-checklist",
+      "stage": "g1",
+      "pins": [
+        {
+          "path": "journal.py",
+          "sha256": "b73114ba046ec039315ba14e7e1b8a93fc24b9e28cecf4d0e23150fa634245c7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f50a397267e392234ca87c7b2dee22202408b79d0b401492e50eaa4bca211387"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "8193264f5c0b75b87e8bda5724adf2ba020566291febd822867348024cc407dc"
+        },
+        {
+          "path": "release.py",
+          "sha256": "34caf363650e80796532086a74a9d5bee6925d6e572b63d34fe18d2c434bbfbf"
+        }
+      ],
+      "observed": [
+        {
+          "id": "transport-shapes:seed",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:array",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "array"
+          },
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:object",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "object"
+          },
+          "input": {
+            "environment": {},
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:null",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "null"
+          },
+          "input": {
+            "environment": null,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:boolean",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "boolean"
+          },
+          "input": {
+            "environment": true,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:number",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "number"
+          },
+          "input": {
+            "environment": 0,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:missing",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "missing"
+          },
+          "input": {
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "run": "r-6bEkhY",
+      "mode": "standard-checklist",
+      "stage": "g2",
+      "pins": [
+        {
+          "path": "journal.py",
+          "sha256": "fbd940a5b274b98e5bd8186a491b094f9acd90124f41611a24b2bf269ccdcad8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "a6f8153bad7d2af9d490ee65fb2cbef4db403d65c85d134c439bbcbb49031e55"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "36026c6a5d3c7252f8196cfc5d18da73279a2440d2f5af35c774c3dff2e03516"
+        },
+        {
+          "path": "release.py",
+          "sha256": "34caf363650e80796532086a74a9d5bee6925d6e572b63d34fe18d2c434bbfbf"
+        }
+      ],
+      "observed": [
+        {
+          "id": "transport-shapes:seed",
+          "input": {
+            "environment": "staging",
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:array",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "array"
+          },
+          "input": {
+            "environment": [],
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:object",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "object"
+          },
+          "input": {
+            "environment": {},
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:null",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "null"
+          },
+          "input": {
+            "environment": null,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:boolean",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "boolean"
+          },
+          "input": {
+            "environment": true,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:number",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "number"
+          },
+          "input": {
+            "environment": 0,
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        },
+        {
+          "id": "transport-shapes:1:missing",
+          "shape": {
+            "path": [
+              "environment"
+            ],
+            "type": "missing"
+          },
+          "input": {
+            "action": "plan",
+            "budget": 10,
+            "changes": []
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "observed": {
+            "json": {
+              "status": "error",
+              "error": "invalid-environment",
+              "actions": [],
+              "units": 0
+            },
+            "exitCode": 0,
+            "exception": null
+          }
+        }
+      ]
+    }
+  ]
+}

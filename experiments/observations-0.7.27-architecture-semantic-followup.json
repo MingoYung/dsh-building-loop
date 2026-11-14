@@ -1,0 +1,583 @@
+{
+  "spec": "building-loop-architecture-rejection-ownership-replay/1",
+  "modelCalls": 0,
+  "priorArchiveSha256": "b74af298e17a357aebce5e5cde38fba929d4c6756692b00cceb92c38279ce6e5",
+  "priorRuntimeSources": [
+    {
+      "file": "engineering-architecture.mjs",
+      "sha256": "b1b5d84aed5ab9e399d8c1ab8401183c970d28414dc12cf94a10d4ac9da62df9"
+    },
+    {
+      "file": "python-dependencies.mjs",
+      "sha256": "0a603bbc5c91a45e38654d2634834cb418f7022d9b67cd383ccd90c75e7fb856"
+    }
+  ],
+  "candidateSources": [
+    {
+      "file": "engineering-architecture.mjs",
+      "sha256": "dbb50686f7b6645281f61da56a7a582d217493ab049bd3dfa3f7af9a0d673ea6"
+    },
+    {
+      "file": "python-dependencies.mjs",
+      "sha256": "0a603bbc5c91a45e38654d2634834cb418f7022d9b67cd383ccd90c75e7fb856"
+    }
+  ],
+  "scope": "Compare the installed prior runtime and the candidate matcher against two exact signed G1 source snapshots and their frozen architecture drafts. Corrected prose controls run in memory. Verify historical findings stay identical.",
+  "mechanism": "Attach clear condition-to-code and named error-code ownership statements to the unique parsed rejection source. Keep explicit external response, pass-through, delegation, and shared or uncertain ownership out of the forced correction path.",
+  "totals": {
+    "originalFalseAccepts": 2,
+    "blockedByCandidate": 2,
+    "matchedClaims": 3,
+    "correctedProseControls": 2,
+    "correctedFalseRetreats": 0,
+    "historicalSnapshots": 8,
+    "historicalFindingsUnchanged": true
+  },
+  "targetedHostTests": {
+    "passed": 29,
+    "failed": 0,
+    "logSha256": "d5f9fd76a77d3c44742f69349167b5bc22856615e9fa074551f8a3cfe490640f",
+    "signedRejectionOwnershipTest": {
+      "invalidAttributionConflicts": 3,
+      "expectedValidClaims": 8,
+      "retainedReviewStage": "first-review"
+    }
+  },
+  "exact": [
+    {
+      "run": "r-1G8kmp",
+      "stage": "g1",
+      "originalTerminal": "closed",
+      "nativePhase": "closed",
+      "documentSha256": "e6a02ddef07a1206e20527de86b71eb067c1feec32d72712fd8a30f485c63639",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "5eefd05c5e6a16516909c87e2dfa32456b6d3a89c274002a293777909da886d6"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "00d6bd7265daff28e4687651cc721c26811bd34cc19ec326a29a45c8dd1aeb00"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "61a0d48405ed01db5d4b2317e5fbc6dc128e70326530742631b378cb71d30042"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "originalReceipt": {
+        "path": "receipts/K01-first.json",
+        "sha256": "50164b815d43b0974454fbb0e26b0ffc1abb309d957abfa1416c2d3f48a2f71f",
+        "status": "accept",
+        "firstReview": {
+          "status": "pass",
+          "architectureSha256": "e6a02ddef07a1206e20527de86b71eb067c1feec32d72712fd8a30f485c63639",
+          "basis": "入口仅传输（解析失败→invalid-json、正常退出），policy 判环境/动作/预算，journal 校验/去重/重放，planner 构图排序并装配唯一结果；错误体由 failure() 与入口字面量统一为 actions=[]、units=0。",
+          "sourceRefs": [
+            {
+              "file": "release.py",
+              "start": 8,
+              "end": 15,
+              "relation": "supports",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            },
+            {
+              "file": "planner.py",
+              "start": 15,
+              "end": 16,
+              "relation": "supports",
+              "sha256": "00d6bd7265daff28e4687651cc721c26811bd34cc19ec326a29a45c8dd1aeb00"
+            },
+            {
+              "file": "journal.py",
+              "start": 30,
+              "end": 75,
+              "relation": "supports",
+              "sha256": "5eefd05c5e6a16516909c87e2dfa32456b6d3a89c274002a293777909da886d6"
+            },
+            {
+              "file": "policy.py",
+              "start": 28,
+              "end": 43,
+              "relation": "supports",
+              "sha256": "61a0d48405ed01db5d4b2317e5fbc6dc128e70326530742631b378cb71d30042"
+            }
+          ]
+        },
+        "independentReview": {
+          "status": "pass",
+          "architectureSha256": "e6a02ddef07a1206e20527de86b71eb067c1feec32d72712fd8a30f485c63639",
+          "basis": "四模块职责与实际控制流一致：release 仅传输，policy 只判环境/动作/预算，journal 管校验与身份，planner 构图排序与装配；导入方向 release→planner→{journal,policy} 未被打破。",
+          "sourceRefs": [
+            {
+              "file": "planner.py",
+              "start": 1,
+              "end": 12,
+              "relation": "supports",
+              "sha256": "00d6bd7265daff28e4687651cc721c26811bd34cc19ec326a29a45c8dd1aeb00"
+            },
+            {
+              "file": "journal.py",
+              "start": 1,
+              "end": 8,
+              "relation": "supports",
+              "sha256": "5eefd05c5e6a16516909c87e2dfa32456b6d3a89c274002a293777909da886d6"
+            }
+          ]
+        }
+      },
+      "before": [],
+      "after": [
+        {
+          "line": 9,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "unknown-dependency",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "_order",
+              "code": "unknown-dependency",
+              "line": 33
+            },
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "unknown-dependency",
+              "line": 66
+            }
+          ]
+        }
+      ],
+      "correctedProseControl": {
+        "documentSha256": "0ae5f6089b9f258d379994181d118994a2607975f886c5506f29daa7c41a47cd",
+        "findings": 0
+      }
+    },
+    {
+      "run": "r-Y6e2M4",
+      "stage": "g1",
+      "originalTerminal": "closed",
+      "nativePhase": "closed",
+      "documentSha256": "33ab52ccf00de5114b755d5e3787658a447a5a729489ea45a5aead8f2aae5cb0",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "2d422f75ac82624a234371bf8bc2cdf050405201c791d452602fd457f0aa6854"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "1917498c718c387d8c1f909dd8a7b75d286c5bda555112b9eed32a64c8b8945a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "68e52b90fca7e8c5d77110cf7125fcae37c9a7412cb7d78419dce152d495d86e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "originalReceipt": {
+        "path": "receipts/K01-first.json",
+        "sha256": "80b1deaf95c249b1832db2749a5028f4419744ff795d11f5fc04eaf4a536a602",
+        "status": "accept",
+        "firstReview": {
+          "status": "pass",
+          "architectureSha256": "33ab52ccf00de5114b755d5e3787658a447a5a729489ea45a5aead8f2aae5cb0",
+          "basis": "Actual imports match the declared chain release.py->planner.py->{journal,policy}; responsibilities split as described; no new modules or stdlib violations.",
+          "sourceRefs": [
+            {
+              "file": "release.py",
+              "start": 5,
+              "end": 5,
+              "relation": "supports",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            },
+            {
+              "file": "planner.py",
+              "start": 13,
+              "end": 14,
+              "relation": "supports",
+              "sha256": "1917498c718c387d8c1f909dd8a7b75d286c5bda555112b9eed32a64c8b8945a"
+            },
+            {
+              "file": "journal.py",
+              "start": 3,
+              "end": 8,
+              "relation": "supports",
+              "sha256": "2d422f75ac82624a234371bf8bc2cdf050405201c791d452602fd457f0aa6854"
+            },
+            {
+              "file": "policy.py",
+              "start": 3,
+              "end": 6,
+              "relation": "supports",
+              "sha256": "68e52b90fca7e8c5d77110cf7125fcae37c9a7412cb7d78419dce152d495d86e"
+            }
+          ]
+        },
+        "independentReview": {
+          "status": "pass",
+          "architectureSha256": "33ab52ccf00de5114b755d5e3787658a447a5a729489ea45a5aead8f2aae5cb0",
+          "basis": "四模块职责与导入边 release→planner→{journal,policy} 和实际源码一致；release.py 只解析 JSON 并转交 plan，不承担领域判断。",
+          "sourceRefs": [
+            {
+              "file": "release.py",
+              "start": 5,
+              "end": 5,
+              "relation": "supports",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            },
+            {
+              "file": "planner.py",
+              "start": 13,
+              "end": 15,
+              "relation": "supports",
+              "sha256": "1917498c718c387d8c1f909dd8a7b75d286c5bda555112b9eed32a64c8b8945a"
+            },
+            {
+              "file": "release.py",
+              "start": 8,
+              "end": 15,
+              "relation": "supports",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+            }
+          ]
+        }
+      },
+      "before": [],
+      "after": [
+        {
+          "line": 7,
+          "from": "release.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 58
+            }
+          ]
+        },
+        {
+          "line": 17,
+          "from": "release.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 58
+            }
+          ]
+        }
+      ],
+      "correctedProseControl": {
+        "documentSha256": "88c47070b83fa16285676e402a899d6446875df92e0bacfc1f95d076a5486f4a",
+        "findings": 0
+      }
+    }
+  ],
+  "laterStages": [
+    {
+      "run": "r-1G8kmp",
+      "stage": "g2",
+      "originalTerminal": "completion-cap",
+      "nativePhase": "first-audit",
+      "documentSha256": "12c249c4ce685c92700ff92ed0d4388d374b63e232222a2856c7ffddc060801d",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "713bfef0b176fdd9dbdc67cc2cd4160392d61e88d26b234ab8fb9f57237aef06"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "60d112b8542efa27e6983b0ef0a43dda1d40892668c1c3e4a8a8fb9e2110c76a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "a3e00c60d11fc52edc68f891ac11bca3b1ec483181fcf50d9faca440305abc03"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "before": [],
+      "after": [
+        {
+          "line": 9,
+          "from": "journal.py",
+          "relation": "decision",
+          "code": "unknown-dependency",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "_order",
+              "code": "unknown-dependency",
+              "line": 33
+            },
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "unknown-dependency",
+              "line": 109
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-Y6e2M4",
+      "stage": "g2",
+      "originalTerminal": "closed",
+      "nativePhase": "closed",
+      "documentSha256": "73c263e5b9ab12b2694ebc8af6d41d4ec6dc3f0e0efdb3a09baa3b17af728052",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "3f7831eeaa47488308b487f844fd88c8b1ab80844ea4bc88ec62ecebbb378e85"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c12807fd62d812c7dd44ef5c266f983494e0cce291016d51c393d836bd8f54eb"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "33c75eb401ec7c2b75461aa3a49b32bce7f2b6820c9caa536ead9b842f6b3494"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "before": [],
+      "after": [
+        {
+          "line": 7,
+          "from": "release.py",
+          "relation": "decision",
+          "code": "invalid-request",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "invalid-request",
+              "line": 80
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "historical": [
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g1",
+      "documentSha256": "16a5f9e84b6e2799d3c85643a238cad232269476a3dc28a4b0a2b11120c57db6",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "ce5175a69255a79ab7433d3939e2243e354d6c440138b4fe15b76c43d5708b17"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "e821b0e664cd65db65696d9e61e1fe1a64da94372708e9cc12a60e2bd5ff5d6b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "ac553b6f6ab1c6af9a6c5e87e3e8eb70500a2929282dc1c81ff0369929988fb8"
+        },
+        {
+          "path": "release.py",
+          "sha256": "b1939e1139c5dd57b33752919877d4394f4d9ac29d47c7e8fedbf429968a2736"
+        }
+      ],
+      "conflictsBefore": 2,
+      "conflictsAfter": 2
+    },
+    {
+      "run": "r-Y6Ou84",
+      "stage": "g2",
+      "documentSha256": "4349bf3d0d4cb391087d79a5357fb5222bba919f154ef8ea136147130cd74d22",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "50ece2f0c7cdaf9d9596ddae54a98bfa2cc5d9a6bc81a909574af418be9e52c0"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "4b054b16ac97d8406e83dd6807bc2377ec62c9ad65884fffb7387ceba426d655"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "7b7d00934cc55cf39e5cd1a756f049a5d0ecfbb5e19cf14522b2404ffa9370ac"
+        },
+        {
+          "path": "release.py",
+          "sha256": "b1939e1139c5dd57b33752919877d4394f4d9ac29d47c7e8fedbf429968a2736"
+        }
+      ],
+      "conflictsBefore": 1,
+      "conflictsAfter": 1
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g1",
+      "documentSha256": "5bb1eb95e82a1372039715bc0684e8de3d68f2cb6d5a41891a796642054121ee",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "d43071a22b807c2cff312c76f7ecdc559403c50d7581400a3e6f265367c791f9"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "36a4958bc776baebfc9887ccb50b2e0f916c49c6f8c4d78fee60456cd9e2e531"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "49a9689472cfd37355c7d920c903a0cd51d4bf8fe592a1c807e47055a9541cf4"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "conflictsBefore": 2,
+      "conflictsAfter": 2
+    },
+    {
+      "run": "r-nFfK7c",
+      "stage": "g2",
+      "documentSha256": "4aee1aede1221c7664a154bf52ea4d7cb11cb2d02627bb32efab9949b966fddc",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "3806d2cf1fa6a9eff7fa60e3db925b1c333ad2bb3f10e0fa089003098d5120b4"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d24ef43be3d560f21511fa05a2e75624f4093a5cd57e88ce39929a91778bb6ac"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "68d2c37d53517deacc606c380b0ad15c136f99cd9d5393e03afcec5ef016a38f"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "conflictsBefore": 2,
+      "conflictsAfter": 2
+    },
+    {
+      "run": "r-AWu8XL",
+      "stage": "g1",
+      "documentSha256": "95431f86cc78605278750e6ef435347f4dd8e99cc978bfb676b401f460dc2634",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "658b3780d130added9f8bb6d1b698dfa31e1e01632f2fe33e7474b5f13324272"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "edfb792f17d78bf4ab9a6291126d94f3d05e6a54bf000b0bba1d428e232430d1"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "058c6197f326b29fa0ca9f96294bb5a53570533fb8239db0e00352ec8eab8837"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7"
+        }
+      ],
+      "conflictsBefore": 4,
+      "conflictsAfter": 4
+    },
+    {
+      "run": "r-AWu8XL",
+      "stage": "g2",
+      "documentSha256": "145b618a34fef6f55e1cd4cdc24451dac99fa0c5cc17d4ca5f4c2312d7a45a08",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "a59f95607b4f7f9b673284ed147838265b68b832558bf14da8079076fa3a7590"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "84c19ef571dc5e0b05b2dae266c079829f21a2f119cb166c2fe2b4f36a10477a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "862d1d64392867af4b7fe70f58574acbd90a85302f86f7262b4c8471f08bc7a7"
+        },
+        {
+          "path": "release.py",
+          "sha256": "2618e3ec987b62e342efdb6e9ab9af3609adf5228cd7110c1374cd40113a84c7"
+        }
+      ],
+      "conflictsBefore": 4,
+      "conflictsAfter": 4
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g1",
+      "documentSha256": "22edf7effd0ccb129911c4c51e4e5f584ee31fcec2cdc3ca90c8774b1b48f6a0",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "9e7c9119294f56cfdda92c986c80fd029ef18bfdf46e2af65098a8ac5fa3e0c3"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "7b118e290bad849619e2c66255a0de528a47086b8d54a0350cdaaaec0e957cae"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "46c03edcce122c58c2f1e2d4cac1fd4e20fc49a5ea17ed17bdd8d16a08a50b43"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d187137b48c5ca84239f4326f3c2952ad85ed01f1600a9198d6fe746d87756bc"
+        }
+      ],
+      "conflictsBefore": 3,
+      "conflictsAfter": 3
+    },
+    {
+      "run": "r-H4dGsq",
+      "stage": "g2",
+      "documentSha256": "e0ca9cf7b678b57465fd3ef65bad7f7b62f2b26bd6a1ffbcd7c25df95bbca7bf",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "52c83b5c3815d8c4af3b983120f7a9ee201cd9c854fb0238ba5888f1dccde72c"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "b25b7a7f0de37d15f577f44ec7d9acf0432d022d201bde90673614327e2fad44"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "6029ecf9337574bf4ef1ed0041f4a8bc0b7799fa3cff53a85907541ab3fb4b8b"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d187137b48c5ca84239f4326f3c2952ad85ed01f1600a9198d6fe746d87756bc"
+        }
+      ],
+      "conflictsBefore": 0,
+      "conflictsAfter": 0
+    }
+  ]
+}

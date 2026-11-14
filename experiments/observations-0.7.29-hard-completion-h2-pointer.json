@@ -1,0 +1,235 @@
+{
+  "spec": "building-loop-h2-diagnostic-oracle/1",
+  "scope": "H2 repetition 2 Building-loop. Isolate the behavior defect and why one live diagnostic loop could not create a host reproduction receipt. The native score recorded here is a live checkpoint.",
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "provenance": [
+    "compact native H2 progress and role events",
+    "persisted H2 diagnostic tool request and response pairs",
+    "read-only replay of the exact ClosedIndex class reconstructed from two matching version-pinned journal readbacks",
+    "frozen candidate source modules and in-memory comparator controls"
+  ],
+  "behaviorDefect": {
+    "unit": "K02",
+    "requiredClause": {
+      "path": "CHANGE-G2.md",
+      "line": 3
+    },
+    "signedFailingCaseId": "revision-window-nested-predecessor",
+    "source": {
+      "path": "windows.py",
+      "sha256": "0aada2bf4686b33b2ffd160ccc510639f0fe37ece639d282c391a9ad683161b1",
+      "lines": [
+        75,
+        76,
+        81,
+        83
+      ]
+    },
+    "mechanism": "Sorted windows are allowed to overlap. The immediate predecessor can end before the query while an earlier enclosing window still overlaps. The old implementation only inspected the nearest previous interval and equal-start group.",
+    "modelAuthoredToyCase": {
+      "closed": [
+        [
+          0,
+          100
+        ],
+        [
+          5,
+          10
+        ]
+      ],
+      "reserve": [
+        50,
+        60
+      ],
+      "expectedError": "window-closed",
+      "observedStatus": "ok",
+      "exitCode": 0
+    },
+    "offlineClassReplay": [
+      {
+        "query": [
+          50,
+          60
+        ],
+        "observed": false,
+        "halfOpenReference": true
+      },
+      {
+        "query": [
+          6,
+          7
+        ],
+        "observed": true,
+        "halfOpenReference": true
+      },
+      {
+        "query": [
+          100,
+          110
+        ],
+        "observed": false,
+        "halfOpenReference": false
+      }
+    ]
+  },
+  "nativeComparison": {
+    "previousDiagnosisEvidence": {
+      "seqs": [
+        154,
+        155,
+        160,
+        161
+      ],
+      "pointer": "/eventIndex",
+      "expected": 0,
+      "clause": {
+        "path": "SPEC.md",
+        "line": 11
+      },
+      "outcome": "mismatch",
+      "proofMinted": true,
+      "submissionAccepted": true,
+      "scope": "Earlier diagnostic cycle and different source version."
+    },
+    "rejectedDiagnosis": {
+      "representativeCallSeq": 76,
+      "representativeResultSeq": 77,
+      "representativeResultElapsedMs": 293593,
+      "pointer": "/error",
+      "expected": "window-closed",
+      "clause": {
+        "path": "CHANGE-G2.md",
+        "line": 3
+      },
+      "executionStatus": "passed",
+      "applicationStatus": "ok",
+      "actualPointerPresent": false,
+      "comparisonOutcome": "unavailable",
+      "proofMinted": false,
+      "otherSameProbeResultSeqs": [
+        89,
+        107,
+        352
+      ],
+      "observedSubmissionsThroughSeq": 364,
+      "submittedIds": {
+        "submitCallsWithProofField": 32,
+        "rerouteCallsWithProofField": 2,
+        "rawSnapshotHashSubstitutions": 23,
+        "currentMintedProofMatches": 0,
+        "earlierMintedProofMatches": 0
+      }
+    },
+    "recoveredDiagnosis": {
+      "callSeq": 179,
+      "resultSeq": 180,
+      "resultElapsedMs": 562598,
+      "pointer": "/results",
+      "expected": [],
+      "clause": {
+        "path": "CHANGE-G2.md",
+        "line": 3
+      },
+      "applicationStatus": "ok",
+      "actualPointerPresent": true,
+      "actualArrayLength": 1,
+      "comparisonOutcome": "mismatch",
+      "proofMinted": true,
+      "submitCallSeq": 197,
+      "submitResultSeq": 198,
+      "submitAcceptedElapsedMs": 575999,
+      "phase": "diagnosis-verify"
+    },
+    "subsequentLiveScore": {
+      "passed": 104,
+      "total": 104,
+      "elapsedMs": 621236,
+      "sourceSha256": "5b928774f2f88ab92879ec2188e1baad59d887695800925aa0643e7264f7a5cc",
+      "scope": "Assessor checkpoint after the original executor resumed."
+    }
+  },
+  "candidateSource": [
+    {
+      "path": "governance/code-review-probes.mjs",
+      "sha256": "f43e46a5dac0019e4686ca68140e29d3e9fdee1cba0d36b222bf5a954076ba35",
+      "lines": [
+        24,
+        31,
+        53,
+        243,
+        245,
+        247,
+        248,
+        250,
+        255
+      ],
+      "observation": "Missing field under an ungrounded projection is unavailable. A mismatch on a present field is comparable. A grounded ad-hoc assertion cannot use a whole JSON object."
+    },
+    {
+      "path": "governance/index.mjs",
+      "sha256": "20d885dccc984e6494c3913edc09617a5b22d9be248abfb3b8001febd75b7577",
+      "lines": [
+        1331,
+        1332,
+        1346,
+        1358,
+        1360,
+        1420,
+        1485,
+        1487
+      ],
+      "observation": "The behavior-diagnosis comparator receives the requirement but no grounding object. The adapter forwards outcome and actual without the comparator's missing-unstated-field reason. A current proof must be actually persisted and matched by ID at submission."
+    },
+    {
+      "path": "governance/stall-diagnostics.mjs",
+      "sha256": "76dcd14ff68b86a06a5faef6cbab2402f99c5387bf6b853e6b16399ef651e23e",
+      "lines": [
+        246,
+        250,
+        289,
+        304,
+        310,
+        315
+      ],
+      "observation": "A behavior receipt requires an observable mismatch. Snapshot digests cannot substitute for current host-minted proof IDs. The generic rejection conflates absent and stale proofs."
+    }
+  ],
+  "offlineComparatorControls": [
+    {
+      "clause": {
+        "path": "CHANGE-G2.md",
+        "line": 3
+      },
+      "pointer": "/error",
+      "expected": "window-closed",
+      "applicationStatus": "ok",
+      "outcome": "unavailable",
+      "reason": "missing-unstated-field",
+      "proofMinted": false
+    },
+    {
+      "clause": {
+        "path": "SPEC.md",
+        "line": 11
+      },
+      "pointer": "/status",
+      "expected": "error",
+      "applicationStatus": "ok",
+      "outcome": "mismatch",
+      "proofMinted": true,
+      "proofValidated": true
+    },
+    {
+      "clause": {
+        "path": "SPEC.md",
+        "line": 11
+      },
+      "pointer": "/status",
+      "expected": "error",
+      "applicationStatus": "error",
+      "outcome": "match",
+      "proofMinted": false
+    }
+  ],
+  "interpretation": "There was a real nested-interval implementation defect. One comparator choice obscured it, the diagnostic adapter hid the reason, and the agent kept submitting values that had never been minted as proof IDs. A different present-field comparator later produced an authentic proof and enabled the original executor to reach a fully passing live code score. The source-only /status control demonstrates a second admissible comparator and is not a native completed review."
+}

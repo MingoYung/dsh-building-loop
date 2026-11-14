@@ -1,0 +1,81 @@
+{
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "run": "r-kcBQoe",
+  "mode": "standard-checklist",
+  "stage": "G3",
+  "session": "50a3fb3a9f26",
+  "scope": "Actual user-tool unittest requests and native job results. The benchmark did not cut these jobs at 300 or 600 seconds.",
+  "observations": [
+    {
+      "requestSeq": 364,
+      "elapsedAtRequestMs": 265385,
+      "command": "python -m unittest discover -s tests 2>&1 | Select-Object -Last 25",
+      "requestedTimeoutMs": 900000,
+      "nativeJobRegistrationSeq": 365,
+      "nativeJobSettlement": {
+        "seq": 366,
+        "status": "completed",
+        "cause": "producer"
+      },
+      "nativeResult": {
+        "seq": 367,
+        "elapsedMs": 768474,
+        "visibleTestSummary": [
+          "FAIL: test_item_shape_is_interleaved_with_domain_checks (test_release.Batch.test_item_shape_is_interleaved_with_domain_checks)",
+          "Ran 41 tests in 502.055s",
+          "FAILED (failures=1, errors=2)"
+        ],
+        "exceptionClasses": [
+          "RecursionError",
+          "AssertionError"
+        ]
+      },
+      "wallMs": 503089
+    },
+    {
+      "requestSeq": 387,
+      "elapsedAtRequestMs": 778012,
+      "command": "python -m unittest discover -s tests 2>&1 | Select-String -Pattern '^FAIL: |^ERROR: |^Ran |^OK|^FAILED' | ForEach-Object { $_.Line }",
+      "requestedTimeoutMs": 900000,
+      "nativeJobRegistrationSeq": 388,
+      "nativeJobSettlement": {
+        "seq": 389,
+        "status": "completed",
+        "cause": "producer"
+      },
+      "nativeResult": {
+        "seq": 390,
+        "elapsedMs": 1247764,
+        "visibleTestSummary": [
+          "ERROR: test_retain_transitive_through_unapplied_intermediate_at_scale (test_release.Batch.test_retain_transitive_through_unapplied_intermediate_at_scale)",
+          "ERROR: test_scale_retain_through_unapplied_intermediate (test_release.Batch.test_scale_retain_through_unapplied_intermediate)",
+          "Ran 41 tests in 468.765s",
+          "FAILED (errors=2)"
+        ],
+        "exceptionClasses": []
+      },
+      "wallMs": 469752
+    },
+    {
+      "requestSeq": 395,
+      "elapsedAtRequestMs": 1251056,
+      "command": "python -m unittest tests.test_release.Batch.test_scale_retain_through_unapplied_intermediate 2>&1 | Select-Object -First 25",
+      "requestedTimeoutMs": 300000,
+      "nativeJobRegistrationSeq": 396,
+      "nativeJobSettlement": {
+        "seq": 397,
+        "status": "completed",
+        "cause": "producer"
+      },
+      "nativeResult": {
+        "seq": 398,
+        "elapsedMs": 1481299,
+        "visibleTestSummary": [
+          "ERROR: test_scale_retain_through_unapplied_intermediate (tests.test_release.Batch.test_scale_retain_through_unapplied_intermediate)"
+        ],
+        "exceptionClasses": []
+      },
+      "wallMs": 230243
+    }
+  ]
+}

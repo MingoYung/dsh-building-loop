@@ -1,0 +1,216 @@
+{
+  "spec": "building-loop-h1-dispatch-comparison/1",
+  "scope": "Two native Windows DSH Building-loop H1 starts under the frozen 0.7.29 candidate. The stalled lane is a frozen outcome; the successful lane is limited to its observed dispatch and first passing live assessment.",
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "provenance": [
+    "reservation-ab events and progress journals",
+    "persisted native session journal tool replies",
+    "first lane frozen H1 result",
+    "frozen 0.7.29 runtime source"
+  ],
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "thinking": "disabled",
+    "maxTokens": 12288
+  },
+  "common": {
+    "unit": "K01",
+    "initialSourceSha256": "7e04accde93cdb323f05ee046c936410ad632d0689649cb8757e5c920a078c91",
+    "goalSha256": "e621920028f4fd3ea040c5334afd810035dd2d10347924753264573f521804d5",
+    "prepare": {
+      "role": "coordinator",
+      "phase": "dispatch",
+      "complete": true,
+      "pending": [],
+      "files": [
+        "PROJECT-GOAL.md",
+        "SPEC.md",
+        "CHANGE-G2.md",
+        "INDEX.md",
+        "modules/architecture.md"
+      ],
+      "next": [
+        {
+          "tool": "building_loop_file",
+          "action": "write",
+          "path": "modules/architecture.md"
+        },
+        {
+          "tool": "building_loop",
+          "action": "architecture",
+          "unit": "K01"
+        }
+      ],
+      "checkpointAdvance": {
+        "action": "advance",
+        "unit": "K01"
+      },
+      "requiredStaticImportsHeading": "静态导入",
+      "staticImportsHeadingPresentInReadFile": true,
+      "staticImportsHeadingDeclaredInArchitectureContract": false
+    },
+    "registrationResult": {
+      "phase": "dispatch",
+      "keys": [
+        "unit",
+        "phase",
+        "architecture"
+      ],
+      "next": null
+    }
+  },
+  "lanes": [
+    {
+      "repetition": 1,
+      "modelTurn": [
+        {
+          "seq": 17,
+          "elapsedMs": 3323,
+          "event": "proposal-confirmed"
+        },
+        {
+          "seq": 19,
+          "elapsedMs": 3377,
+          "event": "ledger-called-before-bound-tool-surface",
+          "result": "unknown tool"
+        },
+        {
+          "seq": 28,
+          "elapsedMs": 5763,
+          "event": "bound-prepare"
+        },
+        {
+          "seq": 49,
+          "elapsedMs": 14925,
+          "event": "architecture-write-rejected",
+          "reason": "缺少唯一可见章节「静态导入」"
+        },
+        {
+          "seq": 55,
+          "elapsedMs": 18734,
+          "event": "architecture-write-accepted"
+        },
+        {
+          "seq": 62,
+          "elapsedMs": 20769,
+          "event": "architecture-registered",
+          "sha256": "c645088222321d675c20d08d359b3b42c259be8c704d1908f51c2b4224c1b568"
+        },
+        {
+          "seq": 67,
+          "elapsedMs": 25155,
+          "event": "text-only-reply",
+          "excerpt": "## 派单：K01",
+          "toolCallCount": 0
+        },
+        {
+          "seq": 69,
+          "elapsedMs": 25158,
+          "event": "turn-ended",
+          "reason": "completed"
+        }
+      ],
+      "advanceCalled": false,
+      "executorSpawned": false,
+      "frozen": {
+        "terminal": "stalled-idle",
+        "elapsedMs": 55271,
+        "elapsedQuietMs": 30114,
+        "sourceFilesChanged": 0,
+        "sourceSha256": "7e04accde93cdb323f05ee046c936410ad632d0689649cb8757e5c920a078c91",
+        "passed": 22,
+        "total": 60
+      }
+    },
+    {
+      "repetition": 2,
+      "modelTurn": [
+        {
+          "seq": 17,
+          "elapsedMs": 3138,
+          "event": "proposal-confirmed"
+        },
+        {
+          "seq": 26,
+          "elapsedMs": 5103,
+          "event": "bound-prepare"
+        },
+        {
+          "seqs": [
+            33,
+            35,
+            37,
+            39
+          ],
+          "elapsedMs": [
+            7235,
+            7279,
+            7329,
+            7377
+          ],
+          "event": "four-coordinator-source-reads-rejected-by-allowlist"
+        },
+        {
+          "seq": 75,
+          "elapsedMs": 20927,
+          "event": "architecture-write-accepted"
+        },
+        {
+          "seq": 82,
+          "elapsedMs": 23209,
+          "event": "architecture-registered",
+          "sha256": "5e90b9703f26d05aac664935b3209baf418d05624c658186345754203f29302a"
+        },
+        {
+          "seq": 90,
+          "elapsedMs": 26402,
+          "event": "advance-accepted",
+          "phase": "intake",
+          "executorSpawned": true,
+          "reused": false
+        }
+      ],
+      "advanceCalled": true,
+      "executorSpawned": true,
+      "firstPassingLiveAssessment": {
+        "elapsedMs": 58001,
+        "sourceSha256": "32d0f7956b7a51d451b24c2c5efe97109214d50f2a52524f0a2e7637fe29c130",
+        "passed": 60,
+        "total": 60
+      }
+    }
+  ],
+  "source": [
+    {
+      "path": "governance/index.mjs",
+      "sha256": "20d885dccc984e6494c3913edc09617a5b22d9be248abfb3b8001febd75b7577",
+      "lines": [
+        152,
+        270,
+        1047,
+        1052,
+        2475,
+        2966,
+        2976
+      ],
+      "observation": "Dispatch text names advance. Prepare prioritizes the architecture write/register instruction and exposes advance separately in the checkpoint. Architecture registration returns its result without adding a new dispatch action."
+    },
+    {
+      "path": "governance/engineering-architecture.mjs",
+      "sha256": "79bf655378eecc6ab80d0b64c5648ac4f8dbbe1fbefe1934fd2fe2a4096fc10d",
+      "lines": [
+        557,
+        602,
+        644
+      ],
+      "observation": "Registration returns architecture, unit and phase. The initial contract omits the required imports heading."
+    }
+  ],
+  "comparisonWithG3": {
+    "evidenceSha256": "3349d475da169cde58b28a1e6fbfce606f305dd5d664a0f930cdce2ac47d06cf",
+    "sameFailureFamily": "A naturally ended coordinator turn left an authorized task without an executor.",
+    "differentStoppingStep": "G3 repetition 1 stopped before architecture creation after source-read denial. H1 repetition 1 successfully registered the architecture and then returned prose in place of invoking advance. H1 repetition 2 recovered from four source-read denials."
+  },
+  "causalLimits": "The missing advance call explains the lack of H1 execution. The tool response did not present a fresh next action, and earlier stage guidance already named advance. This trace does not establish that changing the response alone would prevent a recurrence."
+}

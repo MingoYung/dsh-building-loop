@@ -1,0 +1,43 @@
+{
+  "spec": "building-loop-blind-document-erratum/1",
+  "scope": "Public provenance correction after commitments and reveal. Original native scores, masked judgments, and digests preserved.",
+  "archiveSha256": "aceea1bde63ce45d825b9df027b6a5f13a4381668323ccb25d22410f6a85a996",
+  "judgmentsSha256": "aead4d6cf528f3eb853a478af6333df3248a6ec63ed7f999a29b829001f0c03d",
+  "controlsSha256": "77865a1dd7539b6ae7ea8fb903af85c484502b89c7203214518daf0500f47883",
+  "preregistrationSha256": "c5b9bdd531c2ce6ff92b18144a06011da844e07ccbdf4175c63fa722d22f80fb",
+  "references": [
+    {
+      "path": "reservation-ab/CHANGE-G2.md",
+      "line": 3,
+      "sha256": "effff4217039ca18a6c26993c7830c712f545ab0f1a24b27e254a8d611b39666",
+      "scope": "original native and preregistered",
+      "countVerdict": "24,000 maximum, no explicit overflow error code; malformed field shapes explicitly invalid-window"
+    },
+    {
+      "path": "future-freeze/reservation-ab/CHANGE-G2.md",
+      "line": 3,
+      "sha256": "1bbf55c9d59aeec3eabafa4627e029b043eec74baca910843235208ac4d81c77",
+      "scope": "future-only overlay, created after the original paid run",
+      "countVerdict": "explicitly invalid-window beyond 24,000"
+    }
+  ],
+  "affectedCell": {
+    "cell": "cell-57925b5b6ed3",
+    "mode": "building-loop",
+    "rep": 1,
+    "stage": "H2",
+    "withdrawn": "The original native owner text explicitly names invalid-window for overflow.",
+    "stillSupported": [
+      "Original native scorer requires invalid-window at the count limit; frozen code and authored plan choose invalid-request. Treat this as an evaluator-specific failure against a partially specified owner clause.",
+      "Original native owner text assigns malformed field shapes to windows. Authored document lines 24 and 32 place this responsibility in windows, while events.py lines 39 to 62 actually return invalid-window on malformed fields. This document and source inconsistency is independent of the count interpretation.",
+      "Authored rollback directions lines 36 to 38 call for removing transfer support and retaining a successful transfer check without a scope split. Those directions require reconciliation."
+    ],
+    "judgmentChange": "None. Document remains defective on the native ownership and rollback evidence."
+  },
+  "affectedComment": {
+    "cell": "cell-57925b5b6ed3",
+    "location": "events.py:39-55",
+    "rationale": "The comment attributes the invalid-request overflow classification to the original clause; that clause does not specify the error. Independent owner/source mismatch for malformed window shape survives. Aggregate supported count remains unchanged."
+  },
+  "controlProvenance": "Original blind-public-controls.py resolves ROOT / reservation-ab and verifies original public input and assessor digests against the blind intake. No future overlay or private task inputs were used for the blind control runs."
+}

@@ -1,0 +1,183 @@
+{
+  "spec": "building-loop-native-g4-review-grounding-replay/1",
+  "run": "r-j5sGRU",
+  "stage": "G4",
+  "sourcePins": [
+    {
+      "path": "journal.py",
+      "sha256": "b6462ce634ca87ea56120bd80ec3dffde80267cbdad0b88df3123efd99f72a6a"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "b783b81c953add7666e0762e9cb3647553f06f92be5f9e07c18fea3f1d14a394"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+    },
+    {
+      "path": "release.py",
+      "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+    }
+  ],
+  "receipt": {
+    "file": "receipts/K02-first.json",
+    "sha256": "0d8a01c13aea33890be389ca1186043cfcec10c45882aaa269431e294fd7b5b3",
+    "role": "first-review",
+    "actorHash": "90439a9c3a26",
+    "decision": "reject",
+    "finding": "retain-default-not-normalized",
+    "citedSource": {
+      "file": "journal.py",
+      "start": 254,
+      "end": 271,
+      "sha256": "b6462ce634ca87ea56120bd80ec3dffde80267cbdad0b88df3123efd99f72a6a"
+    },
+    "protectedCaseCitedStatus": "passed",
+    "proofId": "probe-99c280b2cefbf07099cf8e5d6fbaab8c4b6c",
+    "replayExpected": {
+      "exitCode": 0,
+      "json": 0,
+      "pointer": "/requestIndex"
+    },
+    "requirement": {
+      "file": "CHANGE-G2.md",
+      "start": 5,
+      "end": 5,
+      "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+      "quote": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。"
+    },
+    "clauseFullLine": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价，数组顺序保留，JSON 数字和布尔值不能混同。ID 相同但请求数据不同，报 conflicting-operation，序号指向发生冲突的后续项。不同 operation_id 彼此独立，即使回退参数完全一样。有效结果中每项新增 operationId 字段，取请求的 operation_id。"
+  },
+  "archive": {
+    "sha256": "08cf5f0dcc04ff6b41418d7f87c71187b51ba8c58a7de277688f9e3a25ba2829",
+    "comparatorSha256": "2c9230fbbe3c2ff53769b43e40298e52cfd9f9caf5041fcf5e1c4d9e33986c4d"
+  },
+  "actualReplay": {
+    "input": {
+      "action": "rollback-many",
+      "limit": 10,
+      "requests": [
+        {
+          "operation_id": "a",
+          "environment": "staging",
+          "budget": 0,
+          "changes": [
+            {
+              "id": "x",
+              "component": "c",
+              "units": 1
+            }
+          ],
+          "applied": [
+            "x"
+          ],
+          "retain": []
+        },
+        {
+          "operation_id": "a",
+          "environment": "staging",
+          "budget": 0,
+          "changes": [
+            {
+              "id": "x",
+              "component": "c",
+              "units": 1
+            }
+          ],
+          "applied": [
+            "x"
+          ]
+        }
+      ]
+    },
+    "output": {
+      "status": "error",
+      "error": "conflicting-operation",
+      "requestIndex": 1,
+      "results": [],
+      "units": 0
+    },
+    "exitCode": 0
+  },
+  "correctIdenticalPayloadControl": {
+    "input": {
+      "action": "rollback-many",
+      "limit": 10,
+      "requests": [
+        {
+          "operation_id": "a",
+          "environment": "staging",
+          "budget": 0,
+          "changes": [
+            {
+              "id": "x",
+              "component": "c",
+              "units": 1
+            }
+          ],
+          "applied": [
+            "x"
+          ],
+          "retain": []
+        },
+        {
+          "operation_id": "a",
+          "environment": "staging",
+          "budget": 0,
+          "changes": [
+            {
+              "id": "x",
+              "component": "c",
+              "units": 1
+            }
+          ],
+          "applied": [
+            "x"
+          ],
+          "retain": []
+        }
+      ]
+    },
+    "output": {
+      "status": "ok",
+      "results": [
+        {
+          "actions": [
+            "x"
+          ],
+          "units": 1,
+          "operationId": "a"
+        }
+      ],
+      "units": 1
+    },
+    "exitCode": 0,
+    "validObservableExpectation": {
+      "exitCode": 0,
+      "json": 1,
+      "pointer": "/units"
+    }
+  },
+  "results": {
+    "observedAcceptedWrongExpectation": {
+      "outcome": "mismatch",
+      "actual": {
+        "exitCode": 0,
+        "json": 1
+      }
+    },
+    "negativeControlRightResponseAgainstWrongExpectation": {
+      "outcome": "unavailable",
+      "reason": "missing-unstated-field"
+    },
+    "positiveControlRightResponseAgainstCorrectExpectation": {
+      "outcome": "match",
+      "actual": {
+        "exitCode": 0,
+        "json": 1
+      }
+    }
+  },
+  "scope": "Runs the authenticated public reviewer example against the exact signed native snapshot, plus an exact duplicate positive control. The positive success has no requestIndex; the claimed requestIndex=0 would not describe either success or the observed conflicting-operation error. Default application for execution and raw request identity are separately specified, so the example does not establish a blocking normalization defect."
+}

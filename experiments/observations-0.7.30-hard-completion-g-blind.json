@@ -1,0 +1,3542 @@
+{
+  "spec": "dsh-engineering-blind-comparison/1",
+  "suite": "hard-ab",
+  "archiveSha256": "aceea1bde63ce45d825b9df027b6a5f13a4381668323ccb25d22410f6a85a996",
+  "intakeSha256": "d724b75761985fc89db05725e0414c6b97ce14240aa6b78702339b3033c3f606",
+  "sourceJudgmentsSha256": "4c06b6ada4536cd4d37cbcb2437e2341b5fe59c9aa1970ee733e9707a2eb8bbf",
+  "docJudgmentsSha256": "6fc9775c6007226adc76e6e84ea244592883746188c5e88b4b1fe44f5e4a241c",
+  "publicControlsSha256": "cce5230bc63d5e18b148d940b7b52a4ee4c59aed2af105c8df31d56ff5606cc2",
+  "postfreezeSeedSha256": "50fe6dd20e13dfc67418a68c76c68982099f858f3400588204c5f3a41940f249",
+  "groups": [
+    {
+      "mode": "standard",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": true,
+          "twoFullPostfreezeScores": true,
+          "sameDirectoryNewSession": true
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    },
+    {
+      "mode": "standard-checklist",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": false,
+          "twoFullPostfreezeScores": false,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    },
+    {
+      "mode": "building-loop",
+      "pairs": [
+        {
+          "rep": 1,
+          "twoNativeCompletions": false,
+          "twoFullOnlineScores": true,
+          "twoFullPostfreezeScores": true,
+          "sameDirectoryNewSession": false
+        },
+        {
+          "rep": 2,
+          "twoNativeCompletions": true,
+          "twoFullOnlineScores": true,
+          "twoFullPostfreezeScores": true,
+          "sameDirectoryNewSession": true
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "cell": "cell-670e87cd4f35",
+      "rep": 1,
+      "run": "r-WIRmLz",
+      "mode": "standard",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "defect",
+            "basis": "Transport only decodes, calls planner and emits JSON. Journal adds forbidden dependency on policy.",
+            "evidence": [
+              "release.py:12-25",
+              "journal.py:3-6"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:54-77",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "isolation": {
+            "status": "supported",
+            "basis": "Different batch entries have local state; same change IDs across different items pass.",
+            "evidence": [
+              "planner.py:130-169",
+              "same-change-id-two-items"
+            ]
+          },
+          "atomic": {
+            "status": "defect",
+            "basis": "All elements are shaped before any element executes; a later null overrides an earlier production freeze. Wire results still remain atomic.",
+            "evidence": [
+              "planner.py:153-166",
+              "earlier-domain-before-later-shape"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "Shares the G2 resolver, but journal imports policy and batch shape/business are separate whole-batch passes.",
+            "evidence": [
+              "journal.py:3-4",
+              "planner.py:86-108",
+              "planner.py:153-164"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:55-65",
+            "code": "planner.py:54-77"
+          },
+          {
+            "obligation": "atomic-order",
+            "status": "defect",
+            "basis": "Documents shape-first behavior, which contradicts the owner first-actual-item requirement. Isolation explanation is still useful.",
+            "comment": "planner.py:131-139",
+            "code": "planner.py:153-166"
+          }
+        ],
+        "publicControlPassed": 14,
+        "publicControlTotal": 16,
+        "publicFailedCases": [
+          "earlier-domain-before-later-shape",
+          "targeted:error-order-early-domain-vs-later-invalid-item"
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "status": "missing",
+        "basis": "No authored architecture or handoff document in this staged capture.",
+        "evidence": [],
+        "capturedDocuments": [],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "7cd581c728520a838602c9c325279e219207e276b84a4b9ce04c2568d5688d21"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "036d5d19a09e509562d99fbe32c062feb2268cea0347a55143501bd264b84cd4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "3c5e9283e315c4a74bbecbc24a71859c9f547fdd538b3a4225bc51450117b154"
+        },
+        {
+          "path": "release.py",
+          "sha256": "958d1e74ad1481ea2ed0f8b902d3798d5d085282127507f41ea326da10e69bab"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 769880,
+        "quietMs": 2391,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 767489
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 769880,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 46,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 14,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_read_item",
+            "keyed_fields",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_envelope",
+            "read_item",
+            "read_retain"
+          ],
+          "lineCount": 125
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolved",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 169
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "decide",
+            "limit_for"
+          ],
+          "lineCount": 87
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "invalid_json",
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "usage": {
+        "tokenComparison": 1246581,
+        "cacheComparison": 98.4912,
+        "tokenAll": 5677409,
+        "cacheAll": 98.9288,
+        "usage": {
+          "comparison": {
+            "inputTokens": 18513,
+            "cacheReadTokens": 1208448,
+            "cacheWriteTokens": 0,
+            "outputTokens": 19620,
+            "totalTokens": 1246581,
+            "known": 45,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 41867,
+            "cacheReadTokens": 4367872,
+            "cacheWriteTokens": 0,
+            "outputTokens": 21089,
+            "totalTokens": 4430828,
+            "known": 82,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-2a69b7d65e4f",
+      "rep": 1,
+      "run": "r-WIRmLz",
+      "mode": "standard",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "finalOwnerDocDrift": [
+        {
+          "path": "SPEC.md",
+          "suppliedSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+          "frozenSha256": "bebafd3848190fb757b43b29344ac758c87eff639d258b4e448ff2c5cb1479f4"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "defect",
+            "basis": "Transport only decodes, calls planner and emits JSON. Journal adds forbidden dependency on policy.",
+            "evidence": [
+              "release.py:12-25",
+              "journal.py:3-6"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:54-77",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "identity": {
+            "status": "supported",
+            "basis": "Fingerprint is structure-aware, dictionary order irrelevant, list sequence preserved, and exact replay skips a second result.",
+            "evidence": [
+              "journal.py:98-160",
+              "planner.py:172-195",
+              "object-key-order-does-not-charge-twice"
+            ]
+          },
+          "quota": {
+            "status": "supported",
+            "basis": "Input-order processing precedes a strict final charge comparison; the public ordering and quota controls agree.",
+            "evidence": [
+              "planner.py:172-200",
+              "later-domain-priority-over-batch-budget"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "Resolved single/batch path is shared, but journal imports policy for envelope metadata, violating the existing module dependency boundary.",
+            "evidence": [
+              "journal.py:5-6",
+              "planner.py:86-108"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:55-65",
+            "code": "planner.py:54-77"
+          },
+          {
+            "obligation": "identity",
+            "status": "supported",
+            "basis": "Explains data identity and JSON types; type tags and sorted dictionary pairs implement it.",
+            "comment": "journal.py:99-118",
+            "code": "journal.py:119-160"
+          },
+          {
+            "obligation": "quota-order",
+            "status": "defect",
+            "basis": "Current G4 charge flow and comments are accurate; the historical claim that G3 required all shapes before any business rule contradicts G3.",
+            "comment": "planner.py:131-146",
+            "code": "planner.py:172-200"
+          }
+        ],
+        "publicControlPassed": 24,
+        "publicControlTotal": 24,
+        "publicFailedCases": []
+      },
+      "documents": {
+        "stage": "G4",
+        "status": "missing",
+        "basis": "No authored architecture or handoff document in this staged capture.",
+        "evidence": [],
+        "capturedDocuments": [],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "1ece2b6d1756efc64f66dab4ff28a6fb5be6f4a1e291388a96d5b836fbd3987d"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f1822d60425672613dc0ebea5307c57af9f4c803719b5ec8f18fdf4cf8f137dd"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "a4183753c6ab57438b636c7a8b221e4db1217bf973f9590f4bab0f761c65f4ae"
+        },
+        {
+          "path": "release.py",
+          "sha256": "958d1e74ad1481ea2ed0f8b902d3798d5d085282127507f41ea326da10e69bab"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 72,
+          "total": 72
+        },
+        "protected": {
+          "passed": 48,
+          "total": 48
+        },
+        "required": {
+          "passed": 24,
+          "total": 24
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 655487,
+        "quietMs": 2083,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 653404
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 655487,
+      "postfreeze": {
+        "passed": 32,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 72,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 72,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 24,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_read_item",
+            "canonical",
+            "fingerprint",
+            "keyed_fields",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_envelope",
+            "read_item",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 222
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolved",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 200
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "batch_limit",
+            "decide",
+            "limit_for"
+          ],
+          "lineCount": 105
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "invalid_json",
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "usage": {
+        "tokenComparison": 2663274,
+        "cacheComparison": 98.0794,
+        "tokenAll": 6925324,
+        "cacheAll": 99.0528,
+        "usage": {
+          "comparison": {
+            "inputTokens": 50711,
+            "cacheReadTokens": 2589696,
+            "cacheWriteTokens": 0,
+            "outputTokens": 22867,
+            "totalTokens": 2663274,
+            "known": 55,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 14450,
+            "cacheReadTokens": 4224768,
+            "cacheWriteTokens": 0,
+            "outputTokens": 22832,
+            "totalTokens": 4262050,
+            "known": 45,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-68ec0393d837",
+      "rep": 1,
+      "run": "r-WIRmLz",
+      "mode": "standard-checklist",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "finalOwnerDocDrift": [
+        {
+          "path": "CHANGE-G2.md",
+          "suppliedSha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc",
+          "frozenSha256": "fdd228463b0aee030ac1fb966a3cd69e28abbb71d329d0d0084c45decdc86e16"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:17-25"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:77-109",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "isolation": {
+            "status": "supported",
+            "basis": "Different batch entries have local state; same change IDs across different items pass.",
+            "evidence": [
+              "planner.py:189-213",
+              "same-change-id-two-items"
+            ]
+          },
+          "atomic": {
+            "status": "defect",
+            "basis": "A separate shape scan can stop on item 1 before evaluating the valid earlier item. No partial result remains true.",
+            "evidence": [
+              "planner.py:163-208",
+              "earlier-domain-before-later-shape"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "G2 evaluate is shared, but responsibility for request shape sits in planner and the two-loop dispatch causes the observed error priority failure.",
+            "evidence": [
+              "planner.py:163-208"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:78-95",
+            "code": "planner.py:77-109"
+          },
+          {
+            "obligation": "atomic-order",
+            "status": "defect",
+            "basis": "Justifies whole-batch shape priority in direct conflict with owner order. Note at lines 182-184 also wrongly equates index zero and null.",
+            "comment": "planner.py:164-170",
+            "code": "planner.py:177-208"
+          }
+        ],
+        "publicControlPassed": 14,
+        "publicControlTotal": 16,
+        "publicFailedCases": [
+          "earlier-domain-before-later-shape",
+          "targeted:error-order-early-domain-vs-later-invalid-item"
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "status": "defect",
+        "basis": "Standalone architecture and test report explain graph closure and boundaries. The test report claims all G3 requirements pass while asserting a later shape failure correctly supersedes an earlier business error. Public control proves the opposite is required.",
+        "evidence": [
+          "ARCHITECTURE.md:59-92",
+          "ARCHITECTURE.md:159-167",
+          "TEST-REPORT.md:60-70",
+          "earlier-domain-before-later-shape"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "8aca976cefb36d690cc8936bc7bdce625a3cffd34764cf7c859dfbc89043e1c6"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "477d5a29aebcc426a5bfb195c45123e591f5e3299f2bed5239823a4b93a43ce8"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "8485ed2e8f7cc075487e93acf65bedeb32e6540bfff212de9925468ec1d27016"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c58f43920eb4019f628ef3de2b184fea8a91ac22e220c6632bee758b8b6cea94"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "de5064950d83037e24b0fcbaad6b99437d9a7cd975e0ddf4ea680cf3be6df71e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "fe810560c41b8130a2cdf0bdeabc3cc3dcaaef8e366fc4746ef67d5f173a65a0"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 501434,
+        "quietMs": 2310,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 499124
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 501434,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 14,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_items",
+            "_units",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 230
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 71
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "usage": {
+        "tokenComparison": 1494068,
+        "cacheComparison": 98.7157,
+        "tokenAll": 3594795,
+        "cacheAll": 99.1538,
+        "usage": {
+          "comparison": {
+            "inputTokens": 18803,
+            "cacheReadTokens": 1445248,
+            "cacheWriteTokens": 0,
+            "outputTokens": 30017,
+            "totalTokens": 1494068,
+            "known": 43,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 11233,
+            "cacheReadTokens": 2074368,
+            "cacheWriteTokens": 0,
+            "outputTokens": 15126,
+            "totalTokens": 2100727,
+            "known": 32,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-8904d072ebe5",
+      "rep": 1,
+      "run": "r-WIRmLz",
+      "mode": "standard-checklist",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:17-25"
+            ]
+          },
+          "closure": {
+            "status": "missing",
+            "basis": "The G3 walk still exists, but the G4 envelope cannot call it; frozen G4 and a G3 cell have identical four-file SHA pins.",
+            "evidence": [
+              "planner.py:172-185",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "identity": {
+            "status": "missing",
+            "basis": "No G4 operation ID admission or replay table. G4 envelope reaches the legacy exact two-key batch gate.",
+            "evidence": [
+              "planner.py:172-185",
+              "operation-id-required"
+            ]
+          },
+          "quota": {
+            "status": "missing",
+            "basis": "No limit validation or batch comparison; accepted legacy input only sums units.",
+            "evidence": [
+              "planner.py:172-213",
+              "batch-limit-required"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "The legacy resolver still exists, but there is no revision path or G4 logic to review.",
+            "evidence": [
+              "planner.py:189-230"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:78-95",
+            "code": "planner.py:77-109"
+          },
+          {
+            "obligation": "identity",
+            "status": "not-applicable",
+            "basis": "No G4 identity path exists. Legacy G3 commentary remains present.",
+            "comment": null,
+            "code": null
+          },
+          {
+            "obligation": "quota-order",
+            "status": "not-applicable",
+            "basis": "No G4 quota path exists. Separate implementation defect is recorded.",
+            "comment": null,
+            "code": null
+          }
+        ],
+        "publicControlPassed": 7,
+        "publicControlTotal": 24,
+        "publicFailedCases": [
+          "item-forbids-action",
+          "item-must-be-object",
+          "same-change-id-two-items",
+          "earlier-domain-before-later-shape",
+          "no-partial-result-after-success",
+          "retention-through-unapplied-dependency",
+          "batch-limit-required",
+          "operation-id-required",
+          "object-key-order-does-not-charge-twice",
+          "different-operation-ids-charge-independently",
+          "same-id-boolean-different-from-integer",
+          "operation-id-exact-case",
+          "later-domain-priority-over-batch-budget",
+          "targeted:retention-small",
+          "targeted:retention-shared-unapplied-dag",
+          "targeted:error-order-early-domain-vs-later-invalid-item",
+          "targeted:object-key-order-does-not-charge-twice"
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "status": "defect",
+        "basis": "Both authored docs are byte-identical to a G3 cell and describe only G3. No G4 identity/limit change or handoff is recorded.",
+        "evidence": [
+          "ARCHITECTURE.md:59-92",
+          "TEST-REPORT.md:1",
+          "TEST-REPORT.md:60-70"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "ARCHITECTURE.md",
+            "sha256": "8aca976cefb36d690cc8936bc7bdce625a3cffd34764cf7c859dfbc89043e1c6"
+          },
+          {
+            "path": "TEST-REPORT.md",
+            "sha256": "477d5a29aebcc426a5bfb195c45123e591f5e3299f2bed5239823a4b93a43ce8"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "8485ed2e8f7cc075487e93acf65bedeb32e6540bfff212de9925468ec1d27016"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "c58f43920eb4019f628ef3de2b184fea8a91ac22e220c6632bee758b8b6cea94"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "de5064950d83037e24b0fcbaad6b99437d9a7cd975e0ddf4ea680cf3be6df71e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "fe810560c41b8130a2cdf0bdeabc3cc3dcaaef8e366fc4746ef67d5f173a65a0"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 25,
+          "total": 72
+        },
+        "protected": {
+          "passed": 24,
+          "total": 48
+        },
+        "required": {
+          "passed": 1,
+          "total": 24
+        },
+        "lostOldCount": 24
+      },
+      "terminal": "waiting-user",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "waiting-user",
+        "classification": "native-input-required",
+        "inputKinds": [
+          "question"
+        ],
+        "waitingAgents": 1,
+        "elapsedMs": 39136,
+        "quietMs": 327
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 39136,
+      "postfreeze": {
+        "passed": 0,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 25,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 25,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 7,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_items",
+            "_units",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 230
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 71
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "usage": {
+        "tokenComparison": 236393,
+        "cacheComparison": 88.8601,
+        "tokenAll": 236393,
+        "cacheAll": 88.8601,
+        "usage": {
+          "comparison": {
+            "inputTokens": 26156,
+            "cacheReadTokens": 208640,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1597,
+            "totalTokens": 236393,
+            "known": 10,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-2cf6a8995393",
+      "rep": 1,
+      "run": "r-WIRmLz",
+      "mode": "building-loop",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:10-15"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:64-88",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "isolation": {
+            "status": "supported",
+            "basis": "Different batch entries have local state; same change IDs across different items pass.",
+            "evidence": [
+              "planner.py:116-147",
+              "same-change-id-two-items"
+            ]
+          },
+          "atomic": {
+            "status": "supported",
+            "basis": "Single ordered pass stops on first actual failure and discards local partial result; both contrasts pass.",
+            "evidence": [
+              "earlier-domain-before-later-shape",
+              "no-partial-result-after-success"
+            ]
+          },
+          "reuse": {
+            "status": "supported",
+            "basis": "One loop calls the normal G2 plan for each fresh request, preserving failure semantics.",
+            "evidence": [
+              "planner.py:97-146",
+              "planner.py:150-176"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:65-74",
+            "code": "planner.py:64-88"
+          },
+          {
+            "obligation": "atomic-order",
+            "status": "supported",
+            "basis": "First failure wins, per-item G2 isolation, and only final success uses collected actions.",
+            "comment": "planner.py:117-126",
+            "code": "planner.py:128-146"
+          }
+        ],
+        "publicControlPassed": 16,
+        "publicControlTotal": 16,
+        "publicFailedCases": []
+      },
+      "documents": {
+        "stage": "G3",
+        "status": "supported",
+        "basis": "Index reaches implementation, rollback and verification. Graph-through-unapplied explanation and per-item G2 processing match current source/public cases. Historical planning sequence cannot be established from frozen docs.",
+        "evidence": [
+          "INDEX.md:3-5",
+          "modules/architecture.md:15-24",
+          "modules/architecture.md:26-32",
+          "planner.py:77-88",
+          "planner.py:116-147"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "45d6d35aae38cd0f2f11ce0942dc8c159ce0af51dfb406fe932daad4afb8323f"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "825e4919ee01769a7153a2ed336abebe0f3d2aba5ac9b1fbcf1af151d4ff6358"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "stalled-idle",
+      "nativePhase": "first-audit-ready",
+      "completion": {
+        "terminal": "stalled-idle",
+        "classification": "nonterminal-without-runnable-work",
+        "elapsedMs": 601919,
+        "quietMs": 30152,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 571767
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 601919,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 16,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "read_batch_item",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 176
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 1515131,
+        "cacheComparison": 90.0546,
+        "tokenAll": 4066671,
+        "cacheAll": 94.5883,
+        "usage": {
+          "comparison": {
+            "inputTokens": 148809,
+            "cacheReadTokens": 1347456,
+            "cacheWriteTokens": 0,
+            "outputTokens": 18866,
+            "totalTokens": 1515131,
+            "known": 59,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 69346,
+            "cacheReadTokens": 2465536,
+            "cacheWriteTokens": 0,
+            "outputTokens": 16658,
+            "totalTokens": 2551540,
+            "known": 56,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-be7d3bc4d9d0",
+      "rep": 1,
+      "run": "r-WIRmLz",
+      "mode": "building-loop",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:10-15"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:72-96",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "identity": {
+            "status": "supported",
+            "basis": "Canonical serialization keeps object order irrelevant and preserves list order and bool/number difference; replay skips result/charge.",
+            "evidence": [
+              "planner.py:138-147",
+              "planner.py:180-207",
+              "object-key-order-does-not-charge-twice"
+            ]
+          },
+          "quota": {
+            "status": "supported",
+            "basis": "All actual per-item failures precede the final strict quota test. G2 rollback remains uncapped.",
+            "evidence": [
+              "planner.py:196-218",
+              "planner.py:221-247",
+              "later-domain-priority-over-batch-budget"
+            ]
+          },
+          "reuse": {
+            "status": "supported",
+            "basis": "Unique items use the existing G2 plan; only batch results, identity and quota stay in the batch driver.",
+            "evidence": [
+              "planner.py:150-218",
+              "planner.py:221-247"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:73-82",
+            "code": "planner.py:72-96"
+          },
+          {
+            "obligation": "identity",
+            "status": "supported",
+            "basis": "Explains sorted object keys with list order unchanged; JSON encoding keeps bool/number distinct.",
+            "comment": "planner.py:139-145",
+            "code": "planner.py:146-147"
+          },
+          {
+            "obligation": "quota-order",
+            "status": "supported",
+            "basis": "Explains source-of-truth G2 work, replay skip and after-all quota; code uses one local charged total.",
+            "comment": "planner.py:151-161",
+            "code": "planner.py:180-218"
+          }
+        ],
+        "publicControlPassed": 24,
+        "publicControlTotal": 24,
+        "publicFailedCases": []
+      },
+      "documents": {
+        "stage": "G4",
+        "status": "defect",
+        "basis": "Navigable G4 architecture gives correct ordered processing, identity comparison and quota rules. Its verification section says retries retain a result slot and output order matches all requests; source returns one result for the first occurrence only.",
+        "evidence": [
+          "INDEX.md:3-5",
+          "modules/architecture.md:16-21",
+          "modules/architecture.md:33-38",
+          "planner.py:180-218",
+          "LEDGER.md:9-20"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "f77836230ac49e7814d7c29677b699bf10ca8c361e1c1cf76a63dbf96cf3810c"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "70b4155a1cd5bfde03528505e7a19ece9272d98816fa033ccece52d3bbad15d7"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ac11c0fde253acc8a39e6399fe605866a83f28866f6d27ed2b9c14e652a986ed"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 72,
+          "total": 72
+        },
+        "protected": {
+          "passed": 48,
+          "total": 48
+        },
+        "required": {
+          "passed": 24,
+          "total": 24
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "completion": {
+        "terminal": "closed",
+        "classification": "native-workflow-end",
+        "elapsedMs": 470899,
+        "quietMs": 2163,
+        "hostWorkflowEnd": {
+          "phase": "closed",
+          "elapsedMs": 460060
+        },
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 468736
+        }
+      },
+      "carry": "frozen-workspace-continuation-after-idle-stall",
+      "elapsedMs": 470899,
+      "postfreeze": {
+        "passed": 32,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 72,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 72,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 24,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "read_batch_item",
+            "read_operation_id",
+            "request_fingerprint",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 247
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 2098257,
+        "cacheComparison": 97.3959,
+        "tokenAll": 4135088,
+        "cacheAll": 96.1073,
+        "usage": {
+          "comparison": {
+            "inputTokens": 53796,
+            "cacheReadTokens": 2012032,
+            "cacheWriteTokens": 0,
+            "outputTokens": 32429,
+            "totalTokens": 2098257,
+            "known": 60,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 105250,
+            "cacheReadTokens": 1914624,
+            "cacheWriteTokens": 0,
+            "outputTokens": 16957,
+            "totalTokens": 2036831,
+            "known": 48,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-8e80911e5b44",
+      "rep": 2,
+      "run": "r-xQug3N",
+      "mode": "standard",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "finalOwnerDocDrift": [
+        {
+          "path": "CHANGE-G2.md",
+          "suppliedSha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc",
+          "frozenSha256": "3ac196daf96680348748e3e9394baea72d53dbd42d881c58ddc45149f17ef5ad"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:10-15"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:68-88",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "isolation": {
+            "status": "supported",
+            "basis": "Different batch entries have local state; same change IDs across different items pass.",
+            "evidence": [
+              "planner.py:122-144",
+              "same-change-id-two-items"
+            ]
+          },
+          "atomic": {
+            "status": "supported",
+            "basis": "Single ordered pass stops on first actual failure and discards local partial result; both contrasts pass.",
+            "evidence": [
+              "earlier-domain-before-later-shape",
+              "no-partial-result-after-success"
+            ]
+          },
+          "reuse": {
+            "status": "supported",
+            "basis": "Journal validates entry shape, policy controls limits, and batch and single share evaluate with per-item fail-fast.",
+            "evidence": [
+              "journal.py:78-106",
+              "planner.py:97-144"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:69-77",
+            "code": "planner.py:68-88"
+          },
+          {
+            "obligation": "atomic-order",
+            "status": "supported",
+            "basis": "Correctly explains independent G2 processing and no partial result.",
+            "comment": "planner.py:123-130",
+            "code": "planner.py:132-144"
+          }
+        ],
+        "publicControlPassed": 16,
+        "publicControlTotal": 16,
+        "publicFailedCases": []
+      },
+      "documents": {
+        "stage": "G3",
+        "status": "missing",
+        "basis": "No authored architecture or handoff document in this staged capture.",
+        "evidence": [],
+        "capturedDocuments": [],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "af85c2038a0c8c0103f20e619b7a43b6fc3c064b0baf6c9b593eb48deb7b4ee7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "55ea748c007995965c21af479c0dd378e20238a7e0c15d7d0100cb2f11d05fb4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 261024,
+        "quietMs": 2356,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 258668
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 261024,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 16,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 106
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__str__",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 156
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 896800,
+        "cacheComparison": 97.4795,
+        "tokenAll": 896800,
+        "cacheAll": 97.4795,
+        "usage": {
+          "comparison": {
+            "inputTokens": 22089,
+            "cacheReadTokens": 854272,
+            "cacheWriteTokens": 0,
+            "outputTokens": 20439,
+            "totalTokens": 896800,
+            "known": 29,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-7c02e97d12c4",
+      "rep": 2,
+      "run": "r-xQug3N",
+      "mode": "standard",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:10-15"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:69-89",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "identity": {
+            "status": "defect",
+            "basis": "Canonical comparison correctly recognizes equivalent key order, yet final list iterates all identities and returns a retry result twice.",
+            "evidence": [
+              "journal.py:133-145",
+              "planner.py:161-192",
+              "object-key-order-does-not-charge-twice"
+            ]
+          },
+          "quota": {
+            "status": "defect",
+            "basis": "Missing limit is accepted; earlier business failure can be superseded by the whole-batch shape pass. A final aggregate is charged only once per key.",
+            "evidence": [
+              "policy.py:70-83",
+              "planner.py:148-192",
+              "batch-limit-required",
+              "earlier-domain-before-later-shape"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "G2 evaluate is shared, but three whole-batch passes and reconstruction of results from identities create the precedence and replay-output defects.",
+            "evidence": [
+              "planner.py:148-193"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:70-78",
+            "code": "planner.py:69-89"
+          },
+          {
+            "obligation": "identity",
+            "status": "defect",
+            "basis": "Comment admits returned replay results despite contract saying one first result only. The charge is deduplicated.",
+            "comment": "planner.py:134-142",
+            "code": "planner.py:176-193"
+          },
+          {
+            "obligation": "quota-order",
+            "status": "defect",
+            "basis": "Claims preserved first-failure rules while later shape/conflict scans run before earlier business and missing limit is accepted.",
+            "comment": "planner.py:124-142",
+            "code": "planner.py:148-188"
+          }
+        ],
+        "publicControlPassed": 19,
+        "publicControlTotal": 24,
+        "publicFailedCases": [
+          "earlier-domain-before-later-shape",
+          "batch-limit-required",
+          "object-key-order-does-not-charge-twice",
+          "targeted:error-order-early-domain-vs-later-invalid-item",
+          "targeted:object-key-order-does-not-charge-twice"
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "status": "missing",
+        "basis": "No authored architecture or handoff document in this staged capture.",
+        "evidence": [],
+        "capturedDocuments": [],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e26aad5832f5d1d43f84f9c679b929a78b94111de5fd7678cd20f3aa89ad65f1"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "03dac2bf9194f4391a98bf87d3fd1465c1eeaeef1e5a27a14a525db62ab3637a"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "97d949895d18749aa46d573eb05c6c2e3017964af9fb4c3befb3700dcca803fe"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 59,
+          "total": 72
+        },
+        "protected": {
+          "passed": 36,
+          "total": 48
+        },
+        "required": {
+          "passed": 23,
+          "total": 24
+        },
+        "lostOldCount": 12
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 347838,
+        "quietMs": 2371,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 345467
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 347838,
+      "postfreeze": {
+        "passed": 16,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 59,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 59,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 19,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain",
+            "request_identity"
+          ],
+          "lineCount": 146
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__str__",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 206
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for",
+            "read_batch_limit"
+          ],
+          "lineCount": 83
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 1805175,
+        "cacheComparison": 98.6209,
+        "tokenAll": 2254490,
+        "cacheAll": 98.821,
+        "usage": {
+          "comparison": {
+            "inputTokens": 24534,
+            "cacheReadTokens": 1754496,
+            "cacheWriteTokens": 0,
+            "outputTokens": 26145,
+            "totalTokens": 1805175,
+            "known": 51,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 1706,
+            "cacheReadTokens": 444800,
+            "cacheWriteTokens": 0,
+            "outputTokens": 2809,
+            "totalTokens": 449315,
+            "known": 8,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-3ea1b7308069",
+      "rep": 2,
+      "run": "r-xQug3N",
+      "mode": "standard-checklist",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "finalOwnerDocDrift": [
+        {
+          "path": "CHANGE-G2.md",
+          "suppliedSha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc",
+          "frozenSha256": "6bb61cca7ecda9407e4fe981bed550d1b0fce9669cc11bd781f3c2f84496fbdb"
+        },
+        {
+          "path": "SPEC.md",
+          "suppliedSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+          "frozenSha256": "1d20f89dec1163bca8afa5f9eaa45b319b7fbb71a309fb9e6a7d93b8e6998abe"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:10-15"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:68-97",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "isolation": {
+            "status": "supported",
+            "basis": "Different batch entries have local state; same change IDs across different items pass.",
+            "evidence": [
+              "planner.py:170-217",
+              "same-change-id-two-items"
+            ]
+          },
+          "atomic": {
+            "status": "defect",
+            "basis": "A valid element with a dangling graph edge is recoded as invalid-batch-item. Error envelope still discards prior work.",
+            "evidence": [
+              "planner.py:17-20",
+              "planner.py:199-214",
+              "no-partial-result-after-success"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "Shared graph rollback helper, plus a separate first-item freeze pass and category remapping that can diverge from shared G2.",
+            "evidence": [
+              "planner.py:106-122",
+              "planner.py:135-162",
+              "planner.py:199-214"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:69-84",
+            "code": "planner.py:68-97"
+          },
+          {
+            "obligation": "atomic-order",
+            "status": "defect",
+            "basis": "Explicitly misclassifies graph-domain failures as item-shape errors, even though prior results are correctly discarded.",
+            "comment": "planner.py:205-213",
+            "code": "planner.py:199-214"
+          }
+        ],
+        "publicControlPassed": 15,
+        "publicControlTotal": 16,
+        "publicFailedCases": [
+          "no-partial-result-after-success"
+        ]
+      },
+      "documents": {
+        "stage": "G3",
+        "status": "defect",
+        "basis": "Contains navigation within authored docs, explicit scope, useful iterative graph rationale, rollback order and reproducible commands. It treats graph semantic errors as malformed batch shape; the independent retained case records unknown-dependency instead. Named local test counts remain a separate author report.",
+        "evidence": [
+          "docs/ARCHITECTURE.md:57-81",
+          "docs/PLAN-G3.md:29-47",
+          "docs/PLAN-G3.md:59-89",
+          "no-partial-result-after-success"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "docs/ARCHITECTURE.md",
+            "sha256": "68b80fab72d981b78e0648626614f2cf4a773d143c619617e2bdc99b45d0f2d4"
+          },
+          {
+            "path": "docs/PLAN-G3.md",
+            "sha256": "55bd33a15ace89f8862c88fbb49483267c6c4c1ad4ba79d9884de6a72afd87e8"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "630b91d03096dfdb5ae83a437e66714a4d5e39acc66c2456f1896a4aca621523"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f10c674ef4b46cc6ef1b203819512a822779cd80a52bf7e659e16299c1e4365f"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "14f03f59afcd3b4a86bd7b4e620e62d425d9c0a44eccc353a291699e9baf8a3a"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 44,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 23,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 1087210,
+        "quietMs": 2158,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 1085052
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 1087210,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 35,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 44,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 15,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_validated",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 123
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_frozen_early",
+            "_is_batch",
+            "_rollback_item",
+            "_same_rollback",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 244
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_frozen",
+            "is_frozen",
+            "limit_for"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 1329603,
+        "cacheComparison": 98.0564,
+        "tokenAll": 10828430,
+        "cacheAll": 99.3922,
+        "usage": {
+          "comparison": {
+            "inputTokens": 25292,
+            "cacheReadTokens": 1276032,
+            "cacheWriteTokens": 0,
+            "outputTokens": 28279,
+            "totalTokens": 1329603,
+            "known": 41,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 40142,
+            "cacheReadTokens": 9424256,
+            "cacheWriteTokens": 0,
+            "outputTokens": 34429,
+            "totalTokens": 9498827,
+            "known": 109,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-bebdd96b83f6",
+      "rep": 2,
+      "run": "r-xQug3N",
+      "mode": "standard-checklist",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "finalOwnerDocDrift": [
+        {
+          "path": "SPEC.md",
+          "suppliedSha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+          "frozenSha256": "bdf93b03ae5167be4a7b2c6c443b6c53416360c51d018e0f99ad4a50312e1148"
+        }
+      ],
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "defect",
+            "basis": "Entrypoint delegates to planner, but planner imports a missing dependency in the exact four-file scope.",
+            "evidence": [
+              "release.py:5",
+              "planner.py:7",
+              "forbidden-top-level-key"
+            ]
+          },
+          "closure": {
+            "status": "unresolved",
+            "basis": "The traversal marks every visited dependency then only retains applied IDs; entry cannot load in the exact four-file delivery.",
+            "evidence": [
+              "planner.py:88-104"
+            ]
+          },
+          "identity": {
+            "status": "defect",
+            "basis": "Delegates to out-of-scope replay.py; the frozen four-file artifact cannot import the public entrypoint.",
+            "evidence": [
+              "planner.py:7",
+              "forbidden-top-level-key"
+            ]
+          },
+          "quota": {
+            "status": "defect",
+            "basis": "Separate up-front shape/ID scan precedes any G2 verdict; later bad item can win. Quota itself is applied after execution.",
+            "evidence": [
+              "planner.py:263-321"
+            ]
+          },
+          "reuse": {
+            "status": "defect",
+            "basis": "A new unresolved module import plus multiple batch prepasses add dependencies/control paths; the single-item rollback helper itself is shared.",
+            "evidence": [
+              "planner.py:7",
+              "planner.py:107-123",
+              "planner.py:224-321"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:70-85",
+            "code": "planner.py:69-98"
+          },
+          {
+            "obligation": "identity",
+            "status": "unresolved",
+            "basis": "Describes replay, but delegates canonicalization to an unstaged import; executable truth cannot be confirmed in this capture.",
+            "comment": "planner.py:186-197",
+            "code": "planner.py:212-221"
+          },
+          {
+            "obligation": "quota-order",
+            "status": "defect",
+            "basis": "Correctly describes implemented prepasses, but falsely claims the owner required all shape/conflict work ahead of any business verdict.",
+            "comment": "planner.py:225-244",
+            "code": "planner.py:263-295"
+          }
+        ],
+        "publicControlPassed": 0,
+        "publicControlTotal": 24,
+        "publicFailedCases": [
+          "forbidden-top-level-key",
+          "item-forbids-action",
+          "item-must-be-object",
+          "same-change-id-two-items",
+          "earlier-domain-before-later-shape",
+          "no-partial-result-after-success",
+          "retention-through-unapplied-dependency",
+          "single-budget-zero-remains-uncapped",
+          "single-null-retain-invalid",
+          "single-null-applied-invalid",
+          "single-non-array-dependency-invalid",
+          "single-array-action-invalid",
+          "batch-limit-required",
+          "operation-id-required",
+          "limit-must-not-be-bool",
+          "object-key-order-does-not-charge-twice",
+          "different-operation-ids-charge-independently",
+          "same-id-boolean-different-from-integer",
+          "operation-id-exact-case",
+          "later-domain-priority-over-batch-budget",
+          "targeted:retention-small",
+          "targeted:retention-shared-unapplied-dag",
+          "targeted:error-order-early-domain-vs-later-invalid-item",
+          "targeted:object-key-order-does-not-charge-twice"
+        ]
+      },
+      "documents": {
+        "stage": "G4",
+        "status": "defect",
+        "basis": "Current architecture explicitly adds replay.py despite four-module requirement and documents all-item prepasses; imports are absent from four-file artifact. G3 plan is correctly marked historical; current plan offers detailed rollback and check instructions, but local test totals are unverified from this masked material.",
+        "evidence": [
+          "docs/ARCHITECTURE.md:18-32",
+          "docs/ARCHITECTURE.md:36-54",
+          "docs/PLAN-G3.md:3-7",
+          "docs/PLAN-G4.md:49-62",
+          "docs/PLAN-G4.md:80-87"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "docs/ARCHITECTURE.md",
+            "sha256": "d5ada7862155411ea772553234f67eab5bc1cf402e3af7259ca84b2c4065063a"
+          },
+          {
+            "path": "docs/PLAN-G3.md",
+            "sha256": "8b6e132e51e02b02049f782a7de33f3ab6c38ea7e8953407a4aca5a46bf92b34"
+          },
+          {
+            "path": "docs/PLAN-G4.md",
+            "sha256": "1f5159e6d0712007c2c8c40c05cd306a5b5b94ae59bae2f8f89fb831c01f5b98"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "a3da876388ceecfc7efc13352dcf04d3c691647a0b0842cbaac8f10ffecf0f77"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "932769b081bba6b98aa629a24ddf6cf765fa066f4d8843cbcf231d53205cab76"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "14f03f59afcd3b4a86bd7b4e620e62d425d9c0a44eccc353a291699e9baf8a3a"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 0,
+          "total": 72
+        },
+        "protected": {
+          "passed": 0,
+          "total": 44
+        },
+        "required": {
+          "passed": 0,
+          "total": 24
+        },
+        "lostOldCount": 44
+      },
+      "terminal": "completed",
+      "nativePhase": null,
+      "completion": {
+        "terminal": "completed",
+        "classification": "native-response-end",
+        "elapsedMs": 518460,
+        "quietMs": 2152,
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 516308
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 518460,
+      "postfreeze": {
+        "passed": 0,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 0,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": true,
+          "score": {
+            "passed": 0,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 0,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_validated",
+            "parse_limit",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 185
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_batch_frozen_early",
+            "_is_batch",
+            "_rollback_item",
+            "_same_rollback",
+            "add",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 348
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_frozen",
+            "is_frozen",
+            "limit_for"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "usage": {
+        "tokenComparison": 3196765,
+        "cacheComparison": 98.5033,
+        "tokenAll": 6105638,
+        "cacheAll": 98.9991,
+        "usage": {
+          "comparison": {
+            "inputTokens": 47324,
+            "cacheReadTokens": 3114496,
+            "cacheWriteTokens": 0,
+            "outputTokens": 34945,
+            "totalTokens": 3196765,
+            "known": 56,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 13265,
+            "cacheReadTokens": 2878592,
+            "cacheWriteTokens": 0,
+            "outputTokens": 17016,
+            "totalTokens": 2908873,
+            "known": 29,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-022880261dee",
+      "rep": 2,
+      "run": "r-xQug3N",
+      "mode": "building-loop",
+      "nativeStage": "g1",
+      "stage": "G3",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G3",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:16-27"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:60-82",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "isolation": {
+            "status": "supported",
+            "basis": "Different batch entries have local state; same change IDs across different items pass.",
+            "evidence": [
+              "planner.py:121-144",
+              "same-change-id-two-items"
+            ]
+          },
+          "atomic": {
+            "status": "supported",
+            "basis": "Single ordered pass stops on first actual failure and discards local partial result; both contrasts pass.",
+            "evidence": [
+              "earlier-domain-before-later-shape",
+              "no-partial-result-after-success"
+            ]
+          },
+          "reuse": {
+            "status": "supported",
+            "basis": "Batch adapts each item to the same single-request plan in one ordered loop; policy and journal keep their boundaries.",
+            "evidence": [
+              "planner.py:121-144",
+              "planner.py:147-170"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:61-70",
+            "code": "planner.py:60-82"
+          },
+          {
+            "obligation": "atomic-order",
+            "status": "supported",
+            "basis": "States independent local items and first actual error; both code and replay support.",
+            "comment": "planner.py:122-133",
+            "code": "planner.py:131-144"
+          }
+        ],
+        "publicControlPassed": 16,
+        "publicControlTotal": 16,
+        "publicFailedCases": []
+      },
+      "documents": {
+        "stage": "G3",
+        "status": "defect",
+        "basis": "Current document distinguishes the closure fix, G2 reuse, verification and rollback with a navigable index. It attributes routing to release.py and says it forwards requests alone; the entry delegates the entire payload to planner and does no dispatch. Heap topological ordering also prevents the literal O(V+E) bound.",
+        "evidence": [
+          "INDEX.md:3-5",
+          "modules/architecture.md:17-23",
+          "planner.py:34-57",
+          "release.py:14-27",
+          "modules/architecture.md:34-39"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "cccad4cc6c5f378d2b2d90da97e9af8312e5ceb8b6fff6bf9ee5cc1f399a4dd8"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "263ee013415eca027db52c97b2765477f2de0978f2544546d72fd5cb684317b8"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ea152865248d4c1db9ce553c8dde2a122d7ea3b67f236d14c21ed1f06a1f842b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 48,
+          "total": 48
+        },
+        "protected": {
+          "passed": 21,
+          "total": 21
+        },
+        "required": {
+          "passed": 27,
+          "total": 27
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "completion": {
+        "terminal": "closed",
+        "classification": "native-workflow-end",
+        "elapsedMs": 684244,
+        "quietMs": 2935,
+        "hostWorkflowEnd": {
+          "phase": "closed",
+          "elapsedMs": 675476
+        },
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 681309
+        }
+      },
+      "carry": "same-frozen-seed",
+      "elapsedMs": 684244,
+      "postfreeze": {
+        "passed": 16,
+        "total": 16
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 48,
+            "total": 48
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 16,
+        "total": 16
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_item_request",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 170
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 31
+        }
+      },
+      "usage": {
+        "tokenComparison": 1414159,
+        "cacheComparison": 89.5298,
+        "tokenAll": 5342062,
+        "cacheAll": 95.2745,
+        "usage": {
+          "comparison": {
+            "inputTokens": 146293,
+            "cacheReadTokens": 1250944,
+            "cacheWriteTokens": 0,
+            "outputTokens": 16922,
+            "totalTokens": 1414159,
+            "known": 52,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 103540,
+            "cacheReadTokens": 3786112,
+            "cacheWriteTokens": 0,
+            "outputTokens": 38251,
+            "totalTokens": 3927903,
+            "known": 65,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    },
+    {
+      "cell": "cell-f13c150ca904",
+      "rep": 2,
+      "run": "r-xQug3N",
+      "mode": "building-loop",
+      "nativeStage": "g2",
+      "stage": "G4",
+      "status": "frozen",
+      "codeEngineering": {
+        "stage": "G4",
+        "status": "frozen",
+        "checks": {
+          "boundary": {
+            "status": "supported",
+            "basis": "Pinned entrypoint confines transport to JSON decode, planner call and one output. Local imports match owner direction.",
+            "evidence": [
+              "release.py:16-27"
+            ]
+          },
+          "closure": {
+            "status": "supported",
+            "basis": "Traversal stack and visited set follow unapplied dependencies, retaining only applied ancestors. Two public retention shapes passed.",
+            "evidence": [
+              "planner.py:67-89",
+              "targeted:retention-small",
+              "targeted:retention-shared-unapplied-dag"
+            ]
+          },
+          "identity": {
+            "status": "supported",
+            "basis": "Canonical values carry type tags, sorted object keys and unchanged list order; repeats reuse the first result.",
+            "evidence": [
+              "planner.py:140-172",
+              "planner.py:205-223",
+              "same-id-boolean-different-from-integer"
+            ]
+          },
+          "quota": {
+            "status": "supported",
+            "basis": "Per-item business completes before a strict final aggregate limit, and retries add neither result nor units.",
+            "evidence": [
+              "planner.py:198-239",
+              "later-domain-priority-over-batch-budget"
+            ]
+          },
+          "reuse": {
+            "status": "supported",
+            "basis": "Batch dispatch calls the existing single plan for unique normalized items. Identity resides in planner alongside orchestration, a cohesion tradeoff with no extra local edge.",
+            "evidence": [
+              "planner.py:175-239",
+              "planner.py:242-265"
+            ]
+          }
+        },
+        "comments": [
+          {
+            "obligation": "closure-invariant",
+            "status": "supported",
+            "basis": "Explains complete traversal through unapplied intermediates and filters only what is retained; agrees with the actual loop. Code may be unreachable from the selected public envelope in this frozen cell.",
+            "comment": "planner.py:68-77",
+            "code": "planner.py:67-89"
+          },
+          {
+            "obligation": "identity",
+            "status": "supported",
+            "basis": "Explains structural equality and why Python bool/number equality cannot be reused. Code uses tagged structures.",
+            "comment": "planner.py:141-152",
+            "code": "planner.py:153-171"
+          },
+          {
+            "obligation": "quota-order",
+            "status": "supported",
+            "basis": "Explains first actual failure and dedup; adjacent notes state the only final quota comparison.",
+            "comment": "planner.py:176-185",
+            "code": "planner.py:205-239"
+          }
+        ],
+        "publicControlPassed": 24,
+        "publicControlTotal": 24,
+        "publicFailedCases": []
+      },
+      "documents": {
+        "stage": "G4",
+        "status": "defect",
+        "basis": "Current G4 code uses one ordered per-item pass and returns only the first result. Architecture claims separate whole-batch passes and repeats retry results. It cites a heap as O(V+E) and honestly flags its authored 2,000-node evidence as pending. Closed ledger records are workflow evidence, separate from documentation accuracy.",
+        "evidence": [
+          "INDEX.md:3-5",
+          "modules/architecture.md:21-31",
+          "modules/architecture.md:42",
+          "modules/architecture.md:51-54",
+          "planner.py:205-239",
+          "LEDGER.md:55-63"
+        ],
+        "capturedDocuments": [
+          {
+            "path": "INDEX.md",
+            "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+          },
+          {
+            "path": "LEDGER.md",
+            "sha256": "2cb90a14697a95b0178a908daf6734e4d23e7ac16777afee68edafc686888a0f"
+          },
+          {
+            "path": "modules/architecture.md",
+            "sha256": "4bcec5f630a90e5d41f3ed35515b13761479938b6d6c6c1dbd4e097055b25fd4"
+          }
+        ],
+        "planningTimeline": "unobserved-before-reveal",
+        "closure": "deferred-to-native-outcome-after-reveal"
+      },
+      "artifactPins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d2ed61d3970a3bb4f6b3209554f8d2160a02e31428341bac0fa14aa55df1a5b4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        }
+      ],
+      "finalScore": {
+        "online": {
+          "passed": 72,
+          "total": 72
+        },
+        "protected": {
+          "passed": 48,
+          "total": 48
+        },
+        "required": {
+          "passed": 24,
+          "total": 24
+        },
+        "lostOldCount": 0
+      },
+      "terminal": "closed",
+      "nativePhase": "closed",
+      "completion": {
+        "terminal": "closed",
+        "classification": "native-workflow-end",
+        "elapsedMs": 911969,
+        "quietMs": 2147,
+        "hostWorkflowEnd": {
+          "phase": "closed",
+          "elapsedMs": 903101
+        },
+        "rootTurnEnd": {
+          "reason": "completed",
+          "elapsedMs": 909823
+        }
+      },
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 911969,
+      "postfreeze": {
+        "passed": 32,
+        "total": 32
+      },
+      "observations": [
+        {
+          "targetMs": 300000,
+          "carriedForward": false,
+          "score": {
+            "passed": 72,
+            "total": 72
+          }
+        },
+        {
+          "targetMs": 600000,
+          "carriedForward": false,
+          "score": {
+            "passed": 72,
+            "total": 72
+          }
+        }
+      ],
+      "publicControls": {
+        "passed": 24,
+        "total": 24
+      },
+      "architectureBoundaries": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_item_request",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "request_identity",
+            "retained_closure",
+            "rollback_actions",
+            "tag",
+            "topological_order"
+          ],
+          "lineCount": 265
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 31
+        }
+      },
+      "usage": {
+        "tokenComparison": 2368157,
+        "cacheComparison": 96.5221,
+        "tokenAll": 12364492,
+        "cacheAll": 97.595,
+        "usage": {
+          "comparison": {
+            "inputTokens": 81127,
+            "cacheReadTokens": 2251520,
+            "cacheWriteTokens": 0,
+            "outputTokens": 35510,
+            "totalTokens": 2368157,
+            "known": 63,
+            "missing": 0
+          },
+          "extension": {
+            "inputTokens": 214064,
+            "cacheReadTokens": 9727104,
+            "cacheWriteTokens": 0,
+            "outputTokens": 55167,
+            "totalTokens": 9996335,
+            "known": 142,
+            "missing": 0
+          },
+          "cleanup": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          },
+          "persisted": {
+            "inputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "outputTokens": 0,
+            "totalTokens": 0,
+            "known": 0,
+            "missing": 0
+          }
+        }
+      }
+    }
+  ]
+}

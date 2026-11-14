@@ -1,0 +1,337 @@
+{
+  "intakeSha256": "f88c51a9f4308c7f998c97bb4e1114384cd66fea44364dcd3ce677eeea726d37",
+  "scope": "Additional blinded source-guided checks outside preregistered total; no private seed",
+  "cells": [
+    {
+      "cell": "cell-6359d984aaf1",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "nested-closure-shadows-longer-predecessor",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 35.3,
+          "ownerReference": "CHANGE-G2.md:3",
+          "input": {
+            "operation": "apply",
+            "active": [],
+            "events": [
+              {
+                "event_id": "new",
+                "kind": "reserve",
+                "id": "z",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 50,
+                "end": 60
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 0,
+                "end": 100
+              },
+              {
+                "resource": "dock",
+                "start": 5,
+                "end": 10
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "window-closed",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "ok",
+            "active": [
+              {
+                "id": "z",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 50,
+                "end": 60,
+                "revision": 1
+              }
+            ],
+            "results": [
+              {
+                "event_id": "new",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "runnerError": null
+        },
+        {
+          "id": "transfer-inside-currently-closed-window",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 38.9,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "half-open-end-touches-but-does-not-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 41.8,
+          "ownerReference": "CHANGE-G2.md:3; SPEC.md:5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-7d1d3d1164fa",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "nested-closure-shadows-longer-predecessor",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 38.1,
+          "ownerReference": "CHANGE-G2.md:3"
+        },
+        {
+          "id": "transfer-inside-currently-closed-window",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 35.5,
+          "ownerReference": "CHANGE-G2.md:3,5",
+          "input": {
+            "operation": "apply",
+            "active": [
+              {
+                "id": "z",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 50,
+                "end": 60,
+                "revision": 1
+              }
+            ],
+            "events": [
+              {
+                "event_id": "move",
+                "kind": "transfer",
+                "id": "z",
+                "resource": "dock",
+                "owner": "other",
+                "start": 50,
+                "end": 60,
+                "if_revision": 1
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 0,
+                "end": 100
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "window-closed",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "ok",
+            "active": [
+              {
+                "id": "z",
+                "resource": "dock",
+                "owner": "other",
+                "start": 50,
+                "end": 60,
+                "revision": 2
+              }
+            ],
+            "results": [
+              {
+                "event_id": "move",
+                "outcome": "applied",
+                "fromRevision": 1,
+                "toRevision": 2
+              }
+            ]
+          },
+          "runnerError": null
+        },
+        {
+          "id": "half-open-end-touches-but-does-not-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 36.5,
+          "ownerReference": "CHANGE-G2.md:3; SPEC.md:5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-d744fc9e1ba7",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "nested-closure-shadows-longer-predecessor",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 38.1,
+          "ownerReference": "CHANGE-G2.md:3"
+        },
+        {
+          "id": "transfer-inside-currently-closed-window",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 37.8,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "half-open-end-touches-but-does-not-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 39.3,
+          "ownerReference": "CHANGE-G2.md:3; SPEC.md:5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-cb616e2a3fd2",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "nested-closure-shadows-longer-predecessor",
+          "status": "failed",
+          "exitCode": 0,
+          "elapsedMs": 35.0,
+          "ownerReference": "CHANGE-G2.md:3",
+          "input": {
+            "operation": "apply",
+            "active": [],
+            "events": [
+              {
+                "event_id": "new",
+                "kind": "reserve",
+                "id": "z",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 50,
+                "end": 60
+              }
+            ],
+            "closed": [
+              {
+                "resource": "dock",
+                "start": 0,
+                "end": 100
+              },
+              {
+                "resource": "dock",
+                "start": 5,
+                "end": 10
+              }
+            ]
+          },
+          "expected": {
+            "status": "error",
+            "error": "window-closed",
+            "eventIndex": 0,
+            "active": [],
+            "results": []
+          },
+          "actual": {
+            "status": "ok",
+            "active": [
+              {
+                "id": "z",
+                "resource": "dock",
+                "owner": "dispatch",
+                "start": 50,
+                "end": 60,
+                "revision": 1
+              }
+            ],
+            "results": [
+              {
+                "event_id": "new",
+                "outcome": "applied"
+              }
+            ]
+          },
+          "runnerError": null
+        },
+        {
+          "id": "transfer-inside-currently-closed-window",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 33.0,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "half-open-end-touches-but-does-not-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 33.5,
+          "ownerReference": "CHANGE-G2.md:3; SPEC.md:5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-cffba0c996de",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "nested-closure-shadows-longer-predecessor",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 32.5,
+          "ownerReference": "CHANGE-G2.md:3"
+        },
+        {
+          "id": "transfer-inside-currently-closed-window",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 31.4,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "half-open-end-touches-but-does-not-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 32.5,
+          "ownerReference": "CHANGE-G2.md:3; SPEC.md:5"
+        }
+      ]
+    },
+    {
+      "cell": "cell-57925b5b6ed3",
+      "stage": "H2",
+      "cases": [
+        {
+          "id": "nested-closure-shadows-longer-predecessor",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 32.3,
+          "ownerReference": "CHANGE-G2.md:3"
+        },
+        {
+          "id": "transfer-inside-currently-closed-window",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 36.0,
+          "ownerReference": "CHANGE-G2.md:3,5"
+        },
+        {
+          "id": "half-open-end-touches-but-does-not-overlap",
+          "status": "passed",
+          "exitCode": 0,
+          "elapsedMs": 31.7,
+          "ownerReference": "CHANGE-G2.md:3; SPEC.md:5"
+        }
+      ]
+    }
+  ]
+}

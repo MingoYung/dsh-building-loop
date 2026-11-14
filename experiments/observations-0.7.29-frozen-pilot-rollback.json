@@ -1,0 +1,690 @@
+{
+  "scope": "Offline host rollback helpers plus real Linux bubblewrap Python sandbox. No model, installed DSH or authenticated HTTP transport used.",
+  "releaseArchiveSha256": "5a1f0aa8e140f65d4e04f8c79528ad560c491eb1a6c41fe1b2dc6d6b6cb9ea57",
+  "historicalRun": "r-hO1Nzt",
+  "historicalStage": "g2",
+  "historicalArchitectureSha256": "1b5a58fd9231e5489d9311bda66b339103086d81bd1141143302ed55aebe08f1",
+  "historicalArchitectureExcerpt": {
+    "line": 31,
+    "text": "3. 最后回退 policy.py 的 production-frozen 前置判定，恢复 G1 的双环境支持（第 5 行失效）。"
+  },
+  "limit": "Tests the documented production-freeze step in isolation under a selective rollback objective. The archived prose orders this step after two broader reversions; this result does not establish a defect in the complete ordered rollback.",
+  "signedCandidateSha256": "ebc4acb19258697f0ff039f28f692f225aa3e89055d2b3a8c298aafc90c792a6",
+  "historicalCandidateSignature": "verified Ed25519 with frozen owner key",
+  "historicalBaselineSignature": "verified Ed25519 with frozen owner key",
+  "historicalSources": [
+    {
+      "path": "journal.py",
+      "sha256": "79b501caed0569bc1539952f4b2bcbf5766a25d1e09af0c16eecc9f6b162f708"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "d0ddadc04411f7eea0d4a12816c8f5289aa592772b15db36a921eaaf407a803d"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "87e022916f715cf9f45ed0299cbcc9f2cfe18a0824dbeb9031af534c091955d6"
+    },
+    {
+      "path": "release.py",
+      "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+    }
+  ],
+  "results": [
+    {
+      "id": "wrong",
+      "architectureInput": "published branch-only plan",
+      "actionTransport": "typed fence",
+      "proof": {
+        "version": 1,
+        "status": "failed",
+        "binding": {
+          "policySha256": "6e371604d9fc1d9f259088e106e6fbf5c592ab1cfd4787ddbb6d2e7e3b118d5b",
+          "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+          "receiptSha256": "ebc4acb19258697f0ff039f28f692f225aa3e89055d2b3a8c298aafc90c792a6",
+          "originalArtifactsSha256": "cc510276accc2f4292d923f34d3775065417418fc6d651c1c045f130e71bf919",
+          "rehearsalArtifactsSha256": "8c76739f3ad6f4f150f8654307c9e206db569013015e719f1d5416c91f17e3ae",
+          "architectureSha256": "5e3713e44c259d7b61bc3b1d7cade04e1dbd44b8eb18e50db210d3924c295e29",
+          "rollbackSha256": "c401582709d2eedd63a0f94595a32e698781fb2a769a85fcd579c31c28370e05",
+          "checksSha256": "26e42ff466a796c26d43bfaa71fcd0d16866350157f45993281c837d3f113490"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "87e022916f715cf9f45ed0299cbcc9f2cfe18a0824dbeb9031af534c091955d6",
+            "afterSha256": "80b72462158e7e83fda4fd5d094a3804c579fc60c8f898ac3321815db2122c1c"
+          }
+        ],
+        "total": 4,
+        "passed": 3,
+        "receipts": [
+          {
+            "id": "historical-selective:example:production-plan",
+            "snapshotSha256": "928edc5696d3a3d02b9efc4effeea5815312c26a0dc3d5b9044079a88d94ce5a"
+          },
+          {
+            "id": "historical-selective:example:production-rollback",
+            "snapshotSha256": "55b24bf94d3cf6d8441157966a3429ab16f6be715f514425dd98d616caa2b196"
+          },
+          {
+            "id": "historical-selective:example:staging-plan-quota-still-enforced",
+            "snapshotSha256": "f01ef2cd92c13b7d6112db49c743fe94432e29ab4fb53093b19ad62e35889204"
+          },
+          {
+            "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+            "snapshotSha256": "11758f50758f7b322e3fae776e2d42eed0013d4ae0a8733b4f35af990ea8410c"
+          }
+        ],
+        "failures": [
+          {
+            "id": "historical-selective:example:production-plan",
+            "outcome": "mismatch",
+            "actual": {
+              "exitCode": 0,
+              "json": {
+                "status": "error",
+                "error": "budget-exceeded",
+                "actions": [],
+                "units": 0
+              }
+            },
+            "stdin": "{\"environment\":\"production\",\"action\":\"plan\",\"budget\":5,\"changes\":[{\"id\":\"a\",\"component\":\"api\",\"units\":4,\"depends_on\":[]}]}\n",
+            "expected": {
+              "exitCode": 0,
+              "json": {
+                "status": "ok",
+                "actions": [
+                  "a"
+                ],
+                "units": 4
+              }
+            }
+          }
+        ]
+      },
+      "probes": [
+        {
+          "id": "historical-selective:example:production-plan",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 13,
+            "end": 13,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "6b6f9ac33588ca2860a75673523196d09c08349770836361b8ab5def5fb9a09d"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 4
+            }
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          }
+        },
+        {
+          "id": "historical-selective:example:production-rollback",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 14,
+            "end": 14,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "53f1f756b282b37211ed9e2740d160831986c9c4a24856de04361c3e64b4f396"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 1
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-plan-quota-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "c0ce3d52fa32ccbcb35af06601245dc720cb33fb5cdd612c1c448cdbfb570112"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 7,
+            "end": 7,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "7dc0d6594d9a02bf0611cea862ad83e88abf408d99f3048b483dc60c8cae1ac5"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "correct",
+      "architectureInput": "corrected plan",
+      "actionTransport": "typed fence",
+      "proof": {
+        "version": 1,
+        "status": "passed",
+        "binding": {
+          "policySha256": "6e371604d9fc1d9f259088e106e6fbf5c592ab1cfd4787ddbb6d2e7e3b118d5b",
+          "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+          "receiptSha256": "ebc4acb19258697f0ff039f28f692f225aa3e89055d2b3a8c298aafc90c792a6",
+          "originalArtifactsSha256": "cc510276accc2f4292d923f34d3775065417418fc6d651c1c045f130e71bf919",
+          "rehearsalArtifactsSha256": "c8e880ea19d5cd480ee12770dde92a953457f28e832638342c93015e009fc6f7",
+          "architectureSha256": "0af513dd34a30b30d34521c05a6d9ce38c4954311ea19a5c8f63ead17ed70104",
+          "rollbackSha256": "f0279e9c97680bce0ea38a6c77020ef1645f8517f903122f36c3738225b85b30",
+          "checksSha256": "26e42ff466a796c26d43bfaa71fcd0d16866350157f45993281c837d3f113490"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "87e022916f715cf9f45ed0299cbcc9f2cfe18a0824dbeb9031af534c091955d6",
+            "afterSha256": "0a2e7eed9a77f9e586859967d9b98a888a503117580082dba2d26a72fd09d277"
+          }
+        ],
+        "total": 4,
+        "passed": 4,
+        "receipts": [
+          {
+            "id": "historical-selective:example:production-plan",
+            "snapshotSha256": "e9c26ecccba529e8ae70522394c3e5c4a8cfd2ad7213f21258ea776e9cbb28e5"
+          },
+          {
+            "id": "historical-selective:example:production-rollback",
+            "snapshotSha256": "180471576f20771fa16b1bb3a25efba562979556be80bf6f08f23746c83e864c"
+          },
+          {
+            "id": "historical-selective:example:staging-plan-quota-still-enforced",
+            "snapshotSha256": "ac6c0460a3de211130bead135c6d45a79bf75e44edfb88fecd4931380e961f53"
+          },
+          {
+            "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+            "snapshotSha256": "2fae168f72a8b1e12a0ff3cbb99aef4707b3583d9fadc4ad18804cadf6751022"
+          }
+        ],
+        "failures": []
+      },
+      "probes": [
+        {
+          "id": "historical-selective:example:production-plan",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 13,
+            "end": 13,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "6b6f9ac33588ca2860a75673523196d09c08349770836361b8ab5def5fb9a09d"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 4
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 4
+          }
+        },
+        {
+          "id": "historical-selective:example:production-rollback",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 14,
+            "end": 14,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "53f1f756b282b37211ed9e2740d160831986c9c4a24856de04361c3e64b4f396"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 1
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-plan-quota-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "c0ce3d52fa32ccbcb35af06601245dc720cb33fb5cdd612c1c448cdbfb570112"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 7,
+            "end": 7,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "7dc0d6594d9a02bf0611cea862ad83e88abf408d99f3048b483dc60c8cae1ac5"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "wrong-opaque",
+      "architectureInput": "published branch-only plan",
+      "actionTransport": "opaque executor proposal",
+      "proof": {
+        "version": 1,
+        "status": "failed",
+        "binding": {
+          "policySha256": "6e371604d9fc1d9f259088e106e6fbf5c592ab1cfd4787ddbb6d2e7e3b118d5b",
+          "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+          "receiptSha256": "ebc4acb19258697f0ff039f28f692f225aa3e89055d2b3a8c298aafc90c792a6",
+          "originalArtifactsSha256": "cc510276accc2f4292d923f34d3775065417418fc6d651c1c045f130e71bf919",
+          "rehearsalArtifactsSha256": "8c76739f3ad6f4f150f8654307c9e206db569013015e719f1d5416c91f17e3ae",
+          "architectureSha256": "95c6bc682fa6328a1ef801aae3cb0389d8829e5cbfbdf758e12665b7d119e5e7",
+          "rollbackSha256": "9d6f05648c04528ef562df1fe0f4b63c92bc9d36879715e6b251453c1e976cfb",
+          "checksSha256": "26e42ff466a796c26d43bfaa71fcd0d16866350157f45993281c837d3f113490",
+          "proposalId": "rollback-c84541d8cf2b4a7c545af771b9d791071a80f4184d3ec1142b4da98cec9bb52b"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "87e022916f715cf9f45ed0299cbcc9f2cfe18a0824dbeb9031af534c091955d6",
+            "afterSha256": "80b72462158e7e83fda4fd5d094a3804c579fc60c8f898ac3321815db2122c1c"
+          }
+        ],
+        "total": 4,
+        "passed": 3,
+        "receipts": [
+          {
+            "id": "historical-selective:example:production-plan",
+            "snapshotSha256": "a83e02cfa7ee9fc900c9a3c91fba7c8bb440e8c51309078b6047f85583e4c986"
+          },
+          {
+            "id": "historical-selective:example:production-rollback",
+            "snapshotSha256": "9a28c43f3a622a95e71fccc7e1532b22755c0ae549f64aef2b563b215d3eb97a"
+          },
+          {
+            "id": "historical-selective:example:staging-plan-quota-still-enforced",
+            "snapshotSha256": "bd0db0a6d42d79415fd748f0fafca63edb4aa0b10c3e0d62179b7f5eccb9398d"
+          },
+          {
+            "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+            "snapshotSha256": "142516647102d7d65fbcca85df1f0d57cf1272bacb540811f3588f68a7b6f8ce"
+          }
+        ],
+        "failures": [
+          {
+            "id": "historical-selective:example:production-plan",
+            "outcome": "mismatch",
+            "actual": {
+              "exitCode": 0,
+              "json": {
+                "status": "error",
+                "error": "budget-exceeded",
+                "actions": [],
+                "units": 0
+              }
+            },
+            "stdin": "{\"environment\":\"production\",\"action\":\"plan\",\"budget\":5,\"changes\":[{\"id\":\"a\",\"component\":\"api\",\"units\":4,\"depends_on\":[]}]}\n",
+            "expected": {
+              "exitCode": 0,
+              "json": {
+                "status": "ok",
+                "actions": [
+                  "a"
+                ],
+                "units": 4
+              }
+            }
+          }
+        ]
+      },
+      "probes": [
+        {
+          "id": "historical-selective:example:production-plan",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 13,
+            "end": 13,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "6b6f9ac33588ca2860a75673523196d09c08349770836361b8ab5def5fb9a09d"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 4
+            }
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          }
+        },
+        {
+          "id": "historical-selective:example:production-rollback",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 14,
+            "end": 14,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "53f1f756b282b37211ed9e2740d160831986c9c4a24856de04361c3e64b4f396"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 1
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-plan-quota-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "c0ce3d52fa32ccbcb35af06601245dc720cb33fb5cdd612c1c448cdbfb570112"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 7,
+            "end": 7,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "7dc0d6594d9a02bf0611cea862ad83e88abf408d99f3048b483dc60c8cae1ac5"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "correct-opaque",
+      "architectureInput": "corrected plan",
+      "actionTransport": "opaque executor proposal",
+      "proof": {
+        "version": 1,
+        "status": "passed",
+        "binding": {
+          "policySha256": "6e371604d9fc1d9f259088e106e6fbf5c592ab1cfd4787ddbb6d2e7e3b118d5b",
+          "goalSha256": "065cec2169ba871865e69cdaf245a61bddc74c621716859b926f59dacd971208",
+          "receiptSha256": "ebc4acb19258697f0ff039f28f692f225aa3e89055d2b3a8c298aafc90c792a6",
+          "originalArtifactsSha256": "cc510276accc2f4292d923f34d3775065417418fc6d651c1c045f130e71bf919",
+          "rehearsalArtifactsSha256": "c8e880ea19d5cd480ee12770dde92a953457f28e832638342c93015e009fc6f7",
+          "architectureSha256": "cd238523789b9a8780c8f32f0695113dcb54a9ffe872522c2c1645e9fc8cdc7f",
+          "rollbackSha256": "772817343bb5bacf217f6bf32113f86ed0abb94890372a5acdb6c7c3c22eb313",
+          "checksSha256": "26e42ff466a796c26d43bfaa71fcd0d16866350157f45993281c837d3f113490",
+          "proposalId": "rollback-7d404614bc36ef6336e2adf22bdfad40430d424a9fb1bff383f8da9fdce7db33"
+        },
+        "changed": [
+          {
+            "file": "policy.py",
+            "beforeSha256": "87e022916f715cf9f45ed0299cbcc9f2cfe18a0824dbeb9031af534c091955d6",
+            "afterSha256": "0a2e7eed9a77f9e586859967d9b98a888a503117580082dba2d26a72fd09d277"
+          }
+        ],
+        "total": 4,
+        "passed": 4,
+        "receipts": [
+          {
+            "id": "historical-selective:example:production-plan",
+            "snapshotSha256": "8e21af0641fbbbf3822d5439e00347c01783feb28dd26c4bd2c7feec207f8719"
+          },
+          {
+            "id": "historical-selective:example:production-rollback",
+            "snapshotSha256": "047feafd72925f22dd61ca78c989bbf2ef8db53126ad439a1b87a756daa6cf87"
+          },
+          {
+            "id": "historical-selective:example:staging-plan-quota-still-enforced",
+            "snapshotSha256": "f53952fce01633f22577c587863f4310a523b3af64fd2e01b0006c665afa09c4"
+          },
+          {
+            "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+            "snapshotSha256": "a9d9e3294491ec1737e07fcab678b434ddde3b119771c34bd962d5a6f835cadf"
+          }
+        ],
+        "failures": []
+      },
+      "probes": [
+        {
+          "id": "historical-selective:example:production-plan",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 13,
+            "end": 13,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "6b6f9ac33588ca2860a75673523196d09c08349770836361b8ab5def5fb9a09d"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 4
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 4
+          }
+        },
+        {
+          "id": "historical-selective:example:production-rollback",
+          "clause": {
+            "file": "SPEC.md",
+            "start": 14,
+            "end": 14,
+            "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+            "quoteSha256": "53f1f756b282b37211ed9e2740d160831986c9c4a24856de04361c3e64b4f396"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [
+                "a"
+              ],
+              "units": 1
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [
+              "a"
+            ],
+            "units": 1
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-plan-quota-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 6,
+            "end": 6,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "c0ce3d52fa32ccbcb35af06601245dc720cb33fb5cdd612c1c448cdbfb570112"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "error",
+              "error": "budget-exceeded",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "error",
+            "error": "budget-exceeded",
+            "actions": [],
+            "units": 0
+          }
+        },
+        {
+          "id": "historical-selective:example:staging-rollback-retain-still-enforced",
+          "clause": {
+            "file": "CHANGE-G2.md",
+            "start": 7,
+            "end": 7,
+            "sha256": "8f6d81a5b507765ed86dd159e69df11faef28507cbf01a9492a22fa2a57d698a",
+            "quoteSha256": "7dc0d6594d9a02bf0611cea862ad83e88abf408d99f3048b483dc60c8cae1ac5"
+          },
+          "expected": {
+            "exitCode": 0,
+            "json": {
+              "status": "ok",
+              "actions": [],
+              "units": 0
+            }
+          },
+          "actual": {
+            "status": "ok",
+            "actions": [],
+            "units": 0
+          }
+        }
+      ]
+    }
+  ],
+  "frozenAndCurrentSourceDigestsUnchanged": true
+}

@@ -1,0 +1,23 @@
+{
+  "run": "r-nUAPW1",
+  "unit": "K02",
+  "sourceArtifact": "5225708dc5317e77206e",
+  "policySha256": "509c5b56c986fc9be8abd404c115869f3f4d54aabfef826f0a7e485f95e335b9",
+  "receiptName": "K02-first.json",
+  "receiptDecision": "reject",
+  "findingIds": [
+    "POLICY-DOCSTRING-SYNTAX",
+    "POLICY-STALE-DOCSTRING"
+  ],
+  "observations": {
+    "pythonAstParse": true,
+    "docstringSourceLines": {
+      "start": 22,
+      "end": 28
+    },
+    "parsedDocstring": "Return (action, budget) for a request that passes policy.\n\n    Policy decides environment, action shape, budget shape and the G2 freeze.\n    It deliberately does not know which changes end up in the output: the cap\n    has to be applied to the emitted units after replay/deduplication, so that\n    comparison lives in the planner, which owns plan/rollback selection.\n    ",
+    "binaryTestsPassed": 21,
+    "freezeInDocstring": true
+  },
+  "conclusion": "The stated syntax failure and absence of the G2 freeze are contradicted by actual signed source. A more explicit mention of error code could be advisory; the existing success precondition is accurate."
+}

@@ -1,0 +1,123 @@
+{
+  "spec": "building-loop-review-quote-boundary-patch-replay/1",
+  "patchSha256": "929339ebc09eaba8eb38a4c7373f7ddfdca09026f9dc1c09dc41de74f1c9c048",
+  "modelCalls": 0,
+  "frozenArchiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+  "scope": "Contrasts exact frozen-package bypass with a detached runtime patch. Exercises actual quote, comparison and finding APIs with disclosed synthetic responses.",
+  "original": {
+    "full-current-clause": {
+      "quote": "When the input contains no entries, output field `count` equals 0.",
+      "outcome": "mismatch",
+      "blocking": false,
+      "admitsFinding": false
+    },
+    "truncated-quote": {
+      "quote": "output field `count` equals 0.",
+      "outcome": "mismatch",
+      "blocking": true,
+      "admitsFinding": true
+    }
+  },
+  "detached": [
+    {
+      "id": "whole-conditional",
+      "quote": "When the input contains no entries, output field `count` equals 0.",
+      "input": {
+        "entries": [
+          1
+        ]
+      },
+      "actual": {
+        "count": 1
+      },
+      "outcome": "mismatch",
+      "blocking": false,
+      "admitsFinding": false,
+      "clauseComplete": true,
+      "conditionalContext": true
+    },
+    {
+      "id": "same-line-cut",
+      "quote": "output field `count` equals 0.",
+      "input": {
+        "entries": [
+          1
+        ]
+      },
+      "actual": {
+        "count": 1
+      },
+      "outcome": "mismatch",
+      "blocking": false,
+      "admitsFinding": false,
+      "clauseComplete": false,
+      "conditionalContext": true
+    },
+    {
+      "id": "markdown-continuation-cut",
+      "quote": "Output field `count` equals 0.",
+      "input": {
+        "entries": [
+          1
+        ]
+      },
+      "actual": {
+        "count": 1
+      },
+      "outcome": "mismatch",
+      "blocking": false,
+      "admitsFinding": false,
+      "clauseComplete": false,
+      "conditionalContext": true
+    },
+    {
+      "id": "complete-unconditional",
+      "quote": "Output field `count` is at most 5.",
+      "input": {
+        "entries": [
+          1
+        ]
+      },
+      "actual": {
+        "count": 6
+      },
+      "outcome": "mismatch",
+      "blocking": true,
+      "admitsFinding": true,
+      "clauseComplete": true,
+      "conditionalContext": false
+    },
+    {
+      "id": "fenced-excerpt",
+      "quote": "Output field `count` is at most 5.",
+      "input": {
+        "entries": [
+          1
+        ]
+      },
+      "actual": {
+        "count": 6
+      },
+      "outcome": "mismatch",
+      "blocking": false,
+      "admitsFinding": false,
+      "clauseComplete": false,
+      "conditionalContext": false
+    },
+    {
+      "id": "registered-conditional",
+      "quote": "When the input contains no entries, output field `count` equals 0.",
+      "input": {
+        "entries": []
+      },
+      "actual": {
+        "count": 1
+      },
+      "outcome": "mismatch",
+      "blocking": true,
+      "admitsFinding": true,
+      "clauseComplete": true,
+      "conditionalContext": true
+    }
+  ]
+}

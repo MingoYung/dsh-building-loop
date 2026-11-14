@@ -1,0 +1,216 @@
+{
+  "status": "passed",
+  "carrier": "Windows DSH NEXT native Web CLI with deterministic loopback model",
+  "archiveSha256": "b6d4bb9729d9b3096ff0adcfee5396e3003af2af1a9a9e84d578ed38c152cce7",
+  "requests": [
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 1,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 2,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 0,
+      "action": "propose",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "stage": "G1",
+      "prior": 0,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 1,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "child",
+      "stage": "G1",
+      "prior": 1,
+      "action": "block",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 2,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 3,
+      "action": "prepare",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G2",
+      "prior": 4,
+      "action": "advance",
+      "offered": true
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    },
+    {
+      "role": "root",
+      "stage": "G1",
+      "prior": 3,
+      "offered": false
+    }
+  ],
+  "scope": "Synthetic signed baselines are fixture inputs. The probe validates the native authorization, ownership and ledger transitions.",
+  "installedHandoffSha256": "674e422e3a005b1b111e91416da026d01119465da5a305189e0784da111e0da3",
+  "native": {
+    "rows": [
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 17,
+        "error": false,
+        "unit": "K01",
+        "status": "started"
+      },
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 26,
+        "error": false,
+        "unit": "K01",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K01",
+          "goalSha256": "6d5d8bf859947c22c217c61b5b9fc872f204aa2516da4afcb40325a5d27ac44f",
+          "policySha256": "401aa0d260579777e40772185fb2cac32d376c7af0b4c2c0ff9095081ca3b9a9",
+          "advance": {
+            "action": "advance",
+            "unit": "K01"
+          }
+        }
+      },
+      {
+        "stage": "G1",
+        "role": "owner",
+        "seq": 34,
+        "error": false,
+        "unit": "K01",
+        "phase": "intake"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 17,
+        "error": false,
+        "unit": "K02",
+        "status": "started"
+      },
+      {
+        "stage": "G1",
+        "role": "child",
+        "seq": 21,
+        "error": true,
+        "text": "Error: 已确认的工程目标或授权版本已变化，请在新的主会话按当前目标和单元重新确认开工"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 26,
+        "error": true,
+        "text": "Error: 所有者已确认工作单元 K02；当前调用不能推进 K01"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 32,
+        "error": true,
+        "text": "Error: 原工作单元仍未退出可写阶段或已关单；只有已阻塞的未完成单元可以替换"
+      },
+      {
+        "stage": "G1",
+        "role": "child",
+        "seq": 27,
+        "error": false,
+        "unit": "K01",
+        "phase": "blocked"
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 38,
+        "error": false,
+        "unit": "K02",
+        "phase": "dispatch",
+        "checkpoint": {
+          "unit": "K02",
+          "goalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+          "policySha256": "401aa0d260579777e40772185fb2cac32d376c7af0b4c2c0ff9095081ca3b9a9",
+          "replaceUnit": "K01",
+          "advance": {
+            "action": "advance",
+            "unit": "K02"
+          }
+        }
+      },
+      {
+        "stage": "G2",
+        "role": "owner",
+        "seq": 46,
+        "error": false,
+        "unit": "K02",
+        "phase": "intake"
+      }
+    ],
+    "phases": {
+      "K01": "retired",
+      "K02": "intake"
+    },
+    "distinctCoordinators": true,
+    "sameWorkspaceState": true,
+    "historicalOwnerPreserved": true,
+    "oldLedgerStatus": "superseded",
+    "oldAcceptance": false,
+    "replacement": {
+      "outcome": "superseded",
+      "oldGoalSha256": "6d5d8bf859947c22c217c61b5b9fc872f204aa2516da4afcb40325a5d27ac44f",
+      "newGoalSha256": "0a80701e0673679f832e38db37155d773837f5166828a99908e564360330ed8c",
+      "previousPhase": "intake",
+      "newUnit": "K02",
+      "userEvent": 9,
+      "userSha256": "03c4b92102d099a6a4de4a41ebe1693a9c8a4e0abe8e78d15cd54d0c6a7e6bff"
+    }
+  },
+  "formalProfileUnchanged": true
+}

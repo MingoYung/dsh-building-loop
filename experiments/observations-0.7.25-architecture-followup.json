@@ -1,0 +1,320 @@
+{
+  "scope": "Detached prototype, frozen short stage replay; no paid model and no production change",
+  "observations": [
+    {
+      "lane": "r-Ku113T",
+      "stage": "g1",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "7a60ed773b8a1074f37f82fc05a66f87fcbd3191866ed866ae681919ffa3d35f"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "648b5ff5bb179e5273c3fe8b4b1a8a74964dab0fa4d472a6527d92c49a8cd006"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "cdefbb929bce393505b1ff3e5cbe7ae89ade6df30d6af048cd32798543e2c166"
+        },
+        {
+          "path": "release.py",
+          "sha256": "99d49f02c008f580da11dae6d9ad9cd5428bbda939a7621b5beb789ceb3955cf"
+        }
+      ],
+      "architectureSha256": "6146b162e7e3d6c47d555281e036635dfe5100cab7af95f3a378dd9457b765a0",
+      "conflicts": [
+        {
+          "line": 5,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "json-decoding",
+          "actual": [
+            {
+              "file": "release.py",
+              "line": 16,
+              "symbol": "json.load"
+            }
+          ]
+        },
+        {
+          "line": 6,
+          "from": "journal.py",
+          "relation": "validation",
+          "field": "environment",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "environment",
+              "line": 33
+            },
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "environment",
+              "line": 30,
+              "code": "invalid-environment"
+            }
+          ]
+        },
+        {
+          "line": 6,
+          "from": "journal.py",
+          "relation": "validation",
+          "field": "action",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "action",
+              "line": 33,
+              "code": "unsupported-action"
+            }
+          ]
+        },
+        {
+          "line": 6,
+          "from": "journal.py",
+          "relation": "validation",
+          "field": "budget",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "budget",
+              "line": 37,
+              "code": "invalid-budget"
+            }
+          ]
+        },
+        {
+          "line": 7,
+          "from": "policy.py",
+          "relation": "decision",
+          "code": "budget-exceeded",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "budget-exceeded",
+              "line": 95
+            }
+          ]
+        },
+        {
+          "line": 9,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "line": 9,
+          "from": "release.py",
+          "to": "policy.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "lane": "r-Ku113T",
+      "stage": "g2",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "4aa75ac3d734c56ac83bdd918d0bb8838bd7de1561f9751681679bcf5b354990"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "55f35bf94f8c0767728645a2666fa5c083c0d1cf968a9afd79d039990ca7b2b5"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "0a71951694d87660910046667be41f757f956f04b8f54b6e2fac580600ca181d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "99d49f02c008f580da11dae6d9ad9cd5428bbda939a7621b5beb789ceb3955cf"
+        }
+      ],
+      "architectureSha256": "08630255cc8551964cd90730010907325dbed561d9e0722a4e266d49ba2257dc",
+      "conflicts": [
+        {
+          "line": 5,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "json-decoding",
+          "actual": [
+            {
+              "file": "release.py",
+              "line": 16,
+              "symbol": "json.load"
+            }
+          ]
+        },
+        {
+          "line": 6,
+          "from": "journal.py",
+          "relation": "validation",
+          "field": "environment",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "environment",
+              "line": 51
+            },
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "environment",
+              "line": 48,
+              "code": "production-frozen"
+            },
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "environment",
+              "line": 44,
+              "code": "invalid-environment"
+            }
+          ]
+        },
+        {
+          "line": 6,
+          "from": "journal.py",
+          "relation": "validation",
+          "field": "action",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "action",
+              "line": 59
+            },
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "action",
+              "line": 51,
+              "code": "unsupported-action"
+            }
+          ]
+        },
+        {
+          "line": 6,
+          "from": "journal.py",
+          "relation": "validation",
+          "field": "budget",
+          "actual": [
+            {
+              "file": "policy.py",
+              "symbol": "limit_for",
+              "field": "budget",
+              "line": 57,
+              "code": "invalid-budget"
+            }
+          ]
+        },
+        {
+          "line": 7,
+          "from": "policy.py",
+          "relation": "decision",
+          "code": "budget-exceeded",
+          "actual": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "code": "budget-exceeded",
+              "line": 137
+            }
+          ]
+        },
+        {
+          "line": 9,
+          "from": "release.py",
+          "to": "journal.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "line": 9,
+          "from": "release.py",
+          "to": "policy.py",
+          "relation": "import",
+          "actual": [
+            {
+              "file": "planner.py",
+              "line": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "lane": "r-eBxs00",
+      "stage": "g1",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "d0790594bd43c10f5b7db45f83ed4000b4fc68b79791f4d8ec4b3105fe75a351"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "8980ea9a5be4b573a0b213725bf6429d1320ad38947eee7c544779a7c62990dc"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "2d75eff5042386336218addc6688abadd0150d0a509146a79e393043b2c4a4c2"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d7e0eb2463fd8611af597ea5391bca070d715c88a6e1caa6c2efefd954538e58"
+        }
+      ],
+      "architectureSha256": "5a914cb42edf0e6487bd43f5a6470913789809fecb20a3b7430401afbb9f7b6c",
+      "conflicts": []
+    },
+    {
+      "lane": "r-eBxs00",
+      "stage": "g2",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "cd39fa72bb16c0645834e13434ba163c2835b0bcd3e4f1b67b5ab43953e2e8c7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d76aa436956f90b577e34cf951014ff1496a7f5685b7180f563f1699dac6fc9c"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "43c538c03dda307b454e2ef4f51808dea2cfdddb9cd3249653e1c2665bcdb19d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "d7e0eb2463fd8611af597ea5391bca070d715c88a6e1caa6c2efefd954538e58"
+        }
+      ],
+      "architectureSha256": "489a99f8931d6693ede78b224173a588a1e0962a2d0b0cde4044d8cf6c9a5212",
+      "conflicts": []
+    }
+  ]
+}

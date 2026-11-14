@@ -1,0 +1,154 @@
+{
+  "description": "Archived independently rejected candidate, original receipt and signatures verified, exact Python source executed in the same isolated assessor, observed results replayed through current probe comparison and code review record logic.",
+  "archivedReceiptSha256": "59c75151752db6d05773c161b3fb459c0f740950ce933a6d7d3a9b30fe6ac2f1",
+  "sourcePins": [
+    {
+      "path": "journal.py",
+      "sha256": "66af978079f9e2de25c23e4fcb4f94b26fdbd712cb0a56d33ca7e9bb7f28ea38"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "365df05b0060574b33bf6d57db4e340c7c333d5d94ba729eda3ee875cffcaeec"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "0437977c87df20994acc1d62ec7e0340b8dbc3db9028b5545379438d3f9ef972"
+    },
+    {
+      "path": "release.py",
+      "sha256": "bdb3c1406301dba6699e3d61d0d4589e38672c20bb31817a315a2723e63e393b"
+    }
+  ],
+  "clause": {
+    "file": "SPEC.md",
+    "start": 12,
+    "end": 12,
+    "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+    "quote": "- Missing graph targets or unknown IDs in the persisted `applied` journal fail with `unknown-dependency`. A cycle anywhere fails with `dependency-cycle`. Non-array or malformed dependency/journal input fails with `invalid-change`."
+  },
+  "oldSubmission": {
+    "field": "findings",
+    "id": "edge-order",
+    "reason": "运行或语法问题需登记当前签名版本的受信复现编号。规格未规定的顺序和建议写 observations"
+  },
+  "runs": [
+    {
+      "case": "both-unknown",
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "absent-edge"
+            ]
+          }
+        ],
+        "applied": [
+          "absent-applied"
+        ]
+      },
+      "actual": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      },
+      "check": {
+        "exitCode": 0,
+        "json": "unknown-dependency",
+        "pointer": "/error"
+      },
+      "evidence": {
+        "id": "probe-3fc4337e4577e4a3b38ed74eedd784d98412",
+        "outcome": "match"
+      },
+      "rejectedFinding": "实际运行符合预期，不能将该复现作为退回理由"
+    },
+    {
+      "case": "missing-target-only",
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "absent-edge"
+            ]
+          }
+        ]
+      },
+      "actual": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      },
+      "check": {
+        "exitCode": 0,
+        "json": "unknown-dependency",
+        "pointer": "/error"
+      },
+      "evidence": {
+        "id": "probe-e078a88ef1ededab842062f92ca148838278",
+        "outcome": "match"
+      },
+      "rejectedFinding": "实际运行符合预期，不能将该复现作为退回理由"
+    },
+    {
+      "case": "unknown-applied-only",
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "absent-applied"
+        ]
+      },
+      "actual": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      },
+      "check": {
+        "exitCode": 0,
+        "json": "unknown-dependency",
+        "pointer": "/error"
+      },
+      "evidence": {
+        "id": "probe-6fc45a59ab7573ff4c1aa25338de4ba9c0b3",
+        "outcome": "match"
+      },
+      "rejectedFinding": "实际运行符合预期，不能将该复现作为退回理由"
+    }
+  ]
+}

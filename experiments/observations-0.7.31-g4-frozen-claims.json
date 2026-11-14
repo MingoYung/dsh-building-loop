@@ -1,0 +1,845 @@
+{
+  "fixtureReplay": {
+    "schema": "building-loop/g4-frozen-architecture-claim-replay/1",
+    "status": "pass",
+    "ownerSha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+    "scope": "model-free fixture-level executable assertions; no generic prose parsing or product gate execution",
+    "runs": [
+      {
+        "rep": 1,
+        "cell": "cell-be7d3bc4d9d0",
+        "architectureFile": "blind-review/hard-ab/docs/cell-be7d3bc4d9d0/modules/architecture.md",
+        "architectureSha256": "70b4155a1cd5bfde03528505e7a19ece9272d98816fa033ccece52d3bbad15d7",
+        "ownerFile": "hard-ab/r-WIRmLz/work/bl2/CHANGE-G2.md",
+        "receiptFile": "hard-ab/r-WIRmLz/work/bl2/receipts/K02-first.json",
+        "receiptSha256": "6cce1a78f039371084281df258fcd4f198bf9cd4f0abaa47b7eb311e96eb1571",
+        "receiptDecision": "accept",
+        "candidateFiles": {
+          "journal.py": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8",
+          "planner.py": "ac11c0fde253acc8a39e6399fe605866a83f28866f6d27ed2b9c14e652a986ed",
+          "policy.py": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+          "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        },
+        "historicalApprovals": {
+          "reviewer": {
+            "decision": "pass",
+            "architecture": "pass",
+            "coverageBlocks": 12,
+            "findings": 0,
+            "affected": [
+              {
+                "start": 35,
+                "end": 35,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 37,
+                "end": 37,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              }
+            ]
+          },
+          "auditor": {
+            "decision": "pass",
+            "architecture": "pass",
+            "coverageBlocks": 12,
+            "findings": 0,
+            "affected": [
+              {
+                "start": 35,
+                "end": 35,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 37,
+                "end": 37,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 3
+              }
+            ]
+          }
+        },
+        "cases": {
+          "retry-result-count": {
+            "ownerLine": 5,
+            "ownerRule": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价，数组顺序保留，JSON 数字和布尔值不能混同。ID 相同但请求数据不同，报 conflicting-operation，序号指向发生冲突的后续项。不同 operation_id 彼此独立，即使回退参数完全一样。有效结果中每项新增 operationId 字段，取请求的 operation_id。",
+            "input": {
+              "action": "rollback-many",
+              "limit": 2,
+              "requests": [
+                {
+                  "operation_id": "r",
+                  "environment": "staging",
+                  "budget": 0,
+                  "changes": [
+                    {
+                      "id": "c",
+                      "component": "api",
+                      "units": 2,
+                      "depends_on": []
+                    }
+                  ],
+                  "applied": [
+                    "c"
+                  ]
+                },
+                {
+                  "applied": [
+                    "c"
+                  ],
+                  "changes": [
+                    {
+                      "depends_on": [],
+                      "units": 2,
+                      "component": "api",
+                      "id": "c"
+                    }
+                  ],
+                  "budget": 0,
+                  "environment": "staging",
+                  "operation_id": "r"
+                }
+              ]
+            },
+            "oldDeclaration": {
+              "origin": "manual-encoding-of-archived-prose",
+              "lines": [
+                {
+                  "line": 35,
+                  "text": "- 批量去重：同 operation_id 同数据（含对象字段顺序不同）只计一次 units、重试位与首项结果相同；同 operation_id 不同数据返回 conflicting-operation 且序号指向后续项；不同 operation_id 同参数各自独立计费。"
+                },
+                {
+                  "line": 37,
+                  "text": "- 结果形状：每项含 actions/units/operationId，results 顺序与请求一致；错误仍为原子形状（results 为空、units 为 0），无部分结果。"
+                }
+              ],
+              "value": 2,
+              "verdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner"
+                ]
+              }
+            },
+            "correctedDeclaration": {
+              "value": 1,
+              "verdict": {
+                "status": "pass",
+                "failures": []
+              }
+            },
+            "frozenOutput": {
+              "status": "ok",
+              "results": [
+                {
+                  "actions": [
+                    "c"
+                  ],
+                  "units": 2,
+                  "operationId": "r"
+                }
+              ],
+              "units": 2
+            },
+            "candidateMutation": {
+              "plannerSha256": "e5dfea38de8d9e77eea15d899e2dc333b8b449182b22b79cd47c1edb024ec692",
+              "output": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "c"
+                    ],
+                    "units": 2,
+                    "operationId": "r"
+                  },
+                  {
+                    "actions": [
+                      "c"
+                    ],
+                    "units": 2,
+                    "operationId": "r"
+                  }
+                ],
+                "units": 2
+              },
+              "correctedDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "candidate-vs-owner"
+                ]
+              },
+              "wrongDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner",
+                  "candidate-vs-owner"
+                ]
+              },
+              "otherCaseUnchanged": "first-failure"
+            }
+          },
+          "first-failure": {
+            "ownerLine": 7,
+            "ownerRule": "按原请求顺序处理。先校验单项结构和操作 ID，然后判断重复或冲突。仅新 ID 执行该项的 G2 校验和计算。第一个实际失败项优先于整批配额。仅当全批完成上述处理时，把去重后全部回退动作的 units 和 limit 比较。超额返回 batch-limit-exceeded 和 null 序号；等于或低于上限可以提交。原子错误形状和无部分结果保证保持。批量 limit 只应用于批量接口，各单项 G2 rollback 仍不受 plan 配额约束。",
+            "input": {
+              "action": "rollback-many",
+              "limit": 0,
+              "requests": [
+                {
+                  "operation_id": "r",
+                  "environment": "production",
+                  "budget": 0,
+                  "changes": []
+                },
+                null
+              ]
+            },
+            "oldDeclaration": {
+              "origin": "synthetic-negative-control",
+              "lines": [],
+              "value": {
+                "error": "invalid-batch-item",
+                "requestIndex": 1
+              },
+              "verdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner"
+                ]
+              }
+            },
+            "correctedDeclaration": {
+              "value": {
+                "error": "production-frozen",
+                "requestIndex": 0
+              },
+              "verdict": {
+                "status": "pass",
+                "failures": []
+              }
+            },
+            "frozenOutput": {
+              "status": "error",
+              "error": "production-frozen",
+              "requestIndex": 0,
+              "results": [],
+              "units": 0
+            },
+            "candidateMutation": {
+              "plannerSha256": "5358232593ef0f545dd26b697495dd92005d4c48b3ca30d23891a3ac5053dcd4",
+              "output": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "correctedDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "candidate-vs-owner"
+                ]
+              },
+              "wrongDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner",
+                  "candidate-vs-owner"
+                ]
+              },
+              "otherCaseUnchanged": "retry-result-count"
+            }
+          }
+        }
+      },
+      {
+        "rep": 2,
+        "cell": "cell-f13c150ca904",
+        "architectureFile": "blind-review/hard-ab/docs/cell-f13c150ca904/modules/architecture.md",
+        "architectureSha256": "4bcec5f630a90e5d41f3ed35515b13761479938b6d6c6c1dbd4e097055b25fd4",
+        "ownerFile": "hard-ab/r-xQug3N/work/bl/CHANGE-G2.md",
+        "receiptFile": "hard-ab/r-xQug3N/work/bl/receipts/K02-final.json",
+        "receiptSha256": "e24940704f789c782b37ad8bca0f5181b9e6c5b1b6425eebb335f6ec12f26969",
+        "receiptDecision": "accept",
+        "candidateFiles": {
+          "journal.py": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8",
+          "planner.py": "d2ed61d3970a3bb4f6b3209554f8d2160a02e31428341bac0fa14aa55df1a5b4",
+          "policy.py": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+          "release.py": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        },
+        "historicalApprovals": {
+          "reviewer": {
+            "decision": "pass",
+            "architecture": "pass",
+            "coverageBlocks": 23,
+            "findings": 0,
+            "affected": [
+              {
+                "start": 21,
+                "end": 21,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 23,
+                "end": 23,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 25,
+                "end": 25,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 1
+              },
+              {
+                "start": 29,
+                "end": 29,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 42,
+                "end": 42,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 5
+              }
+            ]
+          },
+          "auditor": {
+            "decision": "pass",
+            "architecture": "pass",
+            "coverageBlocks": 23,
+            "findings": 0,
+            "affected": [
+              {
+                "start": 21,
+                "end": 21,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 1
+              },
+              {
+                "start": 23,
+                "end": 23,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 25,
+                "end": 25,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 1
+              },
+              {
+                "start": 29,
+                "end": 29,
+                "status": "consistent",
+                "facts": [],
+                "sourceRefs": 2
+              },
+              {
+                "start": 42,
+                "end": 42,
+                "status": "consistent",
+                "facts": [
+                  "nonobject-request"
+                ],
+                "sourceRefs": 1
+              }
+            ]
+          }
+        },
+        "cases": {
+          "retry-result-count": {
+            "ownerLine": 5,
+            "ownerRule": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价，数组顺序保留，JSON 数字和布尔值不能混同。ID 相同但请求数据不同，报 conflicting-operation，序号指向发生冲突的后续项。不同 operation_id 彼此独立，即使回退参数完全一样。有效结果中每项新增 operationId 字段，取请求的 operation_id。",
+            "input": {
+              "action": "rollback-many",
+              "limit": 2,
+              "requests": [
+                {
+                  "operation_id": "r",
+                  "environment": "staging",
+                  "budget": 0,
+                  "changes": [
+                    {
+                      "id": "c",
+                      "component": "api",
+                      "units": 2,
+                      "depends_on": []
+                    }
+                  ],
+                  "applied": [
+                    "c"
+                  ]
+                },
+                {
+                  "applied": [
+                    "c"
+                  ],
+                  "changes": [
+                    {
+                      "depends_on": [],
+                      "units": 2,
+                      "component": "api",
+                      "id": "c"
+                    }
+                  ],
+                  "budget": 0,
+                  "environment": "staging",
+                  "operation_id": "r"
+                }
+              ]
+            },
+            "oldDeclaration": {
+              "origin": "manual-encoding-of-archived-prose",
+              "lines": [
+                {
+                  "line": 23,
+                  "text": "4. 再判重试与冲突（conflicting-operation）。第二遍仍按原请求顺序：为每项计算与对象字段顺序无关的规范化请求数据（对象键排序后序列化，数组顺序原样保留，JSON 数字与布尔值不得混同，例如 `1` 与 `true` 不等价，CHANGE-G2.md:5）。同一 `operation_id` 再次出现时，规范化数据相同即重试，只沿用第一次的结果且只计费一次；不同即 `conflicting-operation`，`requestIndex` 指向发生冲突的后续项。不同 operation_id 即使回退参数完全相同也各自独立执行。"
+                },
+                {
+                  "line": 29,
+                  "text": "7. 结果拼装。成功后仍按原请求顺序输出 `{\"status\":\"ok\",\"results\":[{\"actions\":[...],\"units\":n,\"operationId\":\"...\"},...],\"units\":sum}`：重试项重复其首次结果的内容（含 `operationId`），顶层 units 为去重后各实际执行项单位之和，即重试只计费一次。单项 `rollback` 与 `plan` 输出形状不变，不带 operationId。"
+                }
+              ],
+              "value": 2,
+              "verdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner"
+                ]
+              }
+            },
+            "correctedDeclaration": {
+              "value": 1,
+              "verdict": {
+                "status": "pass",
+                "failures": []
+              }
+            },
+            "frozenOutput": {
+              "status": "ok",
+              "results": [
+                {
+                  "actions": [
+                    "c"
+                  ],
+                  "units": 2,
+                  "operationId": "r"
+                }
+              ],
+              "units": 2
+            },
+            "candidateMutation": {
+              "plannerSha256": "69b66ff4e2788418bb56baf35585c621498d217ae5ee3dee9bc94af4885d1216",
+              "output": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "c"
+                    ],
+                    "units": 2,
+                    "operationId": "r"
+                  },
+                  {
+                    "actions": [
+                      "c"
+                    ],
+                    "units": 2,
+                    "operationId": "r"
+                  }
+                ],
+                "units": 2
+              },
+              "correctedDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "candidate-vs-owner"
+                ]
+              },
+              "wrongDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner",
+                  "candidate-vs-owner"
+                ]
+              },
+              "otherCaseUnchanged": "first-failure"
+            }
+          },
+          "first-failure": {
+            "ownerLine": 7,
+            "ownerRule": "按原请求顺序处理。先校验单项结构和操作 ID，然后判断重复或冲突。仅新 ID 执行该项的 G2 校验和计算。第一个实际失败项优先于整批配额。仅当全批完成上述处理时，把去重后全部回退动作的 units 和 limit 比较。超额返回 batch-limit-exceeded 和 null 序号；等于或低于上限可以提交。原子错误形状和无部分结果保证保持。批量 limit 只应用于批量接口，各单项 G2 rollback 仍不受 plan 配额约束。",
+            "input": {
+              "action": "rollback-many",
+              "limit": 0,
+              "requests": [
+                {
+                  "operation_id": "r",
+                  "environment": "production",
+                  "budget": 0,
+                  "changes": []
+                },
+                null
+              ]
+            },
+            "oldDeclaration": {
+              "origin": "manual-encoding-of-archived-prose",
+              "lines": [
+                {
+                  "line": 21,
+                  "text": "3. 先结构校验（invalid-batch-item）。第一遍按原请求顺序逐项校验元素结构：allowed 字段 environment、budget、changes、applied、retain 加 `operation_id`，省略 action 时由批量入口设为 `\"rollback\"`；`operation_id` 必填、非空字符串且长度不超过 64（CHANGE-G2.md:3），违反即 `invalid-batch-item` 加该序号。元素结构非法优先于任何 operation_id 重复或冲突判断。"
+                },
+                {
+                  "line": 23,
+                  "text": "4. 再判重试与冲突（conflicting-operation）。第二遍仍按原请求顺序：为每项计算与对象字段顺序无关的规范化请求数据（对象键排序后序列化，数组顺序原样保留，JSON 数字与布尔值不得混同，例如 `1` 与 `true` 不等价，CHANGE-G2.md:5）。同一 `operation_id` 再次出现时，规范化数据相同即重试，只沿用第一次的结果且只计费一次；不同即 `conflicting-operation`，`requestIndex` 指向发生冲突的后续项。不同 operation_id 即使回退参数完全相同也各自独立执行。"
+                },
+                {
+                  "line": 25,
+                  "text": "5. 仅新 ID 执行 G2 路径。对每个首次出现的 operation_id，在独立上下文中复用 G2 单项 rollback 的校验与计算（含 `production-frozen` 先于图校验、`budget` 只校验不回退配额、`invalid-retain`、`unknown-dependency`、`dependency-cycle`、`conflicting-change`、`invalid-change`），ID、applied、retain 互不影响。首个实际失败项以其实错误码结束整批并带该序号，`results` 为空、`units` 为 0；失败判定先于整批配额（CHANGE-G2.md:7）。"
+                },
+                {
+                  "line": 42,
+                  "text": "5. 判定次序固定为：顶层 invalid-batch → 逐项 invalid-batch-item → conflicting-operation → 首个实际业务错误 → batch-limit-exceeded。前一步失败即结束，不进入后一步，因此配额不会掩盖真实的逐项错误（CHANGE-G2.md:7）。"
+                }
+              ],
+              "value": {
+                "error": "invalid-batch-item",
+                "requestIndex": 1
+              },
+              "verdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner"
+                ]
+              }
+            },
+            "correctedDeclaration": {
+              "value": {
+                "error": "production-frozen",
+                "requestIndex": 0
+              },
+              "verdict": {
+                "status": "pass",
+                "failures": []
+              }
+            },
+            "frozenOutput": {
+              "status": "error",
+              "error": "production-frozen",
+              "requestIndex": 0,
+              "results": [],
+              "units": 0
+            },
+            "candidateMutation": {
+              "plannerSha256": "6f7788154cd082eecdc706a4ebf9a553e38895481a74eef439107907e6b6178d",
+              "output": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "correctedDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "candidate-vs-owner"
+                ]
+              },
+              "wrongDeclarationVerdict": {
+                "status": "fail",
+                "failures": [
+                  "declaration-vs-owner",
+                  "candidate-vs-owner"
+                ]
+              },
+              "otherCaseUnchanged": "retry-result-count"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "productReplay": {
+    "schema": "building-loop/g4-product-owner-examples-replay/1",
+    "status": "pass",
+    "scope": "production architecture registration, current proof binding, review-probe preparation and comparison, exact archived input and Python code via isolated local adapter; model-free",
+    "product": {
+      "policy": "313ab1c4d84616af9e65adee4e7e35863044689957c2c2c6880c1a2c6bf46db8",
+      "project-hierarchy": "0b8f6a7c0dad958c4935b8d5574549ba2286805f87212a3197e02dcf74286ee8",
+      "code-review-probes": "00e80aff73702e31e152ad685762a0b4e32e3334f8252f3b2156aed4e8fc239a",
+      "code-diagnostics": "b9abd88342d0df9b4632c70c3634e5db7718630857bd0b719eb4d28c2cb101fd",
+      "engineering-architecture": "58d794a92d2cfa31c5b0ee630145eecf54fb8fa6382dce8595c757ebdfc9b531"
+    },
+    "runs": [
+      {
+        "rep": 1,
+        "originalArchitectureSha256": "70b4155a1cd5bfde03528505e7a19ece9272d98816fa033ccece52d3bbad15d7",
+        "originalPolicySha256": "8176d1b9d342b2e9dcfcfd7775f3d5700fc27031723eff06fafad4e3b5311b08",
+        "originalReceiptSha256": "6cce1a78f039371084281df258fcd4f198bf9cd4f0abaa47b7eb311e96eb1571",
+        "originalReceiptDecision": "accept",
+        "candidateFiles": {
+          "journal.py": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8",
+          "planner.py": "ac11c0fde253acc8a39e6399fe605866a83f28866f6d27ed2b9c14e652a986ed",
+          "policy.py": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+          "release.py": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        },
+        "controls": {
+          "originalWithoutOwnerSection": "导航文件 modules/architecture.md 须有唯一可见章节「业主可执行实证」",
+          "originalProseInOwnerSection": "架构示例「业主可执行实证」须仅包含一个 json 围栏，说明文字请写在其他章节",
+          "missingOwnerRow": "架构示例「业主可执行实证」缺少维护者登记的可执行实证：public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "originalLocator": "架构示例「业主可执行实证」维护者登记的目标条款已变化：public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "public-batch-behavior:example:object-key-order-does-not-charge-twice": "架构示例「业主可执行实证」与维护者登记的预期结果不一致，或试图覆盖固定输入：public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "public-batch-behavior:example:earlier-domain-before-later-shape": "架构示例「业主可执行实证」与维护者登记的预期结果不一致，或试图覆盖固定输入：public-batch-behavior:example:earlier-domain-before-later-shape",
+          "authorInputOverride": "架构示例「业主可执行实证」与维护者登记的预期结果不一致，或试图覆盖固定输入：public-batch-behavior:example:object-key-order-does-not-charge-twice"
+        },
+        "locatorMigration": {
+          "oldRetryQuote": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价",
+          "newRetryQuote": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价，数组顺序保留，JSON 数字和布尔值不能混同。ID 相同但请求数据不同，报 conflicting-operation，序号指向发生冲突的后续项。不同 operation_id 彼此独立，即使回退参数完全一样。有效结果中每项新增 operationId 字段，取请求的 operation_id。",
+          "fileSha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+          "archivedInputAndExpectedUnchanged": true
+        },
+        "registeredArchitectureSha256": "a7471752f6c248cac50d629c7cf723fc38cab295522debb23dc2c4fa6d945ca1",
+        "ownerProofs": [
+          {
+            "id": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+            "clause": {
+              "file": "CHANGE-G2.md",
+              "start": 5,
+              "end": 5,
+              "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+              "quoteSha256": "21e514647691f97f042c66a36b5521f1d915c395a2061f6a62ed4c94cd2d99a4"
+            }
+          },
+          {
+            "id": "public-batch-behavior:example:earlier-domain-before-later-shape",
+            "clause": {
+              "file": "CHANGE-G2.md",
+              "start": 7,
+              "end": 7,
+              "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+              "quoteSha256": "6c7b271d2b5ac22de8ccda6572143c4a29203dc6b789436574d143a5d603e429"
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "id": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+            "stdinSha256": "983eb893c7ac168043f55db6c641e71d2a99263d3372e6f2602b7609da3aa6cb",
+            "snapshotSha256": "fa8ff4fae91491940494490de7ad9ece9c6bbe4a7494e37ea7c54f246b0b8fda",
+            "goalSha256": "6f554a7e0c7e264725f83b1ff5bb58570523a48b619a11b6d876b1390d3511aa",
+            "policySha256": "5a6f035d30c6af1a4944b87361b18d1aba92410ffbba465692e785346cfd8ab2",
+            "output": {
+              "status": "ok",
+              "results": [
+                {
+                  "actions": [
+                    "retry"
+                  ],
+                  "units": 2,
+                  "operationId": "op-0"
+                }
+              ],
+              "units": 2
+            },
+            "verdict": {
+              "outcome": "match",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "ok",
+                  "results": [
+                    {
+                      "actions": [
+                        "retry"
+                      ],
+                      "units": 2,
+                      "operationId": "op-0"
+                    }
+                  ],
+                  "units": 2
+                }
+              }
+            }
+          },
+          {
+            "id": "public-batch-behavior:example:earlier-domain-before-later-shape",
+            "stdinSha256": "d0c218f58162bd50a50fd5d2fafd3f39d1000c3cb4de59f59fd77a3da206752d",
+            "snapshotSha256": "4ce4322971f4cc0af75ded8f6951bb8ebc6e5cd5c7f74f94944b812fdb0a9429",
+            "goalSha256": "6f554a7e0c7e264725f83b1ff5bb58570523a48b619a11b6d876b1390d3511aa",
+            "policySha256": "5a6f035d30c6af1a4944b87361b18d1aba92410ffbba465692e785346cfd8ab2",
+            "output": {
+              "status": "error",
+              "error": "production-frozen",
+              "requestIndex": 0,
+              "results": [],
+              "units": 0
+            },
+            "verdict": {
+              "outcome": "match",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "requestIndex": 0,
+                  "results": [],
+                  "units": 0
+                }
+              }
+            }
+          }
+        ],
+        "outsideScope": {
+          "status": "registered",
+          "originalFalseProsePreserved": true,
+          "ordinarySemanticReviewRun": false,
+          "architectureSha256": "268b7792c224de98b629eb9c1e2f2c5be87fc401b64b142946350621c741935d"
+        }
+      },
+      {
+        "rep": 2,
+        "originalArchitectureSha256": "4bcec5f630a90e5d41f3ed35515b13761479938b6d6c6c1dbd4e097055b25fd4",
+        "originalPolicySha256": "3739f10ac78bdb2e388a91cfcf72595e5f5d655abdda875e3282aed8fce458cd",
+        "originalReceiptSha256": "e24940704f789c782b37ad8bca0f5181b9e6c5b1b6425eebb335f6ec12f26969",
+        "originalReceiptDecision": "accept",
+        "candidateFiles": {
+          "journal.py": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8",
+          "planner.py": "d2ed61d3970a3bb4f6b3209554f8d2160a02e31428341bac0fa14aa55df1a5b4",
+          "policy.py": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+          "release.py": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        },
+        "controls": {
+          "originalWithoutOwnerSection": "导航文件 modules/architecture.md 须有唯一可见章节「业主可执行实证」",
+          "originalProseInOwnerSection": "架构示例「业主可执行实证」须仅包含一个 json 围栏，说明文字请写在其他章节",
+          "missingOwnerRow": "架构示例「业主可执行实证」缺少维护者登记的可执行实证：public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "originalLocator": "架构示例「业主可执行实证」维护者登记的目标条款已变化：public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "public-batch-behavior:example:object-key-order-does-not-charge-twice": "架构示例「业主可执行实证」与维护者登记的预期结果不一致，或试图覆盖固定输入：public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "public-batch-behavior:example:earlier-domain-before-later-shape": "架构示例「业主可执行实证」与维护者登记的预期结果不一致，或试图覆盖固定输入：public-batch-behavior:example:earlier-domain-before-later-shape",
+          "authorInputOverride": "架构示例「业主可执行实证」与维护者登记的预期结果不一致，或试图覆盖固定输入：public-batch-behavior:example:object-key-order-does-not-charge-twice"
+        },
+        "locatorMigration": {
+          "oldRetryQuote": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价",
+          "newRetryQuote": "同一批内，operation_id 相同且完整请求数据相同的后续项只视为重试。仅返回第一次的结果，计费一次。对象字段顺序不影响等价，数组顺序保留，JSON 数字和布尔值不能混同。ID 相同但请求数据不同，报 conflicting-operation，序号指向发生冲突的后续项。不同 operation_id 彼此独立，即使回退参数完全一样。有效结果中每项新增 operationId 字段，取请求的 operation_id。",
+          "fileSha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+          "archivedInputAndExpectedUnchanged": true
+        },
+        "registeredArchitectureSha256": "9281b86c22cacc0078ded60c91c9a782defef47d760900fe21295800880aeafb",
+        "ownerProofs": [
+          {
+            "id": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+            "clause": {
+              "file": "CHANGE-G2.md",
+              "start": 5,
+              "end": 5,
+              "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+              "quoteSha256": "21e514647691f97f042c66a36b5521f1d915c395a2061f6a62ed4c94cd2d99a4"
+            }
+          },
+          {
+            "id": "public-batch-behavior:example:earlier-domain-before-later-shape",
+            "clause": {
+              "file": "CHANGE-G2.md",
+              "start": 7,
+              "end": 7,
+              "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+              "quoteSha256": "6c7b271d2b5ac22de8ccda6572143c4a29203dc6b789436574d143a5d603e429"
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "id": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+            "stdinSha256": "983eb893c7ac168043f55db6c641e71d2a99263d3372e6f2602b7609da3aa6cb",
+            "snapshotSha256": "26fdafe74e586480eea36bb98072507a3ea6f6a29ad9c3c0bf4cc54d90b9070e",
+            "goalSha256": "6f554a7e0c7e264725f83b1ff5bb58570523a48b619a11b6d876b1390d3511aa",
+            "policySha256": "67fa5a1fc14018ae9f5cde2c1f4bf57b03f1a8dc7c32f8318f4f1ebc967cd47b",
+            "output": {
+              "status": "ok",
+              "results": [
+                {
+                  "actions": [
+                    "retry"
+                  ],
+                  "units": 2,
+                  "operationId": "op-0"
+                }
+              ],
+              "units": 2
+            },
+            "verdict": {
+              "outcome": "match",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "ok",
+                  "results": [
+                    {
+                      "actions": [
+                        "retry"
+                      ],
+                      "units": 2,
+                      "operationId": "op-0"
+                    }
+                  ],
+                  "units": 2
+                }
+              }
+            }
+          },
+          {
+            "id": "public-batch-behavior:example:earlier-domain-before-later-shape",
+            "stdinSha256": "d0c218f58162bd50a50fd5d2fafd3f39d1000c3cb4de59f59fd77a3da206752d",
+            "snapshotSha256": "98f6488d1bba3108a4dd13c068d01bfad5a6e1608c1b16ec7a4b4f8f9f423e11",
+            "goalSha256": "6f554a7e0c7e264725f83b1ff5bb58570523a48b619a11b6d876b1390d3511aa",
+            "policySha256": "67fa5a1fc14018ae9f5cde2c1f4bf57b03f1a8dc7c32f8318f4f1ebc967cd47b",
+            "output": {
+              "status": "error",
+              "error": "production-frozen",
+              "requestIndex": 0,
+              "results": [],
+              "units": 0
+            },
+            "verdict": {
+              "outcome": "match",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "requestIndex": 0,
+                  "results": [],
+                  "units": 0
+                }
+              }
+            }
+          }
+        ],
+        "outsideScope": {
+          "status": "registered",
+          "originalFalseProsePreserved": true,
+          "ordinarySemanticReviewRun": false,
+          "architectureSha256": "7fbdb3f3672f49ddfab333621a0678c3b64a7355639e4e16938158841b041dfd"
+        }
+      }
+    ]
+  }
+}

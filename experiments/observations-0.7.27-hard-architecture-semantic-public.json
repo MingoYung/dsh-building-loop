@@ -1,0 +1,1508 @@
+{
+  "scope": "Independent checks against exact frozen source and document pins. Owner boundary, self-described code, and functionality are scored separately.",
+  "archiveSha256": "5c531f21298dd2bf123fc9c48b9b37cd6feee18fd722156c246be1ad52c5bcc7",
+  "observations": [
+    {
+      "run": "r-QRyWYi",
+      "stage": "G4",
+      "nativePhase": "closed",
+      "terminal": "closed",
+      "elapsedMs": 375505,
+      "receipt": {
+        "file": "K02-first.json",
+        "sha256": "ebccaccd0785b8ef8f9c4ab1bac78fe1da1ca795c68453d7927e9f546112205e",
+        "decision": "accept",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architecture": {
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 1,
+                "end": 61,
+                "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+              },
+              "status": "pass",
+              "basis": "依据各节核验、已读完整架构稿和退回记录生成",
+              "sections": [
+                {
+                  "heading": "模块职责",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 3,
+                    "end": 27,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "职责分工与实现一致：release 形状盲分发、journal 批量纯函数、planner.plan_batch 顺序、policy 不下沉 limit。",
+                  "evidence": [
+                    {
+                      "file": "release.py",
+                      "start": 14,
+                      "end": 18,
+                      "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+                      "relation": "supports",
+                      "excerptSha256": "ca83bee6a2ffed3b046c48f725b55e67f278e67f92c62937d8fa40254968ad27"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 89,
+                      "end": 131,
+                      "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac",
+                      "relation": "supports",
+                      "excerptSha256": "110d4f15b94fdd09fd336ef7225e21a76b8270190dbb764fa5c7e7d627035981"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 166,
+                      "end": 205,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "4914be4e6a055c688253f81f2e2b38d3991557c39f23267847c01e25c69b2ab8"
+                    },
+                    {
+                      "file": "policy.py",
+                      "start": 41,
+                      "end": 63,
+                      "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10",
+                      "relation": "supports",
+                      "excerptSha256": "b2d42bb48c83fb9fdc44a31c21fec3bf36e8350e5daf737eaee1bb0a551c5c87"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "实施顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 28,
+                    "end": 35,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "实施顺序 1-5 与当前源码状态一致，测试要求由签名必测用例覆盖。",
+                  "evidence": [
+                    {
+                      "file": "journal.py",
+                      "start": 89,
+                      "end": 131,
+                      "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac",
+                      "relation": "supports",
+                      "excerptSha256": "110d4f15b94fdd09fd336ef7225e21a76b8270190dbb764fa5c7e7d627035981"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 136,
+                      "end": 205,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "2e6f3800895816a2d93bc0ceaa02dc6c119b03c6d9a1c41097de6cce2ecda21a"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "回退顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 36,
+                    "end": 42,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "回退顺序与真实依赖一致：release 分支→planner plan_batch→journal 批量纯函数，policy 未触碰。",
+                  "evidence": [
+                    {
+                      "file": "release.py",
+                      "start": 5,
+                      "end": 5,
+                      "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+                      "relation": "supports",
+                      "excerptSha256": "8b69d4da645035baa083ea7077524ec4be08355dd5f45d0f2eef5dc970749020"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 4,
+                      "end": 7,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "8d75a28f47980b6e1e6d8a2a8bc1e09a74f0a321b72152ec0dbe81c412d2b2bd"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "关键验证",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 43,
+                    "end": 53,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "关键验证各条与源码路径对应：五键错误形状、去重不计费、冲突指向后续项、limit 最后比较、跨未应用节点闭包。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 14,
+                      "end": 18,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "77def03d1479de68e98aa40b2633b3c4778eb2b68cf2370393d788473bde119a"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 57,
+                      "end": 97,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "28776008645774ddb4452a911f181709c5eb816d57063c0b58485574dc2bd7b4"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 201,
+                      "end": 205,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "112fc7899c6712db7e54ebf157436ae10701d1904d4c54e4a9ba4002aff462f3"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 134,
+                      "end": 172,
+                      "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac",
+                      "relation": "supports",
+                      "excerptSha256": "6a6f8fdb75001fd2b1f452c77be7b96c02ed35e22c77cb171deebee35876bb02"
+                    }
+                  ],
+                  "status": "pass"
+                }
+              ]
+            },
+            "findings": 0
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architecture": {
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 1,
+                "end": 61,
+                "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+              },
+              "status": "pass",
+              "basis": "依据各节核验、已读完整架构稿和退回记录生成",
+              "sections": [
+                {
+                  "heading": "模块职责",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 3,
+                    "end": 27,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "四模块与导入方向 release→planner→{journal,policy} 与静态依赖一致；批量校验在 journal、组装在 planner、配额在 policy、release 仅分发，与架构第 3–26 行逐条吻合，retained_closure 的全图追溯也符合 G3 规模与传递依赖要求。",
+                  "evidence": [
+                    {
+                      "file": "journal.py",
+                      "start": 57,
+                      "end": 91,
+                      "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac",
+                      "relation": "supports",
+                      "excerptSha256": "95bb987fa38f5f7cf9d2b5fe884bbab94503447cf1fd80af416b05a483bffd72"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 136,
+                      "end": 215,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "7bde64c4df7a41159374aa495589c995cfae29afb57743341b1525072c8a80f0"
+                    },
+                    {
+                      "file": "SPEC.md",
+                      "start": 28,
+                      "end": 28,
+                      "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+                      "relation": "supports",
+                      "excerptSha256": "551b4e2cd73bd691019eebd9cdbaf103c5a23d6dbcdaf459cac04d598321df12"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "实施顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 28,
+                    "end": 35,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "实施顺序各步在代码中已落地：journal 新增三个 G4 纯函数且改为三键信封、planner 新增 plan_batch、release 分发不变。",
+                  "evidence": [
+                    {
+                      "file": "journal.py",
+                      "start": 89,
+                      "end": 172,
+                      "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac",
+                      "relation": "supports",
+                      "excerptSha256": "188078b87ee3a3f9806cc7be68efab3d5fcf2ab87971abbedc73176ed2f059d6"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 136,
+                      "end": 215,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "7bde64c4df7a41159374aa495589c995cfae29afb57743341b1525072c8a80f0"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "回退顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 36,
+                    "end": 42,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "回退顺序描述与现有结构相符：批量分支在 planner.plan 内按 action 短路，单项路径独立于 plan_batch，可独立回退。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 211,
+                      "end": 215,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "881201ae8e9dac1bcd9fa141462bffae1d4dd896c4bf8beade36894d101eadd3"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "关键验证",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 43,
+                    "end": 53,
+                    "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393"
+                  },
+                  "basis": "关键验证项逐条对照：去重计费一次、结果条数=去重 ID 数、字段顺序等价、limit 三种情形、首个失败优先、2,000 规模均与代码及签名用例一致；三个登记架构示例实测 outcome=match。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 160,
+                      "end": 204,
+                      "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+                      "relation": "supports",
+                      "excerptSha256": "4bed166012099e757e560fac99a726da64db9095c1e373deb3722459e8b20bf3"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 57,
+                      "end": 91,
+                      "sha256": "cac7aef7c1ce47a9d1bcc5e63db09f44a65338d202f03ce6c831cccb70387fac",
+                      "relation": "supports",
+                      "excerptSha256": "95bb987fa38f5f7cf9d2b5fe884bbab94503447cf1fd80af416b05a483bffd72"
+                    }
+                  ],
+                  "status": "pass"
+                }
+              ]
+            },
+            "findings": 0
+          }
+        ]
+      },
+      "baselineImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "planner"
+        ],
+        "boundaryOk": true,
+        "transportOnlyIO": true,
+        "functions": [
+          "main"
+        ],
+        "lineCount": 23
+      },
+      "finalImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "planner"
+        ],
+        "boundaryOk": true,
+        "transportOnlyIO": true,
+        "functions": [
+          "main"
+        ],
+        "lineCount": 23
+      },
+      "claims": [
+        {
+          "category": "architecture-source",
+          "judgment": "The G4 architecture repeats the wrong JSON decoder and prescribes removing a rollback-many branch from release.py. The actual transport delegates to planner.plan, which owns the branch.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "7a61b52d359d497c29ab28646f5267f2cb2671cfba4d118cca5a0bc23223e393",
+              "lines": [
+                {
+                  "line": 7,
+                  "text": "- `release.py`（传输层，只做传输）：读取 stdin 全部文本，`json.loads` 失败返回 `invalid-json`；解析后若是 dict 且 `action == \"rollback-many\"`，整批交给 `planner` 提供的批量组装函数处理；否则维持现有单项分发。批量入口的错误对象已含 `requestIndex`，传输层不得再次改写或补字段。所有路径输出恰好一个 JSON 对象并以 0 退出。"
+                },
+                {
+                  "line": 33,
+                  "text": "4. `release.py` 的 `rollback-many` 分发维持不变（仍按 action 分派，不新增字段处理）。"
+                },
+                {
+                  "line": 38,
+                  "text": "1. 若批量路径出现问题，先移除 `release.py` 中的 `rollback-many` 分支，使该输入回落到原有行为（`unsupported-action`），单项 plan/rollback 立即恢复原状。"
+                }
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+              "lines": [
+                {
+                  "line": 10,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 16,
+                  "text": "        # it must not add or strip keys, because that would rewrite a"
+                },
+                {
+                  "line": 17,
+                  "text": "        # requestIndex the planner already decided."
+                },
+                {
+                  "line": 18,
+                  "text": "        result = plan(request)"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "a143d917649a454192537fb88a92b5608a5001b03920d58489f0eaed2caf493f",
+              "lines": [
+                {
+                  "line": 208,
+                  "text": "def plan(request):"
+                },
+                {
+                  "line": 209,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 210,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 211,
+                  "text": "    if request.get(\"action\") == BATCH_ACTION:"
+                },
+                {
+                  "line": 212,
+                  "text": "        # The batch keeps its own result shape (`results`/`requestIndex`), so it"
+                },
+                {
+                  "line": 213,
+                  "text": "        # must never fall through to the single-item paths below, which always"
+                },
+                {
+                  "line": 214,
+                  "text": "        # answer with exactly one of the G1/G2 shapes."
+                },
+                {
+                  "line": 215,
+                  "text": "        return plan_batch(request)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "stage": "G4",
+      "nativePhase": "blocked",
+      "terminal": "blocked",
+      "elapsedMs": 376492,
+      "receipt": null,
+      "baselineImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "journal",
+          "planner",
+          "policy"
+        ],
+        "boundaryOk": false,
+        "transportOnlyIO": true,
+        "functions": [
+          "dispatch",
+          "error",
+          "main"
+        ],
+        "lineCount": 60
+      },
+      "finalImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "journal",
+          "planner",
+          "policy"
+        ],
+        "boundaryOk": false,
+        "transportOnlyIO": true,
+        "functions": [
+          "dispatch",
+          "error",
+          "main"
+        ],
+        "lineCount": 64
+      },
+      "claims": [
+        {
+          "category": "owner-import-boundary",
+          "judgment": "The G4 draft and code carry forward the direct release imports of journal and policy despite the original SPEC boundary and G4 requirement to retain the applicable owner constraints.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "5fb70b45cac63bd89b3f9900aa23d1ddde2e86e77ede1d2fa5b462a7e0706ec1",
+              "lines": [
+                {
+                  "line": 5,
+                  "text": "保持现有四模块与既有 import 方向（release.py → planner.py → journal.py/policy.py），只用标准库，无文件与网络操作；既有 plan / rollback 的输出形状、错误码与 G1/G2 行为一律不变。G4 只把 rollback-many 路径升级为“带 limit 与 operation_id 的批量”，单项流程不感知 limit 与 operation_id。release.py 除 planner 外还直接导入 journal 与 policy，仅为在 main() 兜底捕获 PolicyError/JournalError 并转成 error JSON，不承担业务规则。"
+                },
+                {
+                  "line": 36,
+                  "text": "\"journal.py\" -> []"
+                },
+                {
+                  "line": 37,
+                  "text": "\"planner.py\" -> \"journal.py\", \"policy.py\""
+                },
+                {
+                  "line": 38,
+                  "text": "\"policy.py\" -> []"
+                },
+                {
+                  "line": 39,
+                  "text": "\"release.py\" -> \"journal.py\", \"planner.py\", \"policy.py\""
+                }
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "83cf2c0155df9d53a0bcd347576c5a286c54878f86d29211cf0ee8f9ecb5ed42",
+              "lines": [
+                {
+                  "line": 5,
+                  "text": "from planner import MAX_BATCH, batch_failure, plan, rollback_many"
+                },
+                {
+                  "line": 6,
+                  "text": "from journal import JournalError"
+                },
+                {
+                  "line": 7,
+                  "text": "from policy import PolicyError"
+                }
+              ]
+            },
+            {
+              "file": "SPEC.md",
+              "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+              "lines": [
+                {
+                  "line": 3,
+                  "text": "This is a local Python 3.11+ planning service. It consumes one JSON request on stdin through `python release.py` and prints one JSON object. It creates no files, contacts no service, and never executes a deployment. All requests, including domain errors, exit normally with a JSON result. Keep these four modules and the existing import direction. The entrypoint handles transport only, policy handles environment and budget, journal handles input validation/identity/replay, and planner handles graph/order and assembles results. Only use the standard library."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "category": "owner-responsibility",
+          "judgment": "The planner owns environment, freeze, and budget validation inside the batch despite the owner boundary. It also implements request_identity although the implementation plan assigns the request-equivalence key to journal.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "5fb70b45cac63bd89b3f9900aa23d1ddde2e86e77ede1d2fa5b462a7e0706ec1",
+              "lines": [
+                {
+                  "line": 8,
+                  "text": "- journal.py（校验/身份/回放）：负责逐项字段校验、记录去重与操作身份。批内元素只允许 environment、budget、changes、applied、retain、operation_id 六个字段，且必须是对象，否则由批量入口报 invalid-batch-item 与实际序号；action 字段出现即结构非法。operation_id 必填，须为非空字符串且长度不超过 64（按 Unicode 字符计），否则 invalid-batch-item 与实际序号。元素内其余业务校验复用现有单项规则（invalid-environment、invalid-budget、invalid-change、conflicting-change、unknown-dependency、invalid-retain 等）。"
+                },
+                {
+                  "line": 9,
+                  "text": "- policy.py（环境与预算）：逐项判定 production-frozen 先于图与变更校验，以及预算须为非负整数；G2 的 staging 计划配额不作用于回退，也不作用于批内各项回退；G4 的批量 limit 只在整批完成后由 planner 统一比较。"
+                },
+                {
+                  "line": 15,
+                  "text": "2. journal.py：批量元素校验增加 operation_id 规则，并新增“请求数据等价”的身份键：对象字段顺序无关、数组顺序有意义、数字与布尔严格区分；复用既有单项校验函数，不复制业务规则。"
+                }
+              ]
+            },
+            {
+              "file": "journal.py",
+              "sha256": "6d5046e6d8b406bd6db70266a1daa17c94b3428edccd2ab474accb2f3e70174e",
+              "lines": [
+                {
+                  "line": 83,
+                  "text": "def read_operation_id(request):"
+                },
+                {
+                  "line": 97,
+                  "text": "def read_batch_items(requests):"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "9ace5c23e040952b8a3edcc45c2d6fd680ab750e0956b265386c87075abdc4f2",
+              "lines": [
+                {
+                  "line": 132,
+                  "text": "def request_identity(value, depth=0):"
+                },
+                {
+                  "line": 190,
+                  "text": "    if not isinstance(environment, str) or environment not in ENVIRONMENTS:"
+                },
+                {
+                  "line": 191,
+                  "text": "        raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 192,
+                  "text": "    if environment in FROZEN_ENVIRONMENTS:"
+                },
+                {
+                  "line": 193,
+                  "text": "        raise PolicyError(\"production-frozen\")"
+                },
+                {
+                  "line": 194,
+                  "text": "    check_budget(item.get(\"budget\"))"
+                },
+                {
+                  "line": 197,
+                  "text": "    decision = limit_for(dict(item, action=BATCH_ACTION))"
+                },
+                {
+                  "line": 238,
+                  "text": "            identity = request_identity(item)"
+                }
+              ]
+            },
+            {
+              "file": "SPEC.md",
+              "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+              "lines": [
+                {
+                  "line": 3,
+                  "text": "This is a local Python 3.11+ planning service. It consumes one JSON request on stdin through `python release.py` and prints one JSON object. It creates no files, contacts no service, and never executes a deployment. All requests, including domain errors, exit normally with a JSON result. Keep these four modules and the existing import direction. The entrypoint handles transport only, policy handles environment and budget, journal handles input validation/identity/replay, and planner handles graph/order and assembles results. Only use the standard library."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-QRyWYi",
+      "stage": "G3",
+      "nativePhase": "closed",
+      "terminal": "closed",
+      "elapsedMs": 429531,
+      "receipt": {
+        "file": "K01-first.json",
+        "sha256": "d9143081f4cc3070b53e587022a865e38896feb457bcb3757faa927f04de3af1",
+        "decision": "accept",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architecture": {
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 1,
+                "end": 46,
+                "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+              },
+              "status": "pass",
+              "basis": "All four sections match the actual control flow and the two registered architecture probes.",
+              "sections": [
+                {
+                  "heading": "模块职责",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 3,
+                    "end": 13,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "release only dispatches and prints (S4:8-19); journal owns batch/item shape with elements deferred (S1:69-101); policy is unchanged (S3:41-63); planner owns graph/order/retain and assembles the batch (S2:135-169). Import edges remain release->planner->{journal,policy}.",
+                  "evidence": [
+                    {
+                      "file": "release.py",
+                      "start": 14,
+                      "end": 17,
+                      "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+                      "relation": "supports",
+                      "excerptSha256": "658b6f3ffd33538f98d5e85aaff8445febe7c18cecad2e8435e2ee4090980352"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 78,
+                      "end": 83,
+                      "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041",
+                      "relation": "supports",
+                      "excerptSha256": "bc40888801fb9d52ecfdc5e72da7395bbc1327a331dabfe615ceee4e64b8dfa9"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 155,
+                      "end": 169,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "88bc375f978f01527e8c6ee1630c53cf32dc7e993b9dc22374ad5c476dba64e6"
+                    }
+                  ]
+                },
+                {
+                  "heading": "实施顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 14,
+                    "end": 21,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "Steps 2-5 all realised: batch shape validators in journal (S1:69-116); the single-rollback entry extracted and reused by the single path (S2:99-132, 190-197); rollback-many dispatch (S2:175-179); scale kept linear via Kahn plus single-pass closure (S2:30-53, 78-90).",
+                  "evidence": [
+                    {
+                      "file": "journal.py",
+                      "start": 92,
+                      "end": 116,
+                      "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041",
+                      "relation": "supports",
+                      "excerptSha256": "f6865165087e11b009a49cf098bf30263b6b58d9d3faf75ee0c19701369b2bb7"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 190,
+                      "end": 197,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "6d5868c60ebf3f99f2d5ffc66e1242cedc61dfddc23dcca464335c6e9066aa90"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 30,
+                      "end": 53,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "0ced31e8d31fcd3eda8688e5b33586d4c5171bb8ea9f4382797197bc73a8936b"
+                    }
+                  ]
+                },
+                {
+                  "heading": "回退顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 22,
+                    "end": 28,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "Removing the rollback-many branch in planner.plan returns that input to the single-item paths, and rollback logic is shared rather than duplicated, so a step-by-step retreat is feasible with no journal<->planner cycle.",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 175,
+                      "end": 179,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "881201ae8e9dac1bcd9fa141462bffae1d4dd896c4bf8beade36894d101eadd3"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 99,
+                      "end": 132,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "864f52e1a19b482f4e5a7f46e036c73a252bcc95562c141087a022e5561e458b"
+                    }
+                  ]
+                },
+                {
+                  "heading": "关键验证",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 29,
+                    "end": 37,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "Both registered architecture probes ran: retention across an unapplied middle node returned ok with actions [remove] and units 3; an earlier production-frozen element beat a later malformed one with requestIndex 0 and results []. The batch error object carries exactly the five keys, and top-level units is the per-item sum.",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 13,
+                      "end": 17,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "77def03d1479de68e98aa40b2633b3c4778eb2b68cf2370393d788473bde119a"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 56,
+                      "end": 90,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "2447f5257b2135f6525b0726c009995227fd76c84341cd4a12cac18ed86a2156"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 155,
+                      "end": 169,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "88bc375f978f01527e8c6ee1630c53cf32dc7e993b9dc22374ad5c476dba64e6"
+                    }
+                  ]
+                }
+              ]
+            },
+            "findings": 0
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architecture": {
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 1,
+                "end": 45,
+                "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+              },
+              "status": "pass",
+              "basis": "依据各节核验、已读完整架构稿和退回记录生成",
+              "sections": [
+                {
+                  "heading": "模块职责",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 3,
+                    "end": 13,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "release 只做传输、journal 做校验与批量形状、policy 不变、planner 负责图与批量组装；实际源码与导入方向一致。",
+                  "evidence": [
+                    {
+                      "file": "release.py",
+                      "start": 14,
+                      "end": 18,
+                      "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+                      "relation": "supports",
+                      "excerptSha256": "ca83bee6a2ffed3b046c48f725b55e67f278e67f92c62937d8fa40254968ad27"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 69,
+                      "end": 116,
+                      "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041",
+                      "relation": "supports",
+                      "excerptSha256": "12d65b370c87afa26f3784a6b6d58764040a2873d0e7745c0a2201de358869ce"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 135,
+                      "end": 169,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "c1e6675a473481470e3f2c0f25fc2e65973b1b05d9daaf86e74b4ce86c4b62bb"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "实施顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 14,
+                    "end": 21,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "实施步骤 1-5（读现状、journal 校验、planner 入口、release 分支、补测试）均在代码中落实，模块职责未被破坏。",
+                  "evidence": [
+                    {
+                      "file": "journal.py",
+                      "start": 69,
+                      "end": 89,
+                      "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041",
+                      "relation": "supports",
+                      "excerptSha256": "af8370b2327bae6588c7b1a88a5844bd4b626dca96f1a6f79c1016ad51d8d7d1"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 171,
+                      "end": 179,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "7226dc9e083e734303dc4d64356b7dd16779e3478a810856ff0c5cfe496d16bf"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "回退顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 22,
+                    "end": 28,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "回退顺序描述的三个点存在：release.py 无独立批量分支（dispatched in planner），planner 抽出的 rollback_result，journal 的纯校验函数。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 99,
+                      "end": 132,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "864f52e1a19b482f4e5a7f46e036c73a252bcc95562c141087a022e5561e458b"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 92,
+                      "end": 116,
+                      "sha256": "24d680a75f824c68d13f4f8cb22eb06c20a565c03919e6976ac62ac13c7f5041",
+                      "relation": "supports",
+                      "excerptSha256": "f6865165087e11b009a49cf098bf30263b6b58d9d3faf75ee0c19701369b2bb7"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "关键验证",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 29,
+                    "end": 37,
+                    "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644"
+                  },
+                  "basis": "关键验证条款被测证：错误对象只含五键、requestIndex 为 null 或整数（probe-0c78e0 等）、结果顺序与 units 求和、首个失败结束整批（probe-8d568a）、2,000 变更规模示例通过。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 13,
+                      "end": 17,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "77def03d1479de68e98aa40b2633b3c4778eb2b68cf2370393d788473bde119a"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 157,
+                      "end": 169,
+                      "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+                      "relation": "supports",
+                      "excerptSha256": "2eaa6e7ef6d807ed94cd5e7af5336c04dd3806d9d5e2d7b089cf9757588fc88f"
+                    }
+                  ],
+                  "status": "pass"
+                }
+              ]
+            },
+            "findings": 0
+          }
+        ]
+      },
+      "baselineImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "planner"
+        ],
+        "boundaryOk": true,
+        "transportOnlyIO": true,
+        "functions": [
+          "main"
+        ],
+        "lineCount": 19
+      },
+      "finalImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "planner"
+        ],
+        "boundaryOk": true,
+        "transportOnlyIO": true,
+        "functions": [
+          "main"
+        ],
+        "lineCount": 23
+      },
+      "claims": [
+        {
+          "category": "architecture-source",
+          "judgment": "The architecture names json.loads and a conditional release.py batch dispatch. The source calls json.load and unconditionally delegates parsed requests to planner.plan, where the batch branch resides.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "532beaaa8010260e0b85a2247d1e8541113bb21ef025931e89d85c8920be9644",
+              "lines": [
+                {
+                  "line": 7,
+                  "text": "- `release.py`（传输层，只做传输）：读取 stdin 全部文本，`json.loads` 失败返回 `invalid-json`；解析后若是 dict 且 `action == \"rollback-many\"`，整批交给批量入口（`planner` 提供的批量组装函数）处理；否则维持现有单项分发。批量入口的错误对象已含 `requestIndex`，传输层不得再次改写或补字段。所有路径输出恰好一个 JSON 对象并以 0 退出。"
+                },
+                {
+                  "line": 19,
+                  "text": "4. 在 `release.py` 增加 `rollback-many` 分支，只做分发与 JSON 输出。"
+                },
+                {
+                  "line": 24,
+                  "text": "1. 若批量路径出现问题，先移除 `release.py` 中的 `rollback-many` 分支，使该输入回落到原有行为（`unsupported-action`），单项 plan/rollback 立即恢复原状。"
+                }
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "c819655b455ad5cedf68073f723dad28ce4e1cecb383f07fd5bbe4ac34e19f54",
+              "lines": [
+                {
+                  "line": 10,
+                  "text": "        request = json.load(sys.stdin)"
+                },
+                {
+                  "line": 13,
+                  "text": "    else:"
+                },
+                {
+                  "line": 14,
+                  "text": "        # A `rollback-many` batch is dispatched by planner.plan, which answers with"
+                },
+                {
+                  "line": 15,
+                  "text": "        # the batch shape (`results`/`requestIndex`). Transport stays shape-blind:"
+                },
+                {
+                  "line": 16,
+                  "text": "        # it must not add or strip keys, because that would rewrite a"
+                },
+                {
+                  "line": 17,
+                  "text": "        # requestIndex the planner already decided."
+                },
+                {
+                  "line": 18,
+                  "text": "        result = plan(request)"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "8c9704c5205d48c5fa81716c6a4339d490019d81a546de876531a495a60cc6c6",
+              "lines": [
+                {
+                  "line": 172,
+                  "text": "def plan(request):"
+                },
+                {
+                  "line": 173,
+                  "text": "    if not isinstance(request, dict):"
+                },
+                {
+                  "line": 174,
+                  "text": "        return failure(\"invalid-request\")"
+                },
+                {
+                  "line": 175,
+                  "text": "    if request.get(\"action\") == BATCH_ACTION:"
+                },
+                {
+                  "line": 176,
+                  "text": "        # The batch keeps its own result shape (`results`/`requestIndex`), so it"
+                },
+                {
+                  "line": 177,
+                  "text": "        # must never fall through to the single-item paths below, which always"
+                },
+                {
+                  "line": 178,
+                  "text": "        # answer with exactly one of the G1/G2 shapes."
+                },
+                {
+                  "line": 179,
+                  "text": "        return plan_batch(request)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run": "r-P5jGT4",
+      "stage": "G3",
+      "nativePhase": "closed",
+      "terminal": "closed",
+      "elapsedMs": 495018,
+      "receipt": {
+        "file": "K01-first.json",
+        "sha256": "64eda10b423ee3035c014dc118d063d0894bfb9853e7145f586900be196b1753",
+        "decision": "accept",
+        "verdicts": [
+          {
+            "role": "reviewer",
+            "decision": "pass",
+            "architecture": {
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 1,
+                "end": 39,
+                "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+              },
+              "status": "pass",
+              "basis": "依据各节核验、已读完整架构稿和退回记录生成",
+              "sections": [
+                {
+                  "heading": "模块职责",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 3,
+                    "end": 11,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "架构‘模块职责’与源码一致：release 只做形状，journal 做元素校验，policy 做环境/预算与冻结，planner 做图与组装；import 方向与静态导入一致。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 4,
+                      "end": 18,
+                      "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+                      "relation": "supports",
+                      "excerptSha256": "7611e3f57c66a4721e5b418ff05ec11792965dfc67da29dcbee1d80cd66407b8"
+                    },
+                    {
+                      "file": "release.py",
+                      "start": 5,
+                      "end": 7,
+                      "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+                      "relation": "supports",
+                      "excerptSha256": "ba8ad5f4ab2a89e923ed122bb41c4fe5e6bda2fa1598448d10262f03318ab9f2"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "实施顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 12,
+                    "end": 18,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "‘实施顺序’描述的 release→journal→planner 落地与实际代码结构相符。",
+                  "evidence": [
+                    {
+                      "file": "release.py",
+                      "start": 32,
+                      "end": 38,
+                      "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+                      "relation": "supports",
+                      "excerptSha256": "0dec45ce747510c658d1f62abc3c42bda231947b5131d5e50070b429c4b12b8a"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 76,
+                      "end": 95,
+                      "sha256": "86f4032c73c1ecb9465f88b24596a290cf880db6039d6f0316d91b80f1b4b7e1",
+                      "relation": "supports",
+                      "excerptSha256": "dc01aad8e171b4249c8b0dbc2aac509fee9534c80a85829fda7d3da70611a12c"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 124,
+                      "end": 166,
+                      "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+                      "relation": "supports",
+                      "excerptSha256": "3b31e36f17a7f7b987350d2f8ef12e9ea62cbadd385d279f735073632ff3ed5a"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "回退顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 19,
+                    "end": 22,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "‘回退顺序’说明可独立成 patch，实际新增集中在批量入口、元素校验和求解抽取，单项路径逻辑保持原样。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 169,
+                      "end": 193,
+                      "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+                      "relation": "supports",
+                      "excerptSha256": "4aa4a404dd073645dc7d5847c63584816767debab314f4ce1a0fdec88678a9c3"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "关键验证",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 23,
+                    "end": 31,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "‘关键验证’各条已由 probe 实证：成功形状、失败形状与 requestIndex、首个失败优先、跨未应用节点追溯、回退不受配额、退出码 0。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 124,
+                      "end": 166,
+                      "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+                      "relation": "supports",
+                      "excerptSha256": "3b31e36f17a7f7b987350d2f8ef12e9ea62cbadd385d279f735073632ff3ed5a"
+                    },
+                    {
+                      "file": "release.py",
+                      "start": 41,
+                      "end": 56,
+                      "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+                      "relation": "supports",
+                      "excerptSha256": "b254a17c2a7e123938ea6cc54ce92a530256dba9878431fefe42e91c2d586a22"
+                    }
+                  ],
+                  "status": "pass"
+                }
+              ]
+            },
+            "findings": 0
+          },
+          {
+            "role": "auditor",
+            "decision": "pass",
+            "architecture": {
+              "source": {
+                "file": "modules/architecture.md",
+                "start": 1,
+                "end": 39,
+                "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+              },
+              "status": "pass",
+              "basis": "依据各节核验、已读完整架构稿和退回记录生成",
+              "sections": [
+                {
+                  "heading": "模块职责",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 3,
+                    "end": 11,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "模块职责与静态导入边一致：release→planner/journal/policy，planner→journal/policy，policy 为叶子；各模块职责描述与源码匹配。",
+                  "evidence": [
+                    {
+                      "file": "PROJECT-GOAL.md",
+                      "start": 3,
+                      "end": 3,
+                      "sha256": "bff281e82e68709f422ffada8dcb49eadf1f1933850abc1416c1dd32fcbf730d",
+                      "relation": "supports",
+                      "excerptSha256": "1b51201021a32232715620d0018720303713345f1162fecd461764729bb1e577"
+                    },
+                    {
+                      "file": "release.py",
+                      "start": 5,
+                      "end": 7,
+                      "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+                      "relation": "supports",
+                      "excerptSha256": "ba8ad5f4ab2a89e923ed122bb41c4fe5e6bda2fa1598448d10262f03318ab9f2"
+                    },
+                    {
+                      "file": "policy.py",
+                      "start": 1,
+                      "end": 7,
+                      "sha256": "99ef6be432dc7e93c8ac04f7a8cff34d5d047050c3bf81045eedd6d0cd759349",
+                      "relation": "supports",
+                      "excerptSha256": "04e5f3a5f882066ba32a2672b032cc89a6cbf6ca36de368b4b1de0842db75fb3"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "实施顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 12,
+                    "end": 18,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "三项实施顺序与现有代码落点一致（形状识别、批量元素校验、批量循环复用单项求解）。",
+                  "evidence": [
+                    {
+                      "file": "SPEC.md",
+                      "start": 28,
+                      "end": 28,
+                      "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+                      "relation": "supports",
+                      "excerptSha256": "551b4e2cd73bd691019eebd9cdbaf103c5a23d6dbcdaf459cac04d598321df12"
+                    },
+                    {
+                      "file": "planner.py",
+                      "start": 106,
+                      "end": 166,
+                      "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+                      "relation": "supports",
+                      "excerptSha256": "9748e092af303e4371224d695919fbd796dd6f1a88efb5a295f07847db423b08"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "回退顺序",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 19,
+                    "end": 22,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "回退顺序与新增代码层次一致，每步可独立撤除。",
+                  "evidence": [
+                    {
+                      "file": "planner.py",
+                      "start": 124,
+                      "end": 166,
+                      "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+                      "relation": "supports",
+                      "excerptSha256": "3b31e36f17a7f7b987350d2f8ef12e9ea62cbadd385d279f735073632ff3ed5a"
+                    },
+                    {
+                      "file": "journal.py",
+                      "start": 76,
+                      "end": 95,
+                      "sha256": "86f4032c73c1ecb9465f88b24596a290cf880db6039d6f0316d91b80f1b4b7e1",
+                      "relation": "supports",
+                      "excerptSha256": "dc01aad8e171b4249c8b0dbc2aac509fee9534c80a85829fda7d3da70611a12c"
+                    }
+                  ],
+                  "status": "pass"
+                },
+                {
+                  "heading": "关键验证",
+                  "source": {
+                    "file": "modules/architecture.md",
+                    "start": 23,
+                    "end": 31,
+                    "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5"
+                  },
+                  "basis": "关键验证条目与 G3 条款一致；成功/失败形状、首个失败、production 冻结、2000 变更与退出码 0 均经探针与签名用例复核。",
+                  "evidence": [
+                    {
+                      "file": "SPEC.md",
+                      "start": 30,
+                      "end": 30,
+                      "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+                      "relation": "supports",
+                      "excerptSha256": "86766ed39f8f58e9cd9e22ae532027d7617262cdd9f42efa0ee5c9e21bd6e9ce"
+                    },
+                    {
+                      "file": "release.py",
+                      "start": 41,
+                      "end": 56,
+                      "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+                      "relation": "supports",
+                      "excerptSha256": "b254a17c2a7e123938ea6cc54ce92a530256dba9878431fefe42e91c2d586a22"
+                    }
+                  ],
+                  "status": "pass"
+                }
+              ]
+            },
+            "findings": 0
+          }
+        ]
+      },
+      "baselineImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "planner"
+        ],
+        "boundaryOk": true,
+        "transportOnlyIO": true,
+        "functions": [
+          "main"
+        ],
+        "lineCount": 19
+      },
+      "finalImportBoundary": {
+        "parse": true,
+        "moduleImports": [
+          "journal",
+          "planner",
+          "policy"
+        ],
+        "boundaryOk": false,
+        "transportOnlyIO": true,
+        "functions": [
+          "dispatch",
+          "error",
+          "main"
+        ],
+        "lineCount": 60
+      },
+      "claims": [
+        {
+          "category": "owner-import-boundary",
+          "judgment": "SPEC requires existing import direction. The baseline release module imports only planner among project modules. The frozen release module additionally imports journal and policy. Its architecture accurately lists these extra edges in the static block but also asserts preservation, and both roles approved.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+              "lines": [
+                {
+                  "line": 5,
+                  "text": "保持现有四模块与既有 import 方向（release.py → planner.py → journal.py/policy.py），只用标准库，无文件与网络操作；既有 plan / rollback 的输出形状、错误码与 G2 行为一律不变，G3 只新增 rollback-many 路径。release.py 除 planner 外还直接导入 journal 与 policy，仅为在 main() 兜底捕获 PolicyError/JournalError 并转成 error JSON，不承担业务规则。"
+                },
+                {
+                  "line": 34,
+                  "text": "```text"
+                },
+                {
+                  "line": 35,
+                  "text": "\"journal.py\" -> []"
+                },
+                {
+                  "line": 36,
+                  "text": "\"planner.py\" -> \"journal.py\", \"policy.py\""
+                },
+                {
+                  "line": 37,
+                  "text": "\"policy.py\" -> []"
+                },
+                {
+                  "line": 38,
+                  "text": "\"release.py\" -> \"journal.py\", \"planner.py\", \"policy.py\""
+                }
+              ]
+            },
+            {
+              "file": "release.py",
+              "sha256": "e71f5a3d72836e4177953d851e399f343b6c8beb391d534a4f03c2e28b50bfc4",
+              "lines": [
+                {
+                  "line": 5,
+                  "text": "from planner import MAX_BATCH, batch_failure, plan, rollback_many"
+                },
+                {
+                  "line": 6,
+                  "text": "from journal import JournalError"
+                },
+                {
+                  "line": 7,
+                  "text": "from policy import PolicyError"
+                }
+              ]
+            },
+            {
+              "file": "SPEC.md",
+              "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+              "lines": [
+                {
+                  "line": 3,
+                  "text": "This is a local Python 3.11+ planning service. It consumes one JSON request on stdin through `python release.py` and prints one JSON object. It creates no files, contacts no service, and never executes a deployment. All requests, including domain errors, exit normally with a JSON result. Keep these four modules and the existing import direction. The entrypoint handles transport only, policy handles environment and budget, journal handles input validation/identity/replay, and planner handles graph/order and assembles results. Only use the standard library."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "category": "owner-responsibility",
+          "judgment": "SPEC assigns environment and budget to policy. The batch loop in planner directly validates environment, applies the freeze, checks the budget, then calls policy.limit_for again.",
+          "evidence": [
+            {
+              "file": "modules/architecture.md",
+              "sha256": "e3a6bc750ef15fb1d301a23cc62512b0a6474c448f3d588299c4c1de045902d5",
+              "lines": [
+                {
+                  "line": 8,
+                  "text": "- journal.py（校验/身份/回放）：负责逐项字段校验与记录去重。批内元素只允许 environment、budget、changes、applied、retain 五个字段，且必须是对象，否则由批量入口报 invalid-batch-item 与实际序号；action 字段出现即结构非法。省略 action 时由批量入口设为 rollback。元素内其余业务校验复用现有单项规则（invalid-environment、invalid-budget、invalid-change、conflicting-change、unknown-dependency、invalid-retain 等）。"
+                },
+                {
+                  "line": 9,
+                  "text": "- policy.py（环境与预算）：逐项判定 production-frozen 先于图与变更校验，以及预算须为非负整数；G2 的 staging 计划配额不作用于回退，也不作用于批内各项回退。"
+                },
+                {
+                  "line": 10,
+                  "text": "- planner.py（图/顺序与结果组装）：对每项在完整依赖图上做确定性拓扑序（ID 字典序打破平局），回退取全序的逆序；retain 保留集及其被保留变更所需的已应用传递依赖都排除。追溯必须在完整图上进行，再只排除已应用祖先，因此跨越未应用中间节点时也能找到已应用的传递祖先；单图规模 2,000 变更须线性或近线性。批量各项互相独立、互不影响，按请求顺序逐项处理，首个失败项以其真实错误码结束整批，无部分结果。"
+                }
+              ]
+            },
+            {
+              "file": "planner.py",
+              "sha256": "5b640bc141624830701e8659456b1e161f3501bf30b40a382c01dae36776515c",
+              "lines": [
+                {
+                  "line": 150,
+                  "text": "            # The batch entry point owns the action, so an element can only ever"
+                },
+                {
+                  "line": 151,
+                  "text": "            # be a rollback; environment/budget keep their usual owners and the"
+                },
+                {
+                  "line": 152,
+                  "text": "            # production freeze still fires before any graph validation."
+                },
+                {
+                  "line": 153,
+                  "text": "            environment = item.get(\"environment\")"
+                },
+                {
+                  "line": 154,
+                  "text": "            if not isinstance(environment, str) or environment not in ENVIRONMENTS:"
+                },
+                {
+                  "line": 155,
+                  "text": "                raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 156,
+                  "text": "            if environment in FROZEN_ENVIRONMENTS:"
+                },
+                {
+                  "line": 157,
+                  "text": "                raise PolicyError(\"production-frozen\")"
+                },
+                {
+                  "line": 158,
+                  "text": "            check_budget(item.get(\"budget\"))"
+                },
+                {
+                  "line": 159,
+                  "text": "            decision = limit_for(dict(item, action=BATCH_ACTION))"
+                }
+              ]
+            },
+            {
+              "file": "SPEC.md",
+              "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9",
+              "lines": [
+                {
+                  "line": 3,
+                  "text": "This is a local Python 3.11+ planning service. It consumes one JSON request on stdin through `python release.py` and prints one JSON object. It creates no files, contacts no service, and never executes a deployment. All requests, including domain errors, exit normally with a JSON result. Keep these four modules and the existing import direction. The entrypoint handles transport only, policy handles environment and budget, journal handles input validation/identity/replay, and planner handles graph/order and assembles results. Only use the standard library."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

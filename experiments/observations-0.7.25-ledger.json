@@ -1,0 +1,67 @@
+{
+  "spec": "building-loop-ledger-capacity-and-recovery/1",
+  "runtime": "Windows Node through registered production host handlers, no model calls",
+  "commands": [
+    "node --test test/ledger-crash.test.mjs test/coherence.test.mjs test/preflight.test.mjs test/repairs.test.mjs test/engineering-handoff.test.mjs",
+    "node --test --test-name-pattern=\"an incremental ledger page\" test/ledger-crash.test.mjs"
+  ],
+  "regression": {
+    "pass": 76,
+    "fail": 0
+  },
+  "changedProjectContext": {
+    "pass": 1,
+    "fail": 0,
+    "previouslyStagedDecisionsCarried": 0,
+    "oldCursorRejected": true,
+    "latestEvidenceRequired": true
+  },
+  "observations": {
+    "generatedItems": 332,
+    "projectionBytes": [
+      196509,
+      73401
+    ],
+    "indexBytes": 727,
+    "oldLocator": {
+      "volume": "part-1.md",
+      "evidenceSha256": "fe070f84e64400ebab1b01bd0fd28fd2b981611cfda214b06c5849722d809ea7"
+    },
+    "incremental": {
+      "total": 4,
+      "retained": 2,
+      "refetched": 2,
+      "modelDecisions": 2,
+      "writtenBodies": [
+        "part-2.md",
+        "ledger.md"
+      ]
+    },
+    "hardExitRecovered": true,
+    "lateEvent": {
+      "preservedValidatedDecisions": 16,
+      "staleReviewRejected": true
+    }
+  },
+  "stateBoundary": {
+    "stateLimit": 8388608,
+    "accepted": 8388608,
+    "rejected": 8388609,
+    "preexistingBytesKept": true,
+    "elapsedMs": 802
+  },
+  "rawEvidence": [
+    {
+      "name": "combined.tap",
+      "sha256": "e99ef9c63c63411852e039eb991e0f3367c666f564cf787d5f2cdc6c20c8c2d8"
+    },
+    {
+      "name": "changed-context.tap",
+      "sha256": "86a9d2036f01518c45baf9102345a54ae2080a50c19f741d3418f45b53c0558b"
+    },
+    {
+      "name": "capacity.json",
+      "sha256": "57880600ed18c1efe70abcf89934a228ff14a4459de11001b0db58599472e95f"
+    }
+  ]
+}

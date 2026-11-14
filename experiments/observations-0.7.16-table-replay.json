@@ -1,0 +1,159 @@
+{
+  "method": "Replay archived production first draft through the actual registered tools in the isolated Node host fixture, then change row IDs only",
+  "priorCandidateVersion": "0.7.15",
+  "priorArchiveSha256": "e58896553bca6dbd132e7dde35f99bdd2716a7a1262dc48b7db660bb70331ea8",
+  "promptSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+  "contract": {
+    "columns": [
+      "编号",
+      "值",
+      "依据"
+    ],
+    "ids": [
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q4",
+      "Q5",
+      "Q6"
+    ]
+  },
+  "registeredHandlers": {
+    "failure": "[building-loop/deliverable-table] 交付表缺少原样编号 Q1、Q2、Q3、Q4、Q5、Q6；交付表第 5、6、7、8、9、10 行的编号不在明确要求的清单中",
+    "phaseAfterRejection": "intake",
+    "phaseAfterCorrection": "review-ready"
+  },
+  "original": {
+    "sha256": "4dba6cc59deaab6e10182d1d723d1e088a5fe8dfac3baf7630e18a93a80db5f9",
+    "score": {
+      "correct": 0,
+      "maximum": 6,
+      "checks": [
+        {
+          "label": "Q1",
+          "expected": "H",
+          "values": [],
+          "status": "missing"
+        },
+        {
+          "label": "Q2",
+          "expected": "5",
+          "values": [],
+          "status": "missing"
+        },
+        {
+          "label": "Q3",
+          "expected": "7",
+          "values": [],
+          "status": "missing"
+        },
+        {
+          "label": "Q4",
+          "expected": "9",
+          "values": [],
+          "status": "missing"
+        },
+        {
+          "label": "Q5",
+          "expected": "12",
+          "values": [],
+          "status": "missing"
+        },
+        {
+          "label": "Q6",
+          "expected": "14",
+          "values": [],
+          "status": "missing"
+        }
+      ]
+    },
+    "issues": [
+      "交付表缺少原样编号 Q1、Q2、Q3、Q4、Q5、Q6",
+      "交付表第 5、6、7、8、9、10 行的编号不在明确要求的清单中"
+    ],
+    "text": "# 交付稿\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| 1 | H | 最优字典序排程 A[0,2) B[2,6) C[2,5) H[5,7) D[7,9) E[6,9) F[9,10) G[10,12)，H 起 5 早于 D 起 7 |\n| 2 | 5 | H 需 C 完成；C≥2，OPS 上 C 后须排 D(2)、H(2)、F(1)，D≥max(B,C)=6，取最小 D=7 时 H 只能占 [5,7) |\n| 3 | 7 | D 需 B、C 完成（≥6）；D=6 会令 H≥8、F≥10、结束 13>12，故 D 最小可行值为 7 |\n| 4 | 9 | F 在 OPS 上须等 D、E、H 全完：max(D 完 9, E 完 9, H 完 7)=9 |\n| 5 | 12 | 下界：C≥2 结束 5，OPS 上 C 后 D+H+F=2+2+1=5 → OPS 结束≥10，G 在 IO 再 +2 → ≥12；上述排程达到 12 |\n| 6 | 14 | E 改为 5：B[2,6)，E[6,11)，F≥11 → F[11,12)，G[12,14)；F 受 E 完成时刻 11 约束为下界 |\n\n大白话：基线最快 12 结束，且要字母序最早就先做 H 再做 D（H 从 5 开始、D 从 7 开始、F 从 9 开始）；E 一旦变成 5 个时间单位，就变成卡脖子的活，整体最早要 14 才结束。\n"
+  },
+  "corrected": {
+    "sha256": "2a7eed413e527fc96ad83fa522311db27d0fbe368afbd9f98b74342b4ff9cda0",
+    "score": {
+      "correct": 6,
+      "maximum": 6,
+      "checks": [
+        {
+          "label": "Q1",
+          "expected": "H",
+          "values": [
+            {
+              "raw": "H",
+              "value": "H",
+              "explanation": "最优字典序排程 A[0,2) B[2,6) C[2,5) H[5,7) D[7,9) E[6,9) F[9,10) G[10,12)，H 起 5 早于 D 起 7"
+            }
+          ],
+          "status": "correct"
+        },
+        {
+          "label": "Q2",
+          "expected": "5",
+          "values": [
+            {
+              "raw": "5",
+              "value": "5",
+              "explanation": "H 需 C 完成；C≥2，OPS 上 C 后须排 D(2)、H(2)、F(1)，D≥max(B,C)=6，取最小 D=7 时 H 只能占 [5,7)"
+            }
+          ],
+          "status": "correct"
+        },
+        {
+          "label": "Q3",
+          "expected": "7",
+          "values": [
+            {
+              "raw": "7",
+              "value": "7",
+              "explanation": "D 需 B、C 完成（≥6）；D=6 会令 H≥8、F≥10、结束 13>12，故 D 最小可行值为 7"
+            }
+          ],
+          "status": "correct"
+        },
+        {
+          "label": "Q4",
+          "expected": "9",
+          "values": [
+            {
+              "raw": "9",
+              "value": "9",
+              "explanation": "F 在 OPS 上须等 D、E、H 全完：max(D 完 9, E 完 9, H 完 7)=9"
+            }
+          ],
+          "status": "correct"
+        },
+        {
+          "label": "Q5",
+          "expected": "12",
+          "values": [
+            {
+              "raw": "12",
+              "value": "12",
+              "explanation": "下界：C≥2 结束 5，OPS 上 C 后 D+H+F=2+2+1=5 → OPS 结束≥10，G 在 IO 再 +2 → ≥12；上述排程达到 12"
+            }
+          ],
+          "status": "correct"
+        },
+        {
+          "label": "Q6",
+          "expected": "14",
+          "values": [
+            {
+              "raw": "14",
+              "value": "14",
+              "explanation": "E 改为 5：B[2,6)，E[6,11)，F≥11 → F[11,12)，G[12,14)；F 受 E 完成时刻 11 约束为下界"
+            }
+          ],
+          "status": "correct"
+        }
+      ]
+    },
+    "issues": [],
+    "text": "# 交付稿\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| Q1 | H | 最优字典序排程 A[0,2) B[2,6) C[2,5) H[5,7) D[7,9) E[6,9) F[9,10) G[10,12)，H 起 5 早于 D 起 7 |\n| Q2 | 5 | H 需 C 完成；C≥2，OPS 上 C 后须排 D(2)、H(2)、F(1)，D≥max(B,C)=6，取最小 D=7 时 H 只能占 [5,7) |\n| Q3 | 7 | D 需 B、C 完成（≥6）；D=6 会令 H≥8、F≥10、结束 13>12，故 D 最小可行值为 7 |\n| Q4 | 9 | F 在 OPS 上须等 D、E、H 全完：max(D 完 9, E 完 9, H 完 7)=9 |\n| Q5 | 12 | 下界：C≥2 结束 5，OPS 上 C 后 D+H+F=2+2+1=5 → OPS 结束≥10，G 在 IO 再 +2 → ≥12；上述排程达到 12 |\n| Q6 | 14 | E 改为 5：B[2,6)，E[6,11)，F≥11 → F[11,12)，G[12,14)；F 受 E 完成时刻 11 约束为下界 |\n\n大白话：基线最快 12 结束，且要字母序最早就先做 H 再做 D（H 从 5 开始、D 从 7 开始、F 从 9 开始）；E 一旦变成 5 个时间单位，就变成卡脖子的活，整体最早要 14 才结束。\n"
+  }
+}

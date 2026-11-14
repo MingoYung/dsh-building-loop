@@ -1,0 +1,146 @@
+{
+  "spec": "building-loop-checklist-g3-performance-forensics/1",
+  "provenance": "Native event log and persisted session journal, exact 600-second source observation, three public read-only WSL bwrap invocations through the existing case evaluator's candidate CLI. No live workspace writes, model calls, private cases or full self-test reruns.",
+  "run": "r-kcBQoe",
+  "mode": "standard-checklist",
+  "stage": "G3",
+  "observation": {
+    "targetMs": 600000,
+    "elapsedMs": 600123,
+    "candidateSha256": "053cdbbee0ea479c0162809671dc250933356f538cdcc776b7adaf76c7baf2ae",
+    "plannerSha256": "474f4ab22c4d67f9110cf8b68d7262e2b1e7b10afa6a4053f778825ca9f4de84",
+    "kind": "fixed-time snapshot, not the stage's final deliverable"
+  },
+  "candidateSource": {
+    "path": "planner.py",
+    "line": 80,
+    "defect": "Only pushes already applied targets into its retain traversal stack, so an unapplied intermediate blocks reaching earlier applied ancestors.",
+    "spec": "SPEC-G3.md:5 requires traversing the full graph then filtering applied ancestors."
+  },
+  "controlledReplay": [
+    {
+      "case": "registered-retention-shared-unapplied-dag",
+      "nodes": 55,
+      "elapsedMs": 34.704,
+      "exitCode": 0,
+      "actual": {
+        "actions": [
+          "remove",
+          "anchor"
+        ],
+        "units": 4
+      },
+      "expected": {
+        "actions": [
+          "remove"
+        ],
+        "units": 3
+      }
+    },
+    {
+      "case": "candidate-only counterpart of model self-test 1",
+      "nodesFirstItem": 2000,
+      "nodesSecondItem": 1,
+      "appliedFirstItem": 1001,
+      "retain": [
+        "c1998"
+      ],
+      "elapsedMs": 53.189,
+      "exitCode": 0,
+      "actual": {
+        "firstActionCount": 1000,
+        "firstUnits": 1000,
+        "secondActions": [
+          "solo"
+        ],
+        "secondUnits": 2,
+        "batchUnits": 1002
+      },
+      "expected": {
+        "firstActions": [
+          "c1999"
+        ],
+        "firstUnits": 1,
+        "secondActions": [
+          "solo"
+        ],
+        "secondUnits": 2,
+        "batchUnits": 3
+      }
+    },
+    {
+      "case": "candidate-only counterpart of model self-test 2",
+      "nodes": 2000,
+      "applied": 1001,
+      "retain": [
+        "c1999"
+      ],
+      "elapsedMs": 38.53,
+      "exitCode": 0,
+      "actual": {
+        "actionCount": 999,
+        "units": 999,
+        "allActionsWereApplied": true
+      },
+      "expected": {
+        "actions": [],
+        "units": 0
+      }
+    }
+  ],
+  "nativeSelfTests": {
+    "modelTests": "tests/test_release.py had two scale assertions expecting an approximately 999-member reverse odd-ID list, even though only even IDs and c1999 were applied and c1999 was excluded from that list. This conflicts with the public rollback rule. That is a separate defect from the program failing to retain applied ancestors.",
+    "trace": [
+      {
+        "seq": 345,
+        "role": "standard-checklist",
+        "kind": "result",
+        "reportedSuiteSeconds": 14.99,
+        "tests": 41,
+        "observation": "Three failures; two very large list mismatches with displayed diff lengths 24,228 and 24,204."
+      },
+      {
+        "seq": 363,
+        "elapsedMs": 265385,
+        "role": "standard-checklist",
+        "kind": "call",
+        "action": "pwsh, model-created full unittest suite"
+      },
+      {
+        "seq": 367,
+        "elapsedMs": 768474,
+        "role": "standard-checklist",
+        "kind": "result",
+        "wallMs": 503089,
+        "reportedSuiteSeconds": 502.055,
+        "tests": 41,
+        "observation": "A scale-test failure traceback ended in Python unittest sequence diff rendering, RecursionError. Summary: one failure, two errors."
+      },
+      {
+        "seq": 376,
+        "elapsedMs": 773234,
+        "role": "standard-checklist",
+        "kind": "result",
+        "observation": "Readback preserves source of both self-authored scale assertions, lines 491–533."
+      },
+      {
+        "seq": 386,
+        "elapsedMs": 778012,
+        "role": "standard-checklist",
+        "kind": "call",
+        "action": "pwsh, same full unittest suite filtered to summary"
+      },
+      {
+        "seq": 390,
+        "elapsedMs": 1247764,
+        "role": "standard-checklist",
+        "kind": "result",
+        "wallMs": 469752,
+        "reportedSuiteSeconds": 468.765,
+        "tests": 41,
+        "observation": "Two errors, both the 2000-node retention assertions; output filtering happened after unittest computed its failure details."
+      }
+    ]
+  },
+  "conclusion": "The observed long tool durations were measured inside the candidate-authored full self-tests. A native failure stack places visible recursion in assertion diff construction. The graph entrypoint independently completes the exact shapes in tens of milliseconds yet returns wrong actions. No measured evidence assigns every second of self-test time to a particular function, nor does this snapshot establish final lane quality."
+}

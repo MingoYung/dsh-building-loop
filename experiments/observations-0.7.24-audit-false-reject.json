@@ -1,0 +1,200 @@
+{
+  "scope": "Exact rejected signed candidate and actual independent finding. Proposed reorder is a temporary reproduction, not a project modification.",
+  "run": "r-tXUhNv",
+  "stage": "g1",
+  "receiptSha256": "59c75151752db6d05773c161b3fb459c0f740950ce933a6d7d3a9b30fe6ac2f1",
+  "decision": "reject",
+  "signedRegression": {
+    "receiptSha256": "ea8ad5a7c8508d1aed01f95f0e738cd26963d1658604eb58e915130e470d245d",
+    "suiteSha256": "739fc32026193e8f54fad7fd0851aa673fa3e8b0d866522b7270d10c401d52f5",
+    "baselineReceiptSha256": "d929b3175f396be065bb831bc6f106ba6ae58f18c165c4d4c1917e47bc9a55c8",
+    "artifactsSha256": "1c53ecb459998cc9e6d785e8a117ae58bcde85bb9914273e3284457146c8170c",
+    "protectedPassed": 8,
+    "requiredPassed": 10
+  },
+  "sourcePins": [
+    {
+      "path": "journal.py",
+      "sha256": "66af978079f9e2de25c23e4fcb4f94b26fdbd712cb0a56d33ca7e9bb7f28ea38"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "365df05b0060574b33bf6d57db4e340c7c333d5d94ba729eda3ee875cffcaeec"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "0437977c87df20994acc1d62ec7e0340b8dbc3db9028b5545379438d3f9ef972"
+    },
+    {
+      "path": "release.py",
+      "sha256": "bdb3c1406301dba6699e3d61d0d4589e38672c20bb31817a315a2723e63e393b"
+    }
+  ],
+  "independentFinding": {
+    "file": "planner.py",
+    "start": 83,
+    "end": 84,
+    "sha256": "365df05b0060574b33bf6d57db4e340c7c333d5d94ba729eda3ee875cffcaeec",
+    "id": "edge-order",
+    "owner": "executor",
+    "kind": "behavior",
+    "observation": "plan() 先 read_applied（83 行）再 _check_edges（84 行），因此当请求同时含未知 applied ID 与缺失依赖目标时，返回的是 unknown-applied 的 unknown-dependency，而非缺失目标错误。",
+    "evidence": [
+      {
+        "file": "planner.py",
+        "start": 83,
+        "end": 84,
+        "sha256": "365df05b0060574b33bf6d57db4e340c7c333d5d94ba729eda3ee875cffcaeec",
+        "relation": "supports",
+        "excerptSha256": "5970f01c65939328405130e3bed04a77db37a45d8d4fa754b7c52e2027ed1318"
+      },
+      {
+        "file": "SPEC.md",
+        "start": 12,
+        "end": 12,
+        "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+        "relation": "supports",
+        "excerptSha256": "339e2e9f747902e021ecb50161791be03f14143062b6be6e6ccf2c29d809ab20"
+      }
+    ],
+    "violation": {
+      "type": "requirement",
+      "expected": "图缺失目标与 applied 未知 ID 分别可确定地报告（或优先级有文档依据）。",
+      "actual": "先校验 applied 后校验边，缺依赖被未知日志项错误覆盖；两者共享码使输出无区分。",
+      "requirement": {
+        "file": "SPEC.md",
+        "start": 12,
+        "end": 12,
+        "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d"
+      }
+    },
+    "issue": "SPEC 将 applied 未知 ID 与图缺失目标视为两类独立校验；同一 unknown-dependency 下两者不可区分，且结构错（缺失依赖）比日志身份错更基本。当前先后顺序使缺依赖场景被日志错误掩盖，诊断码不可确定。",
+    "fix": "先 _check_edges(changes) 再 read_applied(request.get(\"applied\"), known_ids)，使图结构错误优先；或在 SPEC 明确标注该优先级并在注释中写明成立条件。"
+  },
+  "actualOwnerRule": "- Missing graph targets or unknown IDs in the persisted `applied` journal fail with `unknown-dependency`. A cycle anywhere fails with `dependency-cycle`. Non-array or malformed dependency/journal input fails with `invalid-change`.",
+  "sourceLines": [
+    "        applied = read_applied(request.get(\"applied\"), known_ids)",
+    "        _check_edges(changes)"
+  ],
+  "hypotheticalPlannerSha256": "39120715be91c57ff2f84dfd9db15900bdc2928204e1210307254cb2054d804b",
+  "supplementalProbes": [
+    {
+      "case": "both-unknown",
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "absent-edge"
+            ]
+          }
+        ],
+        "applied": [
+          "absent-applied"
+        ]
+      },
+      "actualBefore": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      },
+      "afterHypotheticalRequestedReorder": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      }
+    },
+    {
+      "case": "missing-target-only",
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": [
+              "absent-edge"
+            ]
+          }
+        ]
+      },
+      "actualBefore": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      },
+      "afterHypotheticalRequestedReorder": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      }
+    },
+    {
+      "case": "unknown-applied-only",
+      "request": {
+        "environment": "staging",
+        "action": "plan",
+        "budget": 5,
+        "changes": [
+          {
+            "id": "a",
+            "component": "api",
+            "units": 1,
+            "depends_on": []
+          }
+        ],
+        "applied": [
+          "absent-applied"
+        ]
+      },
+      "actualBefore": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      },
+      "afterHypotheticalRequestedReorder": {
+        "output": {
+          "status": "error",
+          "error": "unknown-dependency",
+          "actions": [],
+          "units": 0
+        },
+        "exitCode": 0,
+        "failure": null
+      }
+    }
+  ]
+}

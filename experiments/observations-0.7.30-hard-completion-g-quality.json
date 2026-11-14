@@ -1,0 +1,7099 @@
+{
+  "spec": "building-loop-hard-independent-public-recheck/1",
+  "scope": "Frozen source digest check, visible-spec public probes, and AST/comment inventory. Private inputs and seed not read. Counts do not certify semantic annotation quality.",
+  "publicProbeReferenceControl": {
+    "G3": {
+      "passed": 13,
+      "total": 13
+    },
+    "G4": {
+      "passed": 20,
+      "total": 20
+    }
+  },
+  "missingFrozenStages": [],
+  "results": [
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard",
+      "stage": "G3",
+      "sourcePins": {
+        "status": "error",
+        "error": "invalid-batch-item",
+        "requestIndex": 1,
+        "results": [],
+        "units": 0
+      },
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-frozen-seed",
+      "elapsedMs": 769880,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 27,
+          "total": 27
+        },
+        "priorPassed": 21,
+        "priorStillPass": 21,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 12,
+        "total": 13,
+        "byCategory": {
+          "schema": {
+            "passed": 4,
+            "total": 4
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 1,
+            "total": 2
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "production",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": []
+                  },
+                  false
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_read_item",
+            "keyed_fields",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_envelope",
+            "read_item",
+            "read_retain"
+          ],
+          "lineCount": 125
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolved",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 169
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "decide",
+            "limit_for"
+          ],
+          "lineCount": 87
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "invalid_json",
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 125,
+          "moduleDocstring": true,
+          "commentLines": [
+            6,
+            96
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 15,
+              "end": 27,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 30,
+              "end": 31,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 34,
+              "end": 55,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 58,
+              "end": 60,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 63,
+              "end": 74,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "keyed_fields",
+              "start": 77,
+              "end": 79,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_item",
+              "start": 82,
+              "end": 101,
+              "docstring": true,
+              "inlineCommentCount": 1
+            },
+            {
+              "name": "read_envelope",
+              "start": 104,
+              "end": 115,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_item",
+              "start": 118,
+              "end": 120,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch",
+              "start": 123,
+              "end": 125,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 169,
+          "moduleDocstring": true,
+          "commentLines": [
+            115,
+            116,
+            117,
+            118,
+            121,
+            122,
+            148,
+            162
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 9,
+              "end": 10,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 13,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 18,
+              "end": 25,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 28,
+              "end": 51,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 54,
+              "end": 77,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 80,
+              "end": 83,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "resolved",
+              "start": 86,
+              "end": 108,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan",
+              "start": 111,
+              "end": 127,
+              "docstring": false,
+              "inlineCommentCount": 6
+            },
+            {
+              "name": "plan_batch",
+              "start": 130,
+              "end": 169,
+              "docstring": true,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 87,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            21,
+            22,
+            25,
+            28,
+            29,
+            30,
+            33,
+            34,
+            49,
+            51,
+            52,
+            53,
+            77,
+            78,
+            82
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 47,
+              "end": 54,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 57,
+              "end": 64,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "decide",
+              "start": 67,
+              "end": 87,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 29,
+          "moduleDocstring": true,
+          "commentLines": [
+            18,
+            19,
+            20,
+            21
+          ],
+          "functions": [
+            {
+              "name": "invalid_json",
+              "start": 8,
+              "end": 9,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "main",
+              "start": 12,
+              "end": 25,
+              "docstring": false,
+              "inlineCommentCount": 4
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "a7a4d2cf0de01b0aa3a81a429ff3e1f4f658f0bc7cdc1d2f9a747ce76631b21c"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard",
+      "stage": "G4",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "1ece2b6d1756efc64f66dab4ff28a6fb5be6f4a1e291388a96d5b836fbd3987d"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "f1822d60425672613dc0ebea5307c57af9f4c803719b5ec8f18fdf4cf8f137dd"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "a4183753c6ab57438b636c7a8b221e4db1217bf973f9590f4bab0f761c65f4ae"
+        },
+        {
+          "path": "release.py",
+          "sha256": "958d1e74ad1481ea2ed0f8b902d3798d5d085282127507f41ea326da10e69bab"
+        }
+      ],
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 655487,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 51,
+          "total": 51
+        },
+        "priorPassed": 48,
+        "priorStillPass": 48,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 20,
+        "total": 20,
+        "byCategory": {
+          "schema": {
+            "passed": 6,
+            "total": 6
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 3,
+            "total": 3
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          },
+          "idempotency": {
+            "passed": 4,
+            "total": 4
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "limit-must-not-be-bool",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [
+            "policy"
+          ],
+          "boundaryOk": false,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_read_item",
+            "canonical",
+            "fingerprint",
+            "keyed_fields",
+            "read_applied",
+            "read_batch",
+            "read_changes",
+            "read_envelope",
+            "read_item",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 222
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "resolved",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 200
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "batch_limit",
+            "decide",
+            "limit_for"
+          ],
+          "lineCount": 105
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "invalid_json",
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 222,
+          "moduleDocstring": true,
+          "commentLines": [
+            8,
+            136,
+            146,
+            179
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 17,
+              "end": 29,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 32,
+              "end": 33,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 36,
+              "end": 57,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 60,
+              "end": 62,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 65,
+              "end": 76,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "keyed_fields",
+              "start": 79,
+              "end": 81,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_operation_id",
+              "start": 84,
+              "end": 95,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "fingerprint",
+              "start": 98,
+              "end": 115,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "canonical",
+              "start": 118,
+              "end": 160,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "_read_item",
+              "start": 163,
+              "end": 186,
+              "docstring": true,
+              "inlineCommentCount": 1
+            },
+            {
+              "name": "read_envelope",
+              "start": 189,
+              "end": 206,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_item",
+              "start": 209,
+              "end": 216,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch",
+              "start": 219,
+              "end": 222,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 200,
+          "moduleDocstring": true,
+          "commentLines": [
+            115,
+            116,
+            117,
+            118,
+            121,
+            122,
+            162,
+            168,
+            169,
+            181,
+            192,
+            193,
+            195,
+            196,
+            198
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 9,
+              "end": 10,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 13,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 18,
+              "end": 25,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 28,
+              "end": 51,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 54,
+              "end": 77,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 80,
+              "end": 83,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "resolved",
+              "start": 86,
+              "end": 108,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan",
+              "start": 111,
+              "end": 127,
+              "docstring": false,
+              "inlineCommentCount": 6
+            },
+            {
+              "name": "plan_batch",
+              "start": 130,
+              "end": 200,
+              "docstring": true,
+              "inlineCommentCount": 9
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 105,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            19,
+            23,
+            24,
+            27,
+            30,
+            31,
+            34,
+            35,
+            36,
+            39,
+            40,
+            55,
+            57,
+            58,
+            59,
+            83,
+            84,
+            88,
+            102
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 53,
+              "end": 60,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 63,
+              "end": 70,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "decide",
+              "start": 73,
+              "end": 93,
+              "docstring": true,
+              "inlineCommentCount": 3
+            },
+            {
+              "name": "batch_limit",
+              "start": 96,
+              "end": 105,
+              "docstring": true,
+              "inlineCommentCount": 1
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 29,
+          "moduleDocstring": true,
+          "commentLines": [
+            18,
+            19,
+            20,
+            21
+          ],
+          "functions": [
+            {
+              "name": "invalid_json",
+              "start": 8,
+              "end": 9,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "main",
+              "start": 12,
+              "end": 25,
+              "docstring": false,
+              "inlineCommentCount": 4
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "fec5bbbeeca07c038c34457a04e44c7a14a1a5b67a927538fcf8069b74914846"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "bebafd3848190fb757b43b29344ac758c87eff639d258b4e448ff2c5cb1479f4"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard-checklist",
+      "stage": "G3",
+      "sourcePins": {
+        "status": "error",
+        "error": "invalid-batch-item",
+        "requestIndex": 1,
+        "results": [],
+        "units": 0
+      },
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-frozen-seed",
+      "elapsedMs": 501434,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 27,
+          "total": 27
+        },
+        "priorPassed": 21,
+        "priorStillPass": 21,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 12,
+        "total": 13,
+        "byCategory": {
+          "schema": {
+            "passed": 4,
+            "total": 4
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 1,
+            "total": 2
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "production",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": []
+                  },
+                  false
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_items",
+            "_units",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 230
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 71
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 88,
+          "moduleDocstring": true,
+          "commentLines": [
+            60,
+            61
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 9,
+              "end": 26,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 29,
+              "end": 30,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 33,
+              "end": 62,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "read_applied",
+              "start": 65,
+              "end": 72,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 75,
+              "end": 88,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 230,
+          "moduleDocstring": true,
+          "commentLines": [
+            13,
+            14,
+            15,
+            70,
+            71,
+            102,
+            103,
+            131,
+            132,
+            135,
+            136,
+            137,
+            138,
+            141,
+            142,
+            147,
+            148,
+            153,
+            154,
+            155,
+            178,
+            179,
+            180,
+            182,
+            183,
+            184,
+            210,
+            211,
+            220,
+            221,
+            222,
+            223,
+            224
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 8,
+              "end": 10,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 22,
+              "end": 23,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 26,
+              "end": 39,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 42,
+              "end": 74,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "retained_closure",
+              "start": 77,
+              "end": 109,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "rollback_actions",
+              "start": 112,
+              "end": 115,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_units",
+              "start": 118,
+              "end": 119,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "evaluate",
+              "start": 122,
+              "end": 160,
+              "docstring": true,
+              "inlineCommentCount": 13
+            },
+            {
+              "name": "_batch_items",
+              "start": 163,
+              "end": 186,
+              "docstring": true,
+              "inlineCommentCount": 6
+            },
+            {
+              "name": "rollback_many",
+              "start": 189,
+              "end": 213,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "plan",
+              "start": 216,
+              "end": 230,
+              "docstring": true,
+              "inlineCommentCount": 5
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 71,
+          "moduleDocstring": true,
+          "commentLines": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            17,
+            18,
+            19,
+            22,
+            23,
+            38,
+            40,
+            41,
+            42,
+            56,
+            57,
+            63,
+            68,
+            69,
+            70
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 36,
+              "end": 43,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 46,
+              "end": 71,
+              "docstring": true,
+              "inlineCommentCount": 6
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 29,
+          "moduleDocstring": true,
+          "commentLines": [
+            23
+          ],
+          "functions": [
+            {
+              "name": "main",
+              "start": 15,
+              "end": 25,
+              "docstring": false,
+              "inlineCommentCount": 1
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "ARCHITECTURE.md",
+          "sha256": "8aca976cefb36d690cc8936bc7bdce625a3cffd34764cf7c859dfbc89043e1c6"
+        },
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "fdd228463b0aee030ac1fb966a3cd69e28abbb71d329d0d0084c45decdc86e16"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "8f9f9ed70849280a1cd3506fe2ea61e4a3c5a3c55041efd698369bfb420d394b"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        },
+        {
+          "path": "TEST-REPORT.md",
+          "sha256": "477d5a29aebcc426a5bfb195c45123e591f5e3299f2bed5239823a4b93a43ce8"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "standard-checklist",
+      "stage": "G4",
+      "sourcePins": {
+        "status": "error",
+        "error": "invalid-batch",
+        "requestIndex": null,
+        "results": [],
+        "units": 0
+      },
+      "terminal": "waiting-user",
+      "hostPhase": null,
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 39136,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 4,
+          "total": 51
+        },
+        "priorPassed": 48,
+        "priorStillPass": 24,
+        "previouslyPassingNowFailedIds": [
+          "heldout-0caf1e27e0dd15dd0a21",
+          "heldout-19be8885482f215da8f0",
+          "heldout-1b90b084661f1b357e74",
+          "heldout-2f2fda6cacfbdb656b0b",
+          "heldout-336537adc5e47df82d5a",
+          "heldout-3428f73e12da0dd2b4a6",
+          "heldout-3d238ec2951c62a94a7a",
+          "heldout-4d02d827b32d4986b05d",
+          "heldout-55d95dffb86c83d93141",
+          "heldout-64ed50b047222259bab4",
+          "heldout-691c076f13944a9032ee",
+          "heldout-6de12d839b43044cdbae",
+          "heldout-700dd54ab372a775183e",
+          "heldout-7309f93f78db7b9f5cac",
+          "heldout-820dab5bf8addffac320",
+          "heldout-8f8162aa57d4e27622cc",
+          "heldout-98ee8874e5e8c753ea00",
+          "heldout-9aff61f83c9e4fa08cab",
+          "heldout-9ebb3a95f613d5373023",
+          "heldout-a0394e5d1355915d77f8",
+          "heldout-b7c616916a210579fbd9",
+          "heldout-b90a1ec50fec2720c2ec",
+          "heldout-bc34dbb015489bcc020a",
+          "heldout-dfe7bde83c1ed1da6a8a"
+        ],
+        "hardFailedIds": [
+          "heldout-043e2f799a8ee4f7e914",
+          "heldout-0caf1e27e0dd15dd0a21",
+          "heldout-0f014a089a51d0cd349d",
+          "heldout-19be8885482f215da8f0",
+          "heldout-1b90b084661f1b357e74",
+          "heldout-20881074f92cc3c5786f",
+          "heldout-27df5e8768f05cb6a409",
+          "heldout-2f2fda6cacfbdb656b0b",
+          "heldout-336537adc5e47df82d5a",
+          "heldout-3428f73e12da0dd2b4a6",
+          "heldout-3d238ec2951c62a94a7a",
+          "heldout-3db6ecaa5faa9a1bb797",
+          "heldout-404e3e0b87fb166b97d4",
+          "heldout-470a2c6f3087e70bdce9",
+          "heldout-4d02d827b32d4986b05d",
+          "heldout-55d95dffb86c83d93141",
+          "heldout-64ed50b047222259bab4",
+          "heldout-691c076f13944a9032ee",
+          "heldout-6de12d839b43044cdbae",
+          "heldout-700dd54ab372a775183e",
+          "heldout-7309f93f78db7b9f5cac",
+          "heldout-797705c221fe97cc229a",
+          "heldout-7e3c4e80bc3c2034f87c",
+          "heldout-820dab5bf8addffac320",
+          "heldout-89dfade6f162e51befc2",
+          "heldout-8d5a2381df27323705fc",
+          "heldout-8dc278926bb850d80294",
+          "heldout-8f8162aa57d4e27622cc",
+          "heldout-9810ee2d2bd5795bc099",
+          "heldout-98ee8874e5e8c753ea00",
+          "heldout-9aff61f83c9e4fa08cab",
+          "heldout-9ebb3a95f613d5373023",
+          "heldout-a0394e5d1355915d77f8",
+          "heldout-a3b4fa48ff08bfd84c68",
+          "heldout-a3d9cbfb7f21a30151fd",
+          "heldout-a7eabeaf2211b25638c7",
+          "heldout-b09d73d29b12cddff3c2",
+          "heldout-b7c616916a210579fbd9",
+          "heldout-b8d9d42ebd16d04827ea",
+          "heldout-b90a1ec50fec2720c2ec",
+          "heldout-bc34dbb015489bcc020a",
+          "heldout-d717f8c4de4f344098be",
+          "heldout-d7478fd855d3142162e8",
+          "heldout-dfe7bde83c1ed1da6a8a",
+          "heldout-e9ad4660c12ef311b116",
+          "heldout-ede2ca35099d97238672",
+          "heldout-f0b7ebeaf3b397a151ce"
+        ]
+      },
+      "publicRecheck": {
+        "passed": 7,
+        "total": 20,
+        "byCategory": {
+          "schema": {
+            "passed": 2,
+            "total": 6
+          },
+          "isolation": {
+            "passed": 0,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 0,
+            "total": 3
+          },
+          "graph": {
+            "passed": 0,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          },
+          "idempotency": {
+            "passed": 0,
+            "total": 4
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "schema",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one",
+                    "action": "rollback"
+                  }
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "schema",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  null
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: status, results, units",
+            "category": "isolation",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 4,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "two"
+                  }
+                ],
+                "limit": 6
+              },
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  },
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 4,
+                    "operationId": "two"
+                  }
+                ],
+                "units": 6
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "production",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  false
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 4,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "absent"
+                    ],
+                    "retain": [],
+                    "operation_id": "two"
+                  }
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: status, results, units",
+            "category": "graph",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "first",
+                        "component": "api",
+                        "units": 1,
+                        "depends_on": []
+                      },
+                      {
+                        "id": "middle",
+                        "component": "api",
+                        "units": 1,
+                        "depends_on": [
+                          "first"
+                        ]
+                      },
+                      {
+                        "id": "top",
+                        "component": "api",
+                        "units": 1,
+                        "depends_on": [
+                          "middle"
+                        ]
+                      },
+                      {
+                        "id": "remove",
+                        "component": "api",
+                        "units": 3,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "first",
+                      "top",
+                      "remove"
+                    ],
+                    "retain": [
+                      "top"
+                    ],
+                    "operation_id": "one"
+                  }
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "remove"
+                    ],
+                    "units": 3,
+                    "operationId": "one"
+                  }
+                ],
+                "units": 3
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "schema",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 4,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "two"
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "operation-id-required",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "schema",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": []
+                  }
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "limit-must-not-be-bool",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: status, results, units",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "operation_id": "one",
+                    "retain": [],
+                    "applied": [
+                      "core"
+                    ],
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "budget": 0,
+                    "environment": "staging"
+                  }
+                ],
+                "limit": 2
+              },
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "two"
+                  }
+                ],
+                "limit": 3
+              },
+              "expected": {
+                "status": "error",
+                "error": "batch-limit-exceeded",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": false,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  }
+                ],
+                "limit": 1
+              },
+              "expected": {
+                "status": "error",
+                "error": "conflicting-operation",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: status, results, units",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "One"
+                  }
+                ],
+                "limit": 4
+              },
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  },
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "One"
+                  }
+                ],
+                "units": 4
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "production",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 4,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "two"
+                  }
+                ],
+                "limit": 0
+              },
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              }
+            }
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 88
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_items",
+            "_units",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 230
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 71
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 29
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 88,
+          "moduleDocstring": true,
+          "commentLines": [
+            60,
+            61
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 9,
+              "end": 26,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 29,
+              "end": 30,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 33,
+              "end": 62,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "read_applied",
+              "start": 65,
+              "end": 72,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 75,
+              "end": 88,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 230,
+          "moduleDocstring": true,
+          "commentLines": [
+            13,
+            14,
+            15,
+            70,
+            71,
+            102,
+            103,
+            131,
+            132,
+            135,
+            136,
+            137,
+            138,
+            141,
+            142,
+            147,
+            148,
+            153,
+            154,
+            155,
+            178,
+            179,
+            180,
+            182,
+            183,
+            184,
+            210,
+            211,
+            220,
+            221,
+            222,
+            223,
+            224
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 8,
+              "end": 10,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 22,
+              "end": 23,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 26,
+              "end": 39,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 42,
+              "end": 74,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "retained_closure",
+              "start": 77,
+              "end": 109,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "rollback_actions",
+              "start": 112,
+              "end": 115,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_units",
+              "start": 118,
+              "end": 119,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "evaluate",
+              "start": 122,
+              "end": 160,
+              "docstring": true,
+              "inlineCommentCount": 13
+            },
+            {
+              "name": "_batch_items",
+              "start": 163,
+              "end": 186,
+              "docstring": true,
+              "inlineCommentCount": 6
+            },
+            {
+              "name": "rollback_many",
+              "start": 189,
+              "end": 213,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "plan",
+              "start": 216,
+              "end": 230,
+              "docstring": true,
+              "inlineCommentCount": 5
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 71,
+          "moduleDocstring": true,
+          "commentLines": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            17,
+            18,
+            19,
+            22,
+            23,
+            38,
+            40,
+            41,
+            42,
+            56,
+            57,
+            63,
+            68,
+            69,
+            70
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 36,
+              "end": 43,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 46,
+              "end": 71,
+              "docstring": true,
+              "inlineCommentCount": 6
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 29,
+          "moduleDocstring": true,
+          "commentLines": [
+            23
+          ],
+          "functions": [
+            {
+              "name": "main",
+              "start": 15,
+              "end": 25,
+              "docstring": false,
+              "inlineCommentCount": 1
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "ARCHITECTURE.md",
+          "sha256": "8aca976cefb36d690cc8936bc7bdce625a3cffd34764cf7c859dfbc89043e1c6"
+        },
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "fec5bbbeeca07c038c34457a04e44c7a14a1a5b67a927538fcf8069b74914846"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        },
+        {
+          "path": "TEST-REPORT.md",
+          "sha256": "477d5a29aebcc426a5bfb195c45123e591f5e3299f2bed5239823a4b93a43ce8"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "building-loop",
+      "stage": "G3",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "825e4919ee01769a7153a2ed336abebe0f3d2aba5ac9b1fbcf1af151d4ff6358"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "terminal": "stalled-idle",
+      "hostPhase": "first-audit-ready",
+      "carry": "same-frozen-seed",
+      "elapsedMs": 601919,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 27,
+          "total": 27
+        },
+        "priorPassed": 21,
+        "priorStillPass": 21,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 13,
+        "total": 13,
+        "byCategory": {
+          "schema": {
+            "passed": 4,
+            "total": 4
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 2,
+            "total": 2
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "read_batch_item",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 176
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 67,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 8,
+              "end": 20,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 23,
+              "end": 24,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 27,
+              "end": 48,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 51,
+              "end": 53,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 56,
+              "end": 67,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 176,
+          "moduleDocstring": true,
+          "commentLines": [
+            7,
+            8,
+            9,
+            13,
+            14,
+            85,
+            86,
+            108,
+            109,
+            110,
+            125,
+            126,
+            137,
+            138,
+            141,
+            142,
+            157,
+            158
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 18,
+              "end": 19,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 22,
+              "end": 25,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 28,
+              "end": 35,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 38,
+              "end": 61,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 64,
+              "end": 88,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "rollback_actions",
+              "start": 91,
+              "end": 94,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch_item",
+              "start": 97,
+              "end": 113,
+              "docstring": true,
+              "inlineCommentCount": 3
+            },
+            {
+              "name": "plan_batch",
+              "start": 116,
+              "end": 147,
+              "docstring": true,
+              "inlineCommentCount": 6
+            },
+            {
+              "name": "plan",
+              "start": 150,
+              "end": 176,
+              "docstring": false,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 63,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            51,
+            52,
+            58
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 41,
+              "end": 63,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 19,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "main",
+              "start": 8,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+        },
+        {
+          "path": "INDEX.md",
+          "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "bff281e82e68709f422ffada8dcb49eadf1f1933850abc1416c1dd32fcbf730d"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        },
+        {
+          "path": "modules/architecture.md",
+          "sha256": "45d6d35aae38cd0f2f11ce0942dc8c159ce0af51dfb406fe932daad4afb8323f"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-WIRmLz",
+      "mode": "building-loop",
+      "stage": "G4",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ac11c0fde253acc8a39e6399fe605866a83f28866f6d27ed2b9c14e652a986ed"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "terminal": "closed",
+      "hostPhase": "closed",
+      "carry": "frozen-workspace-continuation-after-idle-stall",
+      "elapsedMs": 470899,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 51,
+          "total": 51
+        },
+        "priorPassed": 48,
+        "priorStillPass": 48,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 20,
+        "total": 20,
+        "byCategory": {
+          "schema": {
+            "passed": 6,
+            "total": 6
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 3,
+            "total": 3
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          },
+          "idempotency": {
+            "passed": 4,
+            "total": 4
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "limit-must-not-be-bool",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "read_batch_item",
+            "read_operation_id",
+            "request_fingerprint",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 247
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 67,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 8,
+              "end": 20,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 23,
+              "end": 24,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 27,
+              "end": 48,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 51,
+              "end": 53,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 56,
+              "end": 67,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 247,
+          "moduleDocstring": true,
+          "commentLines": [
+            8,
+            9,
+            10,
+            12,
+            13,
+            14,
+            18,
+            19,
+            21,
+            22,
+            93,
+            94,
+            120,
+            121,
+            122,
+            129,
+            130,
+            165,
+            166,
+            167,
+            168,
+            173,
+            174,
+            175,
+            187,
+            188,
+            189,
+            190,
+            191,
+            195,
+            196,
+            201,
+            202,
+            209,
+            210,
+            214,
+            215,
+            228,
+            229
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 26,
+              "end": 27,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 30,
+              "end": 33,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 36,
+              "end": 43,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 46,
+              "end": 69,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 72,
+              "end": 96,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "rollback_actions",
+              "start": 99,
+              "end": 102,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch_item",
+              "start": 105,
+              "end": 123,
+              "docstring": true,
+              "inlineCommentCount": 3
+            },
+            {
+              "name": "read_operation_id",
+              "start": 126,
+              "end": 135,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "request_fingerprint",
+              "start": 138,
+              "end": 147,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan_batch",
+              "start": 150,
+              "end": 218,
+              "docstring": true,
+              "inlineCommentCount": 20
+            },
+            {
+              "name": "plan",
+              "start": 221,
+              "end": 247,
+              "docstring": false,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 63,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            51,
+            52,
+            58
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 41,
+              "end": 63,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 19,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "main",
+              "start": 8,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828"
+        },
+        {
+          "path": "INDEX.md",
+          "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+        },
+        {
+          "path": "LEDGER.md",
+          "sha256": "f77836230ac49e7814d7c29677b699bf10ca8c361e1c1cf76a63dbf96cf3810c"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "348e02afbff8208bfb2b805e1e4b0280f24a6bc1fe7e384ee546e0ddbe5c549e"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        },
+        {
+          "path": "modules/architecture.md",
+          "sha256": "70b4155a1cd5bfde03528505e7a19ece9272d98816fa033ccece52d3bbad15d7"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard",
+      "stage": "G3",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "af85c2038a0c8c0103f20e619b7a43b6fc3c064b0baf6c9b593eb48deb7b4ee7"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "55ea748c007995965c21af479c0dd378e20238a7e0c15d7d0100cb2f11d05fb4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-frozen-seed",
+      "elapsedMs": 261024,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 27,
+          "total": 27
+        },
+        "priorPassed": 21,
+        "priorStillPass": 21,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 13,
+        "total": 13,
+        "byCategory": {
+          "schema": {
+            "passed": 4,
+            "total": 4
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 2,
+            "total": 2
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 106
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__str__",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 156
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 106,
+          "moduleDocstring": true,
+          "commentLines": [
+            3,
+            4,
+            5
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 16,
+              "end": 28,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 31,
+              "end": 32,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 35,
+              "end": 56,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 59,
+              "end": 61,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 64,
+              "end": 75,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch",
+              "start": 78,
+              "end": 91,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch_item",
+              "start": 94,
+              "end": 106,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 156,
+          "moduleDocstring": true,
+          "commentLines": [
+            103,
+            104
+          ],
+          "functions": [
+            {
+              "name": "__str__",
+              "start": 19,
+              "end": 20,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "failure",
+              "start": 23,
+              "end": 24,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 27,
+              "end": 29,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 32,
+              "end": 39,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 42,
+              "end": 65,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 68,
+              "end": 88,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 91,
+              "end": 94,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "evaluate",
+              "start": 97,
+              "end": 119,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "rollback_many",
+              "start": 122,
+              "end": 144,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan",
+              "start": 147,
+              "end": 156,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 63,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            51,
+            52,
+            58
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 41,
+              "end": 63,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 19,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "main",
+              "start": 8,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "3ac196daf96680348748e3e9394baea72d53dbd42d881c58ddc45149f17ef5ad"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "a7a4d2cf0de01b0aa3a81a429ff3e1f4f658f0bc7cdc1d2f9a747ce76631b21c"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard",
+      "stage": "G4",
+      "sourcePins": {
+        "status": "ok",
+        "results": [
+          {
+            "actions": [
+              "core"
+            ],
+            "units": 2,
+            "operationId": "one"
+          },
+          {
+            "actions": [
+              "core"
+            ],
+            "units": 2,
+            "operationId": "one"
+          }
+        ],
+        "units": 2
+      },
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 347838,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 38,
+          "total": 51
+        },
+        "priorPassed": 48,
+        "priorStillPass": 36,
+        "previouslyPassingNowFailedIds": [
+          "heldout-1b90b084661f1b357e74",
+          "heldout-3428f73e12da0dd2b4a6",
+          "heldout-3d238ec2951c62a94a7a",
+          "heldout-4d02d827b32d4986b05d",
+          "heldout-691c076f13944a9032ee",
+          "heldout-820dab5bf8addffac320",
+          "heldout-8f8162aa57d4e27622cc",
+          "heldout-98ee8874e5e8c753ea00",
+          "heldout-9ebb3a95f613d5373023",
+          "heldout-b7c616916a210579fbd9",
+          "heldout-b90a1ec50fec2720c2ec",
+          "heldout-bc34dbb015489bcc020a"
+        ],
+        "hardFailedIds": [
+          "heldout-1b90b084661f1b357e74",
+          "heldout-3428f73e12da0dd2b4a6",
+          "heldout-3d238ec2951c62a94a7a",
+          "heldout-4d02d827b32d4986b05d",
+          "heldout-691c076f13944a9032ee",
+          "heldout-820dab5bf8addffac320",
+          "heldout-89dfade6f162e51befc2",
+          "heldout-8f8162aa57d4e27622cc",
+          "heldout-98ee8874e5e8c753ea00",
+          "heldout-9ebb3a95f613d5373023",
+          "heldout-b7c616916a210579fbd9",
+          "heldout-b90a1ec50fec2720c2ec",
+          "heldout-bc34dbb015489bcc020a"
+        ]
+      },
+      "publicRecheck": {
+        "passed": 17,
+        "total": 20,
+        "byCategory": {
+          "schema": {
+            "passed": 5,
+            "total": 6
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 2,
+            "total": 3
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          },
+          "idempotency": {
+            "passed": 3,
+            "total": 4
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error, requestIndex",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "production",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  false
+                ],
+                "limit": 99
+              },
+              "expected": {
+                "status": "error",
+                "error": "production-frozen",
+                "requestIndex": 0,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: status, error, requestIndex, results, units",
+            "category": "schema",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 4,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "two"
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "invalid-batch",
+                "requestIndex": null,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  },
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 4,
+                    "operationId": "two"
+                  }
+                ],
+                "units": 6
+              }
+            }
+          },
+          {
+            "id": "operation-id-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "limit-must-not-be-bool",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: results",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": [],
+                    "operation_id": "one"
+                  },
+                  {
+                    "operation_id": "one",
+                    "retain": [],
+                    "applied": [
+                      "core"
+                    ],
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "budget": 0,
+                    "environment": "staging"
+                  }
+                ],
+                "limit": 2
+              },
+              "expected": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  }
+                ],
+                "units": 2
+              },
+              "actual": {
+                "status": "ok",
+                "results": [
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  },
+                  {
+                    "actions": [
+                      "core"
+                    ],
+                    "units": 2,
+                    "operationId": "one"
+                  }
+                ],
+                "units": 2
+              }
+            }
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain",
+            "request_identity"
+          ],
+          "lineCount": 146
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__str__",
+            "batch_failure",
+            "build_graph",
+            "evaluate",
+            "failure",
+            "plan",
+            "retained_closure",
+            "rollback_actions",
+            "rollback_many",
+            "topological_order"
+          ],
+          "lineCount": 206
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for",
+            "read_batch_limit"
+          ],
+          "lineCount": 83
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 146,
+          "moduleDocstring": true,
+          "commentLines": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            14
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 23,
+              "end": 35,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 38,
+              "end": 39,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 42,
+              "end": 63,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 66,
+              "end": 68,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 71,
+              "end": 82,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch",
+              "start": 85,
+              "end": 101,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_operation_id",
+              "start": 104,
+              "end": 112,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch_item",
+              "start": 115,
+              "end": 130,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "request_identity",
+              "start": 133,
+              "end": 145,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 206,
+          "moduleDocstring": true,
+          "commentLines": [
+            104,
+            105,
+            167,
+            168,
+            169,
+            183,
+            184
+          ],
+          "functions": [
+            {
+              "name": "__str__",
+              "start": 20,
+              "end": 21,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "failure",
+              "start": 24,
+              "end": 25,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 28,
+              "end": 30,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 33,
+              "end": 40,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 43,
+              "end": 66,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 69,
+              "end": 89,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 92,
+              "end": 95,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "evaluate",
+              "start": 98,
+              "end": 120,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "rollback_many",
+              "start": 123,
+              "end": 194,
+              "docstring": true,
+              "inlineCommentCount": 5
+            },
+            {
+              "name": "plan",
+              "start": 197,
+              "end": 206,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 83,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            21,
+            22,
+            37,
+            39,
+            40,
+            41,
+            55,
+            56,
+            62
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 35,
+              "end": 42,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 45,
+              "end": 67,
+              "docstring": true,
+              "inlineCommentCount": 3
+            },
+            {
+              "name": "read_batch_limit",
+              "start": 70,
+              "end": 83,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 19,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "main",
+              "start": 8,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "fec5bbbeeca07c038c34457a04e44c7a14a1a5b67a927538fcf8069b74914846"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard-checklist",
+      "stage": "G3",
+      "sourcePins": {
+        "status": "error",
+        "error": "invalid-batch-item",
+        "requestIndex": 1,
+        "results": [],
+        "units": 0
+      },
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-frozen-seed",
+      "elapsedMs": 1087210,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 23,
+          "total": 27
+        },
+        "priorPassed": 21,
+        "priorStillPass": 21,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": [
+          "heldout-0caf1e27e0dd15dd0a21",
+          "heldout-19be8885482f215da8f0",
+          "heldout-336537adc5e47df82d5a",
+          "heldout-700dd54ab372a775183e"
+        ]
+      },
+      "publicRecheck": {
+        "passed": 12,
+        "total": 13,
+        "byCategory": {
+          "schema": {
+            "passed": 4,
+            "total": 4
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 1,
+            "total": 2
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "failed",
+            "exitCode": 0,
+            "failure": "Result differs for fields: error",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3",
+            "publicReplay": {
+              "input": {
+                "action": "rollback-many",
+                "requests": [
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 2,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "core"
+                    ],
+                    "retain": []
+                  },
+                  {
+                    "environment": "staging",
+                    "budget": 0,
+                    "changes": [
+                      {
+                        "id": "core",
+                        "component": "api",
+                        "units": 4,
+                        "depends_on": []
+                      }
+                    ],
+                    "applied": [
+                      "absent"
+                    ],
+                    "retain": []
+                  }
+                ]
+              },
+              "expected": {
+                "status": "error",
+                "error": "unknown-dependency",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              },
+              "actual": {
+                "status": "error",
+                "error": "invalid-batch-item",
+                "requestIndex": 1,
+                "results": [],
+                "units": 0
+              }
+            }
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_validated",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 123
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_batch_frozen_early",
+            "_is_batch",
+            "_rollback_item",
+            "_same_rollback",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 244
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_frozen",
+            "is_frozen",
+            "limit_for"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 123,
+          "moduleDocstring": true,
+          "commentLines": [
+            3,
+            4,
+            5
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 15,
+              "end": 27,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 30,
+              "end": 31,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_validated",
+              "start": 34,
+              "end": 47,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch",
+              "start": 50,
+              "end": 69,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch_item",
+              "start": 72,
+              "end": 80,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 83,
+              "end": 104,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 107,
+              "end": 109,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 112,
+              "end": 123,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 244,
+          "moduleDocstring": true,
+          "commentLines": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            189,
+            190,
+            191,
+            192,
+            193,
+            194,
+            195,
+            196,
+            197,
+            205,
+            206,
+            207,
+            208,
+            209,
+            210,
+            211,
+            226,
+            227
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 22,
+              "end": 23,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 26,
+              "end": 29,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 32,
+              "end": 39,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 42,
+              "end": 65,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 68,
+              "end": 97,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 100,
+              "end": 103,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_rollback_item",
+              "start": 106,
+              "end": 122,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_is_batch",
+              "start": 125,
+              "end": 132,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_batch_frozen_early",
+              "start": 135,
+              "end": 162,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_same_rollback",
+              "start": 165,
+              "end": 167,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan_batch",
+              "start": 170,
+              "end": 217,
+              "docstring": true,
+              "inlineCommentCount": 16
+            },
+            {
+              "name": "plan",
+              "start": 220,
+              "end": 244,
+              "docstring": false,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 82,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            70,
+            71,
+            77
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "is_frozen",
+              "start": 41,
+              "end": 47,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "check_frozen",
+              "start": 50,
+              "end": 58,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "limit_for",
+              "start": 61,
+              "end": 82,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 19,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "main",
+              "start": 8,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "6bb61cca7ecda9407e4fe981bed550d1b0fce9669cc11bd781f3c2f84496fbdb"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "7cc2784164ec304829968b2f4f50841cadc4163791129b35d6887f8e61519fd4"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "1d20f89dec1163bca8afa5f9eaa45b319b7fbb71a309fb9e6a7d93b8e6998abe"
+        },
+        {
+          "path": "docs/ARCHITECTURE.md",
+          "sha256": "68b80fab72d981b78e0648626614f2cf4a773d143c619617e2bdc99b45d0f2d4"
+        },
+        {
+          "path": "docs/PLAN-G3.md",
+          "sha256": "55bd33a15ace89f8862c88fbb49483267c6c4c1ad4ba79d9884de6a72afd87e8"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "standard-checklist",
+      "stage": "G4",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "a3da876388ceecfc7efc13352dcf04d3c691647a0b0842cbaac8f10ffecf0f77"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "932769b081bba6b98aa629a24ddf6cf765fa066f4d8843cbcf231d53205cab76"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "14f03f59afcd3b4a86bd7b4e620e62d425d9c0a44eccc353a291699e9baf8a3a"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "terminal": "completed",
+      "hostPhase": null,
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 518460,
+      "native": {
+        "legacy": {
+          "passed": 0,
+          "total": 21
+        },
+        "hard": {
+          "passed": 0,
+          "total": 51
+        },
+        "priorPassed": 44,
+        "priorStillPass": 0,
+        "previouslyPassingNowFailedIds": [
+          "budget-denied",
+          "cycle",
+          "dependency-order",
+          "empty-plan",
+          "heldout-1b90b084661f1b357e74",
+          "heldout-2f2fda6cacfbdb656b0b",
+          "heldout-3428f73e12da0dd2b4a6",
+          "heldout-3d238ec2951c62a94a7a",
+          "heldout-4d02d827b32d4986b05d",
+          "heldout-55d95dffb86c83d93141",
+          "heldout-64ed50b047222259bab4",
+          "heldout-691c076f13944a9032ee",
+          "heldout-6de12d839b43044cdbae",
+          "heldout-7309f93f78db7b9f5cac",
+          "heldout-820dab5bf8addffac320",
+          "heldout-890cf731363fa1d24deb",
+          "heldout-8f8162aa57d4e27622cc",
+          "heldout-98ee8874e5e8c753ea00",
+          "heldout-9aff61f83c9e4fa08cab",
+          "heldout-9ebb3a95f613d5373023",
+          "heldout-a0394e5d1355915d77f8",
+          "heldout-b2ffa810053ca93e11e9",
+          "heldout-b7c616916a210579fbd9",
+          "heldout-b90a1ec50fec2720c2ec",
+          "heldout-bc34dbb015489bcc020a",
+          "heldout-cac340a75d5dc4297ee2",
+          "heldout-dfe7bde83c1ed1da6a8a",
+          "invalid-budget",
+          "invalid-change",
+          "invalid-environment",
+          "invalid-request",
+          "invalid-transport",
+          "production-frozen-before-graph",
+          "production-frozen-plan",
+          "replay-before-budget",
+          "replay-identity-conflict",
+          "retention-transitive",
+          "retention-validation",
+          "rollback-only-applied",
+          "rollback-order",
+          "stable-sort",
+          "staging-quota-current",
+          "unknown-applied",
+          "unknown-dependency"
+        ],
+        "hardFailedIds": [
+          "heldout-043e2f799a8ee4f7e914",
+          "heldout-0caf1e27e0dd15dd0a21",
+          "heldout-0f014a089a51d0cd349d",
+          "heldout-19be8885482f215da8f0",
+          "heldout-1b90b084661f1b357e74",
+          "heldout-20881074f92cc3c5786f",
+          "heldout-27df5e8768f05cb6a409",
+          "heldout-2f2fda6cacfbdb656b0b",
+          "heldout-336537adc5e47df82d5a",
+          "heldout-3428f73e12da0dd2b4a6",
+          "heldout-3d238ec2951c62a94a7a",
+          "heldout-3db6ecaa5faa9a1bb797",
+          "heldout-404e3e0b87fb166b97d4",
+          "heldout-470a2c6f3087e70bdce9",
+          "heldout-4d02d827b32d4986b05d",
+          "heldout-55d95dffb86c83d93141",
+          "heldout-64ed50b047222259bab4",
+          "heldout-691c076f13944a9032ee",
+          "heldout-6de12d839b43044cdbae",
+          "heldout-700dd54ab372a775183e",
+          "heldout-7309f93f78db7b9f5cac",
+          "heldout-797705c221fe97cc229a",
+          "heldout-7cde121f6d5b7a0958bd",
+          "heldout-7e3c4e80bc3c2034f87c",
+          "heldout-820dab5bf8addffac320",
+          "heldout-890cf731363fa1d24deb",
+          "heldout-89dfade6f162e51befc2",
+          "heldout-8d5a2381df27323705fc",
+          "heldout-8dc278926bb850d80294",
+          "heldout-8f8162aa57d4e27622cc",
+          "heldout-9810ee2d2bd5795bc099",
+          "heldout-98ee8874e5e8c753ea00",
+          "heldout-9aff61f83c9e4fa08cab",
+          "heldout-9ebb3a95f613d5373023",
+          "heldout-a0394e5d1355915d77f8",
+          "heldout-a3b4fa48ff08bfd84c68",
+          "heldout-a3d9cbfb7f21a30151fd",
+          "heldout-a7eabeaf2211b25638c7",
+          "heldout-b09d73d29b12cddff3c2",
+          "heldout-b2ffa810053ca93e11e9",
+          "heldout-b7c616916a210579fbd9",
+          "heldout-b8d9d42ebd16d04827ea",
+          "heldout-b90a1ec50fec2720c2ec",
+          "heldout-bc34dbb015489bcc020a",
+          "heldout-cac340a75d5dc4297ee2",
+          "heldout-d717f8c4de4f344098be",
+          "heldout-d7478fd855d3142162e8",
+          "heldout-dfe7bde83c1ed1da6a8a",
+          "heldout-e9ad4660c12ef311b116",
+          "heldout-ede2ca35099d97238672",
+          "heldout-f0b7ebeaf3b397a151ce"
+        ]
+      },
+      "publicRecheck": {
+        "passed": 0,
+        "total": 20,
+        "byCategory": {
+          "schema": {
+            "passed": 0,
+            "total": 6
+          },
+          "isolation": {
+            "passed": 0,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 0,
+            "total": 3
+          },
+          "graph": {
+            "passed": 0,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 0,
+            "total": 5
+          },
+          "idempotency": {
+            "passed": 0,
+            "total": 4
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "isolation",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "graph",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-required",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "limit-must-not-be-bool",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "failed",
+            "exitCode": 1,
+            "failure": "ModuleNotFoundError",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "_validated",
+            "parse_limit",
+            "read_applied",
+            "read_batch",
+            "read_batch_item",
+            "read_changes",
+            "read_operation_id",
+            "read_retain"
+          ],
+          "lineCount": 185
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "_batch_frozen_early",
+            "_is_batch",
+            "_rollback_item",
+            "_same_rollback",
+            "add",
+            "batch_failure",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 348
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "check_frozen",
+            "is_frozen",
+            "limit_for"
+          ],
+          "lineCount": 82
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 19
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 185,
+          "moduleDocstring": true,
+          "commentLines": [
+            3,
+            4,
+            5,
+            6,
+            11,
+            12,
+            13,
+            85
+          ],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 21,
+              "end": 33,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 36,
+              "end": 37,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_validated",
+              "start": 40,
+              "end": 53,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch",
+              "start": 56,
+              "end": 97,
+              "docstring": true,
+              "inlineCommentCount": 1
+            },
+            {
+              "name": "read_operation_id",
+              "start": 100,
+              "end": 112,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "parse_limit",
+              "start": 115,
+              "end": 129,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_batch_item",
+              "start": 132,
+              "end": 142,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 145,
+              "end": 166,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 169,
+              "end": 171,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 174,
+              "end": 185,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 348,
+          "moduleDocstring": true,
+          "commentLines": [
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            257,
+            258,
+            259,
+            260,
+            263,
+            267,
+            268,
+            269,
+            281,
+            285,
+            286,
+            287,
+            288,
+            289,
+            290,
+            291,
+            292,
+            299,
+            300,
+            301,
+            302,
+            309,
+            310,
+            311,
+            312,
+            313,
+            314,
+            315,
+            316,
+            317,
+            318,
+            330,
+            331
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 23,
+              "end": 24,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 27,
+              "end": 30,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 33,
+              "end": 40,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 43,
+              "end": 66,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 69,
+              "end": 98,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 101,
+              "end": 104,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_rollback_item",
+              "start": 107,
+              "end": 123,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_is_batch",
+              "start": 126,
+              "end": 133,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_batch_frozen_early",
+              "start": 136,
+              "end": 163,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_same_rollback",
+              "start": 166,
+              "end": 174,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "__init__",
+              "start": 180,
+              "end": 182,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "__init__",
+              "start": 209,
+              "end": 210,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "add",
+              "start": 212,
+              "end": 221,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan_batch",
+              "start": 224,
+              "end": 321,
+              "docstring": true,
+              "inlineCommentCount": 31
+            },
+            {
+              "name": "plan",
+              "start": 324,
+              "end": 348,
+              "docstring": false,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 82,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            70,
+            71,
+            77
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "is_frozen",
+              "start": 41,
+              "end": 47,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "check_frozen",
+              "start": 50,
+              "end": 58,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "limit_for",
+              "start": 61,
+              "end": 82,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 19,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "main",
+              "start": 8,
+              "end": 15,
+              "docstring": false,
+              "inlineCommentCount": 0
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "c45661e420b8218d8bc374871d83cb1c160ab170bbf1eb3be4f545fc83b37df4"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "bdf93b03ae5167be4a7b2c6c443b6c53416360c51d018e0f99ad4a50312e1148"
+        },
+        {
+          "path": "docs/ARCHITECTURE.md",
+          "sha256": "d5ada7862155411ea772553234f67eab5bc1cf402e3af7259ca84b2c4065063a"
+        },
+        {
+          "path": "docs/PLAN-G3.md",
+          "sha256": "8b6e132e51e02b02049f782a7de33f3ab6c38ea7e8953407a4aca5a46bf92b34"
+        },
+        {
+          "path": "docs/PLAN-G4.md",
+          "sha256": "1f5159e6d0712007c2c8c40c05cd306a5b5b94ae59bae2f8f89fb831c01f5b98"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "building-loop",
+      "stage": "G3",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ea152865248d4c1db9ce553c8dde2a122d7ea3b67f236d14c21ed1f06a1f842b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        }
+      ],
+      "terminal": "closed",
+      "hostPhase": "closed",
+      "carry": "same-frozen-seed",
+      "elapsedMs": 684244,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 27,
+          "total": 27
+        },
+        "priorPassed": 21,
+        "priorStillPass": 21,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 13,
+        "total": 13,
+        "byCategory": {
+          "schema": {
+            "passed": 4,
+            "total": 4
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 2,
+            "total": 2
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "SPEC.md#G3"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "future-limit-key-forbidden-in-g3",
+            "status": "passed",
+            "category": "schema",
+            "contract": "SPEC.md#G3"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_item_request",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "retained_closure",
+            "rollback_actions",
+            "topological_order"
+          ],
+          "lineCount": 170
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 31
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 67,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 8,
+              "end": 20,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 23,
+              "end": 24,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 27,
+              "end": 48,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 51,
+              "end": 53,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 56,
+              "end": 67,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 170,
+          "moduleDocstring": true,
+          "commentLines": [
+            13,
+            14,
+            132,
+            133,
+            140,
+            151,
+            152
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 20,
+              "end": 21,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 24,
+              "end": 31,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 34,
+              "end": 57,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 60,
+              "end": 82,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 85,
+              "end": 88,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 91,
+              "end": 100,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_item_request",
+              "start": 103,
+              "end": 118,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "plan_batch",
+              "start": 121,
+              "end": 144,
+              "docstring": true,
+              "inlineCommentCount": 3
+            },
+            {
+              "name": "plan",
+              "start": 147,
+              "end": 170,
+              "docstring": false,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 63,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            51,
+            52,
+            58
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 41,
+              "end": 63,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 31,
+          "moduleDocstring": true,
+          "commentLines": [
+            20,
+            21,
+            22
+          ],
+          "functions": [
+            {
+              "name": "main",
+              "start": 14,
+              "end": 27,
+              "docstring": false,
+              "inlineCommentCount": 3
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "38f03ed8bd23cce74078e7470568b8aac3567088e1cc3630a8f80abe439b8afc"
+        },
+        {
+          "path": "INDEX.md",
+          "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+        },
+        {
+          "path": "LEDGER.md",
+          "sha256": "cccad4cc6c5f378d2b2d90da97e9af8312e5ceb8b6fff6bf9ee5cc1f399a4dd8"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "bff281e82e68709f422ffada8dcb49eadf1f1933850abc1416c1dd32fcbf730d"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        },
+        {
+          "path": "modules/architecture.md",
+          "sha256": "263ee013415eca027db52c97b2765477f2de0978f2544546d72fd5cb684317b8"
+        }
+      ],
+      "documentClaimsChecked": []
+    },
+    {
+      "run": "r-xQug3N",
+      "mode": "building-loop",
+      "stage": "G4",
+      "sourcePins": [
+        {
+          "path": "journal.py",
+          "sha256": "e7a3046adfac4330a67f7c5ce36169c048002602d25601d0ec842f503daefba8"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "d2ed61d3970a3bb4f6b3209554f8d2160a02e31428341bac0fa14aa55df1a5b4"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "143040c3812997e896705535bdd53533f7ff6a40b3ca878ab5e66ac48f6a8a10"
+        },
+        {
+          "path": "release.py",
+          "sha256": "47d789da32dac1359f5e0623d941428d64732c8b7385fdcfca20cca5f554e732"
+        }
+      ],
+      "terminal": "closed",
+      "hostPhase": "closed",
+      "carry": "same-workspace-new-session",
+      "elapsedMs": 911969,
+      "native": {
+        "legacy": {
+          "passed": 21,
+          "total": 21
+        },
+        "hard": {
+          "passed": 51,
+          "total": 51
+        },
+        "priorPassed": 48,
+        "priorStillPass": 48,
+        "previouslyPassingNowFailedIds": [],
+        "hardFailedIds": []
+      },
+      "publicRecheck": {
+        "passed": 20,
+        "total": 20,
+        "byCategory": {
+          "schema": {
+            "passed": 6,
+            "total": 6
+          },
+          "isolation": {
+            "passed": 1,
+            "total": 1
+          },
+          "failure-priority": {
+            "passed": 3,
+            "total": 3
+          },
+          "graph": {
+            "passed": 1,
+            "total": 1
+          },
+          "legacy": {
+            "passed": 5,
+            "total": 5
+          },
+          "idempotency": {
+            "passed": 4,
+            "total": 4
+          }
+        },
+        "cases": [
+          {
+            "id": "forbidden-top-level-key",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-forbids-action",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "item-must-be-object",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-change-id-two-items",
+            "status": "passed",
+            "category": "isolation",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "earlier-domain-before-later-shape",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "no-partial-result-after-success",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "retention-through-unapplied-dependency",
+            "status": "passed",
+            "category": "graph",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "single-budget-zero-remains-uncapped",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-retain-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G2"
+          },
+          {
+            "id": "single-null-applied-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-non-array-dependency-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "single-array-action-invalid",
+            "status": "passed",
+            "category": "legacy",
+            "contract": "SPEC.md#G1/G2"
+          },
+          {
+            "id": "batch-limit-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-required",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "limit-must-not-be-bool",
+            "status": "passed",
+            "category": "schema",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "object-key-order-does-not-charge-twice",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "different-operation-ids-charge-independently",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "same-id-boolean-different-from-integer",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "operation-id-exact-case",
+            "status": "passed",
+            "category": "idempotency",
+            "contract": "CHANGE-G2.md"
+          },
+          {
+            "id": "later-domain-priority-over-batch-budget",
+            "status": "passed",
+            "category": "failure-priority",
+            "contract": "CHANGE-G2.md"
+          }
+        ]
+      },
+      "architecture": {
+        "journal": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "_id_list",
+            "_read_dependencies",
+            "read_applied",
+            "read_changes",
+            "read_retain"
+          ],
+          "lineCount": 67
+        },
+        "planner": {
+          "parse": true,
+          "moduleImports": [
+            "journal",
+            "policy"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "batch_failure",
+            "batch_item_request",
+            "build_graph",
+            "failure",
+            "plan",
+            "plan_batch",
+            "request_identity",
+            "retained_closure",
+            "rollback_actions",
+            "tag",
+            "topological_order"
+          ],
+          "lineCount": 265
+        },
+        "policy": {
+          "parse": true,
+          "moduleImports": [],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "__init__",
+            "limit_for"
+          ],
+          "lineCount": 63
+        },
+        "release": {
+          "parse": true,
+          "moduleImports": [
+            "planner"
+          ],
+          "boundaryOk": true,
+          "transportOnlyIO": true,
+          "functions": [
+            "main"
+          ],
+          "lineCount": 31
+        }
+      },
+      "annotationInventory": {
+        "journal.py": {
+          "syntax": "ok",
+          "lineCount": 67,
+          "moduleDocstring": true,
+          "commentLines": [],
+          "functions": [
+            {
+              "name": "_id_list",
+              "start": 8,
+              "end": 20,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "_read_dependencies",
+              "start": 23,
+              "end": 24,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_changes",
+              "start": 27,
+              "end": 48,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_applied",
+              "start": 51,
+              "end": 53,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "read_retain",
+              "start": 56,
+              "end": 67,
+              "docstring": true,
+              "inlineCommentCount": 0
+            }
+          ]
+        },
+        "planner.py": {
+          "syntax": "ok",
+          "lineCount": 265,
+          "moduleDocstring": true,
+          "commentLines": [
+            15,
+            16,
+            18,
+            19,
+            22,
+            23,
+            164,
+            165,
+            191,
+            198,
+            199,
+            200,
+            201,
+            206,
+            207,
+            216,
+            217,
+            218,
+            222,
+            223,
+            226,
+            227,
+            235,
+            236,
+            246,
+            247
+          ],
+          "functions": [
+            {
+              "name": "failure",
+              "start": 27,
+              "end": 28,
+              "docstring": false,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "build_graph",
+              "start": 31,
+              "end": 38,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "topological_order",
+              "start": 41,
+              "end": 64,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "retained_closure",
+              "start": 67,
+              "end": 89,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "rollback_actions",
+              "start": 92,
+              "end": 95,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_failure",
+              "start": 98,
+              "end": 111,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "batch_item_request",
+              "start": 114,
+              "end": 137,
+              "docstring": true,
+              "inlineCommentCount": 0
+            },
+            {
+              "name": "request_identity",
+              "start": 140,
+              "end": 172,
+              "docstring": true,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "tag",
+              "start": 152,
+              "end": 169,
+              "docstring": false,
+              "inlineCommentCount": 2
+            },
+            {
+              "name": "plan_batch",
+              "start": 175,
+              "end": 239,
+              "docstring": true,
+              "inlineCommentCount": 16
+            },
+            {
+              "name": "plan",
+              "start": 242,
+              "end": 265,
+              "docstring": false,
+              "inlineCommentCount": 2
+            }
+          ]
+        },
+        "policy.py": {
+          "syntax": "ok",
+          "lineCount": 63,
+          "moduleDocstring": true,
+          "commentLines": [
+            12,
+            13,
+            14,
+            17,
+            18,
+            33,
+            35,
+            36,
+            37,
+            51,
+            52,
+            58
+          ],
+          "functions": [
+            {
+              "name": "__init__",
+              "start": 31,
+              "end": 38,
+              "docstring": false,
+              "inlineCommentCount": 4
+            },
+            {
+              "name": "limit_for",
+              "start": 41,
+              "end": 63,
+              "docstring": true,
+              "inlineCommentCount": 3
+            }
+          ]
+        },
+        "release.py": {
+          "syntax": "ok",
+          "lineCount": 31,
+          "moduleDocstring": true,
+          "commentLines": [
+            20,
+            21,
+            22
+          ],
+          "functions": [
+            {
+              "name": "main",
+              "start": 14,
+              "end": 27,
+              "docstring": false,
+              "inlineCommentCount": 3
+            }
+          ]
+        }
+      },
+      "documents": [
+        {
+          "path": "CHANGE-G2.md",
+          "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828"
+        },
+        {
+          "path": "INDEX.md",
+          "sha256": "1e1c5255e4bb60db6dfeda2ed5304e61c38c826928601ac5ce1f9d16ed884efa"
+        },
+        {
+          "path": "LEDGER.md",
+          "sha256": "2cb90a14697a95b0178a908daf6734e4d23e7ac16777afee68edafc686888a0f"
+        },
+        {
+          "path": "PROJECT-GOAL.md",
+          "sha256": "348e02afbff8208bfb2b805e1e4b0280f24a6bc1fe7e384ee546e0ddbe5c549e"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "33e03dbf6f7836b8ac6e4d67911fa91d3a71923f7bcfea6bfc3f19d5d5495de9"
+        },
+        {
+          "path": "modules/architecture.md",
+          "sha256": "4bcec5f630a90e5d41f3ed35515b13761479938b6d6c6c1dbd4e097055b25fd4"
+        }
+      ],
+      "documentClaimsChecked": []
+    }
+  ]
+}

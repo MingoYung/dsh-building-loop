@@ -1,0 +1,224 @@
+{
+  "spec": "building-loop-architecture-prose-coverage-replay/1",
+  "run": "r-hO1Nzt",
+  "stage": "G1",
+  "architectureSha256": "e589713fa660b4b5e35b47bc8561c3d586e0999b5c7f4e4ac30161958a1182eb",
+  "sourceFact": {
+    "id": "nonobject-request",
+    "exampleId": "public-architecture-responsibility:example:nonobject-request",
+    "mode": "business",
+    "trigger": {
+      "kind": "input-type",
+      "argument": 0,
+      "type": "object",
+      "test": "not"
+    },
+    "clause": {
+      "file": "SPEC.md",
+      "start": 5,
+      "end": 5,
+      "sha256": "a6b9f5e8018ffb15f0bc59c0594baabd48815bb2bb913de731a25fd64910f89d",
+      "quoteSha256": "4b3aa2083c0d1c684af7b289dc2c4ce527214b09ba79a4c8cf42cf6b3b22d835"
+    },
+    "status": "passed",
+    "actual": {
+      "file": "planner.py",
+      "symbol": "plan",
+      "mode": "business",
+      "sha256": "7fe4298479d7611e212be41d17e696dbc993fa84e66c9151ac808ac79e403528",
+      "line": 57,
+      "end": 57,
+      "conditionLine": 56,
+      "code": "invalid-request"
+    },
+    "response": {
+      "id": "public-architecture-responsibility:example:nonobject-request",
+      "snapshotSha256": "29d9ef5bd2605b3b7b875824d4a7a52ab705631d3311b3f63b58faa8c5944381",
+      "exitCode": 0,
+      "responseSha256": "983d02853a12a79f553093ab0d6e6be06ede4b8db5ec49e3f3a8b35ee7b1bf48",
+      "json": {
+        "status": "error",
+        "error": "invalid-request",
+        "actions": [],
+        "units": 0
+      }
+    },
+    "traceSha256": "99a0c955039ebb164e8017852e54d1b73f17d3af3214a6ce27a16056da2ed1cb"
+  },
+  "scope": "Frozen document and accepted receipts replayed against a detached prototype. Semantic judgments are independent replay inputs.",
+  "roles": [
+    {
+      "decision": "pass",
+      "section": {
+        "heading": "实施顺序",
+        "source": {
+          "file": "modules/architecture.md",
+          "start": 13,
+          "end": 21,
+          "sha256": "e589713fa660b4b5e35b47bc8561c3d586e0999b5c7f4e4ac30161958a1182eb"
+        },
+        "basis": "实施顺序与当前源码一致：journal 校验/去重（S1）、policy 环境与预算（S3，仅 plan 封顶）、planner 图与拼装（S2），release 仅做 stdin JSON 传输。",
+        "evidence": [
+          {
+            "file": "journal.py",
+            "start": 23,
+            "end": 49,
+            "sha256": "9f478d7ea84dbd8f3255a4e912efe6e55fa78273ad2db1406ea7fda60b74d006",
+            "relation": "supports",
+            "excerptSha256": "597d329fddc72e1ac5f95fdab0ad2b4c4ae1375bf3252f4efd002efc91224b17"
+          },
+          {
+            "file": "policy.py",
+            "start": 29,
+            "end": 45,
+            "sha256": "b27ec599dca18716a174dffcf4dceec8b69433de3c342b0e62bebc762775ab22",
+            "relation": "supports",
+            "excerptSha256": "d5454e705fb38578d430d26808dbf761551c716fba9fc22e0fd3934edb702096"
+          },
+          {
+            "file": "planner.py",
+            "start": 55,
+            "end": 83,
+            "sha256": "7fe4298479d7611e212be41d17e696dbc993fa84e66c9151ac808ac79e403528",
+            "relation": "supports",
+            "excerptSha256": "a4c7ddb493d636bd3e9546dac8cd7ef2792c0c36f7efdecb6fbaaeddc3fe688c"
+          }
+        ],
+        "status": "pass"
+      }
+    },
+    {
+      "decision": "pass",
+      "section": {
+        "heading": "实施顺序",
+        "source": {
+          "file": "modules/architecture.md",
+          "start": 13,
+          "end": 21,
+          "sha256": "e589713fa660b4b5e35b47bc8561c3d586e0999b5c7f4e4ac30161958a1182eb"
+        },
+        "basis": "实施顺序六条均与实际源码逐条对得上：第 2 条 journal 校验与去重由 read_changes/collapse_duplicates 实现，与代码结构一致。",
+        "evidence": [
+          {
+            "file": "journal.py",
+            "start": 24,
+            "end": 31,
+            "sha256": "9f478d7ea84dbd8f3255a4e912efe6e55fa78273ad2db1406ea7fda60b74d006",
+            "relation": "supports",
+            "excerptSha256": "bd8c9bb4034f38e463acfb7d792041dff77558f813eb1475e5143c1fc87896be"
+          },
+          {
+            "file": "journal.py",
+            "start": 74,
+            "end": 82,
+            "sha256": "9f478d7ea84dbd8f3255a4e912efe6e55fa78273ad2db1406ea7fda60b74d006",
+            "relation": "supports",
+            "excerptSha256": "2695aa9289cebfd32aa0f8a65a7c983e41fd2a2739229d140cb92d6d5f0af079"
+          }
+        ],
+        "status": "pass"
+      }
+    }
+  ],
+  "authored": [
+    {
+      "id": "p-9e8e78d6bb6ce94f88-1",
+      "section": "s1",
+      "heading": "实施顺序",
+      "kind": "list-item",
+      "start": 16,
+      "end": 16,
+      "sha256": "1347f76ffb12ba95a4dfd29c26e76c8e38a479ffc56f69e0faed25678a7c61ed",
+      "refs": [],
+      "text": "2. journal 层（输入校验、身份、重放）：按 SPEC.md 第 5 行校验输入结构与字段类型（environment、action、budget 为非负整数且排除 bool、changes 数组、id/component 非空字符串、units 正整数、depends_on/applied 缺省为空数组，非数组或含非字符串元素一律 invalid-change）；按第 11 行对完全相同的重复记录去重（id、component、units 与依赖集合完全相同），同 id 但内容不同返回 conflicting-change；重放数据 retained 为 caller 提供的 applied 集合。"
+    },
+    {
+      "id": "p-078c35dacbd90353b1-1",
+      "section": "s1",
+      "heading": "实施顺序",
+      "kind": "list-item",
+      "start": 19,
+      "end": 19,
+      "sha256": "9ea4a1dcacd678d0af464ddb36a6bf5aaad0f83041aa62282ba5c78397b1688d",
+      "refs": [],
+      "text": "5. release.py 入口只做传输：从 stdin 读一次 JSON，解析失败 invalid-json，顶层非对象或结构不合 invalid-request，其余交给下层；任何域错误也照常打印一个 JSON 并正常退出。"
+    }
+  ],
+  "checks": {
+    "headingOnly": {
+      "status": "pending",
+      "missing": [
+        "p-a81dacca9d29cd552b-1",
+        "p-9e8e78d6bb6ce94f88-1",
+        "p-f20896dd01941beded-1",
+        "p-1cf212d31a0e597b70-1",
+        "p-078c35dacbd90353b1-1",
+        "p-e9499c073088ca14c2-1",
+        "p-ccc75f8d826b71f40a-1",
+        "p-5c481fe92d7b19a915-1",
+        "p-dfaa486328501402ac-1",
+        "p-e8789b39a4cf016b79-1",
+        "p-c3c13c7fe3ea0f106e-1",
+        "p-ce897f46702645de98-1",
+        "p-d99a3cd3ea8b4a84c6-1",
+        "p-4cddfb6ed687dcd032-1",
+        "p-fbc215738a94f55276-1"
+      ],
+      "missingFacts": [
+        {
+          "section": "s1",
+          "id": "nonobject-request"
+        },
+        {
+          "section": "s2",
+          "id": "nonobject-request"
+        },
+        {
+          "section": "s3",
+          "id": "nonobject-request"
+        }
+      ],
+      "errors": [],
+      "findings": []
+    },
+    "skippedContradiction": {
+      "status": "pending",
+      "missing": [
+        "p-078c35dacbd90353b1-1"
+      ],
+      "missingFacts": [],
+      "errors": [],
+      "findings": []
+    },
+    "independentlyFoundContradiction": {
+      "status": "revise",
+      "missing": [],
+      "missingFacts": [],
+      "errors": [],
+      "findings": [
+        {
+          "id": "p-078c35dacbd90353b1-1",
+          "section": "s1",
+          "heading": "实施顺序",
+          "line": 19,
+          "status": "contradiction",
+          "facts": [
+            "nonobject-request"
+          ]
+        }
+      ]
+    },
+    "corrected": {
+      "status": "pass",
+      "missing": [],
+      "missingFacts": [],
+      "errors": [],
+      "findings": []
+    },
+    "stale": {
+      "status": "pending",
+      "reason": "coverage-version-changed"
+    }
+  },
+  "modelCalls": 0
+}

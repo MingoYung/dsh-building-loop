@@ -1,0 +1,3925 @@
+{
+  "schema": "dsh-hard-case-comparison/1",
+  "carrier": "Installed Windows DSH NEXT, packaged native Web CLI",
+  "candidateVersion": "0.7.17",
+  "archiveSha256": "6480f219246660800dd6f49538660ba640e2a5310eeaa83ca1698a1f203e7dcd",
+  "fixtureSha256": "1ae7afe36fca76ac14fecec128d3e14ed855da650ffeb414b29e29b11344afc7",
+  "rubricSha256": "2aa4f738579e81bcb79fa7137bcc0fecdbd120c19b1944031384fae1154653ea",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "off"
+  },
+  "status": "observation-capped",
+  "observedNativeStatus": "observation-capped",
+  "formalProfileFingerprintsUnchanged": true,
+  "observationCapMs": 150000,
+  "method": "Fresh pair per case, one host, same human prompt and official model, concurrent requests with alternated pair submission order, no repeat or recovery prompt. Primary scores Standard artifact at first completed turn vs first durable Building-loop draft. Missing/ambiguous answer rows earn zero. Latest content and host-accepted closed result are recorded separately. Provider cache is measured but not controllable. Accuracy concerns fixed table values; explanations are available for inspection and were not scored. Post-run sensitivity recovers labels only when none of the frozen expected IDs occurs and all six numeric rows appear once in ascending order. It never changes value text or the primary score.",
+  "comparablePairs": 2,
+  "overall": {
+    "standard": {
+      "correct": 5,
+      "maximum": 12,
+      "firstArtifacts": 1,
+      "correctIgnoringPrefix": 5,
+      "standardCompletedTurns": 1,
+      "nativeClosed": null,
+      "primaryTokens": 32531,
+      "observedTokens": 75773
+    },
+    "building-loop": {
+      "correct": 11,
+      "maximum": 12,
+      "firstArtifacts": 2,
+      "correctIgnoringPrefix": 11,
+      "standardCompletedTurns": null,
+      "nativeClosed": 0,
+      "primaryTokens": 125625,
+      "observedTokens": 1343949
+    }
+  },
+  "fixture": [
+    {
+      "id": "signed-scope",
+      "description": "版本、范围与未知证据",
+      "prompt": "开始建设：核对银杉票据项目的操作权限。每题独立，均在 06-01 冻结结束时作决定。值只写 ALLOW（有完整有效授权）、DENY（有效规则明确禁止）或 HOLD（其余，等待取证）。\n\n[A1] 已签且当前生效 G17：范围只含银杉项目华北内网。仅项目所有者可读取原件。恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。华北内网不能导出原件，也不能把原件跨区复制给同项目。\n[A2] 已签且生效的 G17 增补：华北内网可给已登记的同项目分析员读取无原件字段的内部汇总。其余 G17 规则保持。\n[A3] G18 预览稿写有“分析员可读取原件，校验通过后可跨区复制并外发公开标签原件”。它只用于演练，未生效。\n[A4] 解密或哈希成功仅能证明文件可读或完整；公开标签不能证明输出授权。“14 天前”满足 30 天条件。未写明的信息一律未知。\n\nE1：项目所有者在华北读取一份银杉原件。\nE2：把签名、归属均确认且 14 天前生成的银杉快照恢复至华东。\nE3：签名、华北落点、14 天均确认，解密成功但没有银杉项目归属证明，申请恢复。\nE4：把哈希通过且有公开标签的银杉原件从华北导出公网，申请人引用 G18。\nE5：已登记银杉分析员在华北内网读取一份银杉内部汇总，已核实无原件字段。\nE6：签名、银杉归属、华北落点均确认，只记录了上一次访问时间，没有生成时间，申请恢复。\n\n交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 E1、E2、E3、E4、E5、E6，每个编号恰好一行。值一格只写题目要求的值。依据一格写所用材料编号或简短算式。末行可用“大白话：”总结结论。若当前模式有交付文件则写入 DELIVERY.md，否则在回复贴出完整稿。只用本条消息内的合成材料，不查网络，不读其他文件。"
+    },
+    {
+      "id": "change-schedule",
+      "description": "资源互斥、最早排程与反事实",
+      "prompt": "开始建设：给一次合成维护排程找最早结束时间。时刻从 0 开始，时间单位为整数，区间为 [开始,结束)，允许前一任务恰好结束时开始下一任务。任务不可抢占；每个工位每次只能运行一个任务，不同工位可并行；完成所有任务即结束。\n\n[S1] 任务,工位,持续时间,所有先决任务。A 固定在 0 开始。\nA,OPS,2,无\nB,IO,4,A\nC,OPS,3,A\nD,OPS,2,B与C\nE,IO,3,B\nF,OPS,1,D与E与H\nG,IO,2,F\nH,OPS,2,C\n[S2] 首先按所有任务尽早完成优化。若最早结束时间相同，再按 A、B、C、D、E、F、G、H 的顺序，使起始时刻向量按字典序最小。业务截止时刻为 12，恰好在 12 结束算按期。反事实只把任务 E 的耗时从 3 改成 5，其余均不改。\n\nQ1：最优基线中 D 和 H 谁先开始，值只写 D 或 H。\nQ2：基线任务 H 开始时刻，只写整数。\nQ3：基线任务 D 开始时刻，只写整数。\nQ4：基线任务 F 开始时刻，只写整数。\nQ5：基线最早结束时刻，只写整数。\nQ6：反事实最早结束时刻，只写整数。\n\n交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 Q1、Q2、Q3、Q4、Q5、Q6，每个编号恰好一行。值一格只写题目要求的值。依据一格写所用材料编号或简短算式。末行可用“大白话：”总结结论。若当前模式有交付文件则写入 DELIVERY.md，否则在回复贴出完整稿。只用本条消息内的合成材料，不查网络，不读其他文件。"
+    }
+  ],
+  "expected": {
+    "signed-scope": {
+      "E1": "ALLOW",
+      "E2": "DENY",
+      "E3": "HOLD",
+      "E4": "DENY",
+      "E5": "ALLOW",
+      "E6": "HOLD"
+    },
+    "paired-metrics": {
+      "N1": "A,B,E,F,G,H,J",
+      "N2": "333",
+      "N3": "500",
+      "N4": "417",
+      "N5": "-6",
+      "N6": "BLOCK"
+    },
+    "change-schedule": {
+      "Q1": "H",
+      "Q2": "5",
+      "Q3": "7",
+      "Q4": "9",
+      "Q5": "12",
+      "Q6": "14"
+    }
+  },
+  "pairs": [
+    {
+      "id": "signed-scope",
+      "description": "版本、范围与未知证据",
+      "arms": [
+        {
+          "mode": "standard",
+          "preset": "standard",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": false,
+          "instructionPackets": [],
+          "nativeExecutorSawTableIds": false,
+          "authorHandoff": [],
+          "intakeDispatch": [],
+          "verificationTrace": [],
+          "pendingCalls": [],
+          "observedMs": 150015,
+          "firstArtifactMs": 8431,
+          "firstArtifact": {
+            "sha256": "048d1ae41938e28f620dd85d935c38344c25302b39b52286795fe98171e0fd27",
+            "bytes": 1054,
+            "text": "# 银杉票据项目 · 操作权限核对（06-01 冻结结束）\n\n有效材料：G17（已签、生效）、G17 增补（已签、生效）。G18 为演练稿，未生效，无授权效力。\n\n| 编号 | 值 | 依据 |\n|---|---|---|\n| E1 | ALLOW | G17：仅项目所有者可读取原件；范围含华北内网 |\n| E2 | ALLOW | G17：签名 ✓、归属 ✓、华北落点 ✓、生成 14 天 < 30 天 ✓ |\n| E3 | HOLD | G17：缺归属证明，四项缺一先挂起（A4：解密成功≠归属） |\n| E4 | DENY | G17：华北不能导出原件、不能跨区外发；G18 未生效无授权（A4：哈希+公开标签≠授权） |\n| E5 | ALLOW | G17 增补：华北内网可给已登记同项目分析员读无原件字段内部汇总 |\n| E6 | HOLD | G17：无生成时间，30 天条件未知；A4 未写明即未知（访问时间≠生成时间） |\n\n大白话：E1、E2、E5 按白纸黑字的有效规则放行；E4 被 G17 明确禁止且 G18 只是演练稿，一律拒绝；E3、E6 缺关键要件、无法推定，先挂起补证再判。\n",
+            "kind": "standard-file"
+          },
+          "primary": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：仅项目所有者可读取原件；范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：签名 ✓、归属 ✓、华北落点 ✓、生成 14 天 < 30 天 ✓"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：缺归属证明，四项缺一先挂起（A4：解密成功≠归属）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：华北不能导出原件、不能跨区外发；G18 未生效无授权（A4：哈希+公开标签≠授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17 增补：华北内网可给已登记同项目分析员读无原件字段内部汇总"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：无生成时间，30 天条件未知；A4 未写明即未知（访问时间≠生成时间）"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：仅项目所有者可读取原件；范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：签名 ✓、归属 ✓、华北落点 ✓、生成 14 天 < 30 天 ✓"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：缺归属证明，四项缺一先挂起（A4：解密成功≠归属）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：华北不能导出原件、不能跨区外发；G18 未生效无授权（A4：哈希+公开标签≠授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17 增补：华北内网可给已登记同项目分析员读无原件字段内部汇总"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：无生成时间，30 天条件未知；A4 未写明即未知（访问时间≠生成时间）"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "048d1ae41938e28f620dd85d935c38344c25302b39b52286795fe98171e0fd27",
+            "bytes": 1054,
+            "text": "# 银杉票据项目 · 操作权限核对（06-01 冻结结束）\n\n有效材料：G17（已签、生效）、G17 增补（已签、生效）。G18 为演练稿，未生效，无授权效力。\n\n| 编号 | 值 | 依据 |\n|---|---|---|\n| E1 | ALLOW | G17：仅项目所有者可读取原件；范围含华北内网 |\n| E2 | ALLOW | G17：签名 ✓、归属 ✓、华北落点 ✓、生成 14 天 < 30 天 ✓ |\n| E3 | HOLD | G17：缺归属证明，四项缺一先挂起（A4：解密成功≠归属） |\n| E4 | DENY | G17：华北不能导出原件、不能跨区外发；G18 未生效无授权（A4：哈希+公开标签≠授权） |\n| E5 | ALLOW | G17 增补：华北内网可给已登记同项目分析员读无原件字段内部汇总 |\n| E6 | HOLD | G17：无生成时间，30 天条件未知；A4 未写明即未知（访问时间≠生成时间） |\n\n大白话：E1、E2、E5 按白纸黑字的有效规则放行；E4 被 G17 明确禁止且 G18 只是演练稿，一律拒绝；E3、E6 缺关键要件、无法推定，先挂起补证再判。\n",
+            "kind": "standard-file"
+          },
+          "latestObserved": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：仅项目所有者可读取原件；范围含华北内网"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17：签名 ✓、归属 ✓、华北落点 ✓、生成 14 天 < 30 天 ✓"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：缺归属证明，四项缺一先挂起（A4：解密成功≠归属）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "G17：华北不能导出原件、不能跨区外发；G18 未生效无授权（A4：哈希+公开标签≠授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "G17 增补：华北内网可给已登记同项目分析员读无原件字段内部汇总"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "G17：无生成时间，30 天条件未知；A4 未写明即未知（访问时间≠生成时间）"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": null,
+          "coverage": null,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 8431
+            }
+          ],
+          "toolErrors": [],
+          "streamErrors": [],
+          "roleCount": 1,
+          "usageAtPrimary": {
+            "inputTokens": 1085,
+            "cacheReadTokens": 30592,
+            "cacheWriteTokens": 0,
+            "outputTokens": 854,
+            "totalTokens": 32531,
+            "providerMessages": 3,
+            "withUsage": 3,
+            "cacheReadPercent": 96.57
+          },
+          "usageObserved": {
+            "inputTokens": 1085,
+            "cacheReadTokens": 30592,
+            "cacheWriteTokens": 0,
+            "outputTokens": 854,
+            "totalTokens": 32531,
+            "providerMessages": 3,
+            "withUsage": 3,
+            "cacheReadPercent": 96.57
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 17,
+              "ms": 4533,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 719,
+                "outputTokens": 424,
+                "cacheReadTokens": 9344,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10487
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 23,
+              "ms": 7305,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 200,
+                "outputTokens": 414,
+                "cacheReadTokens": 10368,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10982
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 30,
+              "ms": 8427,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 166,
+                "outputTokens": 16,
+                "cacheReadTokens": 10880,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11062
+              }
+            }
+          ]
+        },
+        {
+          "mode": "building-loop",
+          "preset": "building-loop",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": true,
+          "instructionPackets": [
+            {
+              "actor": "child-1",
+              "seq": 21,
+              "role": "executor",
+              "phase": "intake",
+              "declaredSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualCodePoints": 790,
+              "exactPrompt": true,
+              "deliverableTable": {
+                "columns": [
+                  "编号",
+                  "值",
+                  "依据"
+                ],
+                "ids": [
+                  "E1",
+                  "E2",
+                  "E3",
+                  "E4",
+                  "E5",
+                  "E6"
+                ]
+              },
+              "projectGoal": {
+                "path": "PROJECT-GOAL.md",
+                "totalLines": 17,
+                "sha256": "88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 项目总纲"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "## 目标"
+                  ],
+                  [
+                    4,
+                    "完成用户直接确认的开工任务，逐项依据完整开工原文和授权材料判断。"
+                  ],
+                  [
+                    5,
+                    ""
+                  ],
+                  [
+                    6,
+                    "## 交付与验收"
+                  ],
+                  [
+                    7,
+                    "按原文明确的表头与编号提交。先核对每项输入、适用规则和依赖条件，交付前复核答案、依据与编号。"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "## 已确认范围"
+                  ],
+                  [
+                    10,
+                    "工作范围以用户直接开工原文和当前项目授权为准。"
+                  ],
+                  [
+                    11,
+                    ""
+                  ],
+                  [
+                    12,
+                    "## 用户直接开工指令"
+                  ],
+                  [
+                    13,
+                    "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 9）。"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "## 分块入口"
+                  ],
+                  [
+                    16,
+                    "[项目索引](INDEX.md)"
+                  ],
+                  [
+                    17,
+                    ""
+                  ]
+                ]
+              },
+              "ownerFile": {
+                "path": "CONVERSATION-INPUT.md",
+                "totalLines": 37,
+                "sha256": "a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 会话提供的材料"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。"
+                  ],
+                  [
+                    4,
+                    ""
+                  ],
+                  [
+                    5,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    6,
+                    ""
+                  ],
+                  [
+                    7,
+                    "摘录 SHA-256 b91c83d3cf2c36afd0eea8a12f06f9024ec4ef21bbd592f942348080f624eb36"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "~~~"
+                  ],
+                  [
+                    10,
+                    "已签且当前生效 G17：范围只含银杉项目华北内网。仅项目所有者可读取原件。恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。华北内网不能导出原件，也不能把原件跨区复制给同项目。"
+                  ],
+                  [
+                    11,
+                    "~~~"
+                  ],
+                  [
+                    12,
+                    ""
+                  ],
+                  [
+                    13,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "摘录 SHA-256 c14242bb43b1687f607dbcd8ad1f71d0a9165f450e199c5b6df4212f4737e630"
+                  ],
+                  [
+                    16,
+                    ""
+                  ],
+                  [
+                    17,
+                    "~~~"
+                  ],
+                  [
+                    18,
+                    "已签且生效的 G17 增补：华北内网可给已登记的同项目分析员读取无原件字段的内部汇总。其余 G17 规则保持。"
+                  ],
+                  [
+                    19,
+                    "~~~"
+                  ],
+                  [
+                    20,
+                    ""
+                  ],
+                  [
+                    21,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    22,
+                    ""
+                  ],
+                  [
+                    23,
+                    "摘录 SHA-256 84b306a11055f632081ae69c9ee858578a97d34287acbfd9fe8e3eef27c64290"
+                  ],
+                  [
+                    24,
+                    ""
+                  ],
+                  [
+                    25,
+                    "~~~"
+                  ],
+                  [
+                    26,
+                    "G18 预览稿写有“分析员可读取原件，校验通过后可跨区复制并外发公开标签原件”。它只用于演练，未生效。"
+                  ],
+                  [
+                    27,
+                    "~~~"
+                  ],
+                  [
+                    28,
+                    ""
+                  ],
+                  [
+                    29,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    30,
+                    ""
+                  ],
+                  [
+                    31,
+                    "摘录 SHA-256 2a174e3080f02ea633b9bdc4da9f91e774757eacdba8da53eedccd110697fe51"
+                  ],
+                  [
+                    32,
+                    ""
+                  ],
+                  [
+                    33,
+                    "~~~"
+                  ],
+                  [
+                    34,
+                    "解密或哈希成功仅能证明文件可读或完整；公开标签不能证明输出授权。“14 天前”满足 30 天条件。未写明的信息一律未知。"
+                  ],
+                  [
+                    35,
+                    "~~~"
+                  ],
+                  [
+                    36,
+                    ""
+                  ],
+                  [
+                    37,
+                    ""
+                  ]
+                ]
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 21,
+              "role": "reviewer",
+              "phase": "first-review",
+              "declaredSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualCodePoints": 790,
+              "exactPrompt": true,
+              "deliverableTable": null,
+              "projectGoal": {
+                "path": "PROJECT-GOAL.md",
+                "totalLines": 17,
+                "sha256": "88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 项目总纲"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "## 目标"
+                  ],
+                  [
+                    4,
+                    "完成用户直接确认的开工任务，逐项依据完整开工原文和授权材料判断。"
+                  ],
+                  [
+                    5,
+                    ""
+                  ],
+                  [
+                    6,
+                    "## 交付与验收"
+                  ],
+                  [
+                    7,
+                    "按原文明确的表头与编号提交。先核对每项输入、适用规则和依赖条件，交付前复核答案、依据与编号。"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "## 已确认范围"
+                  ],
+                  [
+                    10,
+                    "工作范围以用户直接开工原文和当前项目授权为准。"
+                  ],
+                  [
+                    11,
+                    ""
+                  ],
+                  [
+                    12,
+                    "## 用户直接开工指令"
+                  ],
+                  [
+                    13,
+                    "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 9）。"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "## 分块入口"
+                  ],
+                  [
+                    16,
+                    "[项目索引](INDEX.md)"
+                  ],
+                  [
+                    17,
+                    ""
+                  ]
+                ]
+              },
+              "ownerFile": {
+                "path": "CONVERSATION-INPUT.md",
+                "totalLines": 37,
+                "sha256": "a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 会话提供的材料"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。"
+                  ],
+                  [
+                    4,
+                    ""
+                  ],
+                  [
+                    5,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    6,
+                    ""
+                  ],
+                  [
+                    7,
+                    "摘录 SHA-256 b91c83d3cf2c36afd0eea8a12f06f9024ec4ef21bbd592f942348080f624eb36"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "~~~"
+                  ],
+                  [
+                    10,
+                    "已签且当前生效 G17：范围只含银杉项目华北内网。仅项目所有者可读取原件。恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。华北内网不能导出原件，也不能把原件跨区复制给同项目。"
+                  ],
+                  [
+                    11,
+                    "~~~"
+                  ],
+                  [
+                    12,
+                    ""
+                  ],
+                  [
+                    13,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "摘录 SHA-256 c14242bb43b1687f607dbcd8ad1f71d0a9165f450e199c5b6df4212f4737e630"
+                  ],
+                  [
+                    16,
+                    ""
+                  ],
+                  [
+                    17,
+                    "~~~"
+                  ],
+                  [
+                    18,
+                    "已签且生效的 G17 增补：华北内网可给已登记的同项目分析员读取无原件字段的内部汇总。其余 G17 规则保持。"
+                  ],
+                  [
+                    19,
+                    "~~~"
+                  ],
+                  [
+                    20,
+                    ""
+                  ],
+                  [
+                    21,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    22,
+                    ""
+                  ],
+                  [
+                    23,
+                    "摘录 SHA-256 84b306a11055f632081ae69c9ee858578a97d34287acbfd9fe8e3eef27c64290"
+                  ],
+                  [
+                    24,
+                    ""
+                  ],
+                  [
+                    25,
+                    "~~~"
+                  ],
+                  [
+                    26,
+                    "G18 预览稿写有“分析员可读取原件，校验通过后可跨区复制并外发公开标签原件”。它只用于演练，未生效。"
+                  ],
+                  [
+                    27,
+                    "~~~"
+                  ],
+                  [
+                    28,
+                    ""
+                  ],
+                  [
+                    29,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    30,
+                    ""
+                  ],
+                  [
+                    31,
+                    "摘录 SHA-256 2a174e3080f02ea633b9bdc4da9f91e774757eacdba8da53eedccd110697fe51"
+                  ],
+                  [
+                    32,
+                    ""
+                  ],
+                  [
+                    33,
+                    "~~~"
+                  ],
+                  [
+                    34,
+                    "解密或哈希成功仅能证明文件可读或完整；公开标签不能证明输出授权。“14 天前”满足 30 天条件。未写明的信息一律未知。"
+                  ],
+                  [
+                    35,
+                    "~~~"
+                  ],
+                  [
+                    36,
+                    ""
+                  ],
+                  [
+                    37,
+                    ""
+                  ]
+                ]
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 21,
+              "role": "auditor",
+              "phase": "first-audit",
+              "declaredSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualSha256": "b103a0ce1e154a010e1b6547c1644175abb4ee236b363093529b7ad55cf275e7",
+              "actualCodePoints": 790,
+              "exactPrompt": true,
+              "deliverableTable": null,
+              "projectGoal": {
+                "path": "PROJECT-GOAL.md",
+                "totalLines": 17,
+                "sha256": "88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 项目总纲"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "## 目标"
+                  ],
+                  [
+                    4,
+                    "完成用户直接确认的开工任务，逐项依据完整开工原文和授权材料判断。"
+                  ],
+                  [
+                    5,
+                    ""
+                  ],
+                  [
+                    6,
+                    "## 交付与验收"
+                  ],
+                  [
+                    7,
+                    "按原文明确的表头与编号提交。先核对每项输入、适用规则和依赖条件，交付前复核答案、依据与编号。"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "## 已确认范围"
+                  ],
+                  [
+                    10,
+                    "工作范围以用户直接开工原文和当前项目授权为准。"
+                  ],
+                  [
+                    11,
+                    ""
+                  ],
+                  [
+                    12,
+                    "## 用户直接开工指令"
+                  ],
+                  [
+                    13,
+                    "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 9）。"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "## 分块入口"
+                  ],
+                  [
+                    16,
+                    "[项目索引](INDEX.md)"
+                  ],
+                  [
+                    17,
+                    ""
+                  ]
+                ]
+              },
+              "ownerFile": {
+                "path": "CONVERSATION-INPUT.md",
+                "totalLines": 37,
+                "sha256": "a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 会话提供的材料"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。"
+                  ],
+                  [
+                    4,
+                    ""
+                  ],
+                  [
+                    5,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    6,
+                    ""
+                  ],
+                  [
+                    7,
+                    "摘录 SHA-256 b91c83d3cf2c36afd0eea8a12f06f9024ec4ef21bbd592f942348080f624eb36"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "~~~"
+                  ],
+                  [
+                    10,
+                    "已签且当前生效 G17：范围只含银杉项目华北内网。仅项目所有者可读取原件。恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。华北内网不能导出原件，也不能把原件跨区复制给同项目。"
+                  ],
+                  [
+                    11,
+                    "~~~"
+                  ],
+                  [
+                    12,
+                    ""
+                  ],
+                  [
+                    13,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "摘录 SHA-256 c14242bb43b1687f607dbcd8ad1f71d0a9165f450e199c5b6df4212f4737e630"
+                  ],
+                  [
+                    16,
+                    ""
+                  ],
+                  [
+                    17,
+                    "~~~"
+                  ],
+                  [
+                    18,
+                    "已签且生效的 G17 增补：华北内网可给已登记的同项目分析员读取无原件字段的内部汇总。其余 G17 规则保持。"
+                  ],
+                  [
+                    19,
+                    "~~~"
+                  ],
+                  [
+                    20,
+                    ""
+                  ],
+                  [
+                    21,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    22,
+                    ""
+                  ],
+                  [
+                    23,
+                    "摘录 SHA-256 84b306a11055f632081ae69c9ee858578a97d34287acbfd9fe8e3eef27c64290"
+                  ],
+                  [
+                    24,
+                    ""
+                  ],
+                  [
+                    25,
+                    "~~~"
+                  ],
+                  [
+                    26,
+                    "G18 预览稿写有“分析员可读取原件，校验通过后可跨区复制并外发公开标签原件”。它只用于演练，未生效。"
+                  ],
+                  [
+                    27,
+                    "~~~"
+                  ],
+                  [
+                    28,
+                    ""
+                  ],
+                  [
+                    29,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    30,
+                    ""
+                  ],
+                  [
+                    31,
+                    "摘录 SHA-256 2a174e3080f02ea633b9bdc4da9f91e774757eacdba8da53eedccd110697fe51"
+                  ],
+                  [
+                    32,
+                    ""
+                  ],
+                  [
+                    33,
+                    "~~~"
+                  ],
+                  [
+                    34,
+                    "解密或哈希成功仅能证明文件可读或完整；公开标签不能证明输出授权。“14 天前”满足 30 天条件。未写明的信息一律未知。"
+                  ],
+                  [
+                    35,
+                    "~~~"
+                  ],
+                  [
+                    36,
+                    ""
+                  ],
+                  [
+                    37,
+                    ""
+                  ]
+                ]
+              }
+            }
+          ],
+          "nativeExecutorSawTableIds": true,
+          "authorHandoff": [
+            {
+              "seq": 15,
+              "ms": 3978,
+              "action": "propose",
+              "goal": "核对银杉票据项目操作权限：依据 G17 及其增补 G17+、未生效的 G18 预览稿与 A4 事实规则，对 E1–E6 六项独立操作判定 ALLOW / DENY / HOLD。仅使用本条消息内的合成材料，以 06-01 冻结结束时的有效规则为准。",
+              "deliverable": "一份短 Markdown（DELIVERY.md）：一张“| 编号 | 值 | 依据 |”表，E1–E6 每编号恰好一行，值只写 ALLOW/DENY/HOLD，依据写材料编号；末行附“大白话：”总结。",
+              "scope": "只依据本条消息中的 G17、G17 增补、G18 预览稿、A4 与 E1–E6 事实；不查网络、不读其他文件、不引入外部政策。G18 未生效，不可作为授权依据；G17 中“华北内网不能导出原件、不能跨区复制原件”优先于 G17 增补的读取授权；缺关键前提一律 HOLD。"
+            },
+            {
+              "seq": 31,
+              "ms": 7705,
+              "action": "advance",
+              "note": "派 K01 执行方起稿 DELIVERY.md：按 G17/G17+/G18(未生效)/A4 对 E1–E6 逐项判 ALLOW/DENY/HOLD，表格三列，E1–E6 各一行，末行“大白话：”总结；只用合成材料。"
+            },
+            {
+              "seq": 58,
+              "ms": 28805,
+              "action": "advance",
+              "note": "K01 已 review-ready，发起首次独立核验：核对 E1–E6 六行齐全、值仅为 ALLOW/DENY/HOLD、依据为材料编号，重点复查 E2（恢复至华东是否超 G17 华北范围）、E4（G18 未生效）、E3/E6 缺项挂起、E5 增补授权。须自读 DELIVERY.md 与 CONVERSATION-INPUT.md。"
+            },
+            {
+              "seq": 85,
+              "ms": 72721,
+              "action": "advance",
+              "note": "首次核验通过（unsupported=[]），启动独立反证：重点攻 E2（题干“恢复至华东”是否与 G17 华北范围冲突，是否应为 DENY 而非 HOLD）、E1（所有者读原件是否受范围/落点前提影响）、E4（DENY 归类是否恰当）、E5（“已登记”是否留未知缺口）。须自行读 DELIVERY.md 与 CONVERSATION-INPUT.md，找反例。"
+            }
+          ],
+          "intakeDispatch": [
+            {
+              "actor": "child-1",
+              "seq": 13,
+              "ms": 7894,
+              "text": "工作单元 K01 进入 intake。候选文件 DELIVERY.md。执行前依据已注入的阶段规则与授权范围。先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。Your parent agent id is \"root\". Before you finish, send your result to that agent with send_message({ agent_id: \"root\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
+            }
+          ],
+          "verificationTrace": [
+            {
+              "actor": "child-2",
+              "seq": 37,
+              "ms": 39007,
+              "action": "record",
+              "block": "B5-64c4c7d4",
+              "status": "supported",
+              "relation": "supports",
+              "basis": "E2 题干只确认“签名、归属均确认且 14 天前生成”，未提华北落点；A1 要求四项缺一先挂起，故 HOLD 成立。“14 天前”按 A4 满足 30 天条件。"
+            },
+            {
+              "actor": "child-2",
+              "seq": 37,
+              "ms": 39007,
+              "action": "record",
+              "block": "B6-292e12c6",
+              "status": "supported",
+              "relation": "supports",
+              "basis": "候选称“缺华北落点，缺一先挂起”：E2 未提华北落点，A1 明确四项缺一先挂起，故缺该项即挂起，推导与规则一致。"
+            },
+            {
+              "actor": "child-2",
+              "seq": 73,
+              "ms": 67415,
+              "action": "review",
+              "note": "六项判断全部经原文核对无误，coverage 17 块全部 supported、pending 为 0；质量六项无退回，建议不阻断验收。",
+              "checks": 0
+            },
+            {
+              "actor": "child-3",
+              "seq": 59,
+              "ms": 100199,
+              "action": "record",
+              "block": "B5-64c4c7d4",
+              "status": "supported",
+              "relation": "supports",
+              "basis": "E2 只确认签名、归属，且 14 天前生成（A4 明确满足 30 天条件），未提华北落点；A1 四项缺一先挂起，因缺一项且未明确超范围，取 HOLD。依据行“四项仅确认签名、归属、14 天”与题干一致。",
+              "premiseQuotes": [
+                "恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。",
+                "“14 天前”满足 30 天条件。"
+              ],
+              "scope": "对象：E2 银杉快照恢复申请；条件：四项中签名、归属、30 天内已确认，华北落点未提（按 A4 未写明即未知），未明确超范围",
+              "counterexample": "只要四项中存在未确认项且不构成明确超范围，规则即指向挂起；E2 缺华北落点，不适用“明确超范围则禁止”，因此 HOLD 无反例。"
+            },
+            {
+              "actor": "child-3",
+              "seq": 65,
+              "ms": 104043,
+              "action": "record",
+              "block": "B6-292e12c6",
+              "status": "supported",
+              "relation": "supports",
+              "basis": "E2 未提华北落点，按 A4 “未写明的信息一律未知”即未确认；A1 四项缺一先挂起，故因缺华北落点而 HOLD。",
+              "premiseQuotes": [
+                "恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。",
+                "未写明的信息一律未知。"
+              ],
+              "scope": "对象：E2 恢复至华东的快照；条件：华北落点未在题干中写明",
+              "counterexample": "未写明即未知，无法成“已确认华北落点”；缺一项只能挂起，除非另有明确超范围证据，而 E2 目标华东并不能直接证明快照落点不在华北（A1 未定义落点口径），故不能升级为禁止。"
+            },
+            {
+              "actor": "child-3",
+              "seq": 125,
+              "ms": 134585,
+              "action": "record",
+              "block": "B15-0e6014fe",
+              "status": "supported",
+              "relation": "supports",
+              "basis": "该句把 A1 恢复快照四项条件与“四项缺一先挂起、明确超范围则禁止”的后果完整重述；反例检查：原文对四项未分轻重、也未为单项缺失设例外，因此“有一项没确认就先挂起”成立，且“明确超出华北范围的直接禁”只限定于明确超范围的情形，与 E2/E3/E6 的 HOLD、E4 的 DENY 口径一致。",
+              "premiseQuotes": [
+                "恢复快照须确认项目归属、华北落点、签名和生成至今不超过 30 天；四项缺一先挂起，明确超范围则禁止。"
+              ],
+              "scope": "对象：恢复快照申请；条件：签名、归属、华北落点、30 天内四项中任一项未确认；例外分支仅限“明确超出华北范围”",
+              "counterexample": "若四项中有一项未确认而规则仍要求放行，需找到原文例外，但原文只给出“明确超范围则禁止”，没有为缺项设放行分支；因此无反例。"
+            },
+            {
+              "actor": "child-3",
+              "seq": 143,
+              "ms": 143139,
+              "action": "audit"
+            }
+          ],
+          "pendingCalls": [],
+          "observedMs": 150014,
+          "firstArtifactMs": 25402,
+          "firstArtifact": {
+            "sha256": "aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64",
+            "bytes": 1158,
+            "text": "# 银杉票据项目操作权限核对（06-01 冻结结束时的决定）\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| E1 | ALLOW | A1（所有者可读原件，范围含华北） |\n| E2 | HOLD | A1＋A4（四项仅确认签名、归属、14 天；缺华北落点，缺一先挂起） |\n| E3 | HOLD | A1＋A4（缺项目归属证明，四项缺一先挂起；解密成功不补授权） |\n| E4 | DENY | A1＋A3＋A4（华北不能导出原件；G18 未生效；公开标签不证明输出授权） |\n| E5 | ALLOW | A2＋A1（已登记同项目分析员、华北内网、无原件字段汇总，均在增补范围内） |\n| E6 | HOLD | A1＋A4（只有上次访问时间，生成时间未知，30 天内条件无法确认，缺一先挂起） |\n\n大白话：所有者本人在华北读原件可以；恢复快照只要签名、归属、华北落点、30 天内四项有一项没确认就先挂起，明确超出华北范围的直接禁；拿解密成功、哈希通过、公开标签或未生效的 G18 预览稿都当不成许可；只有已登记的同项目分析员在华北内网读“无原件字段”的内部汇总这一条增补是放行的。\n",
+            "kind": "building-loop-durable",
+            "source": "native-tool-result-review-ready",
+            "observedAt": 1794486242837
+          },
+          "primary": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A1（所有者可读原件，范围含华北）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（四项仅确认签名、归属、14 天；缺华北落点，缺一先挂起）"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（缺项目归属证明，四项缺一先挂起；解密成功不补授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "A1＋A3＋A4（华北不能导出原件；G18 未生效；公开标签不证明输出授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A2＋A1（已登记同项目分析员、华北内网、无原件字段汇总，均在增补范围内）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（只有上次访问时间，生成时间未知，30 天内条件无法确认，缺一先挂起）"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A1（所有者可读原件，范围含华北）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（四项仅确认签名、归属、14 天；缺华北落点，缺一先挂起）"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（缺项目归属证明，四项缺一先挂起；解密成功不补授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "A1＋A3＋A4（华北不能导出原件；G18 未生效；公开标签不证明输出授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A2＋A1（已登记同项目分析员、华北内网、无原件字段汇总，均在增补范围内）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（只有上次访问时间，生成时间未知，30 天内条件无法确认，缺一先挂起）"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64",
+            "bytes": 1158,
+            "text": "# 银杉票据项目操作权限核对（06-01 冻结结束时的决定）\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| E1 | ALLOW | A1（所有者可读原件，范围含华北） |\n| E2 | HOLD | A1＋A4（四项仅确认签名、归属、14 天；缺华北落点，缺一先挂起） |\n| E3 | HOLD | A1＋A4（缺项目归属证明，四项缺一先挂起；解密成功不补授权） |\n| E4 | DENY | A1＋A3＋A4（华北不能导出原件；G18 未生效；公开标签不证明输出授权） |\n| E5 | ALLOW | A2＋A1（已登记同项目分析员、华北内网、无原件字段汇总，均在增补范围内） |\n| E6 | HOLD | A1＋A4（只有上次访问时间，生成时间未知，30 天内条件无法确认，缺一先挂起） |\n\n大白话：所有者本人在华北读原件可以；恢复快照只要签名、归属、华北落点、30 天内四项有一项没确认就先挂起，明确超出华北范围的直接禁；拿解密成功、哈希通过、公开标签或未生效的 G18 预览稿都当不成许可；只有已登记的同项目分析员在华北内网读“无原件字段”的内部汇总这一条增补是放行的。\n",
+            "kind": "building-loop-durable"
+          },
+          "latestObserved": {
+            "correct": 5,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "E1",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A1（所有者可读原件，范围含华北）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E2",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（四项仅确认签名、归属、14 天；缺华北落点，缺一先挂起）"
+                  }
+                ],
+                "status": "incorrect"
+              },
+              {
+                "label": "E3",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（缺项目归属证明，四项缺一先挂起；解密成功不补授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E4",
+                "expected": "DENY",
+                "values": [
+                  {
+                    "raw": "DENY",
+                    "value": "DENY",
+                    "explanation": "A1＋A3＋A4（华北不能导出原件；G18 未生效；公开标签不证明输出授权）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E5",
+                "expected": "ALLOW",
+                "values": [
+                  {
+                    "raw": "ALLOW",
+                    "value": "ALLOW",
+                    "explanation": "A2＋A1（已登记同项目分析员、华北内网、无原件字段汇总，均在增补范围内）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "E6",
+                "expected": "HOLD",
+                "values": [
+                  {
+                    "raw": "HOLD",
+                    "value": "HOLD",
+                    "explanation": "A1＋A4（只有上次访问时间，生成时间未知，30 天内条件无法确认，缺一先挂起）"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": "ledger-review",
+          "coverage": 17,
+          "receipt": {
+            "sha256": "0afa77eb4313863053e64e0ab221afc5aef52ab3cad74cf9666e11c334fa637b",
+            "bytes": 10536,
+            "text": "{\n  \"unit\": \"K01\",\n  \"phase\": \"first-review\",\n  \"reviewer\": \"child-2\",\n  \"decision\": \"accept\",\n  \"candidateSha256\": \"aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64\",\n  \"candidatePositions\": {\n    \"spec\": \"building-loop-candidate-positions/1\",\n    \"provenance\": \"host-derived-explicit-labels\",\n    \"path\": \"DELIVERY.md\",\n    \"candidateSha256\": \"aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64\",\n    \"errorExampleLines\": [],\n    \"hypothesisLines\": []\n  },\n  \"goal\": {\n    \"sha256\": \"7b058c8affcac0681f5b85df0c8d912d240b5d61a02d64228d6e1634ce2a3184\",\n    \"files\": [\n      {\n        \"file\": \"PROJECT-GOAL.md\",\n        \"sha256\": \"88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c\"\n      }\n    ]\n  },\n  \"goalFit\": {\n    \"pass\": true,\n    \"basis\": \"交付稿满足开工指令全部要求：一张三列表、每个编号恰好一行、值仅用 ALLOW/DENY/HOLD、依据列引用材料编号或简短算式、末行为大白话，且六个判断均经原文逐项核对无误。\"\n  },\n  \"unsupported\": [],\n  \"qualityRejected\": [],\n  \"checks\": [],\n  \"calculations\": [],\n  \"coverage\": {\n    \"version\": 1,\n    \"candidateSha256\": \"aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64\",\n    \"total\": 17,\n    \"pending\": [],\n    \"rejected\": [],\n    \"quotations\": [],\n    \"reusedProofs\": [],\n    \"receiptSha256\": \"19e45e19d3bf05d7a6631b5bab172c815049bc874c4c04e5acd9ee772b16ed87\"\n  },\n  \"formatIssues\": [],\n  \"qualityChecks\": {\n    \"sources\": {\n      \"pass\": true,\n      \"basis\": \"唯一原始资料是会话事件 9 的开工原文（A1–A4、E1–E6），已登记于 CONVERSATION-INPUT.md 第 10、18、26、34 行，与 prepare 注入的 instruction 文本逐句一致。任务明令只用条内合成材料、不查网络，故无外部来源需核实；仍待证的是材料所述“G17 已签生效、G18 未生效”等现实状态，本任务按合成前提接受，不作外部证实。\"\n    },\n    \"conclusion\": {\n      \"pass\": true,\n      \"basis\": \"六个判断与材料逐项吻合：E1 ALLOW（所有者读原件）、E5 ALLOW（A2 增补四条件全满足）、E4 DENY（华北不能导出原件，属明确超范围）、E2/E3/E6 HOLD（分别缺华北落点、项目归属、生成时间，适用“四项缺一先挂起”），并正确排除了解密/哈希成功、公开标签、未生效 G18 作为授权依据。表头、编号、每编号一行、值一格只写三值之一、依据列写材料编号，均符合交付要求，无需修订。\"\n    },\n    \"method\": {\n      \"pass\": true,\n      \"basis\": \"先读 PROJECT-GOAL.md 与 CONVERSATION-INPUT.md 全文取得真实原文，再逐行比对 DELIVERY.md；对每条判断回溯到具体规则句，检查四项条件是否逐项覆盖、HOLD 与 DENY 的分界（缺项挂起 vs 明确超范围禁止）、以及“四条件同时满足才 ALLOW”的量词口径。局限：TASK-LEDGER.md 不在读白名单，未核；未做网络查证，符合任务禁令。\"\n    },\n    \"alternatives\": {\n      \"pass\": true,\n      \"basis\": \"E1 可改为仅引 A1 并省去括注，但现括注同样有据；E4 也可写成“A1 禁止导出＋A3 未生效”。此外存在一种更保守的写法：在 E2 依据中显式注明“14 天前满足 30 天条件（A4）”，可省去读者自行推导，属可选改进而非必要修正。\"\n    },\n    \"detail\": {\n      \"pass\": true,\n      \"basis\": \"摘要：交付稿是一张六行结论表，全部正确。依据：E1 对应 A1“仅项目所有者可读取原件”且范围含华北，无条件缺口，ALLOW 无疑；E2 题干未提华北落点，四项缺一即挂起，14 天前经 A4 判定满足 30 天，HOLD 正确；E3 缺项目归属证明，A4 已明示解密成功只证明可读，HOLD 正确；E4 从华北导出原件为 A1 明文禁止，属“明确超范围则禁止”，DENY 而非 HOLD，候选区分正确；E5 恰为 A2 增补的完整条件组合，ALLOW 正确；E6 只有访问时间、无生成时间，A4“未写明的信息一律未知”，HOLD 正确。末行大白话四项概括与表格结论一致，且置于文末。\"\n    },\n    \"plain\": {\n      \"pass\": true,\n      \"basis\": \"这份表六道题都判对了：能放行的两条有完整依据，三条卡在“缺一项先挂起”上，一条因为是从华北往外导原件被明文禁止，所以直接禁。\"\n    }\n  },\n  \"assessmentProvenance\": {\n    \"quality\": \"executor-model-assessment\",\n    \"qualityChecks\": \"reviewer-model-assessment\",\n    \"goalFit\": \"reviewer-model-assessment\",\n    \"proseVerifiedAsToolExecution\": false,\n    \"toolExecutionSources\": [\n      \"actualReads\",\n      \"searchObservations\"\n    ],\n    \"candidatePositionSource\": \"candidatePositions\"\n  },\n  \"observedSources\": [\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 10,\n      \"end\": 10,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"b81155a3e7b5ed8e884251ef697c3daae474b974f604746304ec5ae8c8216c1c\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 18,\n      \"end\": 18,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"b81155a3e7b5ed8e884251ef697c3daae474b974f604746304ec5ae8c8216c1c\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 26,\n      \"end\": 26,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"b81155a3e7b5ed8e884251ef697c3daae474b974f604746304ec5ae8c8216c1c\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"start\": 34,\n      \"end\": 34,\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"sourceIdentity\": \"b81155a3e7b5ed8e884251ef697c3daae474b974f604746304ec5ae8c8216c1c\",\n      \"provenance\": \"maintainer-pinned-local-material\",\n      \"origin\": {\n        \"kind\": \"primary\",\n        \"locator\": \"dsh-session/root\",\n        \"integrity\": \"matches-pin\"\n      }\n    }\n  ],\n  \"actualReads\": [\n    {\n      \"file\": \"DELIVERY.md\",\n      \"sha256\": \"aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64\",\n      \"ranges\": [\n        [\n          1,\n          13\n        ]\n      ],\n      \"current\": true\n    },\n    {\n      \"file\": \"INDEX.md\",\n      \"sha256\": \"573f7acd617db9f9542030647b7f8490bab9fa2420716d2fdd1e08a710dad895\",\n      \"ranges\": [\n        [\n          1,\n          7\n        ]\n      ],\n      \"current\": true\n    },\n    {\n      \"file\": \"CONVERSATION-INPUT.md\",\n      \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n      \"ranges\": [\n        [\n          1,\n          37\n        ]\n      ],\n      \"current\": true\n    },\n    {\n      \"file\": \"PROJECT-GOAL.md\",\n      \"sha256\": \"88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c\",\n      \"ranges\": [\n        [\n          1,\n          17\n        ]\n      ],\n      \"current\": true\n    }\n  ],\n  \"searchObservations\": {\n    \"spec\": \"building-loop-search-observations/1\",\n    \"provenance\": \"host-observed-tool-execution\",\n    \"actor\": \"child-2\",\n    \"phase\": \"first-review\",\n    \"limit\": 16,\n    \"omitted\": 0,\n    \"entries\": [],\n    \"boundary\": \"Only successful searches retained in this role's current checkpoint; omitted entries are counted. Search results are not read stamps or semantic verification, and an empty list is not proof that no earlier search occurred.\"\n  },\n  \"unlisted\": [],\n  \"unverifiedSources\": [\n    \"材料所述 G17/G18 的现实签署与生效状态（任务限定为合成材料，不作外部查证）\"\n  ],\n  \"revisions\": [],\n  \"suggestions\": [\n    \"可在 E2 依据中补注“14 天前满足 30 天条件（A4）”，讓该行无需读者二次推导；现有写法已正确，不阻礁验收。\"\n  ],\n  \"independentAudit\": {\n    \"auditor\": \"child-3\",\n    \"method\": \"counterexample-and-concept-mapping\",\n    \"coverage\": {\n      \"version\": 1,\n      \"candidateSha256\": \"aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64\",\n      \"total\": 17,\n      \"pending\": [],\n      \"rejected\": [],\n      \"quotations\": [],\n      \"reusedProofs\": [],\n      \"receiptSha256\": \"81ed6c814709058cf6c089d8cddc5cf2f21abbfb675fee957cfc293bc5901fb1\"\n    },\n    \"actualReads\": [\n      {\n        \"file\": \"DELIVERY.md\",\n        \"sha256\": \"aac57bc8423b3aaeb5121f2ae1a0dd5e13b957acb3fff2496e1d7bea4d29ee64\",\n        \"ranges\": [\n          [\n            1,\n            13\n          ]\n        ],\n        \"current\": true\n      },\n      {\n        \"file\": \"INDEX.md\",\n        \"sha256\": \"573f7acd617db9f9542030647b7f8490bab9fa2420716d2fdd1e08a710dad895\",\n        \"ranges\": [\n          [\n            1,\n            7\n          ]\n        ],\n        \"current\": true\n      },\n      {\n        \"file\": \"CONVERSATION-INPUT.md\",\n        \"sha256\": \"a817013ba8a7938331b6787739b69c777f5d7648225d94bc53901bd7bff73c05\",\n        \"ranges\": [\n          [\n            1,\n            37\n          ]\n        ],\n        \"current\": true\n      },\n      {\n        \"file\": \"PROJECT-GOAL.md\",\n        \"sha256\": \"88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c\",\n        \"ranges\": [\n          [\n            1,\n            17\n          ]\n        ],\n        \"current\": true\n      }\n    ],\n    \"searchObservations\": {\n      \"spec\": \"building-loop-search-observations/1\",\n      \"provenance\": \"host-observed-tool-execution\",\n      \"actor\": \"child-3\",\n      \"phase\": \"first-audit\",\n      \"limit\": 16,\n      \"omitted\": 0,\n      \"entries\": [],\n      \"boundary\": \"Only successful searches retained in this role's current checkpoint; omitted entries are counted. Search results are not read stamps or semantic verification, and an empty list is not proof that no earlier search occurred.\"\n    }\n  }\n}\n",
+            "kind": "building-loop-receipt"
+          },
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 9797
+            },
+            {
+              "kind": "completed",
+              "ms": 31598
+            },
+            {
+              "kind": "completed",
+              "ms": 74977
+            }
+          ],
+          "toolErrors": [
+            {
+              "actor": "child-1",
+              "seq": 33,
+              "ms": 12781,
+              "detail": "Error: 只有本单元的补查执行方可预检"
+            },
+            {
+              "actor": "child-1",
+              "seq": 39,
+              "ms": 16004,
+              "detail": "Error: 需要改动理由"
+            },
+            {
+              "actor": "child-2",
+              "seq": 27,
+              "ms": 33145,
+              "detail": "Error: 该文件不在当前读白名单"
+            },
+            {
+              "actor": "child-3",
+              "seq": 115,
+              "ms": 128318,
+              "detail": "Error: B14-0cdc7eb4: B14-0cdc7eb4 多段拆分须为每段填写连续原文 quote。[coverage-span] {\"block\":\"B14-0cdc7eb4\",\"line\":12,\"part\":1,\"reason\":\"missing-quote\",\"offsetUnit\":\"UTF-16\",\"cursor\":0,\"blockLength\":18,\"firstMismatch\":{\"blockOffset\":0,\"partOffset\":0,\"expected\":\"大\",\"received\":null},\"blockText\":{\"from\":0,\"text\":\"大白话：所有者本人在华北读原件可以；\",\"truncated\":false},\"expectedSuffix\":{\"from\":0,\"text\":\"大白话：所有者本人在华北读原件可以；\",\"truncated\":false},\"receivedQuote\":{\"text\":\"\",\"truncated\""
+            },
+            {
+              "actor": "root",
+              "seq": 122,
+              "ms": 148040,
+              "detail": "Error: 该文件不在当前读白名单"
+            }
+          ],
+          "streamErrors": [],
+          "roleCount": 4,
+          "usageAtPrimary": {
+            "inputTokens": 9604,
+            "cacheReadTokens": 50816,
+            "cacheWriteTokens": 0,
+            "outputTokens": 2444,
+            "totalTokens": 62864,
+            "providerMessages": 11,
+            "withUsage": 11,
+            "cacheReadPercent": 84.1
+          },
+          "usageObserved": {
+            "inputTokens": 53885,
+            "cacheReadTokens": 681344,
+            "cacheWriteTokens": 0,
+            "outputTokens": 13634,
+            "totalTokens": 748863,
+            "providerMessages": 51,
+            "withUsage": 51,
+            "cacheReadPercent": 92.67
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 15,
+              "ms": 3978,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 669,
+                "outputTokens": 527,
+                "cacheReadTokens": 1920,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3116
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 24,
+              "ms": 5795,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2076,
+                "outputTokens": 38,
+                "cacheReadTokens": 3200,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5314
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 31,
+              "ms": 7705,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1443,
+                "outputTokens": 142,
+                "cacheReadTokens": 5248,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6833
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 9796,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1112,
+                "outputTokens": 17,
+                "cacheReadTokens": 6784,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7913
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 19,
+              "ms": 9834,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1251,
+                "outputTokens": 46,
+                "cacheReadTokens": 2048,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3345
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 25,
+              "ms": 11332,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1802,
+                "outputTokens": 58,
+                "cacheReadTokens": 3328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5188
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 31,
+              "ms": 12726,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 176,
+                "outputTokens": 39,
+                "cacheReadTokens": 5120,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5335
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 37,
+              "ms": 15994,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 239,
+                "outputTokens": 395,
+                "cacheReadTokens": 5120,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5754
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 43,
+              "ms": 19004,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 140,
+                "outputTokens": 433,
+                "cacheReadTokens": 5632,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6205
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 49,
+              "ms": 20502,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 160,
+                "outputTokens": 58,
+                "cacheReadTokens": 6144,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6362
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 55,
+              "ms": 25350,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 536,
+                "outputTokens": 691,
+                "cacheReadTokens": 6272,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7499
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 50,
+              "ms": 26700,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1177,
+                "outputTokens": 38,
+                "cacheReadTokens": 7808,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9023
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 58,
+              "ms": 28805,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 541,
+                "outputTokens": 168,
+                "cacheReadTokens": 8960,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9669
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 19,
+              "ms": 31165,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2836,
+                "outputTokens": 71,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7899
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 66,
+              "ms": 31597,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1162,
+                "outputTokens": 24,
+                "cacheReadTokens": 9600,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10786
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 25,
+              "ms": 33092,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3907,
+                "outputTokens": 83,
+                "cacheReadTokens": 7808,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11798
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 31,
+              "ms": 35592,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 172,
+                "outputTokens": 282,
+                "cacheReadTokens": 11648,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12102
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 37,
+              "ms": 39007,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 258,
+                "outputTokens": 594,
+                "cacheReadTokens": 12032,
+                "cacheWriteTokens": 0,
+                "totalTokens": 12884
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 43,
+              "ms": 43879,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 248,
+                "outputTokens": 767,
+                "cacheReadTokens": 12800,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13815
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 49,
+              "ms": 50164,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 255,
+                "outputTokens": 1095,
+                "cacheReadTokens": 13696,
+                "cacheWriteTokens": 0,
+                "totalTokens": 15046
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 55,
+              "ms": 52926,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 808,
+                "outputTokens": 247,
+                "cacheReadTokens": 14592,
+                "cacheWriteTokens": 0,
+                "totalTokens": 15647
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 61,
+              "ms": 54733,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 208,
+                "outputTokens": 52,
+                "cacheReadTokens": 15488,
+                "cacheWriteTokens": 0,
+                "totalTokens": 15748
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 67,
+              "ms": 64643,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 137,
+                "outputTokens": 1164,
+                "cacheReadTokens": 15744,
+                "cacheWriteTokens": 0,
+                "totalTokens": 17045
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 73,
+              "ms": 67415,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2103,
+                "outputTokens": 130,
+                "cacheReadTokens": 16000,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18233
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 77,
+              "ms": 69469,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1197,
+                "outputTokens": 38,
+                "cacheReadTokens": 10752,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11987
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 85,
+              "ms": 72721,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 4203,
+                "outputTokens": 172,
+                "cacheReadTokens": 11904,
+                "cacheWriteTokens": 0,
+                "totalTokens": 16279
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 19,
+              "ms": 74424,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2585,
+                "outputTokens": 54,
+                "cacheReadTokens": 4096,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6735
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 93,
+              "ms": 74976,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1165,
+                "outputTokens": 27,
+                "cacheReadTokens": 16256,
+                "cacheWriteTokens": 0,
+                "totalTokens": 17448
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 25,
+              "ms": 76166,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 3938,
+                "outputTokens": 58,
+                "cacheReadTokens": 6656,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10652
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 31,
+              "ms": 78438,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 474,
+                "outputTokens": 61,
+                "cacheReadTokens": 10624,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11159
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 37,
+              "ms": 80159,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 656,
+                "outputTokens": 73,
+                "cacheReadTokens": 11136,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11865
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 43,
+              "ms": 82538,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1427,
+                "outputTokens": 251,
+                "cacheReadTokens": 11776,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13454
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 52,
+              "ms": 96856,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2209,
+                "outputTokens": 412,
+                "cacheReadTokens": 13568,
+                "cacheWriteTokens": 0,
+                "totalTokens": 16189
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 59,
+              "ms": 100199,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2283,
+                "outputTokens": 483,
+                "cacheReadTokens": 16128,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18894
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 65,
+              "ms": 104043,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 489,
+                "outputTokens": 438,
+                "cacheReadTokens": 18560,
+                "cacheWriteTokens": 0,
+                "totalTokens": 19487
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 71,
+              "ms": 106959,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 176,
+                "outputTokens": 375,
+                "cacheReadTokens": 19456,
+                "cacheWriteTokens": 0,
+                "totalTokens": 20007
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 77,
+              "ms": 110056,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 175,
+                "outputTokens": 367,
+                "cacheReadTokens": 19968,
+                "cacheWriteTokens": 0,
+                "totalTokens": 20510
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 83,
+              "ms": 112754,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 156,
+                "outputTokens": 357,
+                "cacheReadTokens": 20480,
+                "cacheWriteTokens": 0,
+                "totalTokens": 20993
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 89,
+              "ms": 116054,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 246,
+                "outputTokens": 195,
+                "cacheReadTokens": 20864,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21305
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 95,
+              "ms": 118554,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 163,
+                "outputTokens": 180,
+                "cacheReadTokens": 21248,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21591
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 101,
+              "ms": 121876,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 185,
+                "outputTokens": 450,
+                "cacheReadTokens": 21504,
+                "cacheWriteTokens": 0,
+                "totalTokens": 22139
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 107,
+              "ms": 124831,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 212,
+                "outputTokens": 433,
+                "cacheReadTokens": 22016,
+                "cacheWriteTokens": 0,
+                "totalTokens": 22661
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 113,
+              "ms": 128262,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 214,
+                "outputTokens": 245,
+                "cacheReadTokens": 22528,
+                "cacheWriteTokens": 0,
+                "totalTokens": 22987
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 119,
+              "ms": 130820,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 317,
+                "outputTokens": 266,
+                "cacheReadTokens": 22912,
+                "cacheWriteTokens": 0,
+                "totalTokens": 23495
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 125,
+              "ms": 134585,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 143,
+                "outputTokens": 470,
+                "cacheReadTokens": 23424,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24037
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 131,
+              "ms": 137435,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 163,
+                "outputTokens": 428,
+                "cacheReadTokens": 23936,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24527
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 137,
+              "ms": 140614,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 260,
+                "outputTokens": 437,
+                "cacheReadTokens": 24320,
+                "cacheWriteTokens": 0,
+                "totalTokens": 25017
+              }
+            },
+            {
+              "actor": "child-3",
+              "seq": 143,
+              "ms": 143139,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 231,
+                "outputTokens": 39,
+                "cacheReadTokens": 24832,
+                "cacheWriteTokens": 0,
+                "totalTokens": 25102
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 104,
+              "ms": 144801,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1345,
+                "outputTokens": 70,
+                "cacheReadTokens": 17408,
+                "cacheWriteTokens": 0,
+                "totalTokens": 18823
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 114,
+              "ms": 146146,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 5430,
+                "outputTokens": 38,
+                "cacheReadTokens": 18816,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24284
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 120,
+              "ms": 148030,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 427,
+                "outputTokens": 58,
+                "cacheReadTokens": 24192,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24677
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "change-schedule",
+      "description": "资源互斥、最早排程与反事实",
+      "arms": [
+        {
+          "mode": "standard",
+          "preset": "standard",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": false,
+          "instructionPackets": [],
+          "nativeExecutorSawTableIds": false,
+          "authorHandoff": [],
+          "intakeDispatch": [],
+          "verificationTrace": [],
+          "pendingCalls": [
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 13908,
+              "name": "pwsh"
+            }
+          ],
+          "observedMs": 150014,
+          "firstArtifactMs": null,
+          "firstArtifact": null,
+          "primary": {
+            "correct": 0,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [],
+                "status": "missing"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 0,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [],
+                "status": "missing"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": null,
+          "latestObserved": {
+            "correct": 0,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [],
+                "status": "missing"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [],
+                "status": "missing"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": null,
+          "coverage": null,
+          "receipt": null,
+          "rootEndReasons": [],
+          "toolErrors": [],
+          "streamErrors": [],
+          "roleCount": 1,
+          "usageAtPrimary": null,
+          "usageObserved": {
+            "inputTokens": 1260,
+            "cacheReadTokens": 40704,
+            "cacheWriteTokens": 0,
+            "outputTokens": 1278,
+            "totalTokens": 43242,
+            "providerMessages": 4,
+            "withUsage": 4,
+            "cacheReadPercent": 97
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 17,
+              "ms": 3179,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 649,
+                "outputTokens": 69,
+                "cacheReadTokens": 9344,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10062
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 25,
+              "ms": 7829,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 221,
+                "outputTokens": 502,
+                "cacheReadTokens": 9856,
+                "cacheWriteTokens": 0,
+                "totalTokens": 10579
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 33,
+              "ms": 12348,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 225,
+                "outputTokens": 629,
+                "cacheReadTokens": 10368,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11222
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 13908,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 165,
+                "outputTokens": 78,
+                "cacheReadTokens": 11136,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11379
+              }
+            }
+          ]
+        },
+        {
+          "mode": "building-loop",
+          "preset": "building-loop",
+          "selectedModel": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "off"
+          },
+          "exactPrompt": true,
+          "comparableModel": true,
+          "nativeExecutorReadFullInstruction": true,
+          "instructionPackets": [
+            {
+              "actor": "child-1",
+              "seq": 21,
+              "role": "executor",
+              "phase": "intake",
+              "declaredSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualCodePoints": 659,
+              "exactPrompt": true,
+              "deliverableTable": {
+                "columns": [
+                  "编号",
+                  "值",
+                  "依据"
+                ],
+                "ids": [
+                  "Q1",
+                  "Q2",
+                  "Q3",
+                  "Q4",
+                  "Q5",
+                  "Q6"
+                ]
+              },
+              "projectGoal": {
+                "path": "PROJECT-GOAL.md",
+                "totalLines": 17,
+                "sha256": "88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 项目总纲"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "## 目标"
+                  ],
+                  [
+                    4,
+                    "完成用户直接确认的开工任务，逐项依据完整开工原文和授权材料判断。"
+                  ],
+                  [
+                    5,
+                    ""
+                  ],
+                  [
+                    6,
+                    "## 交付与验收"
+                  ],
+                  [
+                    7,
+                    "按原文明确的表头与编号提交。先核对每项输入、适用规则和依赖条件，交付前复核答案、依据与编号。"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "## 已确认范围"
+                  ],
+                  [
+                    10,
+                    "工作范围以用户直接开工原文和当前项目授权为准。"
+                  ],
+                  [
+                    11,
+                    ""
+                  ],
+                  [
+                    12,
+                    "## 用户直接开工指令"
+                  ],
+                  [
+                    13,
+                    "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 9）。"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "## 分块入口"
+                  ],
+                  [
+                    16,
+                    "[项目索引](INDEX.md)"
+                  ],
+                  [
+                    17,
+                    ""
+                  ]
+                ]
+              },
+              "ownerFile": {
+                "path": "CONVERSATION-INPUT.md",
+                "totalLines": 28,
+                "sha256": "89b963759bba590e831722fab08d488b4be3286c1046b2de57a0a59e792ab370",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 会话提供的材料"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。"
+                  ],
+                  [
+                    4,
+                    ""
+                  ],
+                  [
+                    5,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    6,
+                    ""
+                  ],
+                  [
+                    7,
+                    "摘录 SHA-256 755d30b69912c844ad2797072b04cb3e9f0f5c0b47deede792dbb5aa699ca44b"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "~~~"
+                  ],
+                  [
+                    10,
+                    "A,OPS,2,无"
+                  ],
+                  [
+                    11,
+                    "B,IO,4,A"
+                  ],
+                  [
+                    12,
+                    "C,OPS,3,A"
+                  ],
+                  [
+                    13,
+                    "D,OPS,2,B与C"
+                  ],
+                  [
+                    14,
+                    "E,IO,3,B"
+                  ],
+                  [
+                    15,
+                    "F,OPS,1,D与E与H"
+                  ],
+                  [
+                    16,
+                    "G,IO,2,F"
+                  ],
+                  [
+                    17,
+                    "H,OPS,2,C"
+                  ],
+                  [
+                    18,
+                    "~~~"
+                  ],
+                  [
+                    19,
+                    ""
+                  ],
+                  [
+                    20,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    21,
+                    ""
+                  ],
+                  [
+                    22,
+                    "摘录 SHA-256 626b01473b7f28c0fcb71d05cce2a1c2f32de16ccb43ace0fd5431ecc640e16b"
+                  ],
+                  [
+                    23,
+                    ""
+                  ],
+                  [
+                    24,
+                    "~~~"
+                  ],
+                  [
+                    25,
+                    "首先按所有任务尽早完成优化。若最早结束时间相同，再按 A、B、C、D、E、F、G、H 的顺序，使起始时刻向量按字典序最小。业务截止时刻为 12，恰好在 12 结束算按期。反事实只把任务 E 的耗时从 3 改成 5，其余均不改。"
+                  ],
+                  [
+                    26,
+                    "~~~"
+                  ],
+                  [
+                    27,
+                    ""
+                  ],
+                  [
+                    28,
+                    ""
+                  ]
+                ]
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 21,
+              "role": "reviewer",
+              "phase": "first-review",
+              "declaredSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualSha256": "98a6ba5d619062aa673ea30341fc834ebbe7302870ac5a01ee111198f011ed05",
+              "actualCodePoints": 659,
+              "exactPrompt": true,
+              "deliverableTable": null,
+              "projectGoal": {
+                "path": "PROJECT-GOAL.md",
+                "totalLines": 17,
+                "sha256": "88be80e92beefb6aaef6f7f695ae3b66c2d9d70f827689042a37679c21c2dd9c",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 项目总纲"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "## 目标"
+                  ],
+                  [
+                    4,
+                    "完成用户直接确认的开工任务，逐项依据完整开工原文和授权材料判断。"
+                  ],
+                  [
+                    5,
+                    ""
+                  ],
+                  [
+                    6,
+                    "## 交付与验收"
+                  ],
+                  [
+                    7,
+                    "按原文明确的表头与编号提交。先核对每项输入、适用规则和依赖条件，交付前复核答案、依据与编号。"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "## 已确认范围"
+                  ],
+                  [
+                    10,
+                    "工作范围以用户直接开工原文和当前项目授权为准。"
+                  ],
+                  [
+                    11,
+                    ""
+                  ],
+                  [
+                    12,
+                    "## 用户直接开工指令"
+                  ],
+                  [
+                    13,
+                    "完整原文由宿主随 prepare 读包交给本阶段子会话（会话事件 9）。"
+                  ],
+                  [
+                    14,
+                    ""
+                  ],
+                  [
+                    15,
+                    "## 分块入口"
+                  ],
+                  [
+                    16,
+                    "[项目索引](INDEX.md)"
+                  ],
+                  [
+                    17,
+                    ""
+                  ]
+                ]
+              },
+              "ownerFile": {
+                "path": "CONVERSATION-INPUT.md",
+                "totalLines": 28,
+                "sha256": "89b963759bba590e831722fab08d488b4be3286c1046b2de57a0a59e792ab370",
+                "complete": true,
+                "exactUtf8": true,
+                "lines": [
+                  [
+                    1,
+                    "# 会话提供的材料"
+                  ],
+                  [
+                    2,
+                    ""
+                  ],
+                  [
+                    3,
+                    "以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。"
+                  ],
+                  [
+                    4,
+                    ""
+                  ],
+                  [
+                    5,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    6,
+                    ""
+                  ],
+                  [
+                    7,
+                    "摘录 SHA-256 755d30b69912c844ad2797072b04cb3e9f0f5c0b47deede792dbb5aa699ca44b"
+                  ],
+                  [
+                    8,
+                    ""
+                  ],
+                  [
+                    9,
+                    "~~~"
+                  ],
+                  [
+                    10,
+                    "A,OPS,2,无"
+                  ],
+                  [
+                    11,
+                    "B,IO,4,A"
+                  ],
+                  [
+                    12,
+                    "C,OPS,3,A"
+                  ],
+                  [
+                    13,
+                    "D,OPS,2,B与C"
+                  ],
+                  [
+                    14,
+                    "E,IO,3,B"
+                  ],
+                  [
+                    15,
+                    "F,OPS,1,D与E与H"
+                  ],
+                  [
+                    16,
+                    "G,IO,2,F"
+                  ],
+                  [
+                    17,
+                    "H,OPS,2,C"
+                  ],
+                  [
+                    18,
+                    "~~~"
+                  ],
+                  [
+                    19,
+                    ""
+                  ],
+                  [
+                    20,
+                    "## 用户消息事件 9"
+                  ],
+                  [
+                    21,
+                    ""
+                  ],
+                  [
+                    22,
+                    "摘录 SHA-256 626b01473b7f28c0fcb71d05cce2a1c2f32de16ccb43ace0fd5431ecc640e16b"
+                  ],
+                  [
+                    23,
+                    ""
+                  ],
+                  [
+                    24,
+                    "~~~"
+                  ],
+                  [
+                    25,
+                    "首先按所有任务尽早完成优化。若最早结束时间相同，再按 A、B、C、D、E、F、G、H 的顺序，使起始时刻向量按字典序最小。业务截止时刻为 12，恰好在 12 结束算按期。反事实只把任务 E 的耗时从 3 改成 5，其余均不改。"
+                  ],
+                  [
+                    26,
+                    "~~~"
+                  ],
+                  [
+                    27,
+                    ""
+                  ],
+                  [
+                    28,
+                    ""
+                  ]
+                ]
+              }
+            }
+          ],
+          "nativeExecutorSawTableIds": true,
+          "authorHandoff": [
+            {
+              "seq": 15,
+              "ms": 4584,
+              "action": "propose",
+              "goal": "为一组带先决任务、双工位（OPS/IO）不可抢占的合成维护排程，求最早完工的基线排程（并在同完工时间下按 A..H 起始时刻字典序取最小），以及只把 E 耗时改为 5 的反事实最早完工时间，回答 Q1–Q6。",
+              "deliverable": "一份短 Markdown（写入 DELIVERY.md 并在回复贴出）：一张“| 编号 | 值 | 依据 |”表，Q1–Q6 各一行，值格只写题目要求的答案，依据格写材料编号或简短算式，末行“大白话：”总结。",
+              "scope": "只用本会话给出的合成材料（S1 任务表、S2 优化与截止规则、反事实设定）；不联网、不读其他文件。范围包括：枚举/推演可行排程、验证最优性、字典序决胜、截止 12 的按期判定与反事实比较。无外部取证需求。"
+            },
+            {
+              "seq": 31,
+              "ms": 8040,
+              "action": "advance",
+              "note": "执行方起稿 DELIVERY.md：用会话材料 S1 任务表与 S2 规则，枚举/推演双工位不可抢占排程，求最早完工并做字典序决胜；给出 Q1–Q6 表格与依据。"
+            },
+            {
+              "seq": 64,
+              "ms": 44858,
+              "action": "advance",
+              "note": "发起首次独立核验：核对 Q1–Q6 数值、排程可行性（依赖/工位不重叠/不可抢占）、最早完工最优性证明与字典序决胜，以及表格格式与“值格只写值”要求。"
+            }
+          ],
+          "intakeDispatch": [
+            {
+              "actor": "child-1",
+              "seq": 13,
+              "ms": 8170,
+              "text": "工作单元 K01 进入 intake。候选文件 DELIVERY.md。执行前依据已注入的阶段规则与授权范围。先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。Your parent agent id is \"root\". Before you finish, send your result to that agent with send_message({ agent_id: \"root\", message: \"<self-contained result>\" }). The parent shares your workspace but does not automatically receive your transcript, tool output, or reasoning. Send earlier messages as well when a finding changes what the parent should do next; sending a message does not end your turn."
+            }
+          ],
+          "verificationTrace": [],
+          "pendingCalls": [],
+          "observedMs": 150014,
+          "firstArtifactMs": 40477,
+          "firstArtifact": {
+            "sha256": "537163211389c9ddac7fc20845c2a0927e220a3242ac4c79d2a75a66f29ff734",
+            "bytes": 2687,
+            "text": "# 合成维护排程：基线最早完成与 E 耗时反事实\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| Q1 | H | 基线 OPS 序列 A[0,2)、C[2,5)、H[5,7)、D[7,9)、F[9,10)：H 起 5 < D 起 7（D 还须等 B 于 6 结束，[S1] B(4)←A） |\n| Q2 | 5 | [S1] H←C←A 同在 OPS，A[0,2) 后 C(3)[2,5)，H 紧随 [5,7) |\n| Q3 | 7 | [S1] D←B 与 C：B[2,6)、C 于 5 结束取 max=6，但 OPS 在 [5,7) 已有 H，故 D 推至 7 |\n| Q4 | 9 | [S1] F←D 与 E 与 H：max(9, 9, 7) = 9（D[7,9)、E[6,9)） |\n| Q5 | 12 | 关键路径 A→B→E→F→G = 2+4+3+1+2 = 12；G(2)[10,12)。OPS 总负载 10、IO 总负载 9 均 ≤12，可达 |\n| Q6 | 14 | 只改 E 为 5：同链 2+4+5+1+2 = 14，取 A[0,2)、B[2,6)、E[6,11)、F[11,12)、G[12,14) |\n\n## 复核要点\n\n- **基线排程**：A[0,2)、B[2,6)、C[2,5)、H[5,7)、D[7,9)、E[6,9)、F[9,10)、G[10,12)。OPS 占用 A/C/H/D/F 无重叠；IO 占用 B/E/G 无重叠。逐条先决：B≥2、C≥2、D≥max(6,5)=6→7、E≥6、H≥5、F≥max(9,9,7)=9、G≥10，全部成立。\n- **为何 H 必先于 D**：要使完成时刻为 12，A→B→E→F→G 这条链必须全紧，于是 B[2,6)、F 须在 9 开工、G[10,12)。OPS 在 A 之后只剩 [2,10) 共 8 个单位，恰好由 C(3)+H(2)+D(2)+F(1) 填满，且 C 须在 D、H 之前、F 在最后。若先排 D 得 C[2,5)、D[5,7)，但 D 需等 B 到 6，不可行；故只能 C[2,5)、H[5,7)、D[7,9)、F[9,10)。\n- **下界与最优性**：12 即关键路径下界，故基线最优，且达到 12 的排程唯一，字典序次级目标不改变结果。反事实下关键路径为 14，且 A[0,2)、B[2,6)、C[2,5)、H[5,7)、D[7,9)、E[6,11)、F[11,12)、G[12,14) 满足全部先决与工位约束，故 14 可达且最优。\n- **截止时刻**：基线恰在 12 结束，按 [S2] 算按期；反事实 14 晚 2 个单位，逾期。本题只问完成时刻，未要求逾期量。\n- **材料边界**：以上均仅据本条消息内的 [S1]、[S2] 合成材料推得，会话原文只能证明\"收到了这些内容\"，不构成任何外部事实证据；数值为按给定数据手算的结果，若有隐藏约束（如工位容量大于 1、或 A 之外的硬性时间窗）则结论需重算。\n- **出处**：任务与先决关系 [S1]；优化目标、字典序次序、截止 12 与\"恰好 12 算按期\"、\"反事实只改 E 耗时\" [S2]。\n\n大白话：基线里 H 排在 D 前面（H 在 5 点开工，D 在 7 点开工，D 得等 B 到 6 点干完再等 OPS 腾出来），F 在 9 点开工，全部任务 12 点整收工，刚好压线不算逾期；要是 E 从 3 变成 5，整条链被拉长，最早就得 14 点才收工，逾期 2 个单位。\n",
+            "kind": "building-loop-durable",
+            "source": "native-tool-result-review-ready",
+            "observedAt": 1794486257912
+          },
+          "primary": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "基线 OPS 序列 A[0,2)、C[2,5)、H[5,7)、D[7,9)、F[9,10)：H 起 5 < D 起 7（D 还须等 B 于 6 结束，[S1] B(4)←A）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "[S1] H←C←A 同在 OPS，A[0,2) 后 C(3)[2,5)，H 紧随 [5,7)"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "[S1] D←B 与 C：B[2,6)、C 于 5 结束取 max=6，但 OPS 在 [5,7) 已有 H，故 D 推至 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "[S1] F←D 与 E 与 H：max(9, 9, 7) = 9（D[7,9)、E[6,9)）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "关键路径 A→B→E→F→G = 2+4+3+1+2 = 12；G(2)[10,12)。OPS 总负载 10、IO 总负载 9 均 ≤12，可达"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "只改 E 为 5：同链 2+4+5+1+2 = 14，取 A[0,2)、B[2,6)、E[6,11)、F[11,12)、G[12,14)"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "firstIgnoringPrefix": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "基线 OPS 序列 A[0,2)、C[2,5)、H[5,7)、D[7,9)、F[9,10)：H 起 5 < D 起 7（D 还须等 B 于 6 结束，[S1] B(4)←A）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "[S1] H←C←A 同在 OPS，A[0,2) 后 C(3)[2,5)，H 紧随 [5,7)"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "[S1] D←B 与 C：B[2,6)、C 于 5 结束取 max=6，但 OPS 在 [5,7) 已有 H，故 D 推至 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "[S1] F←D 与 E 与 H：max(9, 9, 7) = 9（D[7,9)、E[6,9)）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "关键路径 A→B→E→F→G = 2+4+3+1+2 = 12；G(2)[10,12)。OPS 总负载 10、IO 总负载 9 均 ≤12，可达"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "只改 E 为 5：同链 2+4+5+1+2 = 14，取 A[0,2)、B[2,6)、E[6,11)、F[11,12)、G[12,14)"
+                  }
+                ],
+                "status": "correct"
+              }
+            ],
+            "relabeled": false
+          },
+          "latestArtifact": {
+            "sha256": "537163211389c9ddac7fc20845c2a0927e220a3242ac4c79d2a75a66f29ff734",
+            "bytes": 2687,
+            "text": "# 合成维护排程：基线最早完成与 E 耗时反事实\n\n| 编号 | 值 | 依据 |\n| --- | --- | --- |\n| Q1 | H | 基线 OPS 序列 A[0,2)、C[2,5)、H[5,7)、D[7,9)、F[9,10)：H 起 5 < D 起 7（D 还须等 B 于 6 结束，[S1] B(4)←A） |\n| Q2 | 5 | [S1] H←C←A 同在 OPS，A[0,2) 后 C(3)[2,5)，H 紧随 [5,7) |\n| Q3 | 7 | [S1] D←B 与 C：B[2,6)、C 于 5 结束取 max=6，但 OPS 在 [5,7) 已有 H，故 D 推至 7 |\n| Q4 | 9 | [S1] F←D 与 E 与 H：max(9, 9, 7) = 9（D[7,9)、E[6,9)） |\n| Q5 | 12 | 关键路径 A→B→E→F→G = 2+4+3+1+2 = 12；G(2)[10,12)。OPS 总负载 10、IO 总负载 9 均 ≤12，可达 |\n| Q6 | 14 | 只改 E 为 5：同链 2+4+5+1+2 = 14，取 A[0,2)、B[2,6)、E[6,11)、F[11,12)、G[12,14) |\n\n## 复核要点\n\n- **基线排程**：A[0,2)、B[2,6)、C[2,5)、H[5,7)、D[7,9)、E[6,9)、F[9,10)、G[10,12)。OPS 占用 A/C/H/D/F 无重叠；IO 占用 B/E/G 无重叠。逐条先决：B≥2、C≥2、D≥max(6,5)=6→7、E≥6、H≥5、F≥max(9,9,7)=9、G≥10，全部成立。\n- **为何 H 必先于 D**：要使完成时刻为 12，A→B→E→F→G 这条链必须全紧，于是 B[2,6)、F 须在 9 开工、G[10,12)。OPS 在 A 之后只剩 [2,10) 共 8 个单位，恰好由 C(3)+H(2)+D(2)+F(1) 填满，且 C 须在 D、H 之前、F 在最后。若先排 D 得 C[2,5)、D[5,7)，但 D 需等 B 到 6，不可行；故只能 C[2,5)、H[5,7)、D[7,9)、F[9,10)。\n- **下界与最优性**：12 即关键路径下界，故基线最优，且达到 12 的排程唯一，字典序次级目标不改变结果。反事实下关键路径为 14，且 A[0,2)、B[2,6)、C[2,5)、H[5,7)、D[7,9)、E[6,11)、F[11,12)、G[12,14) 满足全部先决与工位约束，故 14 可达且最优。\n- **截止时刻**：基线恰在 12 结束，按 [S2] 算按期；反事实 14 晚 2 个单位，逾期。本题只问完成时刻，未要求逾期量。\n- **材料边界**：以上均仅据本条消息内的 [S1]、[S2] 合成材料推得，会话原文只能证明\"收到了这些内容\"，不构成任何外部事实证据；数值为按给定数据手算的结果，若有隐藏约束（如工位容量大于 1、或 A 之外的硬性时间窗）则结论需重算。\n- **出处**：任务与先决关系 [S1]；优化目标、字典序次序、截止 12 与\"恰好 12 算按期\"、\"反事实只改 E 耗时\" [S2]。\n\n大白话：基线里 H 排在 D 前面（H 在 5 点开工，D 在 7 点开工，D 得等 B 到 6 点干完再等 OPS 腾出来），F 在 9 点开工，全部任务 12 点整收工，刚好压线不算逾期；要是 E 从 3 变成 5，整条链被拉长，最早就得 14 点才收工，逾期 2 个单位。\n",
+            "kind": "building-loop-durable"
+          },
+          "latestObserved": {
+            "correct": 6,
+            "maximum": 6,
+            "checks": [
+              {
+                "label": "Q1",
+                "expected": "H",
+                "values": [
+                  {
+                    "raw": "H",
+                    "value": "H",
+                    "explanation": "基线 OPS 序列 A[0,2)、C[2,5)、H[5,7)、D[7,9)、F[9,10)：H 起 5 < D 起 7（D 还须等 B 于 6 结束，[S1] B(4)←A）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q2",
+                "expected": "5",
+                "values": [
+                  {
+                    "raw": "5",
+                    "value": "5",
+                    "explanation": "[S1] H←C←A 同在 OPS，A[0,2) 后 C(3)[2,5)，H 紧随 [5,7)"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q3",
+                "expected": "7",
+                "values": [
+                  {
+                    "raw": "7",
+                    "value": "7",
+                    "explanation": "[S1] D←B 与 C：B[2,6)、C 于 5 结束取 max=6，但 OPS 在 [5,7) 已有 H，故 D 推至 7"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q4",
+                "expected": "9",
+                "values": [
+                  {
+                    "raw": "9",
+                    "value": "9",
+                    "explanation": "[S1] F←D 与 E 与 H：max(9, 9, 7) = 9（D[7,9)、E[6,9)）"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q5",
+                "expected": "12",
+                "values": [
+                  {
+                    "raw": "12",
+                    "value": "12",
+                    "explanation": "关键路径 A→B→E→F→G = 2+4+3+1+2 = 12；G(2)[10,12)。OPS 总负载 10、IO 总负载 9 均 ≤12，可达"
+                  }
+                ],
+                "status": "correct"
+              },
+              {
+                "label": "Q6",
+                "expected": "14",
+                "values": [
+                  {
+                    "raw": "14",
+                    "value": "14",
+                    "explanation": "只改 E 为 5：同链 2+4+5+1+2 = 14，取 A[0,2)、B[2,6)、E[6,11)、F[11,12)、G[12,14)"
+                  }
+                ],
+                "status": "correct"
+              }
+            ]
+          },
+          "finalAccepted": null,
+          "closed": false,
+          "closedMs": null,
+          "phase": "first-review",
+          "coverage": 20,
+          "receipt": null,
+          "rootEndReasons": [
+            {
+              "kind": "completed",
+              "ms": 11209
+            },
+            {
+              "kind": "completed",
+              "ms": 49054
+            }
+          ],
+          "toolErrors": [
+            {
+              "actor": "child-2",
+              "seq": 39,
+              "ms": 59305,
+              "detail": "Error: B4-c9c5062b: B4-c9c5062b 多段拆分须为每段填写连续原文 quote。[coverage-span] {\"block\":\"B4-c9c5062b\",\"line\":5,\"part\":1,\"reason\":\"missing-quote\",\"offsetUnit\":\"UTF-16\",\"cursor\":0,\"blockLength\":100,\"firstMismatch\":{\"blockOffset\":0,\"partOffset\":0,\"expected\":\"|\",\"received\":null},\"blockText\":{\"from\":0,\"text\":\"| Q1 | H | 基线 OPS 序列 A[0,2)、C[2,5)、H[5,7)、D[7,9)、F[9,10)：H 起 5 < D 起 7（D 还须等 B 于 6 结束，[S1] B(4)←A） |\",\"truncated\":false},\"expectedSuffix\":{\"from\":0,\"text\""
+            },
+            {
+              "actor": "child-2",
+              "seq": 45,
+              "ms": 67590,
+              "detail": "Error: B4-c9c5062b: 推导需明确 rule：source-warrant、modus-ponens、equality-transitive 或 configured-calculation；B5-68666f1d: 推导需明确 rule：source-warrant、modus-ponens、equality-transitive 或 configured-calculation；B6-f689ff8c: 推导需明确 rule：source-warrant、modus-ponens、equality-transitive 或 configured-calculation；B7-a3b2a81c: 推导需明确 rule：source-warrant、modus-ponens、equality-transitive 或 configured-calculation"
+            },
+            {
+              "actor": "child-2",
+              "seq": 57,
+              "ms": 84218,
+              "detail": "Error: B6-f689ff8c: 形式推导须两条原始前提及 formal.premises；modus-ponens 结构示例：{\"premises\":[{\"relation\":\"implies\",\"left\":\"P\",\"right\":\"Q\"},{\"relation\":\"asserts\",\"left\":\"P\"}],\"conclusion\":{\"relation\":\"asserts\",\"left\":\"Q\"}}。把P/Q替换为同一对象的具体命题；若仅转述原文单向规则，可用 source-warrant 和逐字关系引句。；B7-a3b2a81c: 形式推导须两条原始前提及 formal.premises；modus-ponens 结构示例：{\"premises\":[{\"relation\":\"implies\",\"left\":\"P\",\"right\":\"Q\"},{\"relation\":\"asserts\",\"left\":\"P\"}],\"conclusion\":{\"relation\":\"assert"
+            },
+            {
+              "actor": "child-2",
+              "seq": 63,
+              "ms": 90435,
+              "detail": "Error: B6-f689ff8c: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替；B7-a3b2a81c: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替"
+            },
+            {
+              "actor": "child-2",
+              "seq": 81,
+              "ms": 105705,
+              "detail": "Error: B10-20dda085: 证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替"
+            },
+            {
+              "actor": "child-2",
+              "seq": 87,
+              "ms": 109477,
+              "detail": "Error: B10-20dda085: 形式推导须两条原始前提及 formal.premises；modus-ponens 结构示例：{\"premises\":[{\"relation\":\"implies\",\"left\":\"P\",\"right\":\"Q\"},{\"relation\":\"asserts\",\"left\":\"P\"}],\"conclusion\":{\"relation\":\"asserts\",\"left\":\"Q\"}}。把P/Q替换为同一对象的具体命题；若仅转述原文单向规则，可用 source-warrant 和逐字关系引句。"
+            }
+          ],
+          "streamErrors": [],
+          "roleCount": 3,
+          "usageAtPrimary": {
+            "inputTokens": 11502,
+            "cacheReadTokens": 45696,
+            "cacheWriteTokens": 0,
+            "outputTokens": 5563,
+            "totalTokens": 62761,
+            "providerMessages": 9,
+            "withUsage": 9,
+            "cacheReadPercent": 79.89
+          },
+          "usageObserved": {
+            "inputTokens": 30456,
+            "cacheReadTokens": 540416,
+            "cacheWriteTokens": 0,
+            "outputTokens": 24214,
+            "totalTokens": 595086,
+            "providerMessages": 32,
+            "withUsage": 32,
+            "cacheReadPercent": 94.67
+          },
+          "usageRows": [
+            {
+              "actor": "root",
+              "seq": 15,
+              "ms": 4584,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 599,
+                "outputTokens": 454,
+                "cacheReadTokens": 1920,
+                "cacheWriteTokens": 0,
+                "totalTokens": 2973
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 24,
+              "ms": 6341,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1927,
+                "outputTokens": 38,
+                "cacheReadTokens": 3200,
+                "cacheWriteTokens": 0,
+                "totalTokens": 5165
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 31,
+              "ms": 8040,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1415,
+                "outputTokens": 125,
+                "cacheReadTokens": 5120,
+                "cacheWriteTokens": 0,
+                "totalTokens": 6660
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 39,
+              "ms": 9546,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1052,
+                "outputTokens": 38,
+                "cacheReadTokens": 6656,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7746
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 19,
+              "ms": 10665,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1243,
+                "outputTokens": 53,
+                "cacheReadTokens": 2048,
+                "cacheWriteTokens": 0,
+                "totalTokens": 3344
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 45,
+              "ms": 11209,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 487,
+                "outputTokens": 52,
+                "cacheReadTokens": 7680,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8219
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 25,
+              "ms": 32077,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1538,
+                "outputTokens": 3874,
+                "cacheReadTokens": 3328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8740
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 31,
+              "ms": 34148,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1792,
+                "outputTokens": 70,
+                "cacheReadTokens": 7040,
+                "cacheWriteTokens": 0,
+                "totalTokens": 8902
+              }
+            },
+            {
+              "actor": "child-1",
+              "seq": 37,
+              "ms": 40420,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1449,
+                "outputTokens": 859,
+                "cacheReadTokens": 8704,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11012
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 56,
+              "ms": 42517,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1083,
+                "outputTokens": 38,
+                "cacheReadTokens": 8192,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9313
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 64,
+              "ms": 44858,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 570,
+                "outputTokens": 122,
+                "cacheReadTokens": 9216,
+                "cacheWriteTokens": 0,
+                "totalTokens": 9908
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 72,
+              "ms": 47203,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1128,
+                "outputTokens": 38,
+                "cacheReadTokens": 9856,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11022
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 19,
+              "ms": 48122,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 2828,
+                "outputTokens": 51,
+                "cacheReadTokens": 4992,
+                "cacheWriteTokens": 0,
+                "totalTokens": 7871
+              }
+            },
+            {
+              "actor": "root",
+              "seq": 78,
+              "ms": 49053,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 435,
+                "outputTokens": 12,
+                "cacheReadTokens": 11008,
+                "cacheWriteTokens": 0,
+                "totalTokens": 11455
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 25,
+              "ms": 49827,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 5202,
+                "outputTokens": 84,
+                "cacheReadTokens": 7808,
+                "cacheWriteTokens": 0,
+                "totalTokens": 13094
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 31,
+              "ms": 52124,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 983,
+                "outputTokens": 244,
+                "cacheReadTokens": 13056,
+                "cacheWriteTokens": 0,
+                "totalTokens": 14283
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 37,
+              "ms": 59250,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 384,
+                "outputTokens": 1542,
+                "cacheReadTokens": 14208,
+                "cacheWriteTokens": 0,
+                "totalTokens": 16134
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 43,
+              "ms": 67473,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1302,
+                "outputTokens": 1815,
+                "cacheReadTokens": 16128,
+                "cacheWriteTokens": 0,
+                "totalTokens": 19245
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 49,
+              "ms": 77684,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 202,
+                "outputTokens": 2374,
+                "cacheReadTokens": 19200,
+                "cacheWriteTokens": 0,
+                "totalTokens": 21776
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 55,
+              "ms": 84198,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 347,
+                "outputTokens": 1319,
+                "cacheReadTokens": 21760,
+                "cacheWriteTokens": 0,
+                "totalTokens": 23426
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 61,
+              "ms": 90414,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 226,
+                "outputTokens": 1116,
+                "cacheReadTokens": 23424,
+                "cacheWriteTokens": 0,
+                "totalTokens": 24766
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 67,
+              "ms": 95613,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 139,
+                "outputTokens": 1237,
+                "cacheReadTokens": 24704,
+                "cacheWriteTokens": 0,
+                "totalTokens": 26080
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 73,
+              "ms": 101849,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 350,
+                "outputTokens": 1237,
+                "cacheReadTokens": 25984,
+                "cacheWriteTokens": 0,
+                "totalTokens": 27571
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 79,
+              "ms": 105677,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 315,
+                "outputTokens": 619,
+                "cacheReadTokens": 27520,
+                "cacheWriteTokens": 0,
+                "totalTokens": 28454
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 85,
+              "ms": 109452,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 210,
+                "outputTokens": 586,
+                "cacheReadTokens": 28288,
+                "cacheWriteTokens": 0,
+                "totalTokens": 29084
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 91,
+              "ms": 112647,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 145,
+                "outputTokens": 439,
+                "cacheReadTokens": 29056,
+                "cacheWriteTokens": 0,
+                "totalTokens": 29640
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 97,
+              "ms": 120282,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 292,
+                "outputTokens": 1569,
+                "cacheReadTokens": 29568,
+                "cacheWriteTokens": 0,
+                "totalTokens": 31429
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 103,
+              "ms": 131146,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 281,
+                "outputTokens": 2279,
+                "cacheReadTokens": 31360,
+                "cacheWriteTokens": 0,
+                "totalTokens": 33920
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 109,
+              "ms": 137921,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 1819,
+                "outputTokens": 1196,
+                "cacheReadTokens": 32384,
+                "cacheWriteTokens": 0,
+                "totalTokens": 35399
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 115,
+              "ms": 140951,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 267,
+                "outputTokens": 123,
+                "cacheReadTokens": 35328,
+                "cacheWriteTokens": 0,
+                "totalTokens": 35718
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 121,
+              "ms": 143844,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 170,
+                "outputTokens": 118,
+                "cacheReadTokens": 35712,
+                "cacheWriteTokens": 0,
+                "totalTokens": 36000
+              }
+            },
+            {
+              "actor": "child-2",
+              "seq": 127,
+              "ms": 147880,
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "usage": {
+                "inputTokens": 276,
+                "outputTokens": 493,
+                "cacheReadTokens": 35968,
+                "cacheWriteTokens": 0,
+                "totalTokens": 36737
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "phaseTimeline": [
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "intake",
+      "coverage": 0,
+      "ms": 7897
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "intake",
+      "coverage": 0,
+      "ms": 8077
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "review-ready",
+      "coverage": 0,
+      "ms": 25422
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "first-review",
+      "coverage": 0,
+      "ms": 28973
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "review-ready",
+      "coverage": 0,
+      "ms": 40543
+    },
+    {
+      "caseId": "change-schedule",
+      "mode": "building-loop",
+      "phase": "first-review",
+      "coverage": 0,
+      "ms": 45049
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "first-audit-ready",
+      "coverage": 17,
+      "ms": 67612
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "first-audit",
+      "coverage": 0,
+      "ms": 72803
+    },
+    {
+      "caseId": "signed-scope",
+      "mode": "building-loop",
+      "phase": "ledger-review",
+      "coverage": 17,
+      "ms": 143284
+    }
+  ]
+}

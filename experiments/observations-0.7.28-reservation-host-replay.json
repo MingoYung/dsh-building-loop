@@ -1,0 +1,154 @@
+{
+  "spec": "reservation-owner-runtime-replay/1",
+  "run": "r-ZDINdX",
+  "archiveSha256": "ae3152d06ed4740b6da3ba6e89f20fc87bf7d948444071507bc7884bafa3df8a",
+  "installedRuntimeFiles": 54,
+  "modelCalls": 0,
+  "controls": {
+    "registered": [
+      {
+        "id": "business-nonobject",
+        "exampleId": "public-transport-shapes:example:public-business-nonobject",
+        "mode": "business",
+        "trigger": {
+          "kind": "input-type",
+          "argument": 0,
+          "type": "object",
+          "test": "not"
+        },
+        "clause": {
+          "file": "SPEC.md",
+          "start": 3,
+          "end": 3,
+          "sha256": "27dfeb30f0e6f32717cecfb2622337687c29160ae5c939c68e52c4823973da1e",
+          "quoteSha256": "338168c94c317f2473cd62899eb7f9f0f777223ceb64107d9ac2253139103a9b"
+        },
+        "status": "passed",
+        "actual": {
+          "file": "ledger.py",
+          "symbol": "process",
+          "mode": "business",
+          "sha256": "b4111b2989f1623be2ad65b2b3e8a9336151813fcd89b983ecb4a57ec03b98d1",
+          "line": 53,
+          "end": 53,
+          "conditionLine": 52,
+          "code": "invalid-request"
+        },
+        "response": {
+          "id": "public-transport-shapes:example:public-business-nonobject",
+          "status": "passed",
+          "responseMatches": true
+        },
+        "traceSha256": "a67bf4adcb044a69c478ea8f0bd204c515ab927d3ec5346d6e666707790cd81f"
+      },
+      {
+        "id": "entry-json-fallback",
+        "exampleId": "public-transport-shapes:example:public-entry-json-fallback",
+        "mode": "fallback",
+        "trigger": {
+          "kind": "exception",
+          "name": "ValueError"
+        },
+        "clause": {
+          "file": "SPEC.md",
+          "start": 3,
+          "end": 3,
+          "sha256": "27dfeb30f0e6f32717cecfb2622337687c29160ae5c939c68e52c4823973da1e",
+          "quoteSha256": "d935b5aa9caa5d000023d3373ba1be72fd65847d38daee59d208feb327f7a04f"
+        },
+        "status": "passed",
+        "actual": {
+          "file": "entry.py",
+          "symbol": "main",
+          "mode": "fallback",
+          "sha256": "24b1d9ddca9da4167c55ae884363ec9e12348beab4cabd4860624080993165e0",
+          "line": 12,
+          "end": 13,
+          "conditionLine": 11,
+          "code": "invalid-request",
+          "outputLine": 16
+        },
+        "response": {
+          "id": "public-transport-shapes:example:public-entry-json-fallback",
+          "status": "passed",
+          "responseMatches": true
+        },
+        "traceSha256": "35eda9b4081dde2a4368dc7ea2ce1b5e35f0fdd347396f237fb02733c5fc9675"
+      },
+      {
+        "id": "entry-forwarding",
+        "exampleId": "public-transport-shapes:example:public-entry-forwarding",
+        "mode": "forwarding",
+        "trigger": {
+          "kind": "delegate",
+          "file": "ledger.py"
+        },
+        "clause": {
+          "file": "SPEC.md",
+          "start": 3,
+          "end": 3,
+          "sha256": "27dfeb30f0e6f32717cecfb2622337687c29160ae5c939c68e52c4823973da1e",
+          "quoteSha256": "17987426ae7b82eb2a774d8ab7634720265114b1ba9bc775691b38c0d79722f9"
+        },
+        "status": "passed",
+        "actual": {
+          "file": "entry.py",
+          "symbol": "main",
+          "mode": "forwarding",
+          "sha256": "24b1d9ddca9da4167c55ae884363ec9e12348beab4cabd4860624080993165e0",
+          "line": 16,
+          "end": 16,
+          "conditionLine": 15,
+          "target": {
+            "file": "ledger.py",
+            "symbol": "process"
+          },
+          "callLine": 15
+        },
+        "response": {
+          "id": "public-transport-shapes:example:public-entry-forwarding",
+          "status": "passed",
+          "responseMatches": true
+        },
+        "traceSha256": "0f2320d49ea8d866dc995af2045a855488dc5b2abe488be385e6a704f96a961c"
+      }
+    ],
+    "sameOutputWrongOwner": [
+      {
+        "id": "business-nonobject",
+        "exampleId": "public-transport-shapes:example:public-business-nonobject",
+        "mode": "business",
+        "trigger": {
+          "kind": "input-type",
+          "argument": 0,
+          "type": "object",
+          "test": "not"
+        },
+        "clause": {
+          "file": "SPEC.md",
+          "start": 3,
+          "end": 3,
+          "sha256": "27dfeb30f0e6f32717cecfb2622337687c29160ae5c939c68e52c4823973da1e",
+          "quoteSha256": "338168c94c317f2473cd62899eb7f9f0f777223ceb64107d9ac2253139103a9b"
+        },
+        "status": "mismatch",
+        "reason": "decision-position-or-result",
+        "actual": {
+          "file": "entry.py",
+          "symbol": "process_decoded",
+          "mode": "business",
+          "sha256": "9b7397a2769f1861d3e11ba9b46df8d1e7ead5676acb410b7d942afc33167bd9",
+          "line": 10,
+          "end": 11,
+          "conditionLine": 9,
+          "code": "invalid-request"
+        },
+        "response": {
+          "id": "public-transport-shapes:example:public-business-nonobject",
+          "status": "passed",
+          "responseMatches": true
+        }
+      }
+    ]
+  }
+}

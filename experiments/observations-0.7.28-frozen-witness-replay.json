@@ -1,0 +1,511 @@
+{
+  "spec": "building-loop-r72-frozen-witness-replay/1",
+  "modelCalls": 0,
+  "scope": "Exact frozen source pins, typed projection of documented claims, and Python line execution on isolated copies",
+  "runs": [
+    {
+      "run": "r-9CyRwq",
+      "architecture": {
+        "sha256": "69db457bf322343f169bfaae5a3d05a4a85dd13f37848e51ebc78592f91bf255",
+        "line": 9,
+        "text": "- journal.py：输入校验、身份与回放。校验请求对象与字段（非对象/缺字段/类型错 -> invalid-request 或 invalid-change），校验 change 的 id/component 为非空字符串、units 为正整数且排除 bool、depends_on 与 applied 必须是字符串数组（否则 invalid-change）；对 change 记录做去重：id、component、units、depends_on 集合完全相同的重复记录合并为一条，同一 id 但内容冲突返回 conflicting-change；返回规范化的变化集合与已应用 id 集合。"
+      },
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "1cd8367bca1ac32d69718f4ff5623dcbf45fdc44f5de5c21d73c15f1c621a58b"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "c1a0135800277a2da3138e83c4b04f1f3def757cba5bd7dd0da103220592493d"
+        },
+        {
+          "path": "release.py",
+          "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7"
+        }
+      ],
+      "checks": [
+        {
+          "label": "frozen documented wrong business owner",
+          "claim": {
+            "mode": "business",
+            "trigger": {
+              "kind": "input-type",
+              "argument": 0,
+              "type": "object",
+              "test": "not"
+            },
+            "response": {
+              "code": "invalid-request"
+            },
+            "owner": {
+              "file": "journal.py"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+              "line": 60,
+              "end": 60,
+              "conditionLine": 59,
+              "code": "invalid-request"
+            }
+          ],
+          "result": {
+            "status": "mismatch",
+            "reason": "decision-position-or-result",
+            "actual": {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+              "line": 60,
+              "end": 60,
+              "conditionLine": 59,
+              "code": "invalid-request"
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "current source business owner",
+          "claim": {
+            "mode": "business",
+            "trigger": {
+              "kind": "input-type",
+              "argument": 0,
+              "type": "object",
+              "test": "not"
+            },
+            "response": {
+              "code": "invalid-request"
+            },
+            "owner": {
+              "file": "planner.py"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+              "line": 60,
+              "end": 60,
+              "conditionLine": 59,
+              "code": "invalid-request"
+            }
+          ],
+          "result": {
+            "status": "passed",
+            "actual": {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "ec9a438a9da1fcbd835ce172ca8ef0b665470944ddfcdffb773edb25f1c058e0",
+              "line": 60,
+              "end": 60,
+              "conditionLine": 59,
+              "code": "invalid-request"
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "current transport forwards the downstream result",
+          "claim": {
+            "mode": "forwarding",
+            "trigger": {
+              "kind": "delegate",
+              "file": "planner.py"
+            },
+            "owner": {
+              "file": "release.py"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "forwarding",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "line": 15,
+              "end": 15,
+              "conditionLine": 14,
+              "target": {
+                "file": "planner.py",
+                "symbol": "plan"
+              },
+              "callLine": 14
+            }
+          ],
+          "result": {
+            "status": "passed",
+            "actual": {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "forwarding",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "line": 15,
+              "end": 15,
+              "conditionLine": 14,
+              "target": {
+                "file": "planner.py",
+                "symbol": "plan"
+              },
+              "callLine": 14
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "JSON parse failure takes the transport fallback",
+          "claim": {
+            "mode": "fallback",
+            "trigger": {
+              "kind": "exception",
+              "name": "ValueError"
+            },
+            "owner": {
+              "file": "release.py"
+            },
+            "response": {
+              "code": "invalid-json"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "fallback",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "line": 12,
+              "end": 12,
+              "conditionLine": 11,
+              "code": "invalid-json",
+              "outputLine": 15
+            }
+          ],
+          "result": {
+            "status": "passed",
+            "actual": {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "fallback",
+              "sha256": "7cfadf3cc1c81295d9fee5e260e9744d92c6889f6349368c7d63064f587585a7",
+              "line": 12,
+              "end": 12,
+              "conditionLine": 11,
+              "code": "invalid-json",
+              "outputLine": 15
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-json",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "run": "r-v7UYLt",
+      "architecture": {
+        "sha256": "48fdf7c72c92e07d0e90ec38b5acbcf0d5338a7e73a77d1de33b2bc876cb5ca9",
+        "line": 9,
+        "text": "- `release.py`：JSON 解析失败 → `invalid-json`；请求不是对象或缺少/多余顶层字段结构 → `invalid-request`；保证输出恰好为 `{\"status\":\"ok\",\"actions\":[...],\"units\":n}` 或 `{\"status\":\"error\",\"error\":code,\"actions\":[],\"units\":0}`，退出码 0。"
+      },
+      "artifacts": [
+        {
+          "path": "journal.py",
+          "sha256": "8802bc1dc03168e4fb5a22b6d70ac8d9832bafe36f3fd6500afd8a9a1318367b"
+        },
+        {
+          "path": "planner.py",
+          "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b"
+        },
+        {
+          "path": "policy.py",
+          "sha256": "9acdb1326f1a23924e2b0171ac0485f9b863b9ae8f8b3e0ba5d85123ca17593e"
+        },
+        {
+          "path": "release.py",
+          "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69"
+        }
+      ],
+      "checks": [
+        {
+          "label": "frozen documented wrong business owner",
+          "claim": {
+            "mode": "business",
+            "trigger": {
+              "kind": "input-type",
+              "argument": 0,
+              "type": "object",
+              "test": "not"
+            },
+            "response": {
+              "code": "invalid-request"
+            },
+            "owner": {
+              "file": "release.py"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+              "line": 68,
+              "end": 68,
+              "conditionLine": 67,
+              "code": "invalid-request"
+            }
+          ],
+          "result": {
+            "status": "mismatch",
+            "reason": "decision-position-or-result",
+            "actual": {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+              "line": 68,
+              "end": 68,
+              "conditionLine": 67,
+              "code": "invalid-request"
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "current source business owner",
+          "claim": {
+            "mode": "business",
+            "trigger": {
+              "kind": "input-type",
+              "argument": 0,
+              "type": "object",
+              "test": "not"
+            },
+            "response": {
+              "code": "invalid-request"
+            },
+            "owner": {
+              "file": "planner.py"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+              "line": 68,
+              "end": 68,
+              "conditionLine": 67,
+              "code": "invalid-request"
+            }
+          ],
+          "result": {
+            "status": "passed",
+            "actual": {
+              "file": "planner.py",
+              "symbol": "plan",
+              "mode": "business",
+              "sha256": "2089f2b9a256399977fd2db67d1a4712f36d9ff1c63ddd6e4474329bd707d81b",
+              "line": 68,
+              "end": 68,
+              "conditionLine": 67,
+              "code": "invalid-request"
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "current transport forwards the downstream result",
+          "claim": {
+            "mode": "forwarding",
+            "trigger": {
+              "kind": "delegate",
+              "file": "planner.py"
+            },
+            "owner": {
+              "file": "release.py"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "forwarding",
+              "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+              "line": 38,
+              "end": 38,
+              "conditionLine": 29,
+              "target": {
+                "file": "planner.py",
+                "symbol": "plan"
+              },
+              "callLine": 29
+            }
+          ],
+          "result": {
+            "status": "passed",
+            "actual": {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "forwarding",
+              "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+              "line": 38,
+              "end": 38,
+              "conditionLine": 29,
+              "target": {
+                "file": "planner.py",
+                "symbol": "plan"
+              },
+              "callLine": 29
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "JSON parse failure takes the transport fallback",
+          "claim": {
+            "mode": "fallback",
+            "trigger": {
+              "kind": "exception",
+              "name": "ValueError"
+            },
+            "owner": {
+              "file": "release.py"
+            },
+            "response": {
+              "code": "invalid-json"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "fallback",
+              "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+              "line": 26,
+              "end": 26,
+              "conditionLine": 24,
+              "code": "invalid-json",
+              "outputLine": 38
+            }
+          ],
+          "result": {
+            "status": "passed",
+            "actual": {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "fallback",
+              "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+              "line": 26,
+              "end": 26,
+              "conditionLine": 24,
+              "code": "invalid-json",
+              "outputLine": 38
+            }
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-json",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        },
+        {
+          "label": "the same error code does not visit the catchall on a business rejection",
+          "claim": {
+            "mode": "fallback",
+            "trigger": {
+              "kind": "exception",
+              "name": "Exception"
+            },
+            "owner": {
+              "file": "release.py"
+            },
+            "response": {
+              "code": "invalid-request"
+            }
+          },
+          "staticWitnesses": [
+            {
+              "file": "release.py",
+              "symbol": "main",
+              "mode": "fallback",
+              "sha256": "cb5c2a1a076229a62206166bf59a471fbf65061aa0d9a503946c7c76c4416d69",
+              "line": 37,
+              "end": 37,
+              "conditionLine": 30,
+              "code": "invalid-request",
+              "outputLine": 38
+            }
+          ],
+          "result": {
+            "status": "unresolved",
+            "reason": "no-executed-typed-decision"
+          },
+          "response": {
+            "status": "error",
+            "error": "invalid-request",
+            "actions": [],
+            "units": 0
+          },
+          "exitCode": 0
+        }
+      ]
+    }
+  ]
+}

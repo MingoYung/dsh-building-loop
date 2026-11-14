@@ -1,0 +1,120 @@
+{
+  "spec": "building-loop-reservation-benchmark-design/1",
+  "domain": "warehouse-reservation-ledger",
+  "stages": [
+    "H1",
+    "H2"
+  ],
+  "compareMs": 300000,
+  "completeMs": 600000,
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "off"
+  },
+  "arms": [
+    "standard",
+    "standard-checklist",
+    "building-loop"
+  ],
+  "naturalPrompts": [
+    "开始建设：这个仓库预约账本要支持批量处理预约。按 SPEC.md 把这一版做完，现有接口照常用。做完告诉我结果。工作单元 K01。",
+    "开始建设：继续这个仓库预约账本。仓库增加了停用窗口和预约转移，按 CHANGE-G2.md 更新，现有接口照常用。做完告诉我结果。工作单元 K02。"
+  ],
+  "records": {
+    "SPEC.md": {
+      "sha256": "27dfeb30f0e6f32717cecfb2622337687c29160ae5c939c68e52c4823973da1e",
+      "text": "# 仓库预约账本\n\n这是一个无状态的 Python 3.11+ 命令行工具。运行 `python entry.py` 后，从标准输入读取一份 JSON，输出一份 JSON，正常退出。不访问网络或磁盘。维持现有四个模块和导入方向。entry 只解码、委托和输出，ledger 执行业务入口、顺序和事务，events 校验记录与事件身份，windows 校验资源时间区间。解码失败由 entry 返回 `invalid-request`。解码成功但顶层非对象由 ledger 拒绝，返回同样的 `invalid-request`。entry 委托 ledger 并原样输出其业务结果。\n\n已支持 `{\"operation\":\"inspect\",\"active\":[...]}`。active 默认空列表。一条预约有且只有 `id,resource,owner,start,end,revision`，三个名称均为长度 1 至 64 的字符串。时间点是 0 至 10 亿的整数，满足 start < end。revision 为 1 至 10 亿的整数。布尔值不算整数。重复预约 ID 或形状错误由 events 返回 `invalid-active`。同资源区间是左闭右开，首尾相接合法，重叠由 windows 返回 `overlap`。不同资源互不影响。成功 inspect 返回 `{\"status\":\"ok\",\"active\":[...],\"results\":[]}`，按 resource、start、end、id 依次排序。未支持的 operation 或额外顶层字段返回 `invalid-request`。除非下文有变更，保留这些行为。\n\n本轮增加 `{\"operation\":\"apply\",\"active\":[...],\"events\":[...]}`。events 必须是 1 至 4096 项的列表。active 合法后，从第 0 项起按原输入顺序处理。事件的 event_id 与 id 采用同样的字符串规则。reserve 事件有且只有 `event_id,kind,id,resource,owner,start,end`，kind 为 reserve，预约初始 revision=1。release 事件有且只有 `event_id,kind,id`，kind 为 release，删除当前预约。结构或字段值错误由 events 返回 `invalid-event`。正在占用的预约 ID 再 reserve，由 ledger 返回 `duplicate-reservation`。release 找不到当前 ID，由 ledger 返回 `unknown-reservation`。删除后可以再次 reserve 同一 ID。\n\nevents 对当前批次的 event_id 作身份判定。完全相同的后续事件是重试，响应 outcome 为 replay，且不再检查当前预约状态。对象字段顺序不影响身份。相同 event_id 内容不同，由 events 返回 `conflicting-event`。每项先检查事件形状，再检查身份，随后才应用业务。一个较早的业务错误优先于后续任何错误。成功返回 `{\"status\":\"ok\",\"active\":[...],\"results\":[{\"event_id\":\"...\",\"outcome\":\"applied|replay\"},...]}`，results 一项输入一条，active 按 inspect 的规则排序。\n\n所有错误返回 `{\"status\":\"error\",\"error\":\"错误码\",\"eventIndex\":null,\"active\":[],\"results\":[]}`。由单个事件触发时 eventIndex 为该项实际序号。批次原子提交，后续失败时不返回前面结果或部分预约。apply 应处理至少 24,000 条初始预约和 4,096 项事件。不得按全量预约反复扫描每项冲突。业务错误码由指定模块判定，和 entry 输出该结果是两件事。\n"
+    },
+    "CHANGE-G2.md": {
+      "sha256": "effff4217039ca18a6c26993c7830c712f545ab0f1a24b27e254a8d611b39666",
+      "text": "# 仓库预约账本第二次修订\n\n保留 SPEC.md 已有接口及现有行为。apply 新增可选 `closed` 字段，默认空列表。每个停用区间有且只有 `resource,start,end`，按原字段规则校验。区间可重叠或无序，停用区间最多 24,000 条。字段形状错误由 windows 返回 `invalid-window`，在事件开始前检查。初始预约继续有效。新 reserve 或 transfer 在目标资源与停用区间相交时，由 windows 判定 `window-closed`，它优先于目标预约重叠。release 不受停用影响。inspect 维持原请求形状。\n\n事件增加 transfer，有且只有 `event_id,kind,id,resource,owner,start,end,if_revision`，其中 kind 为 transfer，if_revision 是符合旧 revision 字段规则的整数。它用同一 ID 替换预约的资源、所有者、起止时间，并将 revision 加一。先检查形状与身份，再由 ledger 判断预约是否存在以及 revision 是否正好等于 if_revision。版本不符或当前 revision 已达上限，由 ledger 返回 `revision-conflict`。检查目标冲突时排除被替换预约自身。transfer 成功时，results 对该项额外含 `fromRevision,toRevision`，事件重试仍只返回 event_id 与 outcome。其他结果字段保留旧形状。\n\n旧错误顺序仍有效。停用区间错误先于任何单项事件错误，单项形状与身份先于该项状态检查，revision 检查先于停用与重叠检查。每批全部成功才返回修改后的 active 和结果。保留无外部状态、模块职责和原导入方向。\n"
+    },
+    "METHOD.md": {
+      "sha256": "21c2c4ca0fda3de5f434b1c399e5f5fce8234eed010708cf4ee04c16a15af553",
+      "text": "# 仓库预约账本难题评测\n\n题目为 Python 标准库命令行服务。起点是已能运行的只读预约账本。第一关 H1 增加原子事件批处理、区间冲突与批内幂等。第二关 H2 在同一工程加入停用窗口、条件更新与可审计修订号。时间区间为左闭右开。中途新目标只随第二阶段写入工作区。\n\n标准、标准加工程清单、Building-loop 使用相同的 DeepSeek Flash 和相同业务提示。清单是预先固定的通用工程提示。三组均收到相同的公开用户合同和基线源码。Building-loop 的维护者规则在授权中绑定原文规定的模块边界、业务形状判定、入口解码兜底和透传。记录哪一轮实际使用原目录的新会话，前轮未正式结束时记录冻结副本续跑。参考实现、评分器、种子或隐藏测试位于会话工作区外。\n\n一次重复共六个阶段输出。每阶段先按 300 秒保存可比的成绩，允许到 600 秒自然完成。旧通过项和当前新增项分别统计。候选用独立 Linux 沙箱执行，拒绝网络、工作区外文件和回写。统计功能、模块边界、实际职责证据、文档及交接质量。两种分数同时保留。功能分数不能替代独立架构核验或关单状态。\n\n独立性能用例要求单个资源上 24,000 条预约和 4,096 项事件。第二关另加 24,000 个停用窗口。常规沙箱上限三秒，性能用例单独执行、上限一秒，分开记录实际参考时间和对照超时。随机用例从种子变换预约范围、排序、资源、修订号和错误发生顺序。等所有模型进程退出并固定候选源码摘要后，使用新种子再做第二批随机复评。\n\n冻结语义对照包含相同 `invalid-request` 的业务非对象、入口解析兜底和入口透传。记录真实响应与受控调用位置。保留一份将非对象判定挪进入口的功能等价反例，要求业务断言在职责核验处失败，功能分数可保持一致。\n\n公开资料包括两轮业务说明、独立评分及参考校准的可追溯摘要。发布时保留失败和成功，分列未缓存输入、缓存读取、输出和无计量记录。评分器的两个私有种子、候选任务进程和正式配置隔离。\n"
+    },
+    "public-input-examples.json": {
+      "sha256": "4e01454ca88fb5866d5937da5d7a313f7b7528f78682e6fedaffbf3ea728c00e"
+    },
+    "run.mjs": {
+      "sha256": "72ac3b23839914089b7cd71234c870a7fb61c09bb0f3da0201ff8e452a7b3bd9"
+    },
+    "witness.mjs": {
+      "sha256": "e0f8f4bc7b4455b85a12fa5b1720e698bc4465150d7219b535462c992da0c937"
+    },
+    "fixture.mjs": {
+      "sha256": "8d04f2e8e18250fb863e4bef2cb43d323f818483a6a2a56095a0cdc15210ee32"
+    },
+    "assess.py": {
+      "sha256": "81fd5fbde1c14eb4245e637dfd46d139c6547f201e71e851a80aa57fee317f8a"
+    },
+    "base_assess.py": {
+      "sha256": "a233b14b762f7b607d87592463ea5834925f2f9bbb7a299fd56b33451c78feee"
+    },
+    "hard_assess.py": {
+      "sha256": "64a50a6d27143cf5d35ac372e5853ef3cb2d8d957a7882cd5b1a05d0f6a740ae"
+    },
+    "postfreeze.py": {
+      "sha256": "9b31b98d60a493cbadd12179430754e59df1def26a2a53b47262f89ef8af7fa5"
+    },
+    "responsibility-audit.py": {
+      "sha256": "aa48940350a7f88c7a571857eac6b9c493ab9cb1f143bb34ab7c773e6ed64237"
+    },
+    "calibrate.py": {
+      "sha256": "f71117652dc860e6b3eaaf3c4e967b0d0e26e2e3275e2d960c69fcd44318b553"
+    },
+    "review-probe.py": {
+      "sha256": "cbc3101f1e6e76d407c3cde46a761cc88b8a66ff3301871f1bd51c39cbaeee74"
+    },
+    "python_trace.py": {
+      "sha256": "2f1c390606b3e434d8ce470018051edca5acf8be48ba89225aab23a376bde199"
+    },
+    "launch-reservation.ps1": {
+      "sha256": "4388870020f9a0aaea587951e673446ea07e6524f9b85f7a736c4adf84401232"
+    }
+  },
+  "seedFiles": {
+    "entry.py": "2d99dfc97973998aef8a80ed230725e920bf3436d28450ff4d6bd27d1b3edee7",
+    "events.py": "290d4324ff6a1e8b3bdfdadfa78a61d43ce33b55000412f167ab5781e8f1112f",
+    "ledger.py": "3c49c57e078a727ce8e8211123a7978b7becfbc29fec5e4d7651525a06fa41b0",
+    "windows.py": "328713da3b98b3097db0a2fe17901e88ddd1085763be26ee44ce182d8423ea12"
+  },
+  "cases": {
+    "baseline": 18,
+    "H1": 60,
+    "H2": 104,
+    "postfreezePerStage": 24
+  },
+  "performance": {
+    "initial": 24000,
+    "events": 4096,
+    "H2closed": 24000,
+    "timeoutMs": 1000
+  },
+  "ownerResponsibilities": [
+    {
+      "mode": "business",
+      "module": "ledger.py",
+      "trigger": "decoded nonobject",
+      "response": "invalid-request"
+    },
+    {
+      "mode": "fallback",
+      "module": "entry.py",
+      "trigger": "ValueError while decoding",
+      "response": "invalid-request"
+    },
+    {
+      "mode": "forwarding",
+      "module": "entry.py",
+      "delegate": "ledger.py",
+      "trigger": "decoded valid inspect"
+    }
+  ],
+  "exclusions": [
+    "candidate session IDs",
+    "private grader seeds",
+    "reference source bytes"
+  ]
+}

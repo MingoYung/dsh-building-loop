@@ -1,0 +1,722 @@
+{
+  "archiveSha256": "33d62ae01e94e7abc9f499ab84b24d8582b985199eac5dba375b3b6c266686a3",
+  "scope": "Independent necessary-comments audit of exact frozen source: interfaces, key control flow and cross-module constraints. Line counts are informational.",
+  "observations": [
+    {
+      "run": "r-K7uKAM",
+      "stages": [
+        {
+          "stage": "g1",
+          "reviewed": true,
+          "checks": [
+            {
+              "id": "global-heap-tie-break",
+              "file": "planner.py",
+              "start": 21,
+              "end": 36,
+              "passed": true,
+              "reason": "Explains full-graph input, dependency direction and current-ready heap tie-break, as implemented in lines 37–59.",
+              "sha256": "134a454bb46a8501eb4f0967608173cd6d2c079fde6e60b30a511db32b154afc",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 21,
+                  "text": "def order_changes(changes):"
+                },
+                {
+                  "line": 22,
+                  "text": "    \"\"\"Return every change ID in deterministic dependency order."
+                },
+                {
+                  "line": 23,
+                  "text": ""
+                },
+                {
+                  "line": 24,
+                  "text": "    Edges are prerequisite -> dependent, built after deduplication, so a"
+                },
+                {
+                  "line": 25,
+                  "text": "    dependency on a collapsed duplicate still resolves to the surviving ID."
+                },
+                {
+                  "line": 26,
+                  "text": ""
+                },
+                {
+                  "line": 27,
+                  "text": "    Missing prerequisites and cycles both leave nodes unordered; they are told"
+                },
+                {
+                  "line": 28,
+                  "text": "    apart by checking targets first, because SPEC gives them different codes."
+                },
+                {
+                  "line": 29,
+                  "text": "    A cycle reached only through unapplied changes still fails here: the order"
+                },
+                {
+                  "line": 30,
+                  "text": "    is computed over the *full* graph, not just the slice a plan would emit, so"
+                },
+                {
+                  "line": 31,
+                  "text": "    plan and rollback can never disagree about what is executable."
+                },
+                {
+                  "line": 32,
+                  "text": ""
+                },
+                {
+                  "line": 33,
+                  "text": "    The ready set is a heap of IDs, which makes the tie-break lexicographic"
+                },
+                {
+                  "line": 34,
+                  "text": "    among currently eligible changes (not a global sort): a later-alphabet ID"
+                },
+                {
+                  "line": 35,
+                  "text": "    becomes eligible the moment its last prerequisite is emitted."
+                },
+                {
+                  "line": 36,
+                  "text": "    \"\"\""
+                }
+              ]
+            },
+            {
+              "id": "boolean-exclusion-and-uncapped-rollback",
+              "file": "policy.py",
+              "start": 17,
+              "end": 37,
+              "passed": true,
+              "reason": "Explains why Python bool needs an exact type check and why rollback only validates the limit.",
+              "sha256": "05c80b3fdc2b3374d78d4d5f7aecb51ccd103b165606f9b109538550d187ad36",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 17,
+                  "text": "def limit_for(request):"
+                },
+                {
+                  "line": 18,
+                  "text": "    \"\"\"Return the budget, or None meaning \"rollback, uncapped\"."
+                },
+                {
+                  "line": 19,
+                  "text": ""
+                },
+                {
+                  "line": 20,
+                  "text": "    G1 authorizes both actions in both environments, so the environment check"
+                },
+                {
+                  "line": 21,
+                  "text": "    is a validity gate rather than an authorization gate; narrowing an action"
+                },
+                {
+                  "line": 22,
+                  "text": "    to one environment later belongs here alone."
+                },
+                {
+                  "line": 23,
+                  "text": ""
+                },
+                {
+                  "line": 24,
+                  "text": "    The budget is validated for every action but only *caps* plan. Rollback"
+                },
+                {
+                  "line": 25,
+                  "text": "    must finish undoing what was already applied, so a cap would strand a"
+                },
+                {
+                  "line": 26,
+                  "text": "    release half-reverted; returning None tells planner not to compare."
+                },
+                {
+                  "line": 27,
+                  "text": "    \"\"\""
+                },
+                {
+                  "line": 28,
+                  "text": "    if request.get(\"environment\") not in ENVIRONMENTS:"
+                },
+                {
+                  "line": 29,
+                  "text": "        raise PolicyError(\"invalid-environment\")"
+                },
+                {
+                  "line": 30,
+                  "text": "    action = request.get(\"action\")"
+                },
+                {
+                  "line": 31,
+                  "text": "    if action not in ACTIONS:"
+                },
+                {
+                  "line": 32,
+                  "text": "        raise PolicyError(\"unsupported-action\")"
+                },
+                {
+                  "line": 33,
+                  "text": "    budget = request.get(\"budget\")"
+                },
+                {
+                  "line": 34,
+                  "text": "    # type() rather than isinstance: bool is an int subclass and True would"
+                },
+                {
+                  "line": 35,
+                  "text": "    # otherwise pass as budget 1."
+                },
+                {
+                  "line": 36,
+                  "text": "    if type(budget) is not int or budget < 0:"
+                },
+                {
+                  "line": 37,
+                  "text": "        raise PolicyError(\"invalid-budget\")"
+                }
+              ]
+            },
+            {
+              "id": "journal-identity-and-duplicate-policy",
+              "file": "journal.py",
+              "start": 32,
+              "end": 40,
+              "passed": true,
+              "reason": "Documents identity, order independence and distinction between duplicate and conflicting IDs.",
+              "sha256": "6ce694fa1dc0ea0ddddd3f13f12abdbbb0056cec205396f70d30731062b89b07",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 32,
+                  "text": "def read_changes(records):"
+                },
+                {
+                  "line": 33,
+                  "text": "    \"\"\"Return surviving changes keyed by id, after deduplication."
+                },
+                {
+                  "line": 34,
+                  "text": ""
+                },
+                {
+                  "line": 35,
+                  "text": "    Equality covers id, component, units and the *set* of dependencies: two"
+                },
+                {
+                  "line": 36,
+                  "text": "    records differing only in dependency order or repetition are the same"
+                },
+                {
+                  "line": 37,
+                  "text": "    change and collapse to one. Two records sharing an id but differing in any"
+                },
+                {
+                  "line": 38,
+                  "text": "    of those fields are a conflict, because silently keeping one would emit a"
+                },
+                {
+                  "line": 39,
+                  "text": "    plan the caller cannot trace back to their persisted intent."
+                },
+                {
+                  "line": 40,
+                  "text": "    \"\"\""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "g2",
+          "reviewed": true,
+          "checks": [
+            {
+              "id": "recognition-versus-freeze-priority",
+              "file": "policy.py",
+              "start": 18,
+              "end": 25,
+              "passed": true,
+              "reason": "Explains why production remains recognized, which public code would change otherwise, and how two budgets combine.",
+              "sha256": "c844edce2db00fb3d41be8eac0be2d4323372b8ee7a7567a0acd6442db75b54c",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 18,
+                  "text": "# Production stays listed: it is a *valid* environment name that is refused by"
+                },
+                {
+                  "line": 19,
+                  "text": "# policy, not a typo. Removing it would turn a frozen request into"
+                },
+                {
+                  "line": 20,
+                  "text": "# invalid-environment and hide the real reason from the caller."
+                },
+                {
+                  "line": 21,
+                  "text": "ENVIRONMENTS = (\"staging\", \"production\")"
+                },
+                {
+                  "line": 22,
+                  "text": ""
+                },
+                {
+                  "line": 23,
+                  "text": "# G2: staging plans are capped at 3 units for this release, whatever the"
+                },
+                {
+                  "line": 24,
+                  "text": "# request's own budget says. The request budget is still validated and still"
+                },
+                {
+                  "line": 25,
+                  "text": "# applies as a second, possibly tighter cap; the smaller of the two wins."
+                }
+              ]
+            },
+            {
+              "id": "retention-closure-and-signed-output-order",
+              "file": "planner.py",
+              "start": 63,
+              "end": 79,
+              "passed": true,
+              "reason": "Explains traversal across prerequisites, which IDs are retained, and the separate ordering responsibility.",
+              "sha256": "fcd0205ce0f7940876dee5703ffe2b64385a62a2a57d45d304e8a3b6ebd7a3d8",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 63,
+                  "text": "    \"\"\"Return applied IDs a staging rollback must keep: retained closure (G2)."
+                },
+                {
+                  "line": 64,
+                  "text": ""
+                },
+                {
+                  "line": 65,
+                  "text": "    `retain` is already known to be applied (journal read it), so this is a"
+                },
+                {
+                  "line": 66,
+                  "text": "    pure graph closure: starting from the retained IDs, walk prerequisite and"
+                },
+                {
+                  "line": 67,
+                  "text": "    keep every node reached that is in `applied`. Walking only through"
+                },
+                {
+                  "line": 68,
+                  "text": "    *applied* prerequisites matters -- an unapplied prerequisite was never"
+                },
+                {
+                  "line": 69,
+                  "text": "    released, so it cannot be un-released and must not widen the kept set"
+                },
+                {
+                  "line": 70,
+                  "text": "    (and emitting it would break G1's rollback-only-applied rule)."
+                },
+                {
+                  "line": 71,
+                  "text": ""
+                },
+                {
+                  "line": 72,
+                  "text": "    Keeping ancestors is required for correctness, not politeness: a retained"
+                },
+                {
+                  "line": 73,
+                  "text": "    consumer still needs its library, so rolling the library back underneath"
+                },
+                {
+                  "line": 74,
+                  "text": "    it would leave the surviving release broken."
+                },
+                {
+                  "line": 75,
+                  "text": ""
+                },
+                {
+                  "line": 76,
+                  "text": "    The order comes from `changes`/`applied` only, never from the retain list's"
+                },
+                {
+                  "line": 77,
+                  "text": "    own order, so the emitted sequence stays the single deterministic reverse"
+                },
+                {
+                  "line": 78,
+                  "text": "    topological order and is reproducible across calls."
+                },
+                {
+                  "line": 79,
+                  "text": "    \"\"\""
+                }
+              ]
+            },
+            {
+              "id": "applied-membership-and-error-contract",
+              "file": "journal.py",
+              "start": 78,
+              "end": 95,
+              "passed": true,
+              "reason": "Explains where retain is applicable, why plan ignores it, and the retained ID subset and error contract.",
+              "sha256": "7202f6a09bb82d670fa72d7de95c81730eb66cd22cf34dc4ace6e7aa852d1980",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 78,
+                  "text": "    \"\"\"Return the retain list as a set of IDs still to be kept (G2)."
+                },
+                {
+                  "line": 79,
+                  "text": ""
+                },
+                {
+                  "line": 80,
+                  "text": "    Shape violations get their own `invalid-retain` code rather than"
+                },
+                {
+                  "line": 81,
+                  "text": "    `invalid-change`: the caller asked to protect a release scope, and calling"
+                },
+                {
+                  "line": 82,
+                  "text": "    the *changes* invalid would point at the wrong field."
+                },
+                {
+                  "line": 83,
+                  "text": ""
+                },
+                {
+                  "line": 84,
+                  "text": "    `applied` decides what retain may name and is passed in already parsed, so"
+                },
+                {
+                  "line": 85,
+                  "text": "    validation order is fixed: applied shape/identity settles before retain is"
+                },
+                {
+                  "line": 86,
+                  "text": "    looked at. A retain ID that was never applied is rejected rather than"
+                },
+                {
+                  "line": 87,
+                  "text": "    filtered out, because silently dropping it would emit a rollback for a"
+                },
+                {
+                  "line": 88,
+                  "text": "    change the caller just asked to keep -- the most expensive possible"
+                },
+                {
+                  "line": 89,
+                  "text": "    misread. This is a pure membership test; graph reachability of the kept set"
+                },
+                {
+                  "line": 90,
+                  "text": "    stays in planner.py."
+                },
+                {
+                  "line": 91,
+                  "text": ""
+                },
+                {
+                  "line": 92,
+                  "text": "    Only rollback carries retain. For any other action an explicit non-empty"
+                },
+                {
+                  "line": 93,
+                  "text": "    retain is a malformed request, while an explicit [] is harmless because it"
+                },
+                {
+                  "line": 94,
+                  "text": "    keeps nothing and there is nothing to protect."
+                },
+                {
+                  "line": 95,
+                  "text": "    \"\"\""
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "usefulCommentsQualified": true
+    },
+    {
+      "run": "r-A6f7Fu",
+      "stages": [
+        {
+          "stage": "g1",
+          "reviewed": true,
+          "checks": [
+            {
+              "id": "consequence-of-deleting-applied-prerequisite-edge",
+              "file": "journal.py",
+              "start": 96,
+              "end": 102,
+              "passed": false,
+              "reason": "Reverses the observed failure, sending a future maintainer to the wrong diagnosis. Exact bad and repaired snapshot replay is attached.",
+              "sha256": "67ea6458e8a1c1d359e2d92e1b396195ffebb94d2d99f5d979bdffc3216fdf52",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 96,
+                  "text": "    The order is built from every dependency edge, never from"
+                },
+                {
+                  "line": 97,
+                  "text": "    depends_on-minus-applied: applied IDs must still constrain their consumers."
+                },
+                {
+                  "line": 98,
+                  "text": "    If they were dropped, a consumer and its already applied prerequisite would"
+                },
+                {
+                  "line": 99,
+                  "text": "    become eligible together and only lexical order would decide, so the reverse"
+                },
+                {
+                  "line": 100,
+                  "text": "    used by rollback would put the consumer before its prerequisite and break"
+                },
+                {
+                  "line": 101,
+                  "text": "    SPEC.md:14. `applied` is used here only to validate unknown IDs; plan"
+                },
+                {
+                  "line": 102,
+                  "text": "    filtering and budget accounting happen in planner.py."
+                }
+              ]
+            },
+            {
+              "id": "filter-and-reverse-a-fixed-order",
+              "file": "planner.py",
+              "start": 39,
+              "end": 43,
+              "passed": false,
+              "reason": "Filtering a fixed full order to a fixed applied subset commutes with reversal. The real bug was removing edges before ordering.",
+              "sha256": "205a57ef6b0bef2870840ae6336bc3f9ea1aff27b0d1ce88e14b045c3b573f60",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 39,
+                  "text": "            # Reverse the full deterministic order first, then keep the applied"
+                },
+                {
+                  "line": 40,
+                  "text": "            # IDs: that is literally SPEC.md:14 and it fixes the positions of the"
+                },
+                {
+                  "line": 41,
+                  "text": "            # emitted subset. Filtering first and reversing afterwards would give"
+                },
+                {
+                  "line": 42,
+                  "text": "            # a different order whenever an unapplied change sorts into the list."
+                },
+                {
+                  "line": 43,
+                  "text": "            actions = [ident for ident in reversed(order) if ident in applied_ids]"
+                }
+              ]
+            },
+            {
+              "id": "unhashable-policy-boundary",
+              "file": "policy.py",
+              "start": 28,
+              "end": 32,
+              "passed": true,
+              "reason": "Documents the runtime TypeError avoided by checking string type before testing set membership.",
+              "sha256": "fff5568dd8fd03b920daed1b142ca3f64664f417a8992a24fe763dcf2b3a3e4c",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 28,
+                  "text": "    # isinstance(str) is checked before membership: an array or object value is"
+                },
+                {
+                  "line": 29,
+                  "text": "    # unhashable, and `value in set` would raise TypeError and abort the process"
+                },
+                {
+                  "line": 30,
+                  "text": "    # instead of returning the coded error with exit code 0."
+                },
+                {
+                  "line": 31,
+                  "text": "    environment = request.get(\"environment\")"
+                },
+                {
+                  "line": 32,
+                  "text": "    if not isinstance(environment, str) or environment not in ENVIRONMENTS:"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "g2",
+          "reviewed": true,
+          "checks": [
+            {
+              "id": "filter-and-reverse-a-fixed-order",
+              "file": "planner.py",
+              "start": 79,
+              "end": 84,
+              "passed": false,
+              "reason": "A fixed subset filter and reverse commute on the same fixed order. Both reviewers verified a range containing this false comment, unrelated to the working retention behavior.",
+              "sha256": "e67f604e4864ad3a1315e724a20eabc5e7721537cb55ee79b7481fee3ba1200b",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 79,
+                  "text": "            # Reverse the full deterministic order first, then keep the applied"
+                },
+                {
+                  "line": 80,
+                  "text": "            # IDs minus the retained ones: that is literally SPEC.md:14 and it"
+                },
+                {
+                  "line": 81,
+                  "text": "            # fixes the positions of the emitted subset. Filtering first and"
+                },
+                {
+                  "line": 82,
+                  "text": "            # reversing afterwards would give a different order whenever an"
+                },
+                {
+                  "line": 83,
+                  "text": "            # unapplied change sorts into the list, and retention must filter"
+                },
+                {
+                  "line": 84,
+                  "text": "            # the same list rather than re-sort it."
+                }
+              ]
+            },
+            {
+              "id": "staging-production-first-rejection",
+              "file": "policy.py",
+              "start": 46,
+              "end": 52,
+              "passed": true,
+              "reason": "Explains why exact precedence over malformed graph, budget and changes is important for frozen production and why the guard stays before planner reads journal.",
+              "sha256": "f025f473a1d558fbe6cadfb846687d2cb8c2efb145c4cdda69baf37595763722",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 46,
+                  "text": "        # Frozen before action/budget/changes are examined (CHANGE-G2.md:5"
+                },
+                {
+                  "line": 47,
+                  "text": "        # \"before graph or change validation\"): the freeze has to win over"
+                },
+                {
+                  "line": 48,
+                  "text": "        # every structural complaint, so a production request with a malformed"
+                },
+                {
+                  "line": 49,
+                  "text": "        # graph, unknown applied ID or bad budget still gets production-frozen"
+                },
+                {
+                  "line": 50,
+                  "text": "        # instead of invalid-change/invalid-budget. Keep this ahead of the"
+                },
+                {
+                  "line": 51,
+                  "text": "        # action and budget checks, and never relocate it into planner.py"
+                },
+                {
+                  "line": 52,
+                  "text": "        # after read_changes(). Both plan and rollback are frozen here."
+                }
+              ]
+            },
+            {
+              "id": "retention-g2-scope-and-input-shape",
+              "file": "journal.py",
+              "start": 82,
+              "end": 96,
+              "passed": true,
+              "reason": "Documents staging rollback-only parsing and transfer to planner, with the distinct contract code.",
+              "sha256": "14f244750654f2c8c4283797220ea5f7d90d49e4e59586599651e64cdcb7f5f9",
+              "containsAnnotation": true,
+              "lines": [
+                {
+                  "line": 82,
+                  "text": "def read_retain(value):"
+                },
+                {
+                  "line": 83,
+                  "text": "    \"\"\"Validate a staging rollback's retain list; return it in request order."
+                },
+                {
+                  "line": 84,
+                  "text": ""
+                },
+                {
+                  "line": 85,
+                  "text": "    retain is a rollback-only field (CHANGE-G2.md:7): planner.py calls this only"
+                },
+                {
+                  "line": 86,
+                  "text": "    on the rollback path, so a malformed retain on a plan request must never"
+                },
+                {
+                  "line": 87,
+                  "text": "    raise invalid-retain nor change the plan result. The shape rules mirror the"
+                },
+                {
+                  "line": 88,
+                  "text": "    journal (non-array, null, empty string or non-string element) but use their"
+                },
+                {
+                  "line": 89,
+                  "text": "    own code, and a missing field defaults to empty. Membership in `applied` is"
+                },
+                {
+                  "line": 90,
+                  "text": "    not checked here because retain's legal values depend on replay state that"
+                },
+                {
+                  "line": 91,
+                  "text": "    planner.py holds; if it is not an applied ID, planner.py rejects it."
+                },
+                {
+                  "line": 92,
+                  "text": ""
+                },
+                {
+                  "line": 93,
+                  "text": "    Callers pass request.get(\"retain\", []) so an absent field means nothing is"
+                },
+                {
+                  "line": 94,
+                  "text": "    retained (all applied changes roll back, exactly as in G1). Rejections are"
+                },
+                {
+                  "line": 95,
+                  "text": "    JournalError(\"invalid-retain\") so the request still yields the shared error"
+                },
+                {
+                  "line": 96,
+                  "text": "    envelope instead of partial actions."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "usefulCommentsQualified": false
+    }
+  ]
+}

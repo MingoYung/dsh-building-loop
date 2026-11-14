@@ -1,0 +1,82 @@
+{
+  "scope": "Read-only replay on the real earlier DSH arm's archived signed candidate. The alternative note is an in-memory test control.",
+  "runId": "r-AErMFD",
+  "mode": "building-loop",
+  "stage": "g2",
+  "sourceArtifacts": [
+    {
+      "path": "journal.py",
+      "sha256": "70fd1955c9bef3e3bbc09099c9b3cbd35acf584c6a278955e293bc9f22b31b5c"
+    },
+    {
+      "path": "planner.py",
+      "sha256": "3650465f7ac4e8ebb801a586c25253682f3755cc6d12248101b0033018c27f31"
+    },
+    {
+      "path": "policy.py",
+      "sha256": "1b26ffbf8818240173d724a9f378e06e1a92ab12f35fca7f4fc89d0d6321da9a"
+    },
+    {
+      "path": "release.py",
+      "sha256": "6377b80a271fe1eea371e4ceaabfec95a8328c27c37d23cae67870223907828c"
+    }
+  ],
+  "architecture": {
+    "path": "modules/architecture.md",
+    "sha256": "5119fa4e1bce9e3bfeb69b342af11380b4b6041fb7a9707d84e925d55be00c63",
+    "line": 7,
+    "text": "- `release.py`：只做传输。读取 stdin 一段 JSON，按顺序调用 `policy` 判定环境/动作/预算，调用 `journal` 校验与去重，调用 `planner` 排序并装配结果；所有输入错误与领域错误都以 JSON 结果正常退出，不写文件、不联网、不执行部署。`production-frozen` 必须在任何图或改动校验之前返回，即使图是坏的。"
+  },
+  "sourceEvidence": [
+    {
+      "file": "release.py",
+      "line": 11,
+      "text": "from planner import plan"
+    },
+    {
+      "file": "release.py",
+      "line": 30,
+      "text": "        result = plan(request)"
+    }
+  ],
+  "groundedDirectCalls": [
+    {
+      "file": "release.py",
+      "line": 30,
+      "target": "planner.py",
+      "symbol": "plan"
+    }
+  ],
+  "detectedConflicts": [
+    {
+      "line": 7,
+      "from": "release.py",
+      "to": "policy.py",
+      "relation": "call",
+      "actual": [
+        {
+          "file": "planner.py",
+          "line": 30
+        }
+      ]
+    },
+    {
+      "line": 7,
+      "from": "release.py",
+      "to": "journal.py",
+      "relation": "call",
+      "actual": [
+        {
+          "file": "planner.py",
+          "line": 30
+        }
+      ]
+    }
+  ],
+  "correctedControl": {
+    "sha256": "7b08bb0193712b6671552c8235130233e2c543734202c9e8ec530167da6f9d9c",
+    "line": 7,
+    "text": "- `release.py`：只做传输。读取 stdin 一段 JSON，调用 `planner` 进行规划。通过规划模块间接使用策略与日志模块；所有输入错误与领域错误都以 JSON 结果正常退出，不写文件、不联网、不执行部署。`production-frozen` 必须在任何图或改动校验之前返回，即使图是坏的。",
+    "detectedConflicts": []
+  }
+}

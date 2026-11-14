@@ -1,0 +1,33 @@
+{
+  "archiveSha256": "2528507a5ff1ba65935b725a9b670f85b4d104c517030df92da430e28b0279db",
+  "run": "r-kcBQoe",
+  "mode": "standard",
+  "stage": "G4",
+  "session": "d2dea57b5cad",
+  "scope": "Exact persisted native tool call and public owner clause. No reply is injected for this paused experiment arm.",
+  "nativeInteractiveRequest": {
+    "seq": 56,
+    "elapsedMs": 12938,
+    "kind": "ask_user_question",
+    "question": "G4 要求 \"去重后全部回退动作的 units 和 limit 比较\"。但 G2 retain 语义下，被保留(含其传递依赖)的已应用项不会出现在动作里。limit 应该和哪个总数比较？",
+    "choices": [
+      {
+        "label": "只算实际动作 units（保留项不计入）(Recommended)",
+        "description": "比较的是真正会回退的 units 之和，即各 result 的 units 累加；被 retain 保留的已应用项不算。与 G3 顶层 units 口径一致，也与 G4 '回退动作的 units' 字面一致。"
+      },
+      {
+        "label": "算全部已应用项（含被 retain 保留的）",
+        "description": "先统计 applied 中全部 units（不受 retain 影响）再比较，limit 更像'本次回退覆盖范围上限'。"
+      }
+    ],
+    "followup": []
+  },
+  "requirement": {
+    "file": "CHANGE-G4.md",
+    "line": 7,
+    "sha256": "727aa77553187611b424b47c9d2b3633bf225a5add4ca93a19fe056cc8a5c828",
+    "text": "按原请求顺序处理。先校验单项结构和操作 ID，然后判断重复或冲突。仅新 ID 执行该项的 G2 校验和计算。第一个实际失败项优先于整批配额。仅当全批完成上述处理时，把去重后全部回退动作的 units 和 limit 比较。超额返回 batch-limit-exceeded 和 null 序号；等于或低于上限可以提交。原子错误形状和无部分结果保证保持。批量 limit 只应用于批量接口，各单项 G2 rollback 仍不受 plan 配额约束。"
+  },
+  "classification": "waiting-user",
+  "clauseAlreadyAnswers": true
+}

@@ -1,0 +1,471 @@
+{
+  "spec": "building-loop-controlled-reproduction-native/1",
+  "native": {
+    "scenario": "regression",
+    "archiveSha256": "05ec5f21ee1b36581f6a7ff3b6a85806b9a7e5bd1e7cce0d9e7b19f2d5257455",
+    "carrier": "Windows DSH NEXT, isolated native profile and deterministic loopback model",
+    "actions": [
+      {
+        "role": "owner",
+        "step": 0,
+        "name": "building_loop_propose",
+        "action": "propose",
+        "visible": true,
+        "reproduceAvailable": false
+      },
+      {
+        "role": "owner",
+        "step": 1,
+        "name": "building_loop",
+        "action": "prepare",
+        "visible": true,
+        "reproduceAvailable": false
+      },
+      {
+        "role": "owner",
+        "step": 2,
+        "name": "building_loop",
+        "action": "advance",
+        "visible": true,
+        "reproduceAvailable": false
+      },
+      {
+        "role": "owner",
+        "step": 3,
+        "visible": false,
+        "reproduceAvailable": false
+      },
+      {
+        "role": "executor",
+        "step": 0,
+        "name": "building_loop",
+        "action": "prepare",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 1,
+        "name": "building_loop_file",
+        "action": "write",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 2,
+        "name": "building_loop_file",
+        "action": "edit",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 3,
+        "name": "building_loop_reproduce",
+        "action": "check",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 4,
+        "name": "building_loop_reproduce",
+        "action": "probe",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 5,
+        "name": "building_loop",
+        "action": "prepare",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 6,
+        "name": "building_loop",
+        "action": "submit",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 7,
+        "name": "building_loop_file",
+        "action": "edit",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 8,
+        "name": "building_loop_reproduce",
+        "action": "probe",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 9,
+        "name": "building_loop",
+        "action": "prepare",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "executor",
+        "step": 10,
+        "name": "building_loop",
+        "action": "submit",
+        "visible": true,
+        "reproduceAvailable": true
+      },
+      {
+        "role": "owner",
+        "step": 3,
+        "visible": false,
+        "reproduceAvailable": false
+      },
+      {
+        "role": "owner",
+        "step": 3,
+        "visible": false,
+        "reproduceAvailable": false
+      }
+    ],
+    "testRuns": [
+      {
+        "label": "baseline",
+        "digest": "ba41e733aade08724d345ac841856c8a1154581d34bf2db17d88caa2a721a964",
+        "cases": [
+          {
+            "id": "test_existing_failure",
+            "status": "failed"
+          },
+          {
+            "id": "test_lowercase",
+            "status": "passed"
+          },
+          {
+            "id": "test_punctuation",
+            "status": "passed"
+          }
+        ],
+        "exitCode": 1
+      },
+      {
+        "label": "broken",
+        "digest": "7ec7c4d18f690d80b3b3b2788d706c2518f776d195303b2971f2fd9e05d4d753",
+        "cases": [
+          {
+            "id": "test_collapse_spaces",
+            "status": "failed"
+          },
+          {
+            "id": "test_existing_failure",
+            "status": "failed"
+          },
+          {
+            "id": "test_lowercase",
+            "status": "passed"
+          },
+          {
+            "id": "test_punctuation",
+            "status": "failed"
+          }
+        ],
+        "exitCode": 1
+      },
+      {
+        "label": "fixed",
+        "digest": "f8df3163f161f56330f1d157babf8a13696100a28ba92d3923d157aee9065062",
+        "cases": [
+          {
+            "id": "test_collapse_spaces",
+            "status": "passed"
+          },
+          {
+            "id": "test_existing_failure",
+            "status": "failed"
+          },
+          {
+            "id": "test_lowercase",
+            "status": "passed"
+          },
+          {
+            "id": "test_punctuation",
+            "status": "passed"
+          }
+        ],
+        "exitCode": 1
+      }
+    ],
+    "fastRunner": [
+      {
+        "status": "failed",
+        "old": {
+          "status": "failed",
+          "firstError": {
+            "caseId": "test_punctuation",
+            "message": "AssertionError: assert 'ab' == 'a-b'\n  \n  - a-b\n  ?  -\n  + ab"
+          }
+        },
+        "required": [
+          {
+            "caseId": "test_collapse_spaces",
+            "status": "failed",
+            "error": {
+              "caseId": "test_collapse_spaces",
+              "message": "ValueError: invalid literal for int() with base 10: 'not a number'"
+            }
+          }
+        ],
+        "sha256": "7ec7c4d18f690d80b3b3b2788d706c2518f776d195303b2971f2fd9e05d4d753",
+        "snapshotSha256": "5d64e868c76eac4cf4136caf128edc2a53aec784cf36dae521e60a89595d6f2e",
+        "elapsedMs": 888
+      },
+      {
+        "status": "failed",
+        "old": {
+          "status": "failed",
+          "firstError": {
+            "caseId": "test_punctuation",
+            "message": "AssertionError: assert 'ab' == 'a-b'\n  \n  - a-b\n  ?  -\n  + ab"
+          }
+        },
+        "required": [
+          {
+            "caseId": "test_collapse_spaces",
+            "status": "failed",
+            "error": {
+              "caseId": "test_collapse_spaces",
+              "message": "ValueError: invalid literal for int() with base 10: 'not a number'"
+            }
+          }
+        ],
+        "sha256": "7ec7c4d18f690d80b3b3b2788d706c2518f776d195303b2971f2fd9e05d4d753",
+        "snapshotSha256": "5d64e868c76eac4cf4136caf128edc2a53aec784cf36dae521e60a89595d6f2e",
+        "elapsedMs": 940
+      },
+      {
+        "status": "passed",
+        "old": {
+          "status": "passed"
+        },
+        "required": [
+          {
+            "caseId": "test_collapse_spaces",
+            "status": "passed"
+          }
+        ],
+        "sha256": "f8df3163f161f56330f1d157babf8a13696100a28ba92d3923d157aee9065062",
+        "snapshotSha256": "288e2aaec200fa1ee993740e6a810cdc8ece75ac3d5b845009b0f189ca1ce8e1",
+        "elapsedMs": 808
+      }
+    ],
+    "probeRuns": [
+      {
+        "sha256": "7ec7c4d18f690d80b3b3b2788d706c2518f776d195303b2971f2fd9e05d4d753",
+        "snapshotSha256": "ea013d6b5b31cddc5d6eb5d3c4212c307d62c1847fc71aae3b9c2d0c28762c47",
+        "exitCode": 1,
+        "stderr": "ValueError: invalid literal for int() with base 10: 'not a number'",
+        "stack": [
+          {
+            "path": "normalize.py",
+            "line": 2,
+            "function": "normalize"
+          }
+        ]
+      },
+      {
+        "sha256": "f8df3163f161f56330f1d157babf8a13696100a28ba92d3923d157aee9065062",
+        "snapshotSha256": "07c44d53ff2b94eea92983af7f8864b7b6b861eef010d4cbb218d11b2ba5e683",
+        "exitCode": 0,
+        "stdout": "a b"
+      }
+    ],
+    "phase": "review-ready",
+    "toolErrors": [
+      {
+        "role": "executor",
+        "seq": 27,
+        "detail": "Error: 回归代码任务的已有实现文件须用 edit 局部编辑；先读取当前文件获取 beforeSha256"
+      },
+      {
+        "role": "executor",
+        "seq": 57,
+        "detail": "Error: [building-loop/code-regression] 已通过的旧用例回退：test_punctuation (failed)；新增必测用例未通过：test_collapse_spaces (failed)"
+      }
+    ],
+    "inline": [
+      {
+        "seq": 33,
+        "diagnostics": {
+          "status": "failed",
+          "snapshotSha256": "5d64e868c76eac4cf4136caf128edc2a53aec784cf36dae521e60a89595d6f2e",
+          "old": {
+            "status": "failed",
+            "firstError": {
+              "caseId": "test_punctuation",
+              "message": "AssertionError: assert 'ab' == 'a-b'\n  \n  - a-b\n  ?  -\n  + ab"
+            }
+          },
+          "required": [
+            {
+              "caseId": "test_collapse_spaces",
+              "status": "failed",
+              "error": {
+                "caseId": "test_collapse_spaces",
+                "message": "ValueError: invalid literal for int() with base 10: 'not a number'"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "seq": 63,
+        "diagnostics": {
+          "status": "passed",
+          "snapshotSha256": "288e2aaec200fa1ee993740e6a810cdc8ece75ac3d5b845009b0f189ca1ce8e1",
+          "old": {
+            "status": "passed"
+          },
+          "required": [
+            {
+              "caseId": "test_collapse_spaces",
+              "status": "passed"
+            }
+          ]
+        }
+      }
+    ],
+    "manual": [
+      {
+        "seq": 39,
+        "data": {
+          "status": "failed",
+          "snapshotSha256": "5d64e868c76eac4cf4136caf128edc2a53aec784cf36dae521e60a89595d6f2e",
+          "old": {
+            "status": "failed",
+            "firstError": {
+              "caseId": "test_punctuation",
+              "message": "AssertionError: assert 'ab' == 'a-b'\n  \n  - a-b\n  ?  -\n  + ab"
+            }
+          },
+          "required": [
+            {
+              "caseId": "test_collapse_spaces",
+              "status": "failed",
+              "error": {
+                "caseId": "test_collapse_spaces",
+                "message": "ValueError: invalid literal for int() with base 10: 'not a number'"
+              }
+            }
+          ],
+          "recipes": [
+            "normalize-cli"
+          ]
+        }
+      },
+      {
+        "seq": 45,
+        "data": {
+          "status": "failed",
+          "snapshotSha256": "ea013d6b5b31cddc5d6eb5d3c4212c307d62c1847fc71aae3b9c2d0c28762c47",
+          "probe": {
+            "exitCode": 1,
+            "stderr": "ValueError: invalid literal for int() with base 10: 'not a number'",
+            "stack": [
+              {
+                "path": "normalize.py",
+                "line": 2,
+                "function": "normalize"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "seq": 69,
+        "data": {
+          "status": "passed",
+          "snapshotSha256": "07c44d53ff2b94eea92983af7f8864b7b6b861eef010d4cbb218d11b2ba5e683",
+          "probe": {
+            "exitCode": 0,
+            "stdout": "a b"
+          }
+        }
+      }
+    ],
+    "qualification": {
+      "kind": "trusted-regression",
+      "receiptSha256": "c018f96f15615d2e600f100491df704214323992f20165758593de280a4ddd48",
+      "runId": "native-fixed",
+      "suiteSha256": "6b8c6e24ac55c3518959bc3e292b4205af14e464173783dfadf2be52bad5f228",
+      "goalSha256": "69f679ec46ed343d91f7cb1c4a61ccfdd462fa00ecf2e8a8accb3d9be2e2ee56",
+      "artifacts": [
+        {
+          "path": "normalize.py",
+          "sha256": "f8df3163f161f56330f1d157babf8a13696100a28ba92d3923d157aee9065062"
+        }
+      ],
+      "protectedCases": [
+        "test_lowercase",
+        "test_punctuation"
+      ],
+      "requiredCases": [
+        "test_collapse_spaces"
+      ],
+      "cases": [
+        {
+          "id": "test_collapse_spaces",
+          "status": "passed"
+        },
+        {
+          "id": "test_existing_failure",
+          "status": "failed"
+        },
+        {
+          "id": "test_lowercase",
+          "status": "passed"
+        },
+        {
+          "id": "test_punctuation",
+          "status": "passed"
+        }
+      ],
+      "submittedPhase": "intake"
+    },
+    "backupIsExactPreEdit": true,
+    "status": "passed",
+    "formalProfileUnchanged": true
+  },
+  "nodeTest": {
+    "tests": 320,
+    "passed": 320,
+    "failed": 0,
+    "skipped": 0
+  },
+  "upgradeRehearsal": {
+    "version": "0.7.20",
+    "archiveSha256": "05ec5f21ee1b36581f6a7ff3b6a85806b9a7e5bd1e7cce0d9e7b19f2d5257455",
+    "runtimeFilesMatched": 42,
+    "otherDirectDependencies": 18,
+    "action": "rehearse",
+    "refresh": true
+  },
+  "sandboxProbeTests": {
+    "carrier": "Ubuntu WSL and bubblewrap",
+    "probeSha256": "8495686c407ea0f229803e4c5cd9d6ed53109d554334e7a4cdd9a28237f042a9",
+    "tests": 6,
+    "passed": 6,
+    "extraChecksProbeSha256": "a7e48d256e63a940cfc1d6d21eee58e57b6e651f2493625ceb0910acf8826631",
+    "extraChecks": [
+      "no inherited fixture or status file descriptors",
+      "a forked child in a new session was reaped on timeout"
+    ]
+  }
+}
