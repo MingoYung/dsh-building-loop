@@ -166,6 +166,102 @@ export function includes(paths, name) {
   return paths.some(item => keyOf(item) === keyOf(name));
 }
 
+// Each unit maps to its dimension and integer scale in the smallest supported
+// base unit. Only exact multiplicative conversions within one dimension are supported.
+const unitDimensions = [
+  { ns: 1n, "μs": 1_000n, ms: 1_000_000n, s: 1_000_000_000n, min: 60_000_000_000n, h: 3_600_000_000_000n },
+  { mm: 1n, cm: 10n, m: 1_000n, km: 1_000_000n },
+  { mg: 1n, g: 1_000n, kg: 1_000_000n },
+];
+
+export function numericUnitConversion(from, to) {
+  if (typeof from !== "string" || typeof to !== "string") return null;
+  const dimension = unitDimensions.find(units => Object.hasOwn(units, from) && Object.hasOwn(units, to));
+  return dimension ? { from: dimension[from], to: dimension[to] } : null;
+}
+
+function numericRule(input, phases) {
+  const source = relativeName(object(input, "复算规则").source);
+  const { kind, line, sourceUnit, targetUnit, units, keyColumn, valueColumn, before, after, numeratorColumn, denominatorColumn,
+    where, decimals = 2, scope = "claim" } = input;
+  const format = name => typeof name === "string" && !!name.trim() && name.length <= 80 && !/[\x00-\x1f]/u.test(name);
+  const isLine = Number.isSafeInteger(line) && line >= 1;
+  const validUnits = Array.isArray(units) && units.length > 0 && units.length <= 8 &&
+    units.every(unit => format(unit) && unit.length <= 40);
+  if (!includes(phases.supplement.read, source) || !includes(phases["final-review"].evidence, source) ||
+    kind !== "percent-decrease" && !includes(phases["first-review"].evidence, source)) {
+    throw new Error("复算原始文件须具备补查读授权和相应独立核验阶段的证据授权");
+  }
+  if (kind === "source-number") {
+    // Preserve legacy whitelisted keys even when irrelevant to direct extraction.
+    object(input, "复算规则", ["kind", "source", "keyColumn", "valueColumn", "before", "after", "decimals", "line", "sourceUnit", "units", "scope"]);
+    const legacyUnits = Array.isArray(units) && units.length > 0 && units.length <= 8 &&
+      units.every(unit => typeof unit === "string" && unit.trim() && unit.length <= 40);
+    if (!isLine || typeof sourceUnit !== "string" || !sourceUnit.trim() || !legacyUnits || !["claim", "document"].includes(scope)) {
+      throw new Error("原文数值核对须配置原文行、原文单位和等价交付单位，并授权各核验阶段读取");
+    }
+    return { kind, source, line, sourceUnit, units, scope };
+  }
+  if (!Number.isSafeInteger(decimals) || decimals < 0 || decimals > 6) throw new Error("脚本复算精度须为 0–6 位小数");
+  if (kind === "unit-conversion") {
+    object(input, "单位换算", ["kind", "source", "line", "sourceUnit", "targetUnit", "decimals"]);
+    if (!isLine || !numericUnitConversion(sourceUnit, targetUnit) || sourceUnit === targetUnit) {
+      throw new Error("单位换算须指定单个原文行和两个已支持的同量纲单位");
+    }
+    return { kind, source, line, sourceUnit, targetUnit, decimals };
+  }
+  if (kind === "percent-decrease") {
+    object(input, "复算规则", ["kind", "source", "keyColumn", "valueColumn", "before", "after", "decimals", "line", "sourceUnit", "units", "scope"]);
+    if (![keyColumn, valueColumn, before, after].every(format) || keyColumn === valueColumn || before === after) {
+      throw new Error("无效的 CSV 降幅复算规则");
+    }
+    return { kind, source, keyColumn, valueColumn, before, after, decimals };
+  }
+  const numericColumnFields = kind === "ratio" ? ["numeratorColumn", "denominatorColumn"]
+    : ["sum", "average"].includes(kind) ? ["valueColumn"] : [];
+  object(input, "CSV 汇总复算", ["kind", "source", "where", "units", "decimals", ...numericColumnFields]);
+  if (!["count", "sum", "average", "ratio"].includes(kind) ||
+    numericColumnFields.some(name => !format(input[name])) ||
+    kind === "ratio" && (numeratorColumn === denominatorColumn || units !== undefined) ||
+    kind !== "ratio" && !validUnits || kind === "count" && input.decimals !== undefined && input.decimals !== 0) {
+    throw new Error("CSV 汇总只接受明确的计数、求和、平均或百分比口径，须声明适用的列及单位");
+  }
+  let filter;
+  if (where !== undefined) {
+    const { column, equals } = object(where, "CSV 分组", ["column", "equals"]);
+    if (!format(column) || typeof equals !== "string" || equals.length > 80 || /[\x00-\x1f]/u.test(equals)) {
+      throw new Error("CSV 分组须指定列名及精确匹配值");
+    }
+    filter = { column, equals };
+  }
+  return {
+    kind, source, decimals: kind === "count" ? 0 : decimals, units: kind === "ratio" ? ["%"] : units,
+    ...(filter ? { where: filter } : {}),
+    ...Object.fromEntries(numericColumnFields.map(name => [name, input[name]])),
+  };
+}
+
+/** Grant deterministic result projection only inside an explicitly editable
+ * Markdown delivery with the same evidence made available to both reviewers. */
+function hostResultPolicy(input, candidate, phases, calculations, codeTask) {
+  object(input, "宿主结果", ["calculations", "citationLines"]);
+  const entries = input.calculations ?? [];
+  const citationLines = pathList(input.citationLines ?? []);
+  if (codeTask || !/\.(?:md|markdown)$/iu.test(candidate) || !Array.isArray(entries) ||
+    new Set(entries).size !== entries.length ||
+    entries.some(id => typeof id !== "string" || !Object.hasOwn(calculations, id)) ||
+    entries.length + citationLines.length < 1 || entries.length + citationLines.length > 16) {
+    throw new Error("宿主结果须为 Markdown 文稿登记 1–16 项唯一的已配置数字或计数来源，不适用于代码单元");
+  }
+  const sources = [...entries.map(id => calculations[id].source), ...citationLines];
+  if (["intake", "supplement"].some(phase => !includes(phases[phase].write, candidate) ||
+    sources.some(source => !includes(phases[phase].read, source))) ||
+    ["first-review", "final-review"].some(phase => sources.some(source => !includes(phases[phase].evidence, source)))) {
+    throw new Error("宿主结果需要两个执行阶段均能写入候选并读取原文，两个核验阶段须有对应证据读权");
+  }
+  return { calculations: entries, citationLines };
+}
+
 export const hierarchyModuleId = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/u;
 
 /** Resolve a module only through a trusted exact grant or the host's private namespace. */
@@ -334,7 +430,7 @@ export function parseAuthority(bytes) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "hostResults", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture"]);
     if (value.architecture !== undefined) architectureEntries.set(id, value.architecture);
     if (value.plainLast !== undefined && typeof value.plainLast !== "boolean") throw new Error("plainLast 须为布尔值；非文字产物由项目维护者明确关闭");
     if (value.cacheReadRotationThreshold !== undefined && (!Number.isSafeInteger(value.cacheReadRotationThreshold) || value.cacheReadRotationThreshold < 1)) {
@@ -379,29 +475,10 @@ export function parseAuthority(bytes) {
     const calculations = Object.create(null);
     for (const [claim, formula] of Object.entries(object(value.calculations ?? {}, "复算规则"))) {
       if (!claims.includes(claim)) throw new Error("复算规则须绑定已登记的断言编号");
-      object(formula, "复算规则", ["kind", "source", "keyColumn", "valueColumn", "before", "after", "decimals", "line", "sourceUnit", "units", "scope"]);
-      const { kind, keyColumn, valueColumn, before, after, decimals = 2 } = formula;
-      const source = relativeName(formula.source);
-      if (kind === "source-number") {
-        if (![undefined,"claim","document"].includes(formula.scope)
-          || !Number.isSafeInteger(formula.line) || formula.line < 1 || typeof formula.sourceUnit !== "string" || !formula.sourceUnit.trim()
-          || !Array.isArray(formula.units) || !formula.units.length || formula.units.length > 8
-          || formula.units.some(unit => typeof unit !== "string" || !unit.trim() || unit.length > 40)
-          || !includes(phases.supplement.read,source) || ["first-review","final-review"].some(phase=>!includes(phases[phase].evidence,source))) {
-          throw new Error("原文数值核对须配置原文行、原文单位和等价交付单位，并授权各核验阶段读取");
-        }
-        calculations[claim] = { kind, source, line:formula.line, sourceUnit:formula.sourceUnit, units:formula.units, scope:formula.scope ?? "claim" };
-        continue;
-      }
-      if (kind !== "percent-decrease" || !Number.isSafeInteger(decimals) || decimals < 0 || decimals > 6
-        || [keyColumn, valueColumn, before, after].some(item => typeof item !== "string" || !item.trim() || item.length > 80)
-        || keyColumn === valueColumn || before === after) throw new Error("无效的 CSV 降幅复算规则");
-      if (!includes(phases.supplement.read, source) || !includes(phases["final-review"].evidence, source)) {
-        throw new Error("复算原始文件须在补查读授权和终审证据授权内");
-      }
-      calculations[claim] = { kind, source, keyColumn, valueColumn, before, after, decimals };
+      calculations[claim] = numericRule(formula, phases);
     }
     const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases);
+    const hostResults = value.hostResults === undefined ? undefined : hostResultPolicy(value.hostResults, candidate, phases, calculations, codeTask);
     for (const contract of codeTask?.diagnostics?.inputContracts ?? []) {
       for (const { requirement, diagnosticCases } of contract.examples ?? []) {
         if (requirement && (relativeName(requirement.file) !== requirement.file || !includes(goalContext, requirement.file))) {
@@ -416,7 +493,8 @@ export function parseAuthority(bytes) {
     }
     units[id] = { candidate, claims, continuation, phases, calculations, covers,
       requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
-      cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}) };
+      cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}),
+      ...(hostResults ? { hostResults } : {}) };
   }
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {

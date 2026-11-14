@@ -1,4 +1,4 @@
-import { digest, includes, keyOf, readBytes, text } from "./policy.mjs";
+import { digest, includes, keyOf, numericUnitConversion, readBytes, text } from "./policy.mjs";
 import { footnoteDefinition, footnoteId, markdownStructure } from "./markdown-structure.mjs";
 
 export const QUALITY = {
@@ -439,8 +439,8 @@ export function rejectedClaims(root, spec, lines, rejected, readable) {
 }
 
 /** 把普通十进制拆成整数比，复算不依赖浮点近似。 */
-function decimal(value) {
-  const parsed = /^([+-]?)(\d{1,18})(?:\.(\d{1,9}))?$/.exec(value);
+function decimal(value, computed = false) {
+  const parsed = (computed ? /^([+-]?)(\d{1,32})(?:\.(\d{1,9}))?$/ : /^([+-]?)(\d{1,18})(?:\.(\d{1,9}))?$/).exec(value);
   if (!parsed) throw new Error("原始数值需要普通十进制数字");
   const fraction = parsed[3] ?? "";
   return { n: BigInt(parsed[2] + fraction) * (parsed[1] === "-" ? -1n : 1n), scale: 10n ** BigInt(fraction.length) };
@@ -448,8 +448,8 @@ function decimal(value) {
 
 /** 按数值比较百分比，允许等价的小数表示。 */
 function equalNumber(left, right) {
-  const a = decimal(left);
-  const b = decimal(right);
+  const a = decimal(left, true);
+  const b = decimal(right, true);
   return a.n * b.scale === b.n * a.scale;
 }
 
@@ -461,22 +461,41 @@ function formatDecimal(n, places) {
   return (prefix + digits.slice(0, -places) + "." + digits.slice(-places)).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-/** 从指定 CSV 行取原始值，检查口径后复算相对降幅。 */
-function calculate(bytes, rule) {
-  const lines = lineList(bytes);
+/** Read the original physical lines once, preserving exact source locators. */
+function numericCsv(lines) {
   if (lines.some(line => line.includes('"'))) throw new Error("复算支持无引号和无跨行字段的 UTF-8 CSV");
   const header = lines[0].split(",").map(x => x.trim());
-  const key = header.indexOf(rule.keyColumn);
-  const value = header.indexOf(rule.valueColumn);
-  if (key < 0 || value < 0 || new Set(header).size !== header.length) throw new Error("复算 CSV 表头不匹配或有重复列");
-  const rows = new Map();
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const cells = lines[i].split(",").map(x => x.trim());
+  if (new Set(header).size !== header.length) throw new Error("复算 CSV 表头不匹配或有重复列");
+  const column = name => {
+    const index = header.indexOf(name);
+    if (index < 0) throw new Error("复算 CSV 表头缺少已登记列 " + name);
+    return index;
+  };
+  const rows = lines.slice(1).flatMap((quote, i) => {
+    if (!quote.trim()) return [];
+    const cells = quote.split(",").map(value => value.trim());
     if (cells.length !== header.length) throw new Error("复算 CSV 行列数量不一致");
+    return [{ cells, line: i + 2, quote }];
+  });
+  return { column, rows };
+}
+
+/** Round exactly once on the final rational result, ties away from zero. */
+function roundedDecimal(numerator, denominator, decimals) {
+  const scaled = numerator * 10n ** BigInt(decimals);
+  const absolute = scaled < 0n ? -scaled : scaled;
+  const rounded = ((2n * absolute + denominator) / (2n * denominator)) * (scaled < 0n ? -1n : 1n);
+  return formatDecimal(rounded, decimals);
+}
+
+function decrease(lines, rule) {
+  const { column, rows: input } = numericCsv(lines);
+  const key = column(rule.keyColumn), value = column(rule.valueColumn);
+  const rows = new Map();
+  for (const { cells, line } of input) {
     if (cells[key] !== rule.before && cells[key] !== rule.after) continue;
     if (rows.has(cells[key])) throw new Error("复算 CSV 匹配到重复数据行");
-    rows.set(cells[key], { raw: cells[value], line: i + 1 });
+    rows.set(cells[key], { raw: cells[value], line });
   }
   const before = rows.get(rule.before);
   const after = rows.get(rule.after);
@@ -484,44 +503,102 @@ function calculate(bytes, rule) {
   const a = decimal(before.raw);
   const b = decimal(after.raw);
   if (a.n <= 0n || b.n < 0n) throw new Error("降幅复算需要正基准和非负对照值");
-  const numerator = (a.n * b.scale - b.n * a.scale) * 100n * 10n ** BigInt(rule.decimals);
-  const denominator = a.n * b.scale;
-  const absolute = numerator < 0n ? -numerator : numerator;
-  const rounded = ((2n * absolute + denominator) / (2n * denominator)) * (numerator < 0n ? -1n : 1n);
-  return { expected: formatDecimal(rounded, rule.decimals), before, after };
+  const valueText = roundedDecimal((a.n * b.scale - b.n * a.scale) * 100n, a.n * b.scale, rule.decimals);
+  return { value: valueText, before, after, sourceRows: [before.line, after.line].sort((a, b) => a - b),
+    formula: "(基准-对照)/基准×100" };
 }
 
-/** 每次从当前原始文件计算，核结果、来源版本和引用行。 */
+/** Compute the declared population once. For ratios divide the two exact
+ * column sums over that same population, never average the per-row ratios. */
+function aggregate(lines, rule) {
+  const { column, rows } = numericCsv(lines);
+  const selector = rule.where && column(rule.where.column);
+  const selected = rule.where ? rows.filter(row => row.cells[selector] === rule.where.equals) : rows;
+  if (!selected.length || selected.length > 100) throw new Error("CSV 汇总需有 1–100 条匹配原始记录");
+  const slots = BigInt(selected.length);
+  // All input decimals have at most nine fractional digits. A fixed common
+  // denominator avoids denominator growth when summing many rows.
+  const scale = 1_000_000_000n;
+  const sum = (name, nonnegative = false) => {
+    const at = column(name);
+    return selected.reduce((total, row) => {
+      const value = decimal(row.cells[at]);
+      if (nonnegative && value.n < 0n) throw new Error("百分比的分子和分母列须为非负数");
+      return total + value.n * (scale / value.scale);
+    }, 0n);
+  };
+  let numerator = slots, denominator = 1n, formula = "所选记录行数";
+  if (rule.kind === "sum" || rule.kind === "average") {
+    numerator = sum(rule.valueColumn);
+    denominator = rule.kind === "average" ? scale * slots : scale;
+    formula = rule.kind === "average" ? "所选数值之和/记录行数" : "所选数值之和";
+  } else if (rule.kind === "ratio") {
+    numerator = sum(rule.numeratorColumn, true) * 100n;
+    denominator = sum(rule.denominatorColumn, true);
+    if (!denominator) throw new Error("百分比分母列之和必须大于零");
+    formula = "所选分子列之和/所选分母列之和×100";
+  }
+  // The header proves column identity. The file hash also pins unselected
+  // rows, which are examined when applying the exact filter.
+  return { value: roundedDecimal(numerator, denominator, rule.decimals), formula,
+    sourceRows: [1, ...selected.map(row => row.line)] };
+}
+
+function computeNumeric(root, id, rule, readable) {
+  if (!includes(readable, rule.source)) throw new Error("本阶段没有原始数据的读取授权");
+  const bytes = readBytes(root, rule.source);
+  if (!bytes) throw new Error("复算原始文件尚未提供");
+  const sourceLines = lineList(bytes);
+  let details, units;
+  if (rule.kind === "source-number" || rule.kind === "unit-conversion") {
+    const sourceValue = lineQuantity(sourceLines, rule);
+    details = { value: sourceValue, line: rule.line, sourceRows: [rule.line], formula: "原文直接取数" };
+    units = rule.units;
+    if (rule.kind === "unit-conversion") {
+      const { from, to } = numericUnitConversion(rule.sourceUnit, rule.targetUnit);
+      const number = decimal(sourceValue);
+      details = { ...details, value: roundedDecimal(number.n * from, number.scale * to, rule.decimals),
+        sourceValue, formula: rule.sourceUnit + "×" + from + "/" + to + "=" + rule.targetUnit };
+      units = [rule.targetUnit];
+    }
+  } else if (rule.kind === "percent-decrease") {
+    details = decrease(sourceLines, rule);
+    units = ["%"];
+  } else {
+    details = aggregate(sourceLines, rule);
+    units = rule.units;
+  }
+  const { value, sourceRows, ...fields } = details;
+  const unit = units[0];
+  return { id, kind: rule.kind, source: rule.source, sourceHash: digest(bytes), sourceLineCount: sourceLines.length,
+    basis: rule, ...fields, value, unit, expected: value + (unit === "%" && rule.kind !== "source-number" ? unit : " " + unit),
+    sourceRows: sourceRows.map(line => ({ line, quote: sourceLines[line - 1] })) };
+}
+
+/** Measurements are independent from candidate prose. Callers decide which
+ * verified result and proof locations may be projected to the current role. */
+export function configuredNumericMeasurements(root, spec, readable) {
+  return Object.entries(spec.calculations).map(([id, rule]) => {
+    try { return { ...computeNumeric(root, id, rule, readable), available: true }; }
+    catch (error) { return { id, kind: rule.kind, source: rule.source, available: false, issue: error.message }; }
+  });
+}
+
+/** Recheck the candidate against the same current measurement before review. */
 export function numericChecks(root, spec, lines, readable) {
   return Object.entries(spec.calculations).map(([id, rule]) => {
     try {
-      if (!includes(readable, rule.source)) throw new Error("本阶段没有原始数据的读取授权");
-      const bytes = readBytes(root, rule.source);
-      if (!bytes) throw new Error("复算原始文件尚未提供");
-      if (rule.kind === "source-number") return sourceNumber(bytes, rule, lines, id, spec.phases["final-review"].evidence);
-      const { expected, before, after } = calculate(bytes, rule);
-      const row = claimRow(lines, id);
-      const cites = row && citation(row.body, rule.source);
-      const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
-      // A literal ×100% is a formula multiplier, while 24% in a claim is a result.
-      const percentages = quantityScanner(["%"])(body).filter(quantity => quantity.unit)
-        .filter(quantity => !(quantity.complete && quantity.value === "100" && /[×*]\s*$/u.test(body.slice(0, quantity.start))));
-      const correct = percentages.length > 0 && percentages.every(quantity => quantity.complete && equalNumber(quantity.value, expected));
-      const coversRows = cites?.start && cites.start <= Math.min(before.line, after.line)
-        && cites.end >= Math.max(before.line, after.line) && cites.end <= lineList(bytes).length;
-      const issue = !correct ? "结论中的降幅应为 " + expected + "%"
-        : !coversRows ? "出处须引用 " + rule.source + " 中两条原始数据行" : null;
-      return {
-        id, ok: issue === null, issue, expected: expected + "%", reported: percentages.map(quantity => quantity.value + "%"),
-        source: rule.source, sourceHash: digest(bytes), before, after, formula: "(基准-对照)/基准×100",
-      };
+      const { sourceRows, ...measurement } = computeNumeric(root, id, rule, readable);
+      const measured = { ...measurement, sourceRows: sourceRows.map(row => row.line) };
+      return rule.kind === "source-number" ? checkSourceNumber(rule, lines, measured, spec.phases["final-review"].evidence)
+        : checkComputedNumber(rule, lines, measured);
     } catch (error) { return { id, ok: false, source: rule.source, issue: error.message }; }
   });
 }
 
 /** Normalize presentation width without flattening a unit exponent into a digit. */
 function quantityText(value) {
-  return value.replace(/[^\u00b2\u00b3\u00b9\u2070-\u209f]+/gu, span => span.normalize("NFKC"));
+  return value.replace(/[^\u00b2\u00b3\u00b9\u2070-\u209f]+/gu, span => span.normalize("NFKC").replaceAll("−", "-"));
 }
 
 const quantityNumber = /(?<![\d\p{Script=Latin}\p{Script=Greek}.])([+-]?\d+(?:\.\d+)?)/gu;
@@ -564,25 +641,54 @@ function quantityScanner(aliases) {
   });
 }
 
-/** Check direct numerical restatements; conversions require a different declared formula. */
-function sourceNumber(bytes, rule, lines, id, evidence) {
-  const sourceLines = lineList(bytes);
-  const source = quantityText(sourceLines[rule.line - 1] ?? "").replaceAll("−", "-");
+/** Bind one unique numeral and a whole unit to the declared original line. */
+function lineQuantity(sourceLines, rule) {
+  const source = quantityText(sourceLines[rule.line - 1] ?? "");
   const matches = quantityScanner([rule.sourceUnit])(source).filter(quantity => quantity.unit);
   if (matches.length !== 1 || !matches[0].complete) throw new Error("原文指定行须含唯一的数值与完整单位");
-  const expected = matches[0].value;
-  const row = claimRow(lines,id);
+  return matches[0].value;
+}
+
+function checkComputedNumber(rule, lines, measured) {
+  const { id, expected, value, unit, sourceRows, sourceLineCount } = measured;
+  const row = claimRow(lines, id);
+  const cited = row && citation(row.body, rule.source);
+  const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
+  const units = rule.units ?? [unit];
+  // A literal ×100% is a formula multiplier in a percent calculation, not a result.
+  const scanned = quantityScanner(units)(body);
+  const quantities = scanned.filter(quantity => quantity.unit &&
+    !(unit === "%" && quantity.complete && quantity.value === "100" && /[×*]\s*$/u.test(body.slice(0, quantity.start))));
+  // A second bare numeral in a new configured claim can be a different
+  // denominator or one more asserted result. Keep it in explanatory prose.
+  // Legacy percent-decrease has always allowed operands in the same claim.
+  const unexpectedNumber = rule.kind !== "percent-decrease" && scanned.some(quantity => !quantity.unit);
+  const correct = !unexpectedNumber && quantities.length > 0 &&
+    quantities.every(quantity => quantity.complete && equalNumber(quantity.value, value));
+  const coversRows = cited?.start && cited.end <= sourceLineCount &&
+    sourceRows.every(line => cited.start <= line && line <= cited.end);
+  const issue = !correct ? (rule.kind === "percent-decrease" ? "结论中的降幅应为 " : "结论中的复算结果应为 ") + expected
+    : !coversRows ? "出处须引用 " + rule.source +
+      (rule.kind === "percent-decrease" ? " 中两条原始数据行" : " 中实际参与复算的全部原始行") : null;
+  return { ...measured, ok: issue === null, issue, reported: quantities.map(quantity =>
+    unit === "%" ? quantity.value + "%" : quantity.value + " " + quantity.unit) };
+}
+
+/** Check direct numerical restatements; conversions use a declared formula. */
+function checkSourceNumber(rule, lines, measured, evidence) {
+  const { id, value: expected, sourceLineCount } = measured;
+  const row = claimRow(lines, id);
   const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
   const quantities = quantityScanner(rule.units)(body);
   const values = quantities.map(quantity => quantity.value);
   const cited = row && citation(row.body,rule.source);
   const rowOk = quantities.length > 0 && quantities.every(quantity => quantity.complete && equalNumber(quantity.value, expected))
-    && cited?.start <= rule.line && cited?.end >= rule.line && cited.end <= sourceLines.length;
+    && cited?.start <= rule.line && cited?.end >= rule.line && cited.end <= sourceLineCount;
   // This opt-in contract is for one scalar per declared unit across the document.
   // It deliberately does not infer quantities or support arbitrary conversions.
   const documentIssues = rule.scope === "document" ? directQuantityIssues(lines, rule, expected, evidence) : [];
   const ok = rowOk && documentIssues.length === 0;
-  return { id,ok,expected:expected+" "+rule.units[0],source:rule.source,sourceHash:digest(bytes),line:rule.line,
+  return { ...measured, ok,
     reported:values,scope:rule.scope ?? "claim",documentIssues,
     issue:ok?null:!rowOk?"本条直接转述须为原文的 "+expected+" "+rule.units[0]+"，引用原文第 "+rule.line+" 行；转换或旧错数不要混在当前事实行"
       :documentIssues.map(item=>"候选第 "+item.line+" 行："+item.issue).join("；") };

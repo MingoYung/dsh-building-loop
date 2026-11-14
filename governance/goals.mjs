@@ -1,7 +1,7 @@
 import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { lineList, plainLastIssues, requiredLineMarkdown } from "./preflight.mjs";
 import { sourceVersionCurrent } from "./evidence.mjs";
-import { candidateCitationProfiles, requireStoredCalculations, requireStoredFootnoteBindings, requireStoredObjectChecks } from "./coverage.mjs";
+import { candidateCitationProfiles, requireStoredCalculations, requireStoredFootnoteBindings, requireStoredHostResults, requireStoredObjectChecks } from "./coverage.mjs";
 import { reviewedCodeArtifactsCurrent } from "./code-intake.mjs";
 import { currentCodeReview } from "./code-review.mjs";
 import { engineeringArchitectureCurrent } from "./engineering-architecture.mjs";
@@ -250,6 +250,7 @@ export function acceptedVersion(frame, id, active) {
     requireAcceptedDeliveryOutcomes(deliveryOutcomeContract(frame,spec,current),candidate,receipt,active.proof);
   }
   requireStoredCalculations(frame, spec, coverages, candidate);
+  requireStoredHostResults(frame, active, spec, coverages, candidate);
   requireStoredObjectChecks(frame, spec, coverages, candidate, receipt.phase);
   // Do not retroactively reinterpret a completed historical receipt. Open
   // units, including accepted units still awaiting their ledger, need it now.
@@ -283,6 +284,9 @@ export function needsRevalidation(frame, id, active) {
       try {
         const unit=frame.policy.units[id];
         requireStoredFootnoteBindings(unit,[pending.coverage],candidate,pending.phase,active.goal);
+        if (unit.hostResults && !pending.coverage.rejected.length) {
+          requireStoredHostResults(frame, active, unit, [pending.coverage], candidate);
+        }
         const contract=deliveryOutcomeContract(frame,unit,active.goal);
         const outcomes=reviewDeliveryOutcomes(contract,candidate,pending.coverage,pending.reviewer,pending.deliveryOutcomes?.items);
         if(outcomes&&JSON.stringify(outcomes)!==JSON.stringify(pending.deliveryOutcomes))return true;
