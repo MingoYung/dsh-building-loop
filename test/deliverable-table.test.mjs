@@ -4,9 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import { deliverableTableContract, deliverableTableIssues } from "../governance/deliverable-table.mjs";
 import { decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask } from "../governance/conversation-start.mjs";
-import { GOAL, MATERIALS, initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable } from "../governance/conversation-project.mjs";
+import { DELIVERY, GOAL, MATERIALS, initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable } from "../governance/conversation-project.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { fixture, host } from "./helpers.mjs";
+import { QUALITY } from "../governance/preflight.mjs";
 
 const declaration = "交付要求：只给一份短 Markdown。用一张“| 编号 | 值 | 依据 |”表逐项填 Q1、Q2、Q3、Q4、Q5、Q6，每个编号恰好一行。值一格只写题目要求的值。";
 const opening = "开始建设：题目涉及多工位排程。\n\n" + declaration;
@@ -135,9 +136,72 @@ test("a private start without a table keeps its accepted proposal and intake not
   const proposed = { goal: "按确认的目标写清单", deliverable: "两条清单", scope: "既有确认范围" };
   const project = approveDirect(root, original, proposed);
   assert.equal(privateProjectUsesOwnerTable(project), false);
+  assert.equal(fs.existsSync(path.join(project, MATERIALS)), false);
   const goal = fs.readFileSync(path.join(project, GOAL), "utf8");
   for (const value of Object.values(proposed)) assert.ok(goal.includes(value));
   const native = host(root, { automaticCoverage: false });
   await native.flow("root", "advance", { note: "清单的派单备注" });
   assert.match(native.activations[0].request.prompt[0].text, /清单的派单备注/u);
+}));
+
+for (const selected of [true, false]) test(`owner case rows are citable by both reviewers with selected excerpts=${selected}`, () => fixture(async root => {
+  fs.unlinkSync(path.join(root, "BUILDING-LOOP.json"));
+  const rule = "仅支持一区。已指定其他区域时禁止，未指定时待补。";
+  const cases = ["R1：落点一区。", "R2：落点二区。", "R3：未填写落点。"];
+  const instruction = ["开始建设：核实恢复落点。", rule, ...cases,
+    "交付要求：用一张“| 编号 | 值 | 依据 |”表逐项填 R1、R2、R3，每个编号恰好一行。"].join("\r\n");
+  const project = approveDirect(root, instruction, { goal: "核实范围", deliverable: "判定表", scope: "当前资料" }, selected ? [rule] : []);
+  const source = fs.readFileSync(path.join(project, MATERIALS), "utf8");
+  assert.ok(source.includes(instruction));
+  assert.ok(source.includes(`原文 SHA-256 ${digest(instruction)}`));
+  const sourceLines = source.split(/\r?\n/u);
+  const sourceRef = quote => {
+    const line = sourceLines.indexOf(quote) + 1;
+    assert.ok(line > 0);
+    return { file: MATERIALS, start: line, end: line, quote };
+  };
+  const caseRefs = cases.map(sourceRef);
+  const ruleRef = sourceRef(rule);
+  const native = host(root, { automaticCoverage: false });
+  await assert.rejects(native.file("root", "read", MATERIALS), /读白名单/u);
+  const executor = (await native.flow("root", "advance")).childId;
+  await native.flow(executor, "prepare");
+  await native.file(executor, "write", DELIVERY, { content: table([
+    "| R1 | 放行 | 一区 |", "| R2 | 禁止 | 已指定二区 |", "| R3 | 待补 | 未填写 |",
+  ]) + "\n\n大白话：一区放行，明确二区就不接，没填的再问。\n", note: "按用户提供的各项落点整理判定" });
+  await native.file(executor, "read", DELIVERY);
+  assert.equal((await native.flow(executor, "submit")).phase, "review-ready");
+  async function check(actor) {
+    await native.flow(actor, "prepare");
+    const invoke = args => native.invoke(actor, "building_loop_coverage", args);
+    const { blocks } = await invoke({ action: "inventory" });
+    const block = blocks.find(b => b.text.includes("R2"));
+    const caseProof = index => ({ kind: "direct", status: "supported", sourceRelation: "supports",
+      basis: ["原文 R1 明确位于受支持的一区。", "原文 R2 明确指定二区，适用规则中的明确排除。", "原文 R3 未指定落点，按规则待补。"][index],
+      evidence: [caseRefs[index], ruleRef] });
+    const correct = caseProof(1);
+    await assert.rejects(invoke({ action: "record", entries: [{ block: block.id, parts: [{ ...correct,
+      evidence: [{ ...caseRefs[1], quote: cases[2] }],
+    }] }] }), /逐字/u);
+    const entries = blocks.map(b => {
+      const row = /^\| R([1-3]) /u.exec(b.text);
+      const part = row ? caseProof(Number(row[1]) - 1) : b.text.startsWith("|") ?
+        { kind: "nonfactual", status: "supported", basis: "表头或分隔符，仅用于排版。" } :
+        { kind: "direct", status: "supported", sourceRelation: "supports", basis: "用易懂的说法重述一区、其他地区和未填的三种处置。", evidence: [ruleRef] };
+      return { block: b.id, parts: [part] };
+    });
+    assert.deepEqual((await invoke({ action: "record", entries })).invalid, []);
+    const { record } = await invoke({ action: "status", block: block.id });
+    assert.equal(record.parts[0].evidence[0].quote, cases[1]);
+  }
+  const reviewer = (await native.flow("root", "advance")).childId;
+  await check(reviewer);
+  const quality = Object.fromEntries(Object.keys(QUALITY).map(key => [key, "受控样本核对本会话的三条落点。"]));
+  await native.assess(reviewer, { ...quality, revise: [], unlisted: [], unverifiedSources: [], sourceRefs: caseRefs,
+    goalFit: { pass: true, basis: "交付逐行说明三区输入的归类依据。" } });
+  const verdict = await native.flow(reviewer, "review", { note: "已核对受控样本与原文落点", checks: [] });
+  assert.equal(verdict.phase, "first-audit-ready");
+  const auditor = (await native.flow("root", "advance")).childId;
+  assert.notEqual(auditor, reviewer);
+  await check(auditor);
 }));

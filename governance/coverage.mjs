@@ -11,6 +11,8 @@ export const CLASSIFICATION_VERSION = 8;
 export class CoverageRecordError extends Error {}
 const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example"];
 const STATUSES = ["supported", "unsupported", "uncertain"];
+const INVENTORY_LIMIT = 24;
+const RECORD_LIMIT = 12;
 // These unambiguous surface connectives are a conservative minimum, not a
 // universal parser. Untagged/implicit deductions remain the reviewers' duty.
 const explicitInference = text => /(?:因此|所以|由此(?:可见|可得|推出)?|据此(?:可知|推出)?|therefore|\bhence\b|\bthus\b)/i.test(text);
@@ -174,6 +176,9 @@ function explanation(value, label, limit = 1200) {
 
 /** Verify exact quotations against authorized, actually read current source lines. */
 function sourceQuote(frame, active, spec, value) {
+  if (typeof value?.file === "string" && keyOf(relativeName(value.file)) === keyOf(spec.candidate)) {
+    throw objectFailure("unverifiable", "资料引用不在本轮证据授权中 " + spec.candidate + "：候选稿只能证明稿内结构", candidateProofGuide());
+  }
   const ref = evidenceReference(frame, active, spec, value);
   const quote=value.quote, span=typeof quote==="string"&&quote.length<=2000
     ?evidenceSpan(readBytes(frame.root,ref.file),{...ref,quote}):null;
@@ -423,11 +428,18 @@ function objectGuide(input,spec,assertion,phase) {
       {kind:"registered-excerpts",check:"line-range",file:target,start:1,end:2,mode:"subset"}],
   };
   return {templates:examples[input?.kind]??examples,next:"只按原句选择一个模板并替换示例值；删除其他模板的字段，再提交同一块。不要为参数错误改作者正文。",
+    ...(input?.kind === "candidate" ? candidateProofGuide() : {}),
     parameterRules:["candidate 不支持 count：用 citation-count；source 是本句引用目标，不能填候选文件 "+spec.candidate+"，也没有 sources 数组字段。",
       "expected 必须是原句明确声称的数量；示例0不是实测值。registered-excerpts/count 统计已登记摘录条目，结论类别或举例数量不能当摘录总数。",
       "file 与 source 按模板二选一；line-range 用 start/end/mode，按 inventory 原样填写。快照行范围与外部事实或另一来源分别核验。",
       "citation-count 可核末尾完整行号表（第2、4-6行），数量和全表均须相符；citations-marked 核明确的全称含标记；原句限定行首则用 citations-leading-marked，两者都不能替数量、未全标或完全没标作证。",
       "若 inventory 给出 objectCheckHint，按块原样传入；citation-profile 由宿主从原句绑定并复算数量、完整行号和同源标记子集。"]};
+}
+
+/** Manuscript object checks prove only their literal structural predicate. */
+function candidateProofGuide() {
+  return { manuscript: "只核本稿引用数量或明确逐处标记时，优先用 inventory 的 objectCheckHint。没有提示时，只有原句明确给出同一已授权来源路径及可复算的数量或标记，才可按模板填写。",
+    mixedClaims: "把稿内覆盖声明与其中的事实分段核验，外部事实用各自获授权原文。仅有作者自报、来源代号或格式提示，且找不到可绑定的核验依据时，给实际原句的 uncertain、sourceRelation=insufficient 和具体 finding。不要把候选稿改作 evidence 或把未证明内容归为 nonfactual。" };
 }
 function objectMismatchNext(value) {
   if(value.check==="citation-profile")return "分别核对该块的实测数量、完整行号表及明确声明的错例/标记。若原句确错，保留同一 objectCheck，提交 unsupported 和指向实际错处的 finding；不能改参数迁就原句。";
@@ -712,7 +724,7 @@ function checkObject(frame,active,spec,input,assertion,bytes,{host=false}={}) {
     const source=relativeName(input.source),grant=spec.phases[active.phase],seen=active.seen?.[keyOf(spec.candidate)];
     const profile=input.check==="citation-profile"?candidateProfile(lines[assertion.line-1],assertion,source):null;
     if(input.check==="citation-profile"&&!profile)throw objectFailure("parameter","citation-profile 须绑定当前稿件自述的完整原句块、同一来源和完整行号表；不能跳过数值、标记或附加断言",guide);
-    if(!profile&&!/(?:本稿|本文|本节|稿件|候选|当前文档|this (?:draft|document))/iu.test(assertion.quote))throw objectFailure("unverifiable","candidate 检查只证明当前稿件的明确结构，不能替外部事实作证");
+    if(!profile&&!/(?:本稿|本文|本节|稿件|候选|当前文档|this (?:draft|document))/iu.test(assertion.quote))throw objectFailure("unverifiable","candidate 检查只证明当前稿件的明确结构，不能替外部事实作证",candidateProofGuide());
     if(keyOf(source)===keyOf(spec.candidate))throw objectFailure("parameter","source 是该句引用目标，不能填候选自身 "+spec.candidate,guide);
     if(!profile&&!citation(assertion.quote,source))throw objectFailure("parameter","稿件自述必须明确写出所检查的同一来源路径，不能借别的引用对象作证",guide);
     if(!includes(grant.evidence,source)||!includes(grant.read,spec.candidate))throw objectFailure("unverifiable","稿件引用对象不在当前单元授权内");
@@ -1050,19 +1062,23 @@ export function coverageAction(frame, active, spec, args, options = {}) {
   if (!bytes) throw new Error("候选不存在");
   const manifest = documentCoverage(bytes);
   if (args.action === "inventory") {
+    const offset = args.offset ?? 0, requested = args.count ?? 8;
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(requested) || requested < 1) {
+      throw new Error("覆盖分页须使用非负整数 offset 和正整数 count。可从 inventory offset=0 count=8 开始，再按返回 next 继续");
+    }
+    const count = Math.min(requested, INVENTORY_LIMIT);
     if (active.coverage?.candidateSha256 !== manifest.candidateSha256 || active.coverage?.version !== COVERAGE_VERSION) {
       active.coverage = { version: COVERAGE_VERSION, candidateSha256: manifest.candidateSha256, records: {} };
       frame.changed = true;
     }
-    const offset = args.offset ?? 0, count = args.count ?? 8;
-    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(count) || count < 1 || count > 24) throw new Error("覆盖分页 offset/count 无效，每页最多 24 块");
     const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest);
     const pending = manifest.blocks.filter(b => !Object.hasOwn(active.coverage.records, b.id)).map(b => b.id);
     const result = { candidateSha256: manifest.candidateSha256, classificationVersion:CLASSIFICATION_VERSION,total: manifest.blocks.length,
       pending: options.maxBytes ? pending.slice(0,24) : pending, pendingCount: pending.length,
       invalidated:options.maxBytes?invalidated.slice(0,8).map(row=>({...row,reason:row.reason.slice(0,240),
         ...(row.reason.length>240?{reasonTruncated:true}:{})})):invalidated,
-      invalidatedCount:invalidated.length,offset,blocks:[] };
+      invalidatedCount:invalidated.length,offset,blocks:[],
+      ...(requested > count ? { pageLimit: { requested, applied: count } } : {}) };
     for (const row of manifest.blocks.slice(offset,offset+count)) {
       const {lineText,...block}=row;
       const hint=profileHint(row,spec.phases[active.phase],spec.candidate)??registeredLineRange(row.text,spec.phases[active.phase].evidence);
@@ -1077,7 +1093,8 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       result.blocks.push(block);
     }
     if (offset+result.blocks.length<manifest.blocks.length) result.next = {
-      tool:"building_loop_coverage",action:"inventory",offset:offset+result.blocks.length,count:result.blocks.length?24:1,
+      tool:"building_loop_coverage",action:"inventory",offset:offset+result.blocks.length,
+      count:result.blocks.length?Math.min(INVENTORY_LIMIT,manifest.blocks.length-offset-result.blocks.length):1,
       note:"pending 仅是待核编号；record 前必须取得该块的 inventory 原文，不能按编号猜内容。",
     };
     active.coverage.presented=[...new Set([...(active.coverage.presented??[]),...result.blocks.map(block=>block.id)])];
@@ -1094,7 +1111,14 @@ export function coverageAction(frame, active, spec, args, options = {}) {
     const { records, ...compact } = summary;
     return { ...compact, ...(args.block === undefined ? {} : { record: records.find(row => row.block === args.block) ?? null }) };
   }
-  if (args.action !== "record" || !Array.isArray(args.entries) || !args.entries.length || args.entries.length > 12) throw new Error("record 每次提交 1–12 个 entries");
+  if (args.action !== "record" || !Array.isArray(args.entries) || !args.entries.length) throw new Error("record 每次提交 1–12 个 entries");
+  if (args.entries.length > RECORD_LIMIT) {
+    // Reject the full batch before touching proofs. The caller reuses its own
+    // submitted entries in order; listing an ordinal never proves that row.
+    return { status: "batch-too-large", recorded: [], requested: args.entries.length, limit: RECORD_LIMIT,
+      next: { tool: "building_loop_coverage", action: "record", entriesFrom: 1, entriesThrough: RECORD_LIMIT,
+        note: "未保存本批任何条目。原样重交这段 entries，成功后按同一上限提交余项。序号是本次数组位置，不是覆盖块编号。" } };
+  }
   // A source change can invalidate more blocks than fit in one record call.
   // Retire them before incremental repair, so an untouched stale block cannot
   // roll back eleven newly checked proofs. Completion still rechecks every ref.
@@ -1630,7 +1654,9 @@ export function coverageSchema() {
     file:string,source:string,line:integer,expected:{anyOf:[integer,{type:"string",enum:["registered","unregistered"]}]},quote:string,marker:string,
     start:integer,end:integer,mode:{type:"string",enum:["subset","exact"]}},required:["kind","check"],additionalProperties:false,
     description:"direct 专用，与 evidence 互斥。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)、line-range(file,start,end,mode，按 inventory)，只核本地登记摘录，不证明网页全文，勿与其他事实或来源合用。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source，按块照填 inventory 的 objectCheckHint)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding。"};
-  return { offset: integer, count: integer, block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: 12,
+  return { offset: { ...integer, minimum: 0, description: "inventory 的起始位置，使用上页 next.offset。" },
+    count: { ...integer, minimum: 1, maximum: INVENTORY_LIMIT, description: "inventory 每页 1–24 块，下一页按返回的 next 原样传入 offset/count。" },
+    block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,
     description: "每次提交1至12块，按 inventory 分页分批提交；不能把全文超过12块塞进一次调用。", items: { type: "object", properties: {
     block: string, parts: { type: "array", items: { type: "object", properties: {
       quote: { ...string, description: "单一判断可省略，自动取该块完整原文；复合判断须逐段连续覆盖本块，不能把下一块文字并入。匹配失败按 coverage-span 的 part/cursor/expectedSuffix 修正核验参数，不得改写正文或省掉事实。" },

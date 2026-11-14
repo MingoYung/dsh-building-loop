@@ -19,6 +19,7 @@
 | 0.7.29 同模型难题自然完成三组对照 | [G3/G4 与 H1/H2 同模型三组冻结盲评](results-0.7.29-hard-completion.md) |
 | 0.7.30 同模型难题自然完成三组复验 | [G3/G4 与 H1/H2 三组复验](results-0.7.30-hard-completion.md) |
 | 0.7.31 Building-loop 自身缺陷 | [Windows 深路径、架构实证与目标覆盖回归](results-0.7.31-own-defects.md) |
+| 0.7.32 Building-loop 自身缺陷 | [核验恢复、案例来源与目标变更原生验收](results-0.7.32-own-defects.md) |
 | 亿级累计 Token 长工程和进阶题 | [规模边界、真实长跑和独立难题校验](long-horizon-validation.md) |
 | 0.7.23 可执行审核与派单前同目录接手 | [真实长工程、批量复现及失败回放](results-0.7.23.md) |
 | 0.7.22 分批代码核验、架构和同目录接手 | [长工程提示、实测及边界](results-0.7.22.md) |

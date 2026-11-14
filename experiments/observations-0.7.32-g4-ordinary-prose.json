@@ -1,0 +1,800 @@
+{
+  "schema": "building-loop/g4-ordinary-prose-original-closure/1",
+  "status": "reproduced-shared-false-approval",
+  "product": {
+    "policy": "313ab1c4d84616af9e65adee4e7e35863044689957c2c2c6880c1a2c6bf46db8",
+    "code-review": "5fbd99cc675f53b0f3281edde04269ac14d8ac6ca916cf4bd4d81fd889c23d9b",
+    "code-intake": "96e9dbfebf76907ae827eb05f545da80eb42b1ad6298f121941120509b9ae0bc",
+    "architecture-prose-coverage": "f7c30ce2b266e3c49fab760b5fb9aa614c3472a382ad48dc6616891c5101cb83",
+    "engineering-architecture": "58d794a92d2cfa31c5b0ee630145eecf54fb8fa6382dce8595c757ebdfc9b531"
+  },
+  "runs": [
+    {
+      "rep": 1,
+      "originalReceiptSha256": "6cce1a78f039371084281df258fcd4f198bf9cd4f0abaa47b7eb311e96eb1571",
+      "originalArchitectureSha256": "70b4155a1cd5bfde03528505e7a19ece9272d98816fa033ccece52d3bbad15d7",
+      "phase": "closed",
+      "archiveStateSha256": "aa508cdf2600ce511951d81ab55c69ede609abb568805e34938e4914610615d0",
+      "policySha256": "8176d1b9d342b2e9dcfcfd7775f3d5700fc27031723eff06fafad4e3b5311b08",
+      "signedReceiptSha256": "58d1548592e73c7ef4eb74c034e995bed720d68479ccf31f6efe011b478c9d1a",
+      "artifactsSha256": "7e27b6453caf8d8ef167c751b865be9214872baf938aac909fa1ec64965430d2",
+      "qualificationContrasts": [
+        {
+          "id": "public-batch-behavior:example:earlier-domain-before-later-shape",
+          "snapshotSha256": "5cb6486029c7889b1872c84e14a41efacdadc8a733ad0a61402968ba5a09f61f"
+        },
+        {
+          "id": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "snapshotSha256": "8a34c3910831fe8004be3a56beca621c5cdb225498d118acada147b32a5eb88a"
+        }
+      ],
+      "typedFacts": [
+        "nonobject-request"
+      ],
+      "hostConflicts": 0,
+      "engineeringArchitectureCurrent": true,
+      "independentCurrentCodeReview": true,
+      "exactProseReplay": {
+        "reviewer": {
+          "status": "pass",
+          "coverage": 12,
+          "wrongRowsApproved": [
+            {
+              "line": 35,
+              "status": "consistent",
+              "basis": "去重与冲突规则同源实现；对象字段顺序由 sort_keys 规范化、数组保序。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 138,
+                  "end": 147
+                },
+                {
+                  "file": "planner.py",
+                  "start": 186,
+                  "end": 194
+                }
+              ]
+            },
+            {
+              "line": 37,
+              "status": "consistent",
+              "basis": "条目字段为 actions/units/operationId，结果顺序即请求中的首个出现顺序，错误为原子形状。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 200,
+                  "end": 206
+                },
+                {
+                  "file": "planner.py",
+                  "start": 30,
+                  "end": 33
+                }
+              ]
+            }
+          ]
+        },
+        "auditor": {
+          "status": "pass",
+          "coverage": 12,
+          "wrongRowsApproved": [
+            {
+              "line": 35,
+              "status": "consistent",
+              "basis": "同 ID 同指纹复用首项结果、计费一次；不同指纹 conflicted-operation 指向后续项；不同 ID 各自计费。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 5
+                },
+                {
+                  "file": "planner.py",
+                  "start": 186,
+                  "end": 207
+                }
+              ]
+            },
+            {
+              "line": 37,
+              "status": "consistent",
+              "basis": "每项 entry 为 actions/units/operationId，results 按请求顺序（重试不增项）；错误批用空 results 与 units 0。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "CHANGE-G2.md",
+                  "start": 5,
+                  "end": 5
+                },
+                {
+                  "file": "planner.py",
+                  "start": 203,
+                  "end": 207
+                },
+                {
+                  "file": "planner.py",
+                  "start": 30,
+                  "end": 33
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "negativeControls": {
+        "reportedContradiction": "closure-refused",
+        "architectureByteDrift": "closure-refused"
+      },
+      "nativeToolTrace": {
+        "reviewer": {
+          "journalSha256": "cb54d0cddb46b26f39c0a151274a2f2ba358e2669a0a1b01e522a241bb8a201e",
+          "assistantResponses": 18,
+          "allProbeResults": {
+            "architecture:error": 1,
+            "runtime:error": 8,
+            "runtime:match": 8,
+            "runtime:mismatch": 1,
+            "syntax:match": 1
+          },
+          "selectedCalls": [
+            {
+              "seq": 37,
+              "assertion": "architecture",
+              "verdict": "error",
+              "error": "Error: 当前架构稿未登记可执行示例"
+            },
+            {
+              "seq": 37,
+              "assertion": "runtime",
+              "exampleId": "public-batch-behavior:example:earlier-domain-before-later-shape",
+              "verdict": "error",
+              "error": "Error: 登记示例使用已固定的配方和输入，请省略 recipe 和 stdin"
+            },
+            {
+              "seq": 45,
+              "assertion": "runtime",
+              "exampleId": "public-batch-behavior:example:earlier-domain-before-later-shape",
+              "verdict": "match",
+              "grounding": "registered-example",
+              "probeId": "probe-3ec9f23374583f1a963a30c4573c8e7ee46b",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "requestIndex": 0,
+                  "results": [],
+                  "units": 0
+                }
+              }
+            },
+            {
+              "seq": 45,
+              "assertion": "runtime",
+              "exampleId": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+              "verdict": "match",
+              "grounding": "registered-example",
+              "probeId": "probe-3fb595da8f38ef468ecd5ff9da903bd52583",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "ok",
+                  "results": [
+                    {
+                      "actions": [
+                        "retry"
+                      ],
+                      "units": 2,
+                      "operationId": "op-0"
+                    }
+                  ],
+                  "units": 2
+                }
+              }
+            }
+          ],
+          "recordCalls": [
+            {
+              "seq": 129,
+              "hostError": false,
+              "lines": [
+                15,
+                25,
+                27,
+                29,
+                33,
+                34,
+                35,
+                36,
+                37,
+                38,
+                39,
+                40
+              ]
+            }
+          ],
+          "submitCalls": [
+            {
+              "seq": 141,
+              "hostError": false
+            }
+          ]
+        },
+        "auditor": {
+          "journalSha256": "3eb4c5cd01f947f4b160248520e5abe3045d1fe2306ff652d168555ba65f4623",
+          "assistantResponses": 10,
+          "allProbeResults": {},
+          "selectedCalls": [],
+          "recordCalls": [
+            {
+              "seq": 59,
+              "hostError": false,
+              "lines": [
+                15,
+                25,
+                27,
+                29,
+                33,
+                34,
+                35,
+                36,
+                37,
+                38,
+                39,
+                40
+              ]
+            }
+          ],
+          "submitCalls": [
+            {
+              "seq": 71,
+              "hostError": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "rep": 2,
+      "originalReceiptSha256": "e24940704f789c782b37ad8bca0f5181b9e6c5b1b6425eebb335f6ec12f26969",
+      "originalArchitectureSha256": "4bcec5f630a90e5d41f3ed35515b13761479938b6d6c6c1dbd4e097055b25fd4",
+      "phase": "closed",
+      "archiveStateSha256": "c0c24c16e15f9a1073be36d27930ccf2a42f242c9d6af01cc36b22ef49475710",
+      "policySha256": "3739f10ac78bdb2e388a91cfcf72595e5f5d655abdda875e3282aed8fce458cd",
+      "signedReceiptSha256": "81e106b2de79efee82dc6765eb6b379909024057256cf81f42e9aa05c8ef2166",
+      "artifactsSha256": "223074dff2ba79e623352a85647d372c1d609dbf0ac120e4baca4394c7a11347",
+      "qualificationContrasts": [
+        {
+          "id": "public-batch-behavior:example:earlier-domain-before-later-shape",
+          "snapshotSha256": "5920791fdfaca28c0c903459d03644dfe18285da90882c6553797e1c759ea4bc"
+        },
+        {
+          "id": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+          "snapshotSha256": "48f0af0dae5546bca70ad50e66fb4f710e2a2e62ad34857f2a46eb83978014e8"
+        }
+      ],
+      "typedFacts": [
+        "nonobject-request"
+      ],
+      "hostConflicts": 0,
+      "engineeringArchitectureCurrent": true,
+      "independentCurrentCodeReview": true,
+      "exactProseReplay": {
+        "reviewer": {
+          "status": "pass",
+          "coverage": 23,
+          "wrongRowsApproved": [
+            {
+              "line": 21,
+              "status": "consistent",
+              "basis": "元素白名单含 operation_id、强制 action=rollback、operation_id 必填非空≤64；结构校验在查 first 之前，违反即 invalid-batch-item 加序号，与描述规则一致。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 129,
+                  "end": 137
+                },
+                {
+                  "file": "planner.py",
+                  "start": 206,
+                  "end": 211
+                }
+              ]
+            },
+            {
+              "line": 23,
+              "status": "consistent",
+              "basis": "request_identity 类型标签隔离 bool/number/string，sort_keys 抩平键序、数组序保留，同 ID 同数据 continue 不重复计费，异数据 conflicting-operation 指向后续项。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 140,
+                  "end": 172
+                },
+                {
+                  "file": "planner.py",
+                  "start": 215,
+                  "end": 221
+                }
+              ]
+            },
+            {
+              "line": 25,
+              "status": "consistent",
+              "basis": "仅新 ID 调 plan(single)，每项为新鲜 dict，失败直接返回 batch_failure(实际错误码, index)。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 222,
+                  "end": 228
+                }
+              ]
+            },
+            {
+              "line": 29,
+              "status": "consistent",
+              "basis": "成功返回 results 带 operationId，顶层 units 为去重后 total；results 每项只对应一个不同 operation，重试不追加。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 199,
+                  "end": 204
+                },
+                {
+                  "file": "planner.py",
+                  "start": 229,
+                  "end": 233
+                }
+              ]
+            },
+            {
+              "line": 42,
+              "status": "consistent",
+              "basis": "判定次序固定：顶层 invalid-batch（S2:188）→ 逐项结构（S2:206）→ 冲突（S2:219）→ 业务错误（S2:225）→ 配额（S2:237），与描述一致。",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 188,
+                  "end": 188
+                },
+                {
+                  "file": "planner.py",
+                  "start": 206,
+                  "end": 206
+                },
+                {
+                  "file": "planner.py",
+                  "start": 219,
+                  "end": 219
+                },
+                {
+                  "file": "planner.py",
+                  "start": 225,
+                  "end": 225
+                },
+                {
+                  "file": "planner.py",
+                  "start": 237,
+                  "end": 237
+                }
+              ]
+            }
+          ]
+        },
+        "auditor": {
+          "status": "pass",
+          "coverage": 23,
+          "wrongRowsApproved": [
+            {
+              "line": 21,
+              "status": "consistent",
+              "basis": "元素白名单含 operation_id 并要求非空且不超 64 字符，action 被强制为 rollback",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 129,
+                  "end": 137
+                }
+              ]
+            },
+            {
+              "line": 23,
+              "status": "consistent",
+              "basis": "规范串按键排序、数组保序、标量打类型标签，冲突序号指向后续项",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 152,
+                  "end": 172
+                },
+                {
+                  "file": "planner.py",
+                  "start": 219,
+                  "end": 220
+                }
+              ]
+            },
+            {
+              "line": 25,
+              "status": "consistent",
+              "basis": "仅新 ID 调用 plan(single)，首个失败以真实错误码与序号整批返回",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 224,
+                  "end": 228
+                }
+              ]
+            },
+            {
+              "line": 29,
+              "status": "consistent",
+              "basis": "结果项含 actions/units/operationId，重试沿用首次结果，顶层 units 为去重后合计，单项形状不变",
+              "facts": [],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 229,
+                  "end": 239
+                },
+                {
+                  "file": "planner.py",
+                  "start": 264,
+                  "end": 265
+                }
+              ]
+            },
+            {
+              "line": 42,
+              "status": "consistent",
+              "basis": "批内固定判定次序与配额最后比较",
+              "facts": [
+                "nonobject-request"
+              ],
+              "evidence": [
+                {
+                  "file": "planner.py",
+                  "start": 188,
+                  "end": 238
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "negativeControls": {
+        "reportedContradiction": "closure-refused",
+        "architectureByteDrift": "closure-refused"
+      },
+      "nativeToolTrace": {
+        "reviewer": {
+          "journalSha256": "f5fe6eb76fc104e54ca2fe9aa565434cc370c4d523cb5859de518e5f676fd189",
+          "assistantResponses": 58,
+          "allProbeResults": {
+            "runtime:error": 9,
+            "runtime:match": 12,
+            "architecture:error": 1,
+            "runtime:mismatch": 4
+          },
+          "selectedCalls": [
+            {
+              "seq": 63,
+              "assertion": "architecture",
+              "verdict": "error",
+              "error": "Error: 当前架构稿未登记可执行示例"
+            }
+          ],
+          "recordCalls": [
+            {
+              "seq": 197,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                19,
+                21,
+                25,
+                27,
+                29,
+                31,
+                33,
+                37,
+                38,
+                39,
+                42,
+                46,
+                47,
+                48,
+                49,
+                51,
+                53,
+                55
+              ]
+            },
+            {
+              "seq": 203,
+              "hostError": false,
+              "lines": [
+                23
+              ]
+            },
+            {
+              "seq": 209,
+              "hostError": false,
+              "lines": [
+                19,
+                37,
+                46
+              ]
+            },
+            {
+              "seq": 221,
+              "hostError": false,
+              "lines": [
+                15,
+                17
+              ]
+            },
+            {
+              "seq": 369,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                19,
+                21,
+                23,
+                25,
+                27,
+                29,
+                31,
+                33,
+                37,
+                38,
+                39,
+                40,
+                42,
+                46,
+                47,
+                48,
+                49,
+                51,
+                53,
+                54,
+                55
+              ]
+            },
+            {
+              "seq": 391,
+              "hostError": false,
+              "lines": [
+                15,
+                29,
+                31,
+                37,
+                40,
+                42
+              ]
+            }
+          ],
+          "submitCalls": [
+            {
+              "seq": 277,
+              "hostError": false
+            },
+            {
+              "seq": 289,
+              "hostError": false
+            },
+            {
+              "seq": 403,
+              "hostError": false
+            }
+          ]
+        },
+        "auditor": {
+          "journalSha256": "72593200dbb0953a26e01943754caed27cbaef445ef891074baf5988c025ce5e",
+          "assistantResponses": 35,
+          "allProbeResults": {
+            "architecture:error": 1,
+            "runtime:error": 3,
+            "runtime:match": 7,
+            "runtime:unavailable": 1
+          },
+          "selectedCalls": [
+            {
+              "seq": 77,
+              "assertion": "architecture",
+              "verdict": "error",
+              "error": "Error: 当前架构稿未登记可执行示例"
+            },
+            {
+              "seq": 103,
+              "assertion": "runtime",
+              "exampleId": "public-batch-behavior:example:earlier-domain-before-later-shape",
+              "verdict": "match",
+              "grounding": "registered-example",
+              "probeId": "probe-937c742a3e5fc3932d24f4a1bc54060734d7",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "error",
+                  "error": "production-frozen",
+                  "requestIndex": 0,
+                  "results": [],
+                  "units": 0
+                }
+              }
+            },
+            {
+              "seq": 111,
+              "assertion": "runtime",
+              "exampleId": "public-batch-behavior:example:object-key-order-does-not-charge-twice",
+              "verdict": "match",
+              "grounding": "registered-example",
+              "probeId": "probe-2103a950c336769bb7d5a6533fa5e634b810",
+              "actual": {
+                "exitCode": 0,
+                "json": {
+                  "status": "ok",
+                  "results": [
+                    {
+                      "actions": [
+                        "retry"
+                      ],
+                      "units": 2,
+                      "operationId": "op-0"
+                    }
+                  ],
+                  "units": 2
+                }
+              }
+            }
+          ],
+          "recordCalls": [
+            {
+              "seq": 139,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                19,
+                21,
+                23,
+                25,
+                27,
+                29,
+                31,
+                33,
+                37,
+                38,
+                39,
+                40,
+                42,
+                46,
+                47,
+                48,
+                49,
+                51,
+                53,
+                54,
+                55
+              ]
+            },
+            {
+              "seq": 145,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                23,
+                25,
+                37,
+                38,
+                46,
+                54,
+                55
+              ]
+            },
+            {
+              "seq": 151,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                23,
+                25,
+                37,
+                38,
+                46,
+                54,
+                55
+              ]
+            },
+            {
+              "seq": 175,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                23,
+                25,
+                37,
+                38,
+                46,
+                55
+              ]
+            },
+            {
+              "seq": 199,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                23,
+                25,
+                37,
+                38,
+                46,
+                55
+              ]
+            },
+            {
+              "seq": 217,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                19,
+                37,
+                39,
+                42,
+                46,
+                54
+              ]
+            },
+            {
+              "seq": 223,
+              "hostError": false,
+              "lines": [
+                15,
+                17,
+                19,
+                37,
+                39,
+                42,
+                46,
+                54
+              ]
+            },
+            {
+              "seq": 229,
+              "hostError": false,
+              "lines": [
+                54
+              ]
+            }
+          ],
+          "submitCalls": [
+            {
+              "seq": 235,
+              "hostError": false
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

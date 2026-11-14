@@ -73,15 +73,18 @@ function privatePolicy(sessionId, input) {
   };
 }
 
-/** Preserve the selected native text and its event locator as data for the execution and review roles. */
-function materialDocument(materials) {
-  if (!materials?.length) return null;
+/** Preserve native text and its event locator as data for the execution and review roles. */
+function materialDocument(materials = [], instruction) {
+  if (!materials.length && !instruction) return null;
+  const fenced = ({ seq, sha256, text }, label, hashLabel) => {
+    const fences = text.match(/~+/gu) ?? [];
+    const fence = "~".repeat(Math.max(3, ...fences.map(run => run.length + 1)));
+    return ["## " + label + " " + seq, "", hashLabel + " SHA-256 " + sha256, "", fence, text, fence, ""];
+  };
   return ["# 会话提供的材料", "", "以下是该会话里用户提供的原文摘录。它们可证明收到的内容，外部事件仍需独立查证。", "",
-    ...materials.flatMap(item => {
-      const fences = item.text.match(/~+/gu) ?? [];
-      const fence = "~".repeat(Math.max(3, ...fences.map(run => run.length + 1)));
-      return ["## 用户消息事件 " + item.seq, "", "摘录 SHA-256 " + item.sha256, "", fence, item.text, fence, ""];
-    }), ""].join("\n");
+    ...materials.flatMap(item => fenced(item, "用户消息事件", "摘录")),
+    ...(instruction ? fenced(instruction, "已确认开工指令全文 · 用户消息事件", "原文") : []),
+    ""].join("\n");
 }
 
 function goalDocument(proposal, ownerTable) {
@@ -113,7 +116,10 @@ function createPrivateProject(hostHome, sessionId, proposal) {
     // The accepted direct instruction is already bound to the owner's native event.
     // An explicit table task can therefore use host text instead of a proposed answer.
     const ownerTable = !!deliverableTableContract(proposal.instruction);
-    const input = materialDocument(proposal.materials);
+    // Selected excerpts can omit the case rows. Preserve the complete task as
+    // quotable owner input for both reviewers, even if no excerpts were selected.
+    const instruction = ownerTable && { seq: proposal.userSeq, sha256: digest(proposal.instruction), text: proposal.instruction };
+    const input = materialDocument(proposal.materials, instruction);
     const manifest = JSON.stringify(privatePolicy(sessionId, input), null, 2) + "\n";
     parseAuthority(Buffer.from(manifest));
     const files = {

@@ -254,6 +254,61 @@ test("inventory pagination never drops trailing blocks",async()=>fixture(async(r
   assert.equal(new Set(seen).size,27);assert.equal(e.finish().pending.length,0);
 }));
 
+test("archived oversized page and proof batches recover without admitting unsubmitted blocks", async () => fixture(async (root, write) => {
+  write("candidate.md", Array.from({ length: 125 }, (_, index) => `# 第${index + 1}项`).join("\n"));
+  const e = environment(root);
+  const page = e.invoke("inventory", { offset: 96, count: 29 });
+  assert.deepEqual(page.pageLimit, { requested: 29, applied: 24 });
+  assert.equal(page.blocks.length, 24);
+  assert.deepEqual([page.next.offset, page.next.count], [120, 5]);
+  const last = e.invoke("inventory", { offset: page.next.offset, count: page.next.count });
+  assert.equal(last.blocks.length, 5);
+  assert.equal(last.next, undefined);
+  assert.equal(new Set([...page.blocks, ...last.blocks].map(row => row.id)).size, 29);
+  assert.throws(() => e.invoke("inventory", { offset: -1, count: 0 }), /offset=0 count=8/u);
+
+  const entries = [...page.blocks, ...last.blocks].map(({ id }) => ({ block: id, parts: [nonfact] }));
+  const put = rows => e.invoke("record", { entries: rows });
+  const before = JSON.stringify(e.active.coverage);
+  for (const length of [13, 17]) {
+    const invalidBatch = put(entries.slice(0, length));
+    assert.equal(invalidBatch.status, "batch-too-large");
+    assert.equal(invalidBatch.requested, length);
+    assert.deepEqual(invalidBatch.recorded, []);
+    assert.deepEqual([invalidBatch.next.entriesFrom, invalidBatch.next.entriesThrough], [1, 12]);
+    assert.equal(JSON.stringify(e.active.coverage), before);
+  }
+  assert.equal(put(entries.slice(0, 12)).recorded.length, 12);
+  assert.equal(put(entries.slice(12, 17)).recorded.length, 5);
+  assert.equal(e.invoke("status").pending.length, 108);
+  assert.equal(e.invoke("status", { block: entries[17].block }).record, null);
+}));
+
+test("registered review tool routes an oversized transcript batch back to exact splitting", async () => fixture(async (root, write) => {
+  const p = structuredClone(policy);
+  p.units.K01.claims = [];
+  p.units.K01.calculations = {};
+  write("BUILDING-LOOP.json", JSON.stringify(p));
+  write("candidate.md", Array.from({ length: 17 }, (_, index) => `# 第${index + 1}项`).join("\n"));
+  const h = host(root, { automaticCoverage: false });
+  const executor = (await h.flow("root", "advance")).childId;
+  await h.file(executor, "read", "candidate.md");
+  await h.flow(executor, "submit");
+  const reviewer = (await h.flow("root", "advance")).childId;
+  const prepared = await h.flow(reviewer, "prepare");
+  assert.equal(prepared.coverage.blocks.length, 17);
+  const entries = prepared.coverage.blocks.map(({ id }) => ({ block: id, parts: [nonfact] }));
+  const put = rows => h.coverage(reviewer, "record", { entries: rows });
+  const overflow = await put(entries);
+  assert.equal(overflow.status, "batch-too-large");
+  assert.deepEqual(overflow.recorded, []);
+  assert.equal((await h.coverage(reviewer, "status")).pending.length, 17);
+  assert.equal((await put(entries.slice(overflow.next.entriesFrom - 1, overflow.next.entriesThrough))).recorded.length, 12);
+  assert.equal((await h.coverage(reviewer, "status")).pending.length, 5);
+  assert.equal((await put(entries.slice(overflow.next.entriesThrough))).recorded.length, 5);
+  assert.equal((await h.coverage(reviewer, "status")).pending.length, 0);
+}));
+
 test("equality transitivity requires a shared middle concept",async()=>fixture(async(root,write)=>{
   write("functional.csv","本例 A=B。\n本例 B=C。\n");write("candidate.md","本例 A=C。\n");
   const e=environment(root),block=e.invoke("inventory").blocks[0].id;
@@ -758,6 +813,30 @@ function objectDiagnostic(error) {
   const marker="[coverage-object] ",index=error.message.indexOf(marker);assert.ok(index>=0);
   return JSON.parse(error.message.slice(index+marker.length));
 }
+test("candidate self-report advice preserves the external whitelist and offers the existing factual return route", async () => fixture(async (root, write) => {
+  const body = "正文声明各结论有原始资料（A1）；另一结论以实测为据（A2）。\n";
+  const e = objectEnvironment(root, write, body);
+  const block = e.blocks[0];
+  assert.equal(block.objectCheckHint, undefined);
+  const put = part => e.invoke("record", { entries: [{ block: block.id, parts: [part] }] });
+  const base = { kind: "direct", status: "supported", sourceRelation: "supports", basis: "逐字核对当前块的来源范围。" };
+  for (const attempted of [
+    { ...base, evidence: [{ file: "candidate.md", start: 1, end: 1, quote: block.text }] },
+    { ...base, objectCheck: { kind: "candidate", check: "citations-marked", source: "functional.csv", marker: "（A1）" } },
+    { ...base, objectCheck: { kind: "candidate", check: "citation-profile", source: "candidate.md" } },
+  ]) assert.throws(() => put(attempted), error => {
+    const diagnostic = objectDiagnostic(error);
+    assert.match(diagnostic.manuscript, /objectCheckHint/u);
+    assert.match(diagnostic.mixedClaims, /uncertain、sourceRelation=insufficient 和具体 finding/u);
+    return true;
+  });
+  assert.equal(e.invoke("status", { block: block.id }).record, null);
+  const rejected = put({ ...base, status: "uncertain", sourceRelation: "insufficient",
+    finding: { kind: "missing-evidence", quote: block.text, fix: "为稿内标注范围给出准确行号及已授权原始出处。" } });
+  assert.equal(rejected.rejected.length, 1);
+  assert.equal(e.invoke("status", { block: block.id }).record.parts[0].objectCheck, undefined);
+  assert.equal(fs.readFileSync(path.join(root, "candidate.md"), "utf8"), body);
+}));
 test("object parameter errors show valid kind-specific templates and never use the candidate as source",async()=>fixture(async(root,write)=>{
   const e=objectEnvironment(root,write,"[稿件自述] 本稿对 functional.csv 有2行可识别同行引用。\n第一处（出处：functional.csv 第2行）。\n第二处（出处：functional.csv 第2行）。\n");
   for(const bad of [
