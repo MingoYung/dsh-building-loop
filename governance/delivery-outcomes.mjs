@@ -44,10 +44,22 @@ export function deliveryOutcomeContract(frame, spec, goal) {
   return { ...contract, sha256: digest(JSON.stringify(contract)) };
 }
 
-const escape = text => text.replace(/[|\\{}()[\]^$+*?.-]/gu, "\\$&");
+export function deliveryOutcomeInstructions(contract) {
+  if (!contract) return null;
+  return {
+    ...contract,
+    bodyFormat: "正文每项先写 `事项编号：短结果`，同一行再写原始记录和规则。正文同一编号只能有一个结果字段。",
+    ...(contract.summary ? { summaryFormat: "大白话先逐项写 `事项编号：短结果`，使用正文相同结果，各项用句号或分号隔开。" } : {}),
+    reviewFormat: "逐项给原始记录 original-fact、正文 project-application、要求大白话时再给总结 project-application。用 review 或 audit 提交 outcomes。",
+  };
+}
+
+// IDs contain only letters, digits, underscores and hyphens. Interpolate
+// them outside character classes, where a bare hyphen is already literal.
 const scalar = /^[\p{L}\p{N}][\p{L}\p{N}_ -]{0,31}$/u;
 const statusTypes = ["decided", "missing", "inconsistent", "clarify"];
 const brief = (value, limit) => typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= limit && !/[\r\n]/u.test(value);
+const summaryLabel = /^(?:#{1,6}\s*)?(?:大白话|直白说明)\s*(?:[:：]|$)/u;
 // These tokens mark unresolved speech acts even when placed in a result
 // field. A workflow disposition such as "待补" is itself actionable.
 const unresolved = /(?:^|\s)(?:是否|若|如果|除非|可能|或许|未定|未确定|不确定|待定|待确认|待澄清|有待|需确认|需澄清|暂无法|无法确定|maybe\b|if\b|whether\b|unknown\b|undecided\b|unresolved\b|to be determined\b)|(?:是否|除非|若是|待确认|待澄清)/iu;
@@ -55,13 +67,18 @@ const unresolved = /(?:^|\s)(?:是否|若|如果|除非|可能|或许|未定|未
 /** Match the outcome field, not an occurrence of a result word in prose.
  * The chosen witness is always literal and bounded inside the actual line. */
 function declarationsAt(raw, id, summary) {
-  const subject = escape(id);
+  const subject = id;
   const delimiter = summary ? "(?:[ \\t]*[：:][ \\t]*|[ \\t]+)" : "[ \\t]*[：:][ \\t]*";
   const result = "([\\p{L}\\p{N}][\\p{L}\\p{N}_ -]{0,31})";
   const pattern = new RegExp(`(?:^|[\\s：:、，,；;。.!！])(${subject}${delimiter}${result})(?=[\\t ]*(?:$|[。.!！；;，,、（(]))|(\\|[ \\t]*${subject}[ \\t]*\\|[ \\t]*${result}[ \\t]*\\|)`, "gu");
   return [...raw.matchAll(pattern)].filter(match => {
-    if(summary) return true;
-    const prefix=raw.slice(0,match.index + match[0].indexOf(match[1] ?? match[3]));
+    const prefix = raw.slice(0, match.index + match[0].indexOf(match[1] ?? match[3]));
+    if (summary) {
+      // A summary field begins a sentence or a semicolon-delimited item.
+      // Mentions such as "假设 E3：..." cannot supply an operative result.
+      const content = prefix.trim().replace(summaryLabel, "").trim();
+      return content === "" || /[；;。.!！]$/u.test(content);
+    }
     return /^\s*(?:(?:[-*+]\s+|\d+[.)]\s+))?(?:(?:\*\*)?C\d+(?:\*\*)?\s*[:：]\s*)?$/u.test(prefix);
   }).map(match => {
     const quote = (match[1] ?? match[3]).trimEnd();
@@ -72,11 +89,11 @@ function declarationsAt(raw, id, summary) {
 
 function candidateView(bytes) {
   const lines = lineList(bytes);
-  const syntax = markdownStructure(lines);
+  const syntax = markdownStructure(lines, { collectOutcomeRows: true });
   let summaryStart = lines.length;
   for (let i = 0; i < lines.length; i++) {
     const row = syntax.visible[i].replace(/[*_~]/gu, "").trim();
-    if (syntax.closingRows[i] && /^(?:#{1,6}\s*)?(?:大白话|直白说明)\s*(?:[:：]|$)/u.test(row)) summaryStart = i;
+    if (syntax.closingRows[i] && summaryLabel.test(row)) summaryStart = i;
   }
   return { lines, syntax, summaryStart };
 }
@@ -94,8 +111,45 @@ function locate(view, input, summary) {
   return { line: input.line, quote: input.quote, start: at, end: at + input.quote.length };
 }
 
+function fieldsFor(view, id, inSummary) {
+  return view.syntax.visible.flatMap((raw, i) => {
+    if ((i >= view.summaryStart) !== inSummary) return [];
+    if (inSummary ? !view.syntax.closingRows[i] : !view.syntax.outcomeRows[i]) return [];
+    return declarationsAt(raw, id, inSummary).map(field => ({ ...field, line: i + 1 }));
+  });
+}
+
+/** Report the structural requirement to the author before reviewers spend
+ * effort on the full draft. Genuine questions stay eligible for escalation. */
+export function deliveryOutcomeLayoutIssues(contract, bytes) {
+  if (!contract) return [];
+  const view = candidateView(bytes);
+  return contract.items.flatMap(({ id }) => {
+    const body = fieldsFor(view, id, false);
+    const summary = contract.summary ? fieldsFor(view, id, true) : [];
+    if (body.length === 1 && unresolved.test(body[0].decision)) return [];
+    if (body.length !== 1) return [id + " 的正文须有一个唯一可定位的「事项编号：明确结果」字段，将解释和出处写在字段后"];
+    if (contract.summary && (summary.length !== 1 || summary[0].decision !== body[0].decision)) {
+      return [id + " 的大白话缺与正文同值的可定位处置字段，按同一事项编号和结果复述"];
+    }
+    return [];
+  });
+}
+
+/** Inventory includes current host-located fields so reviewers can copy a
+ * short exact witness instead of extracting a unique quote by guessing. */
+export function deliveryOutcomeFields(contract, bytes) {
+  if (!contract) return null;
+  const view = candidateView(bytes);
+  return contract.items.map(({ id }) => ({
+    id,
+    body: fieldsFor(view, id, false),
+    ...(contract.summary ? { summary:fieldsFor(view,id,true) } : {}),
+  }));
+}
+
 function provesSubject(ref, id) {
-  return typeof ref.quote === "string" && new RegExp(`(?<![A-Za-z0-9_-])${escape(id)}(?![A-Za-z0-9_-])`, "u").test(ref.quote);
+  return typeof ref.quote === "string" && new RegExp(`(?<![A-Za-z0-9_-])${id}(?![A-Za-z0-9_-])`, "u").test(ref.quote);
 }
 
 function partsOn(coverage, view, location) {
@@ -152,8 +206,7 @@ function decideRow(view, item, row, coverage, contract) {
     throw new Error(id + " 须分别定位正文和已要求的大白话，并给明确处置结果");
   }
   const check = (loc, inSummary) => {
-    const found = view.syntax.visible.flatMap((raw, i) => (i >= view.summaryStart) === inSummary ?
-      declarationsAt(raw, id, inSummary).map(field => ({ ...field, line: i + 1 })) : []);
+    const found = fieldsFor(view, id, inSummary);
     if (found.length !== 1 || found[0].line !== loc.line || found[0].quote !== loc.quote || found[0].decision !== row.decision) {
       throw new Error(id + " 须逐字指向唯一的「事项编号：结果」字段；条件、提及和其他事项不是本项明确处置");
     }

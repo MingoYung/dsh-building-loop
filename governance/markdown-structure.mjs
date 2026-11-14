@@ -13,13 +13,14 @@ export const footnoteDefinition = new RegExp("^ {0,3}\\[\\^(" + footnoteId + ")\
 /** Classify Markdown from one syntax tree and retain physical line positions.
  * The project consumes original text and can impose stricter requirements
  * than CommonMark on HTML and the authority fence. */
-export function markdownStructure(lines, { collectParagraphs = false } = {}) {
+export function markdownStructure(lines, { collectParagraphs = false, collectOutcomeRows = false } = {}) {
   const source = lines.join("\n");
   const root = fromMarkdown(source, parserOptions);
   const hidden = new Int32Array(lines.length + 1);
   const htmlHidden = new Int32Array(lines.length + 1);
   const visible = [...lines];
   const closingRows = new Uint8Array(lines.length);
+  const outcomeRows = collectOutcomeRows ? new Uint8Array(lines.length) : null;
   const standaloneFootnotes = new Uint8Array(lines.length);
   const continuedFootnotes = new Uint8Array(lines.length);
   const fences = [];
@@ -107,6 +108,12 @@ export function markdownStructure(lines, { collectParagraphs = false } = {}) {
 
     if (node.type === "paragraph" || node.type === "heading") {
       if (collectParagraphs && node.type === "paragraph") paragraphs.push({ start, end });
+      if (outcomeRows && node.type === "paragraph") {
+        // A nested list or an item's explanatory continuation is not an
+        // operative result row. Keep only the lead paragraph of top-level items.
+        if (parent === root) outcomeRows.fill(1, first, last + 1);
+        else if (list && parent === item && node === item.children[0]) outcomeRows[first] = 1;
+      }
       if (parent === root) closingRows.fill(1, first, last + 1);
       // An explicit footer immediately after a top-level list item is an
       // allowed project form, even when CommonMark makes it a lazy line.
@@ -135,6 +142,7 @@ export function markdownStructure(lines, { collectParagraphs = false } = {}) {
     if (htmlDepth) standaloneFootnotes[line] = 0;
   }
   return { fences: fences.filter(fence => !htmlHidden[fence.start]), visible, htmlHidden, closingRows, standaloneFootnotes, continuedFootnotes,
+    ...(outcomeRows ? { outcomeRows } : {}),
     ...(collectParagraphs ? { paragraphs: paragraphs.filter(({ start, end }) =>
       !htmlHidden.slice(start.line - 1, end.line).some(Boolean)) } : {}) };
 }

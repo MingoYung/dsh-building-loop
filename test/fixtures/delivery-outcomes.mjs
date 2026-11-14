@@ -67,7 +67,7 @@ const withDisposition = (decision, body, summary) => {
 export const deliveryVariants = {
   historicalNoOutcome: archivedDeliveryCandidate,
   definiteOutcome: withDisposition("待补", expectedDisposition, positiveSummary),
-  genuineClarification: withDisposition(null, clarification, clarificationSummary),
+  genuineClarification: withDisposition("待确认", clarification, clarificationSummary),
   summaryMismatch: withDisposition("待补", expectedDisposition, inconsistentSummary),
   isolatedNoOutcome: withDisposition(null, archivedDeliveryCandidate.split("\n")[7]
     .replace("- C4：", "").split("（出处：")[0], summaryPrefix + "E3 是否待补仍由总纲规则授权。"),
@@ -393,3 +393,42 @@ export const archivedDeliveryRoles = {
     ]
   }
 };
+
+// Exact native .35 final-review draft with evidence and human-readable results
+// but no accepted field shape for every required result.
+export const nativeOutcomeLayoutSha256 = "29df985fda09518271567aeec36f7ac6711abf86331dea9d17ca51547a94c39d";
+export const nativeOutcomeLayoutDraft = [
+  "# 地区入组与 GitHub 检查状态说明\n",
+  "\n",
+  "## 一、地区入组口径（依据 PROJECT.md 第4行）\n",
+  "\n",
+  "- 地区边界：只纳入华北。\n",
+  "- 明确登记为其他地区的，排除。\n",
+  "- 地区字段空白的，才是待补；空白待补与“其他地区排除”不能混用。\n",
+  "- 地区入组以登记资料的地区字段为依据；判断只看该字段写了什么。\n",
+  "\n",
+  "## 二、三条演练登记的处置\n",
+  "\n",
+  "下列 E1–E3 出自 `sources/regional-register.md`，该文件第1行标题为“地区登记演练”，第2行写明“这是虚构登记，用于核对地区判断；空值没有额外线索。”所以它们只是演练记录，**不得当作外部事实或真实地区数据**；下面只记录该演练文件的字段值与按本项目口径的处置。\n",
+  "\n",
+  "- E1：`sources/regional-register.md` 第3行原文“E1 地区：华北。”——地区为华北，在只纳入华北的边界内，处置为纳入。\n",
+  "- E2：`sources/regional-register.md` 第4行原文“E2 地区：华东。”——地区为华东，是明确登记的其他地区，处置为排除（不是待补）。\n",
+  "- E3：`sources/regional-register.md` 第5行原文“E3 地区：空白。”——地区字段空白，处置为待补；第2行已说明空值没有额外线索，因此不推测其真实地区。\n",
+  "\n",
+  "- C2：E1 的处置为纳入，依据是第3行原文“E1 地区：华北。”（出处：sources/regional-register.md 第3行）。\n",
+  "- C3：E2 的地区为华东，按“只纳入华北、其他地区排除”的边界处置为排除，而不是待补（出处：sources/regional-register.md 第4行）。\n",
+  "- C4：E3 的地区字段为空白，处置为待补，且空值没有额外线索（出处：sources/regional-register.md 第5行）。\n",
+  "\n",
+  "## 三、GitHub 检查状态说明（原始出处，与演练登记分开）\n",
+  "\n",
+  "- 原始出处：GitHub 官方 REST checks 指南，URL 与抓取时间见 `sources/github-checks.md` 第2–3行。\n",
+  "- 第6行原文：“If the status is completed, the conclusion can be any of the following:”，第7行为“failure”，第8行为“success”。据此，状态为 completed 时，结论可以是 failure 等值，completed 不等于成功结论。\n",
+  "- 该文件第4行自述“GitHub 列表仅摘 failure/success 两项，不表示列表只有这两项”。因此本稿只写摘录所见的两项，不断言 GitHub 结论只有 failure 和 success 两项，完整列表仍属未证事项。\n",
+  "- 本节内容来自公开的 GitHub 文档摘录，与第二节的虚构演练登记没有关系，两者不可互相引证。\n",
+  "\n",
+  "- C1：GitHub 检查套件的 completed 状态可能对应 failure 结论，依据第6–7行原文（出处：sources/github-checks.md 第6-7行）。\n",
+  "\n",
+  "[稿件自述] 本稿带 sources/regional-register.md 行号定位的共6行（第14、15、16、18、19、20行）。\n",
+  "\n",
+  "大白话：照登记字段看，E1 写的是华北、纳入；E2 写的是华东、排除；E3 是空白、待补；GitHub 那边，检查显示完成时结论也可能是失败，不是完成就等于成功。\n",
+].join("");

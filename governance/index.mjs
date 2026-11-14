@@ -38,7 +38,8 @@ import { createStallReproductionProof, DIAGNOSIS_WAIT, diagnosisProofIdentity, d
   requireDiagnosisProofScope, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
-import { deliveryOutcomeContract, deliveryOutcomeSchema, reviewDeliveryOutcomes, deliveryOutcomeDisagreements } from "./delivery-outcomes.mjs";
+import { deliveryOutcomeContract, deliveryOutcomeFields, deliveryOutcomeInstructions, deliveryOutcomeLayoutIssues, deliveryOutcomeSchema,
+  reviewDeliveryOutcomes, deliveryOutcomeDisagreements } from "./delivery-outcomes.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
   requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims, engineeringArchitectureSourceFacts,
@@ -1231,6 +1232,11 @@ export function apply(ctx, config = {}) {
         : phase==="blocked" ? "核对阻塞原因；可恢复时用 advance 续派到原子会话"
         : phase==="ledger-review" ? "ledger read 后逐项 ledger review；若有 reviewPage.cursor 则随 review 提交"
         : phase==="closed" ? "已关单，按回执和账本汇报，不再推进已完成阶段" : BEGIN[phase] ? "按当前阶段 advance" : "等待当前工作会话交付");
+      const outcomeContract = spec && !codeReviewMode && ["executor","reviewer","auditor"].includes(frame.role)
+        ? deliveryOutcomeContract(frame,spec,goalSnapshot(frame)) : null;
+      const outcomeDraft = outcomeContract && readBytes(frame.root,spec.candidate);
+      const outcomeFields = outcomeDraft && candidateReadComplete(current,spec.candidate,outcomeDraft)
+        ? deliveryOutcomeFields(outcomeContract,outcomeDraft) : null;
       return {role:frame.role,phase,unit:assignment?.[0] ?? checkpoint?.unit,files,pending,complete:pending.length===0,
         ...(checkpoint ? { checkpoint } : {}),
         ...(instruction ? { instruction } : {}),
@@ -1252,8 +1258,8 @@ export function apply(ctx, config = {}) {
               requirement: { file: "当前目标文件", start: 1, end: 1, quote: "支持预期的目标原句" } } } } } : {}),
         ...(submission ? { submission } : {}),
         ...(deliverableTable ? { deliverableTable } : {}),
-        ...(spec && !codeReviewMode && ["executor", "reviewer", "auditor"].includes(frame.role) ?
-          {outcomeContract: deliveryOutcomeContract(frame, spec, goalSnapshot(frame))} : {}),
+        ...(outcomeContract ? { outcomeContract:deliveryOutcomeInstructions(outcomeContract) } : {}),
+        ...(outcomeFields ? { outcomeFields } : {}),
         ...(frame.role==="coordinator" && current?.outcomeClarification ? {outcomeClarification: current.outcomeClarification} : {}),
         ...(frame.role==="executor" && current?.outcomeIssues?.length ? {outcomeIssues: current.outcomeIssues} : {}),
         ...reconciliationNotice(frame,current),
@@ -2443,6 +2449,8 @@ export function apply(ctx, config = {}) {
     }
     if(preservation.proof)result={...result,requiredLines:preservation.proof,
       ok:result.ok&&preservation.issues.length===0,issues:[...result.issues,...preservation.issues]};
+    const outcomeLayout=deliveryOutcomeLayoutIssues(deliveryOutcomeContract(frame,spec,goal??goalSnapshot(frame)),bytes);
+    if(outcomeLayout.length)result={...result,ok:false,issues:[...result.issues,...outcomeLayout]};
     if(active.outcomeIssues?.length&&active.rejectedCandidate===digest(bytes)){
       result={...result,ok:false,issues:[...result.issues,"逐项交付退回仍未修订，请按 prepare 的 outcomeIssues 修改正文或大白话"]};
     }
@@ -2684,15 +2692,21 @@ export function apply(ctx, config = {}) {
         coverage=fullCoverage();
         requireDisputedProof(active,coverage.records,true);
         const outcomeContract = deliveryOutcomeContract(frame, spec, goal);
+        const outcomeLayout = deliveryOutcomeLayoutIssues(outcomeContract, bytes);
         const oldOutcomes = previous && active.pendingReceipt.deliveryOutcomes?.items;
         const outcomeInput = args.outcomes ?? oldOutcomes;
-        const deliveryOutcomes = reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, outcomeInput);
+        // Formatting belongs to the author. A legacy draft can arrive here
+        // after restart. Return its actual missing fields instead of asking a
+        // reviewer to try new arguments against the same bytes.
+        const deliveryOutcomes = outcomeLayout.length ? null :
+          reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, outcomeInput);
         if (holdOutcomeClarification(active, deliveryOutcomes, goal)) {
           trackUnit(frame,id,active,true);
           frame.changed = true;
           return {unit:id, phase:active.phase, parent:active.owner, outcomeClarification:active.outcomeClarification};
         }
-        const outcomeIssues = deliveryOutcomes?.items.filter(row => row.status !== "decided") ?? [];
+        const outcomeIssues = outcomeLayout.length ? [{ id:"layout", status:"missing", basis:outcomeLayout.join(" / ") }] :
+          deliveryOutcomes?.items.filter(row => row.status !== "decided") ?? [];
         rememberDirectCoverage(frame,active,spec,coverage);
         if(active.assessment?.hash===hash)consistentUnlisted(frame,active,spec,bytes,active.assessment.unlisted,coverage);
         // Evaluate each configured number even when another claim has already failed.
@@ -2723,6 +2737,7 @@ export function apply(ctx, config = {}) {
           candidatePositions:candidatePositionSummary(spec.candidate,bytes),
           goal: active.goal, goalFit: active.assessment?.goalFit,
           ...(deliveryOutcomes ? {deliveryOutcomes} : {}),
+          ...(outcomeLayout.length ? {outcomeLayout} : {}),
           unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage),
           formatIssues: [...layout,...preservation.issues], ...(preservation.proof?{requiredLines:preservation.proof}:{}),
           ...(active.quality ? { quality: active.quality } : {}),
@@ -3311,8 +3326,9 @@ export function apply(ctx, config = {}) {
           ...(assignment && confirmed?.instruction ? ["prepare 的 instruction 是所有者开工时的完整任务指令，补足当时的摘要；后续已确认变更以当前目标为准。它不是证据文件，权限仍由现有授权决定。"] : []),
           ...architectureRule,
           ...(!codeReview && frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
-          ...(!codeReview && frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 完成后最终只提交 building_loop {"action":"audit"}，unit可省略；不要重复发送 checks、quality、note 或全文。宿主从已落盘证明生成回执。'] : []),
+          ...(!codeReview && frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 后提交 building_loop audit；prepare 有 outcomeContract 时附本角色 outcomes。不要重复发送 checks、quality 或全文。'] : []),
           ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, ASSERTION_PROOF_RULE, OUTCOME_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
+          ...(!codeReview && frame.role === "executor" ? [OUTCOME_RULE] : []),
           ...(!codeReview && (phase === "supplement" || frame.role === "reviewer") ? [QUALITY_RULE] : []),
           ...(codeReview || frame.role === "executor" && assignment?.[1].codeIntake ? [CODE_COMMENT_RULE] : []),
           ...(frame.managed && frame.role === "coordinator" ? [

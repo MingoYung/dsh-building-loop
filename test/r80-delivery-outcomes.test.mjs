@@ -6,6 +6,7 @@ import test from "node:test";
 import { documentCoverage } from "../governance/coverage.mjs";
 import {
   declaredDeliveryOutcomes,
+  deliveryOutcomeLayoutIssues,
   requireAcceptedDeliveryOutcomes,
   reviewDeliveryOutcomes,
 } from "../governance/delivery-outcomes.mjs";
@@ -17,6 +18,8 @@ import {
   archivedDeliveryCandidate,
   archivedDeliveryRoles,
   deliveryVariants,
+  nativeOutcomeLayoutDraft,
+  nativeOutcomeLayoutSha256,
 } from "./fixtures/delivery-outcomes.mjs";
 import { frozenAssertionMaterial, installFrozenAssertionFixture } from "./fixtures/assertion-reconciliation.mjs";
 import { fixture, host } from "./helpers.mjs";
@@ -132,7 +135,7 @@ function coverageParts(block, variant, rule) {
     const marker = text.indexOf("，按") >= 0 ? "，按" : text.indexOf("，属") >= 0 ? "，属" : "，本批";
     const breakAt = text.indexOf(marker);
     if (breakAt < 0) return [applyRule(text, [rowFor(entity), rawRow(registerFile, 2)], rule)];
-    const declaration = /^- C\d：E\d：(纳入|排除|待补)，/u.exec(text)?.[0];
+    const declaration = /^- C\d：E\d：(纳入|排除|待补|待确认)，/u.exec(text)?.[0];
     return [
       ...(declaration ? [applyRule(declaration, [rowFor(entity)], rule)] : []),
       direct(text.slice(declaration?.length ?? 0, breakAt), [rowFor(entity)]),
@@ -226,7 +229,7 @@ async function materializeReview(root, variant) {
     goalFit: { pass: true, basis: "旧回执只看证据及行号，曾误以为已写清全部处置。" },
     unverifiedSources: [], unlisted: [], revise: [],
   });
-  return { h, reviewer, prepare, record, draft, outcomes: reportFor(variant, draft) };
+  return { h, reviewer, executor, prepare, record, draft, outcomes: reportFor(variant, draft) };
 }
 
 test("frozen R80 cannot turn a word mentioned in a condition into E3's disposition", () =>
@@ -239,8 +242,12 @@ test("frozen R80 cannot turn a word mentioned in a condition into E3's dispositi
     };
     assert.ok(draft.split("\n")[7].includes(misleading.body.quote));
     assert.ok(draft.split("\n")[13].includes(misleading.summary.quote));
-    await assert.rejects(h.flow(reviewer, "review", { checks, outcomes: [outcomes[0], outcomes[1], misleading] }),
-      /处置|结论|outcome|decision/u);
+    const result = await h.flow(reviewer, "review", { checks, outcomes: [outcomes[0], outcomes[1], misleading] });
+    assert.equal(result.phase, "supplement-ready");
+    const receipt = JSON.parse(fs.readFileSync(path.join(root, "records/first.json"), "utf8"));
+    assert.equal(receipt.candidateSha256, archivedDeliveryAcceptance.candidateSha256);
+    assert.equal(receipt.decision, "reject");
+    assert.ok(receipt.outcomeLayout.some(issue => issue.startsWith("E3 ")));
     assert.equal(fs.existsSync(path.join(root, "records/final.json")), false);
   }));
 
@@ -259,9 +266,53 @@ test("an exact but inconsistent summary cannot count as outcome completion", () 
     const misleading = structuredClone(outcomes);
     misleading[2] = { ...misleading[2], status: "decided", decision: "待补",
       body: { line: 8, quote: "E3：待补" }, summary: { line: 14, quote: "E3 排除" } };
-    await assert.rejects(h.flow(reviewer, "review", { checks, outcomes: misleading }), /处置|结论|outcome|decision/u);
-    assert.equal((await h.flow(reviewer, "review", { checks, outcomes })).phase, "supplement-ready");
+    assert.equal((await h.flow(reviewer, "review", { checks, outcomes: misleading })).phase, "supplement-ready");
+    const receipt = JSON.parse(fs.readFileSync(path.join(root, "records/first.json"), "utf8"));
+    assert.equal(receipt.decision, "reject");
+    assert.ok(receipt.outcomeLayout.some(issue => issue.startsWith("E3 ") && issue.includes("大白话")));
     assert.equal(fs.existsSync(path.join(root, "records/final.json")), false);
+  }));
+
+test("nested examples and conditional summary mentions cannot supply an operative outcome", () => {
+  const contract = { items: [{ id: "ITEM-3" }], summary: true };
+  const source = (body, summary) => Buffer.from(`${body}\n\n大白话：${summary}\n`);
+  assert.deepEqual(deliveryOutcomeLayoutIssues(contract,
+    source("- ITEM-3：待补，登记值未填。", "ITEM-3：待补。")), []);
+  const nested = deliveryOutcomeLayoutIssues(contract,
+    source("- 举例说明\n  - ITEM-3：待补，登记值未填。", "ITEM-3：待补。"));
+  assert.equal(nested.length, 1);
+  assert.match(nested[0], /正文/u);
+  const conditional = deliveryOutcomeLayoutIssues(contract,
+    source("- ITEM-3：待补，登记值未填。", "假设 ITEM-3：待补。"));
+  assert.equal(conditional.length, 1);
+  assert.match(conditional[0], /大白话/u);
+});
+
+test("the exact native layout fails all required outcomes together before author handoff", () =>
+  fixture(async root => {
+    const frozen = Buffer.from(nativeOutcomeLayoutDraft);
+    assert.equal(digest(frozen), nativeOutcomeLayoutSha256);
+    const { h, executor, reviewer, prepare } = await materializeReview(root, "isolatedMissing");
+    assert.equal((await h.flow(reviewer, "review", { checks })).phase, "supplement-ready",
+      "author debt no longer requires retrying the outcome arguments");
+    assert.equal((await h.flow("root", "advance")).childId, executor);
+    await h.flow(executor, "prepare");
+    await h.file(executor, "write", candidateFile, {
+      content: nativeOutcomeLayoutDraft,
+      note: "隔离复跑真机交付原稿。",
+    });
+    await h.file(executor, "read", candidateFile);
+    assert.equal(digest(fs.readFileSync(path.join(root, candidateFile))), nativeOutcomeLayoutSha256);
+
+    const problems = deliveryOutcomeLayoutIssues(prepare.outcomeContract, frozen);
+    assert.deepEqual(problems.map(issue => issue.split(" ")[0]), ["E1", "E2", "E3"]);
+    const result = await h.flow(executor, "preflight");
+    assert.equal(result.ok, false);
+    for (const issue of problems) assert.ok(result.issues.includes(issue));
+    await assert.rejects(h.flow(executor, "submit"), error =>
+      problems.every(issue => error.message.includes(issue)));
+    assert.equal((await h.flow("root", "status")).units[0].phase, "supplement");
+    assert.equal(await fs.promises.readFile(path.join(root, candidateFile), "utf8"), nativeOutcomeLayoutDraft);
   }));
 
 test("genuine unresolved owner definition blocks with a specific question and retains the owner goal", () =>
