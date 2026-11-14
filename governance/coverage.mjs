@@ -1,16 +1,18 @@
 import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
 import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseline, adjacentCitationLocator, exactCitationLocator, footnoteQuoteIndex, verbatimQuotes, requiredLineMarkdown } from "./preflight.mjs";
 import { evidenceReference, evidenceSpan, projectPolicyReference, registeredObservation, UnobservedExcerptError, webSourceLocator } from "./evidence.mjs";
+import { sectionSourceAttribution } from "./assertion-attribution.mjs";
 
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 9;
+export const CLASSIFICATION_VERSION = 10;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
 const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example"];
 const STATUSES = ["supported", "unsupported", "uncertain"];
+const ASSERTIONS = ["material-identity", "original-fact", "project-rule", "project-application", "manuscript-attribution"];
 const INVENTORY_LIMIT = 24;
 const RECORD_LIMIT = 12;
 const COUNT_NUMBER = "\\d+|[零〇一二两三四五六七八九十]+";
@@ -228,6 +230,63 @@ function listedAttribution(block,files) {
 function proofReferences(part) {
   return [...(part.evidence??[]),...(part.inference?.premises??[]),...(part.inference?.warrant??[]),
     ...(part.inference?.assumptions??[]).map(item=>item.evidence)];
+}
+
+/** Validation follows the actual kind and validated references. A caller
+ * cannot assign a provenance label to its own evidence. */
+function assertionContract(part) {
+  const typed=part.assertion;
+  if(!ASSERTIONS.includes(typed)||!["direct","inference"].includes(part.kind)) {
+    throw new Error("[assertion-proof] assertion 须用于逐字定位的独立事实或规则");
+  }
+  const policy=part.inference?.rule==="project-policy";
+  const refs=proofReferences(part);
+  if(part.status!=="supported"){
+    // Rejected assertions still need their original finding. A project rule
+    // contrary to supplied material is not a positive proof.
+    if(!part.finding)throw new Error("[assertion-proof] 未获支持的断言须有实际 finding");
+    return;
+  }
+  if(part.objectCheck)throw new Error("[assertion-proof] 稿件计数/登记集合仍用各自 objectCheck");
+  if(typed==="material-identity"||typed==="manuscript-attribution"){
+    if(part.kind!=="direct"||!refs.length||(typed==="manuscript-attribution"&&new Set(refs.map(ref=>keyOf(ref.file))).size!==1)||
+        refs.some(ref=>!ref?.sourceIdentity||!["synthetic","primary","secondary"].includes(ref.origin?.kind)||ref.origin.integrity!=="matches-pin")) {
+      throw new Error("[assertion-proof] 资料身份/稿件归属须给可独立核实、已读且有登记凭据的实际材料");
+    }
+    return;
+  }
+  if(typed==="original-fact"&&(!refs.length||policy)){
+    throw new Error("[assertion-proof] 原始事实要用实际原始材料；项目处置请单列");
+  }
+  if(typed==="project-rule"&&(!policy||refs.length||!part.inference.policy?.length)){
+    throw new Error("[assertion-proof] 项目规则只用当前总纲；若用于具体记录，单列项目处置");
+  }
+  if(typed==="project-application"&&(!policy||!part.inference.premises.length||!part.inference.policy?.length)){
+    throw new Error("[assertion-proof] 项目处置同时需要当前总纲条款和该具体记录的实际原始行");
+  }
+}
+
+/** Measure a bounded manuscript attribution with actual numbered rows. All
+ * cited ranges still use the same source/version gate as an ordinary proof. */
+function manuscriptAttribution(frame,active,spec,part,block,bytes,{host=false}={}) {
+  const {start,end}=part.manuscript??{};
+  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<1||end<start||!block){
+    throw new Error("[assertion-proof] 稿件归属须用 manuscript:{start,end} 指定实际编号断言行范围");
+  }
+  const seen=active.seen?.[keyOf(spec.candidate)];
+  if(!host&&(seen?.hash!==digest(bytes)||!seen.ranges.some(([a,b])=>a===1&&b>=lineList(bytes).length))){
+    throw new Error("[assertion-proof] 先读完整当前稿，不能用资料身份代证稿件归属");
+  }
+  const source=part.evidence[0].file,grant=spec.phases[active.phase];
+  const section=sectionSourceAttribution(bytes,block.line,source,grant.evidence);
+  if(!section.matches||section.rows[0]?.line!==start||section.rows.at(-1)?.line!==end){
+    throw new Error("[assertion-proof] 稿件来源归属：可见编号行未全部引用此来源，或指定范围不等于本节完整编号行范围");
+  }
+  const rows=section.rows.map(row=>({id:row.id,line:row.line,locators:row.locators.map(ref=>{
+    const current=evidenceReference(frame,active,spec,ref,{host});
+    return {file:current.file,start:current.start,end:current.end,sha256:current.sha256};
+  })}));
+  return {candidateSha256:digest(bytes),source,section:section.section,rows};
 }
 
 /** Legacy receipts predate these provenance labels. Keep their original shape
@@ -856,6 +915,10 @@ export function requireStoredObjectChecks(frame,spec,coverages,bytes,phase="fina
       validateBoundedRecord(frame,{phase},spec,block,record.parts,{host:true});
       for(const part of record.parts) {
       validateObjectPart(frame,{phase},spec,part,lines,block,bytes,{host:true});
+      if(part.manuscriptProof&&JSON.stringify(part.manuscriptProof)!==
+          JSON.stringify(manuscriptAttribution(frame,{phase},spec,part,block,bytes,{host:true}))) {
+        throw new Error("manuscript attribution proof not current");
+      }
       if(part.objectCheck&&(!part.objectCheck.result.matches||part.status!=="supported"))throw new Error("object not accepted");
       if(part.inference?.nonEntailment&&(!part.inference.nonEntailment.holds||part.status!=="supported"))throw new Error("bounded case not accepted");
       }
@@ -1118,6 +1181,16 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible) {
       result.proofObject=result.inference?.rule==="project-policy"?"project-policy":result.objectCheck?.kind??
         (marker==="稿件自述"?"candidate":marker==="摘录范围"?"registered-excerpts":"external");
     }
+    if(part.assertion!==undefined) {
+      result.assertion=part.assertion;
+      assertionContract(result);
+      if(part.assertion==="manuscript-attribution"&&part.status==="supported"){
+        result.manuscript=part.manuscript;
+        result.manuscriptProof=manuscriptAttribution(frame,active,spec,result,block,readBytes(frame.root,spec.candidate));
+      } else if(part.manuscript!==undefined)throw new Error("[assertion-proof] manuscript 仅用于被支持的本节稿件归属");
+    } else if(part.manuscript!==undefined) {
+      throw new Error("[assertion-proof] manuscript 仅用于本节稿件归属");
+    }
     return result;
   });
   if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
@@ -1293,6 +1366,10 @@ function validateRecordSources(frame, active, spec, record, lines, block, bytes,
     if(current.sha256!==ref.sha256||JSON.stringify(current.origin)!==JSON.stringify(ref.origin))throw new Error("合法定位的来源或获取回执版本已变化，须重新核验");
   }
   for (const part of record.parts) {
+    if(part.assertion!==undefined) assertionContract(part);
+    if(part.manuscriptProof&&JSON.stringify(part.manuscriptProof)!==JSON.stringify(manuscriptAttribution(frame,active,spec,part,block,bytes))){
+      throw new Error("[assertion-proof] 当前稿件归属范围的证明已失效");
+    }
     for (const ref of proofReferences(part)) {
       const current = sourceQuote(frame, active, spec, ref);
       if (ref.sha256 !== current.sha256||ref.origin&&JSON.stringify(ref.origin)!==JSON.stringify(current.origin)
@@ -1679,8 +1756,94 @@ function factualMask(record) {
   return mask;
 }
 function objectKind(part) {
+  if (part?.assertion) return part.assertion;
   if (part?.inference?.rule === "project-policy") return "project-policy";
   return part?.objectCheck?JSON.stringify([part.objectCheck.kind,part.objectCheck.file??part.objectCheck.source??null]):"external";
+}
+
+const policyProof = part => part?.inference?.rule==="project-policy" ? part.inference : null;
+const positiveProof = part => part?.status==="supported"&&part.sourceRelation==="supports"&&!part.inference?.counterexample?.possible;
+const factEvidence = part => part?.evidence??part?.inference?.premises??[];
+const provenanceKey = ref => JSON.stringify([ref?.sourceIdentity,ref?.sha256,ref?.origin?.kind,ref?.origin?.observation?.sha256??null]);
+
+/** Same bytes and exact quotation, or a narrower quotation of the same
+ * single physical line. Intersecting ranges alone prove nothing. */
+function sameAssertionReference(a,b) {
+  if(!a?.evidenceSpan||!b?.evidenceSpan||keyOf(a.file)!==keyOf(b.file)||a.sha256!==b.sha256||
+      (a.goalSha256||b.goalSha256?a.goalSha256!==b.goalSha256:provenanceKey(a)!==provenanceKey(b)))return false;
+  return a.evidenceSpan===b.evidenceSpan||
+    a.start===a.end&&b.start===b.end&&a.start===b.start&&
+      (a.quote.includes(b.quote)||b.quote.includes(a.quote));
+}
+function commonRefs(left=[],right=[]) {
+  return left.some(a=>right.some(b=>sameAssertionReference(a,b)));
+}
+function sameRefSet(left=[],right=[]) {
+  return left.length>0&&right.length>0&&left.every(a=>right.some(b=>sameAssertionReference(a,b)))&&
+    right.every(b=>left.some(a=>sameAssertionReference(a,b)));
+}
+function sameMaterialSet(left,right) {
+  const keys=part=>new Set(factEvidence(part).map(provenanceKey));
+  const a=keys(left),b=keys(right);
+  return a.size>0&&a.size===b.size&&[...a].every(key=>b.has(key));
+}
+
+/** A legacy mixed span may attach the same rule to both the value and its
+ * disposition. Converge only the peer's narrower raw fact if a neighbouring
+ * application inside that wider span independently proves the same rule and
+ * raw input. Do not borrow a rule for the neighbouring factual assertion. */
+function redundantLegacyPolicy(a,b,aRecord,bRecord) {
+  if(a.assertion||!positiveProof(a)||!positiveProof(b)||!policyProof(a)?.premises.length||
+    b.assertion&&b.assertion!=="original-fact"||policyProof(b)||b.objectCheck||
+    !commonRefs(factEvidence(a),factEvidence(b)))return false;
+  return bRecord.parts.some(part=>part!==b&&positiveProof(part)&&policyProof(part)?.premises.length&&
+    part.start>=a.start&&part.end<=a.end&&sameRefSet(policyProof(a).policy,policyProof(part).policy)&&
+    sameRefSet(factEvidence(a),factEvidence(part))&&sameRefSet(factEvidence(b),factEvidence(part))&&
+    // A wide passage must prove the narrowed application strictly next to
+    // the raw record, with no intervening assertion that could borrow it.
+    aRecord.text.slice(Math.min(b.end,part.end),Math.max(b.start,part.start)).trim().match(/^[\s\p{P}]*$/u));
+}
+
+function assertionsAgree(a,b,first,second) {
+  if(!a||!b)return false;
+  const ak=objectKind(a),bk=objectKind(b),typed=a.assertion||b.assertion;
+  if(ak===bk&&!typed) {
+    if(ak!=="project-policy"||!positiveProof(a)||!positiveProof(b))return true;
+    return commonRefs(policyProof(a).policy,policyProof(b).policy)&&
+      (!factEvidence(a).length&&!factEvidence(b).length||commonRefs(factEvidence(a),factEvidence(b)));
+  }
+  if(!positiveProof(a)||!positiveProof(b))return ak===bk;
+  if(redundantLegacyPolicy(a,b,first,second)||redundantLegacyPolicy(b,a,second,first))return true;
+  if(ak==="material-identity"&&bk==="material-identity")return sameMaterialSet(a,b);
+  if(ak==="manuscript-attribution"&&bk==="manuscript-attribution")return sameMaterialSet(a,b)&&
+    !!a.manuscriptProof&&JSON.stringify(a.manuscriptProof)===JSON.stringify(b.manuscriptProof);
+  if(ak===bk&&(ak==="project-rule"||ak==="project-application")||
+      (ak==="project-policy"||bk==="project-policy")&&[ak,bk].some(kind=>kind==="project-rule"||kind==="project-application")){
+    const left=policyProof(a),right=policyProof(b),needsFact=ak==="project-application"||bk==="project-application";
+    return !!left&&!!right&&sameRefSet(left.policy,right.policy)&&(needsFact?
+      sameRefSet(left.premises,right.premises):!left.premises.length&&!right.premises.length);
+  }
+  // Different valid primary sources can each prove an independently judged
+  // raw fact. This is the same shape as the legacy external/direct gate.
+  if(![ak,bk].every(kind=>kind==="original-fact"||kind==="external"))return false;
+  const bySource=part=>new Map(factEvidence(part).map(ref=>[keyOf(ref.file),factEvidence(part).filter(row=>keyOf(row.file)===keyOf(ref.file))]));
+  const left=bySource(a),right=bySource(b);
+  return [...left].every(([file,refs])=>!right.has(file)||sameRefSet(refs,right.get(file)));
+}
+
+/** Retain challenged proof roles during retry even if both now omit the
+ * same component. Source text stays with the assigned actor's own proof. */
+function assertionRequirement(part) {
+  if(!positiveProof(part))return null;
+  if(part.assertion)return part.assertion;
+  if(policyProof(part))return factEvidence(part).length?"project-application":"project-rule";
+  return null;
+}
+function requirementMet(part,required) {
+  if(!part||!["direct","inference"].includes(part.kind))return false;
+  if(part.status!=="supported")return !!part.finding;
+  const type=assertionRequirement(part);
+  return type===required || required==="original-fact"&&!type&&factEvidence(part).length>0;
 }
 
 /** A touching marker is equivalent syntax only after both current roles have
@@ -1720,19 +1883,52 @@ export function classificationDisagreements(first,second) {
   return first.records.flatMap(record=>{
     const other=second.records.find(row=>row.block===record.block);if(!other)return [];
     const a=factualMask(record),b=factualMask(other),different=new Uint8Array(a.length),required=new Uint8Array(a.length),objects=new Uint8Array(a.length);
+    const obligations=new Map(),find=(row,i)=>row.parts.find(part=>(part.start??0)<=i&&(part.end??row.text.length)>i);
+    let recheckEvidence=false;
     for(const [start,end] of agreedFootnoteMarkerSpans(first,second,record,other)){a.fill(0,start,end);b.fill(0,start,end);}
     for(let i=0;i<a.length;i++) {
       required[i]=a[i]||b[i];different[i]=a[i]!==b[i]?1:0;
-      if(a[i]&&b[i]) {
-        const find=row=>row.parts.find(part=>(part.start??0)<=i&&(part.end??row.text.length)>i);
-        if(objectKind(find(record))!==objectKind(find(other))){different[i]=1;objects[i]=1;}
+      const left=a[i]?find(record,i):null,right=b[i]?find(other,i):null;
+      if(a[i]&&b[i]&&!assertionsAgree(left,right,record,other)){different[i]=1;objects[i]=1;}
+      if(different[i]) {
+        const kinds=[assertionRequirement(left),assertionRequirement(right)];
+        if(left&&right&&positiveProof(left)&&positiveProof(right)&&kinds[0]&&kinds[0]===kinds[1])recheckEvidence=true;
+        const typed=[left?.assertion,right?.assertion].filter(Boolean);
+        if(typed.length===1&&kinds.every(Boolean)&&kinds[0]!==kinds[1]) {
+          // An untyped proof may cover a wider assertion than its peer. In
+          // this case require both roles to split/review, without promoting
+          // that legacy guess to a one-sided mandatory assertion type.
+          recheckEvidence=true;
+          continue;
+        }
+        // The more specific application carries the rule and the record;
+        // material identity and raw fact may describe adjacent subclauses.
+        const priority=["project-application","project-rule","manuscript-attribution","material-identity","original-fact"];
+        const kind=priority.find(type=>kinds.includes(type));
+        if(kind){
+          if(!obligations.has(kind))obligations.set(kind,new Uint8Array(a.length));
+          obligations.get(kind)[i]=1;
+        }
       }
     }
     const factualSpans=maskSpans(different,record.text),requiredSpans=maskSpans(required,record.text);
+    const requiredAssertions=[...obligations].flatMap(([kind,mask])=>{
+      // Keep punctuation outside the proof requirement. Its exact spans must
+      // not bleed into a separate adjacent assertion using a different object.
+      const out=[];
+      for(let i=0;i<mask.length;i++)if(mask[i]) {
+        const previous=out.at(-1);
+        if(previous&&/^[\s\p{P}]*$/u.test(record.text.slice(previous.end,i)))previous.end=i+1;
+        else out.push({kind,start:i,end:i+1});
+      }
+      return out.map(row=>({...row,quote:record.text.slice(row.start,row.end)}));
+    });
     return factualSpans.length?[{block:record.block,line:record.line,text:record.text,factualSpans,requiredSpans,
       disputeId:digest(JSON.stringify([first.candidateSha256??null,record.block,record.lineText??record.text])),
       ...(objects.some(Boolean)?{objectSpans:maskSpans(objects,record.text)}:{}),
-      basis:"核验对事实范围或证据对象存在分歧。requiredSpans 是扣除宿主有界中性语法后的双方事实并集；按真实对象补证，保留正确正文。纯编号/合法定位及 neutralSpans 可等价，未知修饰、解释与大白话中的事实不能跳过；仍无依据时 block 请求裁定。"}]:[];
+      ...(requiredAssertions.length?{requiredAssertions}:{}),
+      ...(recheckEvidence?{recheckEvidence:true}:{}),
+      basis:"逐条复核 exact quote；requiredAssertions 标出必须补齐的证据类型。仍无依据时提供实际 finding 或 block，不靠降级分类处理。"}]:[];
   });
 }
 
@@ -1740,15 +1936,20 @@ export function classificationDisagreements(first,second) {
 export function recordMeetsDispute(record,dispute) {
   if(!record||record.text!==dispute.text||!Array.isArray(record.parts)||!record.parts.length)return false;
   const mask=factualMask(record),neutral=neutralMask(record.text),spans=dispute.requiredSpans?.length?dispute.requiredSpans:dispute.factualSpans?.length?dispute.factualSpans:[[0,dispute.text.length]];
-  return spans.every(([a,b])=>{
+  const covered=spans.every(([a,b])=>{
     for(let i=a;i<b;i++)if(dispute.text[i]?.trim()&&!/[\s\p{P}]/u.test(dispute.text[i])&&!neutral[i]&&!mask[i])return false;
+    return true;
+  });
+  return covered&&(dispute.requiredAssertions??[]).every(({kind,start,end})=>{
+    for(let i=start;i<end;i++)if(mask[i]&&!requirementMet(record.parts.find(part=>part.start<=i&&part.end>i),kind))return false;
     return true;
   });
 }
 export function requireDisputedProof(active,records,complete=false) {
   for(const dispute of active.reconciliation??[]) {
     const record=records.find(row=>row.block===dispute.block);if(!record&&!complete)continue;
-    if(!recordMeetsDispute(record,dispute))throw new Error("[building-loop/reconciliation] "+dispute.block+" 的事实分类争议尚未逐项落实。已标记事实并集须以 direct/inference 提交实际证明；依据不足可用真实 finding 或 block，不要要求作者改写正确正文。范围="+JSON.stringify(dispute.requiredSpans??dispute.factualSpans));
+    if(!recordMeetsDispute(record,dispute))throw new Error("[building-loop/reconciliation] "+dispute.block+" 的事实分类争议尚未逐项落实。已标记事实须交实际证明；缺证用真实 finding，保留正确正文。范围="+JSON.stringify(dispute.requiredSpans??dispute.factualSpans)
+      +(dispute.requiredAssertions?.length?"；须逐条补证="+JSON.stringify(dispute.requiredAssertions):""));
   }
 }
 
@@ -1781,6 +1982,8 @@ export function coverageSchema() {
       quote: { ...string, description: "单一判断可省略，自动取该块完整原文；复合判断须逐段连续覆盖本块，不能把下一块文字并入。匹配失败按 coverage-span 的 part/cursor/expectedSuffix 修正核验参数，不得改写正文或省掉事实。" },
       kind: { type: "string", enum: KINDS }, status: { type: "string", enum: STATUSES,
         description: "direct/inference 给事实判定；nonfactual 用 supported；hypothesis 宿主固定 uncertain，不能成为已证前提。" }, basis: string, repair: string,
+      assertion: {type:"string",enum:ASSERTIONS,description:"混合证据段按独立断言拆开。material-identity 只核材料自身类别；original-fact 核原始记录；project-rule 核项目规则；project-application 为具体处置，需规则和真实记录；manuscript-attribution 核本稿某节明确编号行的来源归属。各段引所需实际证据。"},
+      manuscript: {type:"object",properties:{start:integer,end:integer},required:["start","end"],additionalProperties:false,description:"仅用于 manuscript-attribution，从本节首个至最后一个可见编号断言实际行号；需先完整读取当前稿和这些出处。"},
       sourceRelation: { type: "string", enum: ["supports", "contradicts", "insufficient"], description: "direct/inference 必填：原始证据对该断言字面含义的关系。error-example 核展示的错误推理，只能 contradicts/insufficient，并提供 evidence；明确错例的状态由宿主固定，不作为已证前提。" },
       finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence", "contradiction", "scope", "invalid-inference"] }, quote: string, fix: string }, required: ["kind", "quote", "fix"], additionalProperties: false },
       evidence: { type: "array", items: ref }, inference: {...inference,description:"常规推导填结构证据；inventory 明示 bounded-non-entailment inferenceHint 的同源段只填事实判定与依据，宿主复算并保存推导；未支持仍给实际 finding。"}, objectCheck,

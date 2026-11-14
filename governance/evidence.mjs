@@ -131,8 +131,8 @@ function checkedSource(frame,active,spec,input,{whole=false,host=false}={}) {
 }
 
 /** Validate a source against actual reads, current bytes and an optional origin pin. */
-export function evidenceReference(frame, active, spec, input) {
-  const {file,bytes,start,end,sha256,pin}=checkedSource(frame,active,spec,input);
+export function evidenceReference(frame, active, spec, input, options) {
+  const {file,bytes,start,end,sha256,pin}=checkedSource(frame,active,spec,input,options);
   const observation=pin?.observation&&observedExcerpt(frame.root,file,bytes,pin,start,end);
   return {file,start,end,sha256,sourceIdentity:sourceIdentity(file,pin),
     provenance:observation?"maintainer-pinned-acquisition-receipt":pin?"maintainer-pinned-local-material":"observed-local-bytes",origin:pin

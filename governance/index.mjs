@@ -142,6 +142,7 @@ const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证
 // Semantic alignment is an explicit review duty, not a host claim that quote
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
+const ASSERTION_PROOF_RULE = "同一块混有材料身份、记录字段和项目处置，分别提交 exact quote 与 assertion：material-identity 用该材料的真实凭据；original-fact 用实际记录；project-rule 只引当前总纲；project-application 同时引总纲和具体记录。额外读过的总纲不挂到仅描述材料身份的断言上。文稿所用来源归属用 manuscript-attribution 核本节可见编号行，不能用一份来源的身份代证整稿。定向重核优先处理 requiredAssertions，不改正确正文。";
 const OBJECT_RULE="外部事实用实际原文 evidence；项目规则与处置用 inference 的 project-policy，把总纲凭证放 policy、事实原文放 premises。已登记摘录范围与稿件自身计数用各自的 direct.objectCheck，按块原样传 objectCheckHint（包括计数的 expected）。局部登记范围只代表该登记范围。错例后说明及大白话含事实时仍逐项核。";
 const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
 const FOOTNOTE_RULE="逐字引句紧接脚注标记时，读当前稿的同名定义和所指原文。旁边其他出处不能替该脚注证明引句。脚注定义后的事实照常核验。";
@@ -1932,7 +1933,8 @@ export function apply(ctx, config = {}) {
           const entry=record.coverage.records[dispute.block];
           // Only this actor's current, sufficient evidence can be retained.
           // Final coverage rechecks the saved proof with this phase's grants.
-          if(!entry||dispute.objectSpans?.length||!recordMeetsDispute(entry,dispute))delete record.coverage.records[dispute.block];
+          if(!entry||dispute.recheckEvidence||dispute.objectSpans?.length&&!dispute.requiredAssertions?.length||
+              !recordMeetsDispute(entry,dispute))delete record.coverage.records[dispute.block];
         }
         if(saved.assessment)record.assessment=structuredClone(saved.assessment);
       } else if(!resumeSame) {
@@ -3261,7 +3263,7 @@ export function apply(ctx, config = {}) {
           ...architectureRule,
           ...(!codeReview && frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
           ...(!codeReview && frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 完成后最终只提交 building_loop {"action":"audit"}，unit可省略；不要重复发送 checks、quality、note 或全文。宿主从已落盘证明生成回执。'] : []),
-          ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
+          ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, ASSERTION_PROOF_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
           ...(!codeReview && (phase === "supplement" || frame.role === "reviewer") ? [QUALITY_RULE] : []),
           ...(codeReview || frame.role === "executor" && assignment?.[1].codeIntake ? [CODE_COMMENT_RULE] : []),
           ...(frame.managed && frame.role === "coordinator" ? [
