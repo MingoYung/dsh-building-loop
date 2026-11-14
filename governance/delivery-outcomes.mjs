@@ -1,6 +1,7 @@
 import { digest, readBytes } from "./policy.mjs";
 import { lineList } from "./preflight.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
+import { sameAssertionReference } from "./coverage.mjs";
 
 const idPattern = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
 const ids = new RegExp(`^${idPattern}(?:\\s*[,，、]\\s*${idPattern})*$`, "u");
@@ -304,6 +305,69 @@ export function deliveryOutcomeDisagreements(first, second) {
       row.decision !== other.decision || row.body.line !== other.body.line || row.body.quote !== other.body.quote ||
       row.summary?.line !== other.summary?.line || row.summary?.quote !== other.summary?.quote;
   }).map(row => row.id);
+}
+
+/** Recognize only complete goal lines that describe the shape of the
+ * deliverable. Extra unrecognized text can contain an operative exception. */
+function isSummaryFormatReference(frame, ref) {
+  if (ref.start !== ref.end || ref.provenance !== "current-project-policy") return false;
+  const goal = readBytes(frame.root, ref.file);
+  if (!goal || digest(goal) !== ref.sha256 || lineList(goal)[ref.start - 1]?.trim() !== ref.quote) return false;
+  const directives = ref.quote.split(/[。.!！]/u).map(text => text.trim()).filter(Boolean);
+  const layout = /^(?:在(?:文末|末尾)用|(?:文末|末尾)(?:给出?|写|用))(?:一句)?(?:大白话|直白说明)(?:复述(?:结果|结论|每项处置)?)?$/u;
+  const numbered = /^(?:为[^，。；]{1,28})?(?:逐项|分别|单独)给出(?:明确)?(?:处置|结果|结论)(?:、原始记录行号)?，(?:并)?在(?:末尾|文末)用(?:大白话|直白说明)复述$/u;
+  return directives.some(text => layout.test(text) || numbered.test(text)) &&
+    directives.every(text => layout.test(text) || numbered.test(text) || /^本轮交付 [A-Za-z0-9_-]{1,32}$/u.test(text));
+}
+
+const exactPremises = (left, right) => {
+  const identity = ref => JSON.stringify([ref.file, ref.sha256, ref.evidenceSpan]);
+  const keys = refs => [...new Set(refs.map(identity))].sort();
+  return left.length > 0 && JSON.stringify(keys(left)) === JSON.stringify(keys(right));
+};
+
+function sameGoverningPolicy(left, right) {
+  // A separate sentence stating who authorized a rule does not add an
+  // operating condition. Keep every other sentence, including exceptions.
+  const core = ref => ref.quote.replace(/(?:^|(?<=。))该(?:口径|规则)由维护者授权总控在本次(?:演练|任务)中作出。$/u, "");
+  const same = (a, b) => sameAssertionReference(a, b) && core(a) !== "" && core(a) === core(b);
+  return left.length > 0 && left.every(a => right.some(b => same(a, b))) && right.every(b => left.some(a => same(a, b)));
+}
+
+/** Compare the same explicit summary field using each role's own body
+ * proof. A duplicate delivery instruction may be incidental in the summary,
+ * but a different business rule, source row, or substantive assumption is not. */
+export function equivalentOutcomeSummaries(frame, bytes, coverage, reports) {
+  const [first, second] = reports;
+  if (!first || !second || first.actor === second.actor || first.contractSha256 !== second.contractSha256 ||
+      first.candidateSha256 !== digest(bytes) || second.candidateSha256 !== first.candidateSha256) return new Map();
+  const view = candidateView(bytes);
+  const pairs = new Map();
+  for (const row of first.items) {
+    const peer = second.items.find(item => item.id === row.id);
+    if (row.status !== "decided" || peer?.status !== "decided" || row.decision !== peer.decision ||
+        !row.summary || !peer.summary || !row.body || !peer.body ||
+        row.body.line !== peer.body.line || row.body.quote !== peer.body.quote ||
+        row.summary.line !== peer.summary.line || row.summary.quote !== peer.summary.quote) continue;
+    const exact = (local, location, hash) => partsOn(local, view, location).find(part => proofHash(part) === hash &&
+      part.assertion === "project-application" && part.inference?.rule === "project-policy" &&
+      part.status === "supported" && part.sourceRelation === "supports" && part.inference.counterexample.possible === false &&
+      part.inference.assumptions.length === 0);
+    const body = [row, peer].map((item, i) => exact(coverage[i], item.body, item.bodyProof));
+    const summary = [row, peer].map((item, i) => exact(coverage[i], item.summary, item.summaryProof));
+    if ([...body, ...summary].some(part => !part) || !sameGoverningPolicy(body[0].inference.policy, body[1].inference.policy) ||
+        !exactPremises(body[0].inference.premises, body[1].inference.premises)) continue;
+    const duplicatesOnly = summary.every((part, i) => {
+      const quote = part.quote;
+      if (!quote.startsWith(row.summary.quote) || !/^[\s\p{P}]*$/u.test(quote.slice(row.summary.quote.length))) return false;
+      const substantive = body[i].inference;
+      return exactPremises(substantive.premises, part.inference.premises) &&
+        sameGoverningPolicy(substantive.policy, part.inference.policy.filter(ref =>
+          substantive.policy.some(other => sameAssertionReference(ref, other)) || !isSummaryFormatReference(frame, ref)));
+    });
+    if (duplicatesOnly) pairs.set(summary[0], summary[1]);
+  }
+  return pairs;
 }
 
 export function requireAcceptedDeliveryOutcomes(contract, bytes, receipt, proof) {

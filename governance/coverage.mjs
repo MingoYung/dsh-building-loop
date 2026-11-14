@@ -6,7 +6,7 @@ import { sectionSourceAttribution } from "./assertion-attribution.mjs";
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 10;
+export const CLASSIFICATION_VERSION = 11;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -1794,7 +1794,7 @@ const provenanceKey = ref => JSON.stringify([ref?.sourceIdentity,ref?.sha256,ref
 
 /** Same bytes and exact quotation, or a narrower quotation of the same
  * single physical line. Intersecting ranges alone prove nothing. */
-function sameAssertionReference(a,b) {
+export function sameAssertionReference(a,b) {
   if(!a?.evidenceSpan||!b?.evidenceSpan||keyOf(a.file)!==keyOf(b.file)||a.sha256!==b.sha256||
       (a.goalSha256||b.goalSha256?a.goalSha256!==b.goalSha256:provenanceKey(a)!==provenanceKey(b)))return false;
   return a.evidenceSpan===b.evidenceSpan||
@@ -1905,7 +1905,7 @@ function agreedFootnoteMarkerSpans(first,second,record,other) {
 }
 
 /** Return differing spans and the stable factual union required of both roles. */
-export function classificationDisagreements(first,second) {
+export function classificationDisagreements(first,second,equivalentOutcomeSummaries = new Map()) {
   return first.records.flatMap(record=>{
     const other=second.records.find(row=>row.block===record.block);if(!other)return [];
     const a=factualMask(record),b=factualMask(other),different=new Uint8Array(a.length),required=new Uint8Array(a.length),objects=new Uint8Array(a.length);
@@ -1915,7 +1915,8 @@ export function classificationDisagreements(first,second) {
     for(let i=0;i<a.length;i++) {
       required[i]=a[i]||b[i];different[i]=a[i]!==b[i]?1:0;
       const left=a[i]?find(record,i):null,right=b[i]?find(other,i):null;
-      if(a[i]&&b[i]&&!assertionsAgree(left,right,record,other)){different[i]=1;objects[i]=1;}
+      const sameSummary = left && right && equivalentOutcomeSummaries.get(left) === right;
+      if(a[i]&&b[i]&&!sameSummary&&!assertionsAgree(left,right,record,other)){different[i]=1;objects[i]=1;}
       if(different[i]) {
         const kinds=[assertionRequirement(left),assertionRequirement(right)];
         if(left&&right&&positiveProof(left)&&positiveProof(right)&&kinds[0]&&kinds[0]===kinds[1])recheckEvidence=true;

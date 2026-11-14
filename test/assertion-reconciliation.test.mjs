@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -9,6 +11,7 @@ import {
   recordMeetsDispute,
 } from "../governance/coverage.mjs";
 import { goalSnapshot } from "../governance/goals.mjs";
+import { equivalentOutcomeSummaries } from "../governance/delivery-outcomes.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import {
   frozenAssertionCases,
@@ -103,6 +106,57 @@ const exactParts = testCase => [
   ...(testCase.prefix ? [neutral(testCase.prefix)] : []),
   ...testCase.atoms.map(evidencePart),
 ];
+
+test("independent delivery summaries converge only on additional format references", () =>
+  fixture(async root => {
+    // Exact business and format clauses from the native decision dispute.
+    const layout = "本轮交付 K01。为演练登记的发布候选单独给出明确处置、原始记录行号，并在末尾用大白话复述。";
+    const governing = "当前演练口径：自动检查完成且结论为失败、人工复核也给了放行意见时，以自动检查的失败结论为准；BUILD-7 退回重跑，原始记录不改。";
+    const full = governing + "该口径由维护者授权总控在本次演练中作出。";
+    const exception = "但已登记为紧急热修时，人工复核放行可以覆盖自动检查失败。";
+    const candidate = Buffer.from("- BUILD-7：退回重跑。\n大白话：BUILD-7：退回重跑。\n");
+    const candidateSha256 = digest(candidate);
+    const [body, summary] = documentCoverage(candidate).blocks;
+    const goalFile = "overview.md";
+    const sameSet = ({extra = layout, otherBasis = governing, mixed = false, differentRow = false, bodyDisagreement = false} = {}) => {
+      const goal = Buffer.from(["# 总纲", "", "", "", extra, full, exception, ""].join("\n"));
+      fs.writeFileSync(path.join(root, goalFile),goal);
+      const sha256 = digest(goal), goalSha256 = digest(JSON.stringify([{file:goalFile,sha256}]));
+      const rule = (line, quote) => ({file:goalFile,start:line,end:line,quote,sha256,goalSha256,
+        evidenceSpan:digest(JSON.stringify([sha256,line,line,quote])),provenance:"current-project-policy"});
+      const common = rule(6, governing), fullRule = rule(6, full), appendix = rule(5, layout), narrower = rule(6, otherBasis);
+      const source = {file:"functional.csv",sha256:digest("synthetic release fixture"),start:3,end:3,
+        quote:"BUILD-7 自动检查状态：completed，结论：failure，人工复核意见：放行。",evidenceSpan:digest("exact raw row")};
+      const make = (block, start, refs, row = source) => ({start,end:block.text.length,quote:block.text.slice(start),status:"supported",
+        sourceRelation:"supports",assertion:"project-application",kind:"inference",
+        inference:{rule:"project-policy",policy:refs,premises:[row],assumptions:[],counterexample:{possible:false}}});
+      const row1 = make(body,0,[fullRule]);
+      const row2 = make(body,0,[bodyDisagreement ? rule(7,exception) : common]);
+      const one = make(summary,4,[appendix, fullRule]);
+      const two = make(summary,4,[narrower],differentRow ? {...source,evidenceSpan:digest("a different raw selection")} : source);
+      if (mixed) one.quote += "这还证明所有发布均应拒绝。";
+      const fields = [{line:1,quote:"BUILD-7：退回重跑",start:2,end:14},{line:2,quote:"BUILD-7：退回重跑",start:4,end:16}];
+      const roles = [[row1,one],[row2,two]];
+      const coverage = roles.map(([a,b])=>({candidateSha256,records:[
+        {block:body.id,line:1,text:body.text,lineText:body.lineText,parts:[a]},
+        {block:summary.id,line:2,text:summary.text,lineText:summary.lineText,parts:[b]},
+      ]}));
+      const reports = roles.map(([a,b],index)=>({actor:"role"+index,candidateSha256,contractSha256:digest("contract"),
+        items:[{id:"BUILD-7",status:"decided",decision:"退回重跑",body:fields[0],summary:fields[1],
+          bodyProof:digest(JSON.stringify(a)),summaryProof:digest(JSON.stringify(b))}]}));
+      const allowed = equivalentOutcomeSummaries({root},candidate,coverage,reports);
+      return {allowed,coverage};
+    };
+    const positive = sameSet();
+    assert.deepEqual(classificationDisagreements(...positive.coverage).map(row=>row.block),[summary.id]);
+    assert.equal(positive.allowed.size,1);
+    assert.deepEqual(classificationDisagreements(...positive.coverage,positive.allowed),[]);
+    for (const negative of [{extra:layout+exception},{otherBasis:"BUILD-7 退回重跑"},{differentRow:true},{bodyDisagreement:true},{mixed:true}]) {
+      const control = sameSet(negative);
+      assert.equal(control.allowed.size,0,JSON.stringify(negative));
+      assert.ok(classificationDisagreements(...control.coverage,control.allowed).some(row=>row.block===summary.id));
+    }
+  }));
 
 function addToReview(reviewer, block, parts) {
   const result = reviewer.invoke("record", { entries: [{ block, parts }] });

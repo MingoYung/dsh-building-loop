@@ -39,7 +39,7 @@ import { createStallReproductionProof, DIAGNOSIS_WAIT, diagnosisProofIdentity, d
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { deliveryOutcomeContract, deliveryOutcomeFields, deliveryOutcomeInstructions, deliveryOutcomeLayoutIssues, deliveryOutcomeProofGaps, deliveryOutcomeSchema,
-  reviewDeliveryOutcomes, deliveryOutcomeDisagreements } from "./delivery-outcomes.mjs";
+  reviewDeliveryOutcomes, deliveryOutcomeDisagreements, equivalentOutcomeSummaries } from "./delivery-outcomes.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
   requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims, engineeringArchitectureSourceFacts,
@@ -2306,7 +2306,10 @@ export function apply(ctx, config = {}) {
     coverageSummary(frame, { ...active, coverage: { ...pending.coverage,
       records: Object.fromEntries(pending.coverage.records.map(record => [record.block, record])) } }, spec);
     const calculations = numericChecks(frame.root, spec, lineList(bytes), frame.reads);
-    const conflicts = classificationDisagreements(pending.coverage, coverage);
+    const equivalentSummaries = deliveryOutcomes && !outcomeIssues.length
+      ? equivalentOutcomeSummaries(frame, bytes, [pending.coverage, coverage], [pending.deliveryOutcomes, deliveryOutcomes])
+      : undefined;
+    const conflicts = classificationDisagreements(pending.coverage, coverage, equivalentSummaries);
     if (!coverage.rejected.length && !formatIssues.length && !outcomeIssues.length && conflicts.length && calculations.every(row => row.ok)) {
       active.reconciliation = conflicts;
       active.reconciliationBinding=checkpointBinding(frame,spec);
