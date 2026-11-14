@@ -14,7 +14,7 @@ import {
 import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory } from "./evidence.mjs";
 import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
-import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage } from "./coverage.mjs";
+import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage, projectPolicyContract } from "./coverage.mjs";
 import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
   pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
 import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
@@ -38,7 +38,7 @@ import { createStallReproductionProof, DIAGNOSIS_WAIT, diagnosisProofIdentity, d
   requireDiagnosisProofScope, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
-import { deliveryOutcomeContract, deliveryOutcomeFields, deliveryOutcomeInstructions, deliveryOutcomeLayoutIssues, deliveryOutcomeSchema,
+import { deliveryOutcomeContract, deliveryOutcomeFields, deliveryOutcomeInstructions, deliveryOutcomeLayoutIssues, deliveryOutcomeProofGaps, deliveryOutcomeSchema,
   reviewDeliveryOutcomes, deliveryOutcomeDisagreements } from "./delivery-outcomes.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
@@ -145,7 +145,7 @@ const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
 const ASSERTION_PROOF_RULE = "同一块混有材料身份、记录字段和项目处置，分别提交 exact quote 与 assertion：material-identity 用该材料的真实凭据；original-fact 用实际记录；project-rule 只引当前总纲；project-application 同时引总纲和具体记录。额外读过的总纲不挂到仅描述材料身份的断言上。文稿所用来源归属用 manuscript-attribution 核本节可见编号行，不能用一份来源的身份代证整稿。定向重核优先处理 requiredAssertions，不改正确正文。";
-const OUTCOME_RULE = "prepare 有 outcomeContract 时，正文每项写「事项编号：明确结果」，分别标出原始记录事实和处置。若要求大白话，在末尾按同一编号和结果复述。两道审核分别在 coverage 用 original-fact 核同项实际记录、用 project-application 核该项处置及其总结，分别提交 outcomes。真实证据歧义用 clarify 和具体问题，未写结果用 missing，正文与总结冲突用 inconsistent。";
+const OUTCOME_RULE = "prepare 有 outcomeContract 时，正文每项写「事项编号：明确结果」，分别标出原始记录事实和处置。若要求大白话，在末尾按同一编号和结果复述。两道审核分别在 coverage 用 original-fact 核同项实际记录、用 project-application 核该项处置及其总结。提交 outcomes 前从 coverage status 看本角色 outcomeProofGaps；status=decided 要分别填 decision、body 和要求的 summary。真实证据歧义用 clarify 和具体问题，未写结果用 missing，正文与总结冲突用 inconsistent。";
 const OBJECT_RULE="外部事实用实际原文 evidence；项目规则与处置用 inference 的 project-policy，把总纲凭证放 policy、事实原文放 premises。已登记摘录范围与稿件自身计数用各自的 direct.objectCheck，按块原样传 objectCheckHint（包括计数的 expected）。局部登记范围只代表该登记范围。错例后说明及大白话含事实时仍逐项核。";
 const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
 const FOOTNOTE_RULE="逐字引句紧接脚注标记时，读当前稿的同名定义和所指原文。旁边其他出处不能替该脚注证明引句。脚注定义后的事实照常核验。";
@@ -1270,8 +1270,7 @@ export function apply(ctx, config = {}) {
         contract:!codeReviewMode&&(frame.role==="auditor"||frame.role==="reviewer")?{
           direct:{kind:"direct",status:"supported|unsupported|uncertain",sourceRelation:"supports|contradicts|insufficient",basis:"具体判断",
             evidence:[{file:"授权原文",start:1,end:1,quote:"对应行逐字引句"}]},
-          ...(frame.policy.goalContext.length ? { projectPolicy: { files: frame.policy.goalContext, kind: "inference", rule: "project-policy",
-            note: "总纲规则按已读行逐字放 inference.policy。仅转述规则可用 premises:[]；对具体记录作判定时，除 policy 外在 premises 引该记录事实原文。两类证明独立，sourceRefs 只放外部事实。" } } : {}),
+          ...(frame.policy.goalContext.length ? { projectPolicy: projectPolicyContract(frame.policy.goalContext) } : {}),
           rejected:{kind:"inference",status:"unsupported",sourceRelation:"insufficient",basis:"具体缺口",
             finding:{kind:"invalid-inference",quote:"候选真实原句",fix:"最小修正"}},
           ...(coverage?.blocks?.some(block=>block.neutralSpans?.length)?{neutralSpanRule:NEUTRAL_SPAN_RULE}:{}),
@@ -1279,7 +1278,8 @@ export function apply(ctx, config = {}) {
             excerptCount:{kind:"registered-excerpts",check:"count",file:"原句明确写出的来源路径",expected:1},
             citingLineCount:{kind:"candidate",check:"citation-count",source:"原句所说的被引用来源，不是候选文件",expected:6},
             note:"示例数字须换成待核原句的数量。已有 objectCheckHint 的块按原样传提示，不套用计数模板。登记摘录只核整个登记集合的条数。"}}:{}),
-          ...(frame.role==="auditor"?{finalSubmission:{action:"audit"},finalSubmissionNote:"全部块已记录后执行 audit。如果 prepare 有 outcomeContract，另交自己的 outcomes；不重发首审 checks、质量说明或全文。"}:{}),
+          ...(frame.role==="auditor"?{finalSubmission:{action:"audit"},...(outcomeContract ? { finalSubmissionRequires:["outcomes"] } : {}),
+            finalSubmissionNote:"全部块已记录后执行 audit。不重发首审 checks、质量说明或全文。"}:{}),
           ...(current.reconciliationRound?{targetedReview:"只补 pending 中不足的本角色记录；已保存并满足目标范围的证明无需重发。核验方可以用 review 省略 checks，宿主重验本角色同版本编号检查。若真实事实缺证，提交具体退回。"}:{}),
           note:"简单块每次 record 最多12块；复杂推导建议每批2–4块，避免工具参数生成超限，证明字段不可省。非事实用 nonfactual + supported + basis；明确假设用 hypothesis；错例用 error-example + evidence。形式P→Q/P/Q须同一命题，asserts不填right。"
         }:undefined};
@@ -2230,12 +2230,15 @@ export function apply(ctx, config = {}) {
     return change(exec.agent, frame => {
       if (!["reviewer", "auditor"].includes(frame.role)) throw new Error("全文覆盖仅本阶段核验或独立反证角色可访问，总控无正文读权");
       const [id, active] = frame.assignment;
-      requireGoalRead(frame, active);
+      const goal = requireGoalRead(frame, active);
       const spec = unitOf(frame, id);
       if (isCodeReviewUnit(frame, active, spec)) throw new Error("当前代码任务用 building_loop_code_review prepare 获取变更范围");
       const binding=refreshCheckpoints(frame,active,spec);
-      reviewCandidate(frame, active, spec);
-      const result=coverageAction(frame, active, spec, args);
+      const bytes = reviewCandidate(frame, active, spec);
+      const contract = args.action === "status" && args.block === undefined ? deliveryOutcomeContract(frame, spec, goal) : null;
+      const result=coverageAction(frame, active, spec, args, contract ? {
+        statusDetails: (coverage, blocks) => ({outcomeProofGaps: deliveryOutcomeProofGaps(contract, bytes, coverage, blocks)}),
+      } : undefined);
       if(frame.role==="reviewer"&&args.action==="record") {
         // Even a finding without a usable original quotation must stay tied
         // to the source versions that were present when it was recorded.
@@ -2259,7 +2262,8 @@ export function apply(ctx, config = {}) {
     const coverage = coverageSummary(frame, active, spec);
     requireDisputedProof(active,coverage.records,true);
     const outcomeContract = deliveryOutcomeContract(frame, spec, goal);
-    const deliveryOutcomes = reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, args.outcomes);
+    const deliveryOutcomes = reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, args.outcomes,
+      outcomeContract ? documentCoverage(bytes).blocks : undefined);
     if (holdOutcomeClarification(active, deliveryOutcomes, goal)) {
       trackUnit(frame,id,active,true);
       return;
@@ -2699,7 +2703,8 @@ export function apply(ctx, config = {}) {
         // after restart. Return its actual missing fields instead of asking a
         // reviewer to try new arguments against the same bytes.
         const deliveryOutcomes = outcomeLayout.length ? null :
-          reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, outcomeInput);
+          reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, outcomeInput,
+            outcomeContract ? documentCoverage(bytes).blocks : undefined);
         if (holdOutcomeClarification(active, deliveryOutcomes, goal)) {
           trackUnit(frame,id,active,true);
           frame.changed = true;

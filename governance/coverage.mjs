@@ -15,6 +15,7 @@ const STATUSES = ["supported", "unsupported", "uncertain"];
 const ASSERTIONS = ["material-identity", "original-fact", "project-rule", "project-application", "manuscript-attribution"];
 const INVENTORY_LIMIT = 24;
 const RECORD_LIMIT = 12;
+const INFERENCE_INPUTS = ["rule", "policy", "premises", "scope", "assumptions", "counterexample", "warrant", "formal", "calculation"];
 const COUNT_NUMBER = "\\d+|[零〇一二两三四五六七八九十]+";
 // These unambiguous surface connectives are a conservative minimum, not a
 // universal parser. Untagged/implicit deductions remain the reviewers' duty.
@@ -180,7 +181,7 @@ function explanation(value, label, limit = 1200) {
 /** Verify exact quotations against authorized, actually read current source lines. */
 function sourceQuote(frame, active, spec, value) {
   if (typeof value?.file === "string" && includes(frame.policy.goalContext ?? [], value.file.replaceAll("\\", "/"))) {
-    throw new Error("总纲条款可用于项目内规则推导：kind=inference、rule=project-policy、policy 填实际总纲行，premises 填外部事实原文");
+    throw new Error("总纲条款可用于项目内规则推导：kind=inference，inference 内填 rule=project-policy、policy（实际总纲引句）、premises（仅转述规则填 []；应用到记录时填该原始记录）、scope、assumptions（无则 []）、counterexample");
   }
   if (typeof value?.file === "string" && keyOf(relativeName(value.file)) === keyOf(spec.candidate)) {
     throw objectFailure("unverifiable", "资料引用不在本轮证据授权中 " + spec.candidate + "：候选稿只能证明稿内结构", candidateProofGuide());
@@ -1034,6 +1035,24 @@ function inferenceProof(frame, active, spec, value, lines, assertion) {
   return proof;
 }
 
+/** An executable-shaped tool example. The reviewer must replace quoted text,
+ * scope and verdict with the independently checked current evidence. */
+export function projectPolicyContract(files) {
+  return {
+    files,
+    partsExample: {
+      kind: "inference", assertion: "project-rule", status: "supported", sourceRelation: "supports",
+      basis: "说明正文是否准确转述这条当前规则",
+      inference: {
+        rule: "project-policy", policy: [{ file: files[0], start: 1, end: 1, quote: "替换为已读总纲的逐字引句" }],
+        premises: [], scope: "写当前规则的适用对象和条件", assumptions: [],
+        counterexample: { possible: false, reason: "核对实际条款，写为何它支持此处的结论" },
+      },
+    },
+    note: "上例仅供转述规则，替换行号与示例内容。应用到记录时用 assertion=project-application，在 inference.premises 中附该已读原始记录。sourceRefs 只收外部资料。",
+  };
+}
+
 /** Explain an exact span failure with bounded source text and a precise cursor.
  * The supplied quote remains untrusted: diagnostics never repair, classify or
  * accept it. Offsets use JavaScript UTF-16 units, as documentCoverage already does.
@@ -1149,6 +1168,12 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible) {
         if (!Array.isArray(part.evidence) || !part.evidence.length || part.evidence.length > 12) throw new Error("直接事实须给 evidence 原文及逐字 quote");
         result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
       } else {
+        // A rejection for fields placed at the part root is a tool-shape
+        // error. Tell the caller to move the actual fields instead of
+        // repeatedly inventing replacement evidence or defaults.
+        const misplaced = INFERENCE_INPUTS.filter(field => Object.hasOwn(part, field));
+        if (misplaced.length) throw new Error("推导参数位置错误：把 parts[] 层的 " + misplaced.join(", ") +
+          " 放到同一 part.inference 对象内；只调整参数层级，保留实际证据和判断。");
         result.inference = inferenceProof(frame, active, spec, part.inference, lines,
           { line: block.line, start: block.start + start, end: block.start + cursor, quote });
         if (part.status === "supported" && result.inference.counterexample.possible) {
@@ -1272,7 +1297,8 @@ export function coverageAction(frame, active, spec, args, options = {}) {
     // explicitly inspect one prior block; the complete proof remains in host state.
     if (args.block !== undefined && !manifest.blocks.some(row => row.id === args.block)) throw new Error("未知覆盖块编号");
     const { records, ...compact } = summary;
-    return { ...compact, ...(args.block === undefined ? {} : { record: records.find(row => row.block === args.block) ?? null }) };
+    return { ...compact, ...options.statusDetails?.(summary, manifest.blocks),
+      ...(args.block === undefined ? {} : { record: records.find(row => row.block === args.block) ?? null }) };
   }
   if (args.action !== "record" || !Array.isArray(args.entries) || !args.entries.length) throw new Error("record 每次提交 1–12 个 entries");
   if (args.entries.length > RECORD_LIMIT) {
@@ -1962,11 +1988,11 @@ export function coverageSchema() {
     right: { ...string, description: "仅 implies/equals 必填；asserts 必须省略，不填空串或复述左项。" } }, required: ["relation", "left"], additionalProperties: false };
   const inference = { type: "object", properties: {
     rule: { type: "string", enum: ["source-warrant", "project-policy", "modus-ponens", "equality-transitive", "configured-calculation"] },
-    premises: { type: "array", items: ref }, warrant: { type: "array", items: ref },
+    premises: { type: "array", items: ref, description: "仅转述当前项目规则时在此填 []；应用到记录时给该条已读原文。与 policy 同样放在 inference 内。" }, warrant: { type: "array", items: ref },
     policy: { type: "array", minItems: 1, maxItems: 8, items: ref,
       description: "仅 project-policy：逐字引用当前总纲已读条款，支持项目内规则及其应用。应用到具体记录时，原始事实仍由 premises 提供。" },
     scope: { anyOf: [string, { type: "object", properties: { objects: {type:"array",items:string,minItems:1,maxItems:12}, conditions: {type:"array",items:string,minItems:1,maxItems:12} }, required:["objects","conditions"],additionalProperties:false }],description:"具体说明适用对象、概念和条件，可用短句或明确的 objects/conditions 对象。" },
-    assumptions: { type: "array", items: { type: "object", properties: { statement: string, evidence: ref }, required: ["statement", "evidence"], additionalProperties: false } },
+    assumptions: { type: "array", description: "没有额外假设时显式填 []。", items: { type: "object", properties: { statement: string, evidence: ref }, required: ["statement", "evidence"], additionalProperties: false } },
     counterexample: { type: "object", properties: { possible: { type: "boolean" }, reason: string }, required: ["possible", "reason"], additionalProperties: false },
     formal: { type: "object", description: "modus-ponens 的两项依次为 implies(P,Q)、asserts(P)，结论 asserts(Q)；equality-transitive 为 equals(A,B)、equals(B,C)，结论 equals(A,C)。premises 与原文前提顺序一致。", properties: { premises: { type: "array", minItems: 2, maxItems: 2, items: proposition }, conclusion: proposition }, required: ["premises", "conclusion"], additionalProperties: false }, calculation: string,
   }, required: ["rule", "premises", "scope", "assumptions", "counterexample"], additionalProperties: false };

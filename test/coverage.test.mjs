@@ -6,7 +6,7 @@ import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { acceptedVersion, goalSnapshot, needsRevalidation } from "../governance/goals.mjs";
 import { QUALITY, lineList, supplementChecks } from "../governance/preflight.mjs";
-import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredFootnoteBindings, requireStoredObjectChecks, sourceLineEnumerationChecks, simulationScopeLocatorIssues } from "../governance/coverage.mjs";
+import { CLASSIFICATION_VERSION, neutralTextSpans, coverageAction, coverageSummary, documentCoverage, citationLineCounts, candidateCitationProfiles, classificationDisagreements, recordMeetsDispute, requireDisputedProof, requireStoredFootnoteBindings, requireStoredObjectChecks, sourceLineEnumerationChecks, simulationScopeLocatorIssues, projectPolicyContract } from "../governance/coverage.mjs";
 
 /** Raw helpers test the mandatory production gate without auto-generated reviews. */
 function environment(root) {
@@ -53,7 +53,16 @@ test("project-policy proofs bind the current read goal and keep external evidenc
   assert.throws(() => record({ ...part, inference: { ...inference, policy: [{ ...rule, quote: "所有件均通过" }] } }), /逐字/);
   assert.throws(() => record({ ...part, inference: { ...inference, premises: [rule] } }), /总纲条款可用于项目内规则/);
   assert.throws(() => record({ ...part, inference: { ...inference, policy: [{ ...rule, start: 3, end: 3, quote: "另行处理归档。" }] } }), /位置须与/);
-  assert.deepEqual(record(part).recorded, [block.id]);
+  // Reproduce the native partly flattened payload, then use the actual
+  // prepared contract shape with exactly the same independently read proof.
+  assert.throws(() => record({ ...part, ...inference, inference: { rule: inference.rule } }),
+    /parts\[\].*policy.*premises.*part\.inference/u);
+  const example = projectPolicyContract([rule.file]).partsExample;
+  assert.equal(example.rule, undefined);
+  assert.deepEqual(example.inference.premises, []);
+  assert.deepEqual(example.inference.assumptions, []);
+  assert.deepEqual(record({ ...example, basis: part.basis, inference: { ...example.inference,
+    policy: [rule], scope: inference.scope, counterexample: inference.counterexample } }).recorded, [block.id]);
   const [{ parts: [saved] }] = e.finish().records;
   assert.equal(saved.proofObject, "project-policy");
   assert.equal(saved.inference.policy[0].goalSha256, e.active.goal.sha256);

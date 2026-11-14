@@ -50,7 +50,7 @@ export function deliveryOutcomeInstructions(contract) {
     ...contract,
     bodyFormat: "正文每项先写 `事项编号：短结果`，同一行再写原始记录和规则。正文同一编号只能有一个结果字段。",
     ...(contract.summary ? { summaryFormat: "大白话先逐项写 `事项编号：短结果`，使用正文相同结果，各项用句号或分号隔开。" } : {}),
-    reviewFormat: "逐项给原始记录 original-fact、正文 project-application、要求大白话时再给总结 project-application。用 review 或 audit 提交 outcomes。",
+    reviewFormat: "先逐项核原始记录 original-fact、正文与大白话 project-application。用 review 或 audit 提交本角色 outcomes。decided 包含 id、status、decision、basis、body、需要时的 summary；body 和 summary 各只放 {line,quote}。",
   };
 }
 
@@ -98,17 +98,23 @@ function candidateView(bytes) {
   return { lines, syntax, summaryStart };
 }
 
-function locate(view, input, summary) {
-  if (!Number.isSafeInteger(input?.line) || !brief(input.quote, 240)) throw new Error("逐项结论须绑定当前稿可见行与逐字 quote");
+function outcomeLocation(view, input, summary) {
+  if (!Number.isSafeInteger(input?.line) || !brief(input.quote, 240)) return null;
   const i = input.line - 1;
   const raw = view.lines[i];
   const visible = view.syntax.visible[i];
   const at = visible?.indexOf(input.quote) ?? -1;
   if (at < 0 || visible.indexOf(input.quote, at + 1) >= 0 || summary&&!view.syntax.closingRows[i] ||
       raw.slice(at, at + input.quote.length) !== input.quote || summary !== (i >= view.summaryStart)) {
-    throw new Error("逐项结论引句须唯一定位在相应的当前正文或大白话，不能引用隐藏示例或另一位置");
+    return null;
   }
   return { line: input.line, quote: input.quote, start: at, end: at + input.quote.length };
+}
+
+function locate(view, input, summary) {
+  const location = outcomeLocation(view, input, summary);
+  if (!location) throw new Error("逐项结论引句须唯一定位在相应的当前正文或大白话，不能引用隐藏示例或另一位置");
+  return location;
 }
 
 function fieldsFor(view, id, inSummary) {
@@ -162,12 +168,10 @@ function partsOn(coverage, view, location) {
 }
 
 function application(coverage, view, location, id, goalSha256) {
-  const proof = partsOn(coverage, view, location).find(part =>
+  return partsOn(coverage, view, location).find(part =>
     part.status === "supported" && part.assertion === "project-application" &&
     part.inference?.rule === "project-policy" && part.inference.policy.some(ref => ref.goalSha256 === goalSha256) &&
     part.inference.premises.some(ref => provesSubject(ref, id)));
-  if (!proof) throw new Error(id + " 的正文或大白话结论缺本角色已核的 project-application 证明，须逐字绑定当前条款及该项记录");
-  return proof;
 }
 
 const proofHash = proof => digest(JSON.stringify(proof));
@@ -176,12 +180,47 @@ const proofHash = proof => digest(JSON.stringify(proof));
  * even when they appear in one physical row. */
 function originalRecord(coverage, line, id, applied) {
   const facts = coverage.records.filter(record => record.line === line).flatMap(record => record.parts);
-  const proof = facts.find(part => part.status === "supported" && part.assertion === "original-fact" &&
+  return facts.find(part => part.status === "supported" && part.assertion === "original-fact" &&
     (part.evidence ?? part.inference?.premises ?? []).some(ref => provesSubject(ref, id) &&
       applied.inference.premises.some(premise =>
         ref.file === premise.file && ref.sha256 === premise.sha256 && ref.evidenceSpan === premise.evidenceSpan)));
-  if (!proof) throw new Error(id + " 的正文缺同一记录的 original-fact 证明，须将原始事实与项目处置分别核对");
-  return proof;
+}
+
+/** Shared by the final proof gate and its preflight. Host positions are
+ * directions for the current actor to inspect, never automatic judgments. */
+function requiredProofs(view, item, body, summary, coverage, contract) {
+  const applied = application(coverage, view, body, item.id, contract.goalSha256);
+  return [
+    { field: "body", assertion: "project-application", location: body, proof: applied },
+    { field: "original", assertion: "original-fact", location: { line: body.line },
+      proof: applied && originalRecord(coverage, body.line, item.id, applied) },
+    ...(summary ? [{ field: "summary", assertion: "project-application", location: summary,
+      proof: application(coverage, view, summary, item.id, contract.goalSha256) }] : []),
+  ];
+}
+
+function proofGap(id, {field, assertion, location}, blocks) {
+  const {line, quote, start, end} = location;
+  return {id, field, assertion, line, ...(quote ? {quote} : {}),
+    blocks: blocks.filter(block => block.line === line &&
+      (start === undefined || block.start <= start && block.end >= end)).map(block => block.id)};
+}
+
+/** The caller supplies only this role's current, revalidated records. A
+ * genuinely unresolved item is left to the role's clarify/missing judgment. */
+export function deliveryOutcomeProofGaps(contract, bytes, coverage, blocks) {
+  if (!contract) return [];
+  const view = candidateView(bytes);
+  return contract.items.flatMap(item => {
+    const [body, ...duplicates] = fieldsFor(view, item.id, false);
+    if (!body || duplicates.length || unresolved.test(body.decision)) return [];
+    const summaries = contract.summary ? fieldsFor(view, item.id, true) : [];
+    const bodyLocation = outcomeLocation(view, body, false);
+    if (!bodyLocation) return [];
+    const summary = summaries.length === 1 && outcomeLocation(view, summaries[0], true);
+    return requiredProofs(view, item, bodyLocation, summary, coverage, contract)
+      .filter(row => !row.proof).map(row => proofGap(item.id, row, blocks));
+  });
 }
 
 function decideRow(view, item, row, coverage, contract) {
@@ -194,7 +233,9 @@ function decideRow(view, item, row, coverage, contract) {
     if (!body || !brief(row.question, 360) || !/[？?]$/u.test(row.question) || row.decision !== undefined) {
       throw new Error(id + " 的待澄清须给相关正文和可回答的具体问题，不填处置结果");
     }
-    return { ...result, question: row.question, bodyProof: proofHash(application(coverage, view, body, id, contract.goalSha256)) };
+    const proof = application(coverage, view, body, id, contract.goalSha256);
+    if (!proof) throw new Error(id + " 的澄清位置缺本角色已核的 project-application 证明，须绑定当前条款及所涉实际记录");
+    return { ...result, question: row.question, bodyProof: proofHash(proof) };
   }
   if (row.status !== "decided") {
     if (row.decision !== undefined || row.question !== undefined || row.status === "inconsistent" && (!body || !summary)) {
@@ -202,31 +243,40 @@ function decideRow(view, item, row, coverage, contract) {
     }
     return result;
   }
-  if (!body || contract.summary && !summary || !brief(row.decision, 32) || !scalar.test(row.decision) || unresolved.test(row.decision) || row.question !== undefined) {
-    throw new Error(id + " 须分别定位正文和已要求的大白话，并给明确处置结果");
+  if (!brief(row.decision, 32) || !scalar.test(row.decision) || unresolved.test(row.decision) || row.question !== undefined) {
+    throw new Error(id + " 的 status=decided 须给明确处置的 decision 字段，不填 question");
   }
+  if (!body || contract.summary && !summary) throw new Error(id + " 须分别定位正文和已要求的大白话");
   const check = (loc, inSummary) => {
     const found = fieldsFor(view, id, inSummary);
     if (found.length !== 1 || found[0].line !== loc.line || found[0].quote !== loc.quote || found[0].decision !== row.decision) {
       throw new Error(id + " 须逐字指向唯一的「事项编号：结果」字段；条件、提及和其他事项不是本项明确处置");
     }
-    return application(coverage, view, loc, id, contract.goalSha256);
   };
-  const applied = check(body,false);
-  return { ...result, decision: row.decision, bodyProof: proofHash(applied),
-    originalProof: proofHash(originalRecord(coverage, body.line, id, applied)),
-    ...(summary ? { summaryProof: proofHash(check(summary,true)) } : {}) };
+  check(body, false);
+  if (summary) check(summary, true);
+  return {result: { ...result, decision: row.decision }, proofs: requiredProofs(view, item, body, summary, coverage, contract)};
 }
 
 /** A report belongs to this role and this candidate. Ledger validation calls
  * the same normalizer over persisted inputs and independent source proofs. */
-export function reviewDeliveryOutcomes(contract, bytes, coverage, actor, input) {
+export function reviewDeliveryOutcomes(contract, bytes, coverage, actor, input, blocks = []) {
   if (!contract) return null;
   if (!Array.isArray(input) || input.length !== contract.items.length) throw new Error("请按 prepare.outcomeContract 提交所有逐项交付判断 outcomes");
   const byId = new Map(input.map(row => [row?.id, row]));
   if (byId.size !== input.length || contract.items.some(item => !byId.has(item.id))) throw new Error("逐项交付编号必须逐个对应当前目标，不能漏交、重复或借用编号");
   const view = candidateView(bytes);
-  const items = contract.items.map(item => decideRow(view, item, byId.get(item.id), coverage, contract));
+  const gaps = [];
+  const items = contract.items.map(item => {
+    const decision = decideRow(view, item, byId.get(item.id), coverage, contract);
+    if (!decision.proofs) return decision;
+    for (const row of decision.proofs) {
+      if (row.proof) decision.result[row.field + "Proof"] = proofHash(row.proof);
+      else gaps.push(proofGap(item.id, row, blocks));
+    }
+    return decision.result;
+  });
+  if (gaps.length) throw new Error("逐项处置缺本角色的证据证明。先用 coverage inventory 读对应块并 record，已提交且正确的 outcomes 可以原样提交。outcomeProofGaps=" + JSON.stringify(gaps));
   return { actor, candidateSha256: digest(bytes), contractSha256: contract.sha256, items };
 }
 

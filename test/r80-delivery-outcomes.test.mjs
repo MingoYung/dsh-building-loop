@@ -349,13 +349,25 @@ test("correct explicit outcomes need two distinct current role proofs before the
     assert.notEqual(auditor, reviewer);
     const independent = await h.flow(auditor, "prepare");
     assert.deepEqual(independent.outcomeContract, prepare.outcomeContract);
+    assert.deepEqual(independent.contract.finalSubmissionRequires, ["outcomes"]);
+    assert.deepEqual(independent.contract.projectPolicy.partsExample.inference.premises, []);
 
     await assert.rejects(h.flow(auditor, "audit", { outcomes }), /未核|证明|覆盖/u);
+    const missingBefore = await h.coverage(auditor, "status");
+    assert.equal(missingBefore.outcomeProofGaps.length, 9);
+    assert.deepEqual(missingBefore.outcomeProofGaps.map(row=>row.field), ["body","original","summary","body","original","summary","body","original","summary"]);
+    assert.ok(missingBefore.outcomeProofGaps.every(row=>row.blocks.length));
+    assert.deepEqual((await h.coverage(reviewer, "status").catch(()=>null))?.outcomeProofGaps, undefined,
+      "the previous reviewer has no read access in the auditor's phase");
     await record(auditor, entries => entries.map(entry => ({
       ...entry, parts: entry.parts.map(part => part.quote.startsWith("E3 待补")
         ? direct(part.quote, [rowFor("E3")]) : part),
     })));
-    await assert.rejects(h.flow(auditor, "audit", { outcomes }), /处置|证明|outcome/u,
+    const gap = (await h.coverage(auditor, "status")).outcomeProofGaps;
+    assert.deepEqual(gap.map(({id, field, line, assertion})=>({id,field,line,assertion})),
+      [{id:"E3",field:"summary",line:14,assertion:"project-application"}]);
+    await assert.rejects(h.flow(auditor, "audit", { outcomes }), error =>
+      error.message.includes(JSON.stringify(gap)),
       "an independent verifier cannot reuse the other role's typed summary disposition");
     await record(auditor, entries => entries.map(entry => ({
       ...entry, parts: entry.parts.map(part =>
@@ -365,6 +377,9 @@ test("correct explicit outcomes need two distinct current role proofs before the
     await assert.rejects(h.flow(auditor, "audit", { outcomes }), /原始|original-fact|outcome/u,
       "independent typed E1/E2 and public source facts cannot discharge E3's original record requirement");
     await record(auditor);
+    assert.deepEqual((await h.coverage(auditor, "status")).outcomeProofGaps, []);
+    const [{decision: unused, ...withoutDecision}, ...rest] = outcomes;
+    await assert.rejects(h.flow(auditor, "audit", { outcomes: [withoutDecision, ...rest] }), /decision 字段/u);
     assert.equal((await h.flow(auditor, "audit", { outcomes })).phase, "ledger-review");
 
     const receipt = JSON.parse(fs.readFileSync(path.join(root, "records/first.json"), "utf8"));
