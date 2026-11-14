@@ -38,6 +38,7 @@ import { createStallReproductionProof, DIAGNOSIS_WAIT, diagnosisProofIdentity, d
   requireDiagnosisProofScope, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
+import { deliveryOutcomeContract, deliveryOutcomeSchema, reviewDeliveryOutcomes, deliveryOutcomeDisagreements } from "./delivery-outcomes.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
 import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
   requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims, engineeringArchitectureSourceFacts,
@@ -143,6 +144,7 @@ const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证
 // hashes or two model approvals establish entailment in arbitrary prose.
 const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
 const ASSERTION_PROOF_RULE = "同一块混有材料身份、记录字段和项目处置，分别提交 exact quote 与 assertion：material-identity 用该材料的真实凭据；original-fact 用实际记录；project-rule 只引当前总纲；project-application 同时引总纲和具体记录。额外读过的总纲不挂到仅描述材料身份的断言上。文稿所用来源归属用 manuscript-attribution 核本节可见编号行，不能用一份来源的身份代证整稿。定向重核优先处理 requiredAssertions，不改正确正文。";
+const OUTCOME_RULE = "prepare 有 outcomeContract 时，正文每项写「事项编号：明确结果」，分别标出原始记录事实和处置。若要求大白话，在末尾按同一编号和结果复述。两道审核分别在 coverage 用 original-fact 核同项实际记录、用 project-application 核该项处置及其总结，分别提交 outcomes。真实证据歧义用 clarify 和具体问题，未写结果用 missing，正文与总结冲突用 inconsistent。";
 const OBJECT_RULE="外部事实用实际原文 evidence；项目规则与处置用 inference 的 project-policy，把总纲凭证放 policy、事实原文放 premises。已登记摘录范围与稿件自身计数用各自的 direct.objectCheck，按块原样传 objectCheckHint（包括计数的 expected）。局部登记范围只代表该登记范围。错例后说明及大白话含事实时仍逐项核。";
 const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
 const FOOTNOTE_RULE="逐字引句紧接脚注标记时，读当前稿的同名定义和所指原文。旁边其他出处不能替该脚注证明引句。脚注定义后的事实照常核验。";
@@ -305,17 +307,19 @@ function viewUnits(frame) {
     const { phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions } = unit;
     const notice=reconciliationNotice(frame,unit);
     const stale=needsRevalidation(frame,id,unit)||!!unit.reconciliationExhausted&&!notice.reason;
+    const waiting=unit.outcomeClarification && unit.outcomeClarification.goalSha256===goalSnapshot(frame).sha256;
     return {
       unit: id, phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions,
       ...(currentUnit ? { current: true } : {}),
       ...notice,
+      ...(waiting && unit.owner===frame.agent.id ? {outcomeClarification:unit.outcomeClarification} : {}),
       ...(unit.owner === frame.agent.id && unit.stallDiagnostic && !TERMINAL.has(phase)
         ? { stallDiagnostic: diagnosisPacket(unit, "coordinator") } : {}),
       ...(frame.policy.units[id].cacheReadRotationThreshold ? {executorUsage:{session:executor,
         cacheReadTokens:unit.executorUsage?.[executor]?.cacheReadTokens??0,
         threshold:frame.policy.units[id].cacheReadRotationThreshold,rotations:unit.rotations??[]}} : {}),
       next: diagnosisNext(unit) ?? (phase === "architecture-sync" && unit.rollbackFailure ? "advance"
-        : ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
+        : ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : waiting||notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
       goalStale: stale,
       owned: unit.owner === frame.agent.id,
       ...(architecture ? { architecture } : {}),
@@ -1248,6 +1252,10 @@ export function apply(ctx, config = {}) {
               requirement: { file: "当前目标文件", start: 1, end: 1, quote: "支持预期的目标原句" } } } } } : {}),
         ...(submission ? { submission } : {}),
         ...(deliverableTable ? { deliverableTable } : {}),
+        ...(spec && !codeReviewMode && ["executor", "reviewer", "auditor"].includes(frame.role) ?
+          {outcomeContract: deliveryOutcomeContract(frame, spec, goalSnapshot(frame))} : {}),
+        ...(frame.role==="coordinator" && current?.outcomeClarification ? {outcomeClarification: current.outcomeClarification} : {}),
+        ...(frame.role==="executor" && current?.outcomeIssues?.length ? {outcomeIssues: current.outcomeIssues} : {}),
         ...reconciliationNotice(frame,current),
         ...(codeReview ? { codeReview } : {}),...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
         ...(manuscriptCounts?.length?{citationLineCounts:manuscriptCounts}:{}),
@@ -1265,7 +1273,7 @@ export function apply(ctx, config = {}) {
             excerptCount:{kind:"registered-excerpts",check:"count",file:"原句明确写出的来源路径",expected:1},
             citingLineCount:{kind:"candidate",check:"citation-count",source:"原句所说的被引用来源，不是候选文件",expected:6},
             note:"示例数字须换成待核原句的数量。已有 objectCheckHint 的块按原样传提示，不套用计数模板。登记摘录只核整个登记集合的条数。"}}:{}),
-          ...(frame.role==="auditor"?{finalSubmission:{action:"audit"},finalSubmissionNote:"全部块已记录后仅提交此动作，unit可省略；checks/quality/note/全文不被audit消费，不要重发。"}:{}),
+          ...(frame.role==="auditor"?{finalSubmission:{action:"audit"},finalSubmissionNote:"全部块已记录后执行 audit。如果 prepare 有 outcomeContract，另交自己的 outcomes；不重发首审 checks、质量说明或全文。"}:{}),
           ...(current.reconciliationRound?{targetedReview:"只补 pending 中不足的本角色记录；已保存并满足目标范围的证明无需重发。核验方可以用 review 省略 checks，宿主重验本角色同版本编号检查。若真实事实缺证，提交具体退回。"}:{}),
           note:"简单块每次 record 最多12块；复杂推导建议每批2–4块，避免工具参数生成超限，证明字段不可省。非事实用 nonfactual + supported + basis；明确假设用 hypothesis；错例用 error-example + evidence。形式P→Q/P/Q须同一命题，asserts不填right。"
         }:undefined};
@@ -1802,7 +1810,11 @@ export function apply(ctx, config = {}) {
         serial: prior.serial + 1, stallId: stall.id, repair };
     }
     const revalidating = needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted;
-    const planned = revalidating ? "final-review"
+    const waiting = prior?.outcomeClarification;
+    if(waiting?.goalSha256 === goalSnapshot(frame).sha256) {
+      throw new Error("当前逐项处置等待用户澄清，请核实并更新总纲后继续");
+    }
+    const planned = (revalidating || waiting) ? "final-review"
       : prior?.phase === "blocked" ? prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
     const priorPhase = prior?.phase === "blocked" ? prior.resumePhase : prior?.phase;
     const isReviewPhase = phase => typeof phase === "string" && (isAudit(phase) || isReview(phase));
@@ -1824,7 +1836,7 @@ export function apply(ctx, config = {}) {
     // checkpoint, reviewer or auditor always resumes its bound identity.
     const rotate=phase==="supplement" && prior?.phase!=="blocked" && spec.continuation==="reuse"
       && threshold!==undefined && used>=threshold;
-    const reusable = regressionRetry ? prior.executor : revalidating ? prior?.reviewer : prior?.phase === "blocked" ? prior.actor
+    const reusable = regressionRetry ? prior.executor : revalidating||waiting ? prior?.reviewer : prior?.phase === "blocked" ? prior.actor
       : rotate ? undefined
       : phase === "supplement" && spec.continuation === "fresh" ? undefined : prior?.[role];
     return { prior, phase, role, reusable, rotate, used, threshold, regressionRetry, serial: (prior?.serial ?? 0) + 1 };
@@ -1895,6 +1907,7 @@ export function apply(ctx, config = {}) {
       else delete record.activationStartSeq;
       delete record.blocked;
       delete record.resumePhase;
+      delete record.outcomeClarification;
       delete record.assessment;
       refreshCheckpoints(frame,record,spec);
       if (plan.rotate) {
@@ -2230,7 +2243,7 @@ export function apply(ctx, config = {}) {
   }
 
   /** Finalize a blind second opinion. Pending acceptance is never ledger evidence. */
-  function audit(frame, id, active, spec) {
+  function audit(frame, id, active, spec, args) {
     if (frame.role !== "auditor" || active.actor === active.reviewer || active.actor === active.executor) throw new Error("独立反证须使用不同于执行及首次核验的子会话");
     const goal = requireGoalRead(frame, active);
     const bytes = reviewCandidate(frame, active, spec);
@@ -2239,6 +2252,13 @@ export function apply(ctx, config = {}) {
     if(needsRevalidation(frame,id,active))throw new Error("待复核的来源或获取回执版本已经变化，请总控重新推进核验");
     const coverage = coverageSummary(frame, active, spec);
     requireDisputedProof(active,coverage.records,true);
+    const outcomeContract = deliveryOutcomeContract(frame, spec, goal);
+    const deliveryOutcomes = reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, args.outcomes);
+    if (holdOutcomeClarification(active, deliveryOutcomes, goal)) {
+      trackUnit(frame,id,active,true);
+      return;
+    }
+    const outcomeIssues = deliveryOutcomes ? deliveryOutcomeDisagreements(pending.deliveryOutcomes, deliveryOutcomes) : [];
     rememberDirectCoverage(frame,active,spec,coverage);
     const layout = plainLastIssues(spec,lineList(bytes));
     const preservation=requiredLineCheck(frame,id,bytes,goal);
@@ -2248,7 +2268,7 @@ export function apply(ctx, config = {}) {
       records: Object.fromEntries(pending.coverage.records.map(record => [record.block, record])) } }, spec);
     const calculations = numericChecks(frame.root, spec, lineList(bytes), frame.reads);
     const conflicts = classificationDisagreements(pending.coverage, coverage);
-    if (!coverage.rejected.length && !formatIssues.length && conflicts.length && calculations.every(row => row.ok)) {
+    if (!coverage.rejected.length && !formatIssues.length && !outcomeIssues.length && conflicts.length && calculations.every(row => row.ok)) {
       active.reconciliation = conflicts;
       active.reconciliationBinding=checkpointBinding(frame,spec);
       active.auditorCheckpoint=ownCheckpoint(frame,active,spec);
@@ -2265,7 +2285,7 @@ export function apply(ctx, config = {}) {
       return;
     }
     const unsupported = calculations.filter(row => !row.ok).map(row => row.id);
-    const decision = coverage.rejected.length || unsupported.length || formatIssues.length ? "reject" : "accept";
+    const decision = coverage.rejected.length || unsupported.length || formatIssues.length || outcomeIssues.length ? "reject" : "accept";
     const receipt = { ...pending, decision, calculations, unsupported, coverage: coverageReceipt(pending.coverage),
       // Recompute for legacy pending receipts too, after matching the exact candidate bytes.
       candidatePositions:candidatePositionSummary(spec.candidate,bytes),
@@ -2273,6 +2293,7 @@ export function apply(ctx, config = {}) {
       qualityRejected: layout.length ? [...new Set([...(pending.qualityRejected??[]),"plain"])] : pending.qualityRejected,
       formatIssues, ...(preservation.proof?{requiredLines:preservation.proof}:{}),
        independentAudit: { auditor: frame.agent.id, method: "counterexample-and-concept-mapping", coverage: coverageReceipt(coverage), actualReads: readInventory(frame, active),
+         ...(deliveryOutcomes ? {deliveryOutcomes} : {}),
          searchObservations:searchObservations(frame,active,spec) } };
     const receiptBytes = buffer(receipt);
     replaceWithHistory(frame.root, active.receipt, text(receiptBytes), "独立反证 " + decision, tag(frame), frame.state.markers);
@@ -2280,6 +2301,7 @@ export function apply(ctx, config = {}) {
     active.qualityRejected = receipt.qualityRejected;
     active.rejected = rejectedClaims(frame.root, spec, lineList(bytes), calculations.filter(row => !row.ok), frame.reads);
     active.coverageRejections = coverage.rejected;
+    active.outcomeIssues = outcomeIssues.map(item => ({ id: item, ...deliveryOutcomes.items.find(row => row.id === item) }));
     active.proof = { reviewer: pending.reviewer, reviewerCoverage: pending.coverage,
       auditor: frame.agent.id, auditorCoverage: coverage };
     active.rejectedCandidate = decision === "reject" ? digest(bytes) : null;
@@ -2295,6 +2317,15 @@ export function apply(ctx, config = {}) {
       beginLedgerReview(frame, id, active, receiptBytes);
       delete active.quality;
     }
+  }
+
+  function holdOutcomeClarification(active, report, goal) {
+    const items = report?.items.filter(row => row.status === "clarify");
+    if (!items?.length) return false;
+    active.outcomeClarification = { goalSha256: goal.sha256, candidateSha256: report.candidateSha256,
+      items: items.map(({ id, status, question }) => ({ id, status, question })) };
+    pause(active, "需要用户澄清逐项处置口径");
+    return true;
   }
 
   /** Keep source review and the blind second decision on the same signed
@@ -2412,6 +2443,9 @@ export function apply(ctx, config = {}) {
     }
     if(preservation.proof)result={...result,requiredLines:preservation.proof,
       ok:result.ok&&preservation.issues.length===0,issues:[...result.issues,...preservation.issues]};
+    if(active.outcomeIssues?.length&&active.rejectedCandidate===digest(bytes)){
+      result={...result,ok:false,issues:[...result.issues,"逐项交付退回仍未修订，请按 prepare 的 outcomeIssues 修改正文或大白话"]};
+    }
     const claimIssues=requiredClaimRowIssues(lines,spec.claims);
     if(claimIssues.length)result={...result,ok:false,issues:[...result.issues.filter(issue=>
       !claimIssues.some(message=>message.startsWith(issue+"，"))),...claimIssues]};
@@ -2630,7 +2664,7 @@ export function apply(ctx, config = {}) {
       } else if (args.codeReview !== undefined) {
         throw new Error("当前任务仍按文稿及证据规则验收，codeReview 仅用于已授权的纯代码交付");
       } else if (args.action === "audit") {
-        audit(frame, id, active, spec);
+        audit(frame, id, active, spec, args);
       } else if (args.action === "review" && frame.role === "reviewer") {
         const goal = requireGoalRead(frame, active);
         const grant = spec.phases[active.phase];
@@ -2649,6 +2683,16 @@ export function apply(ctx, config = {}) {
         let checked = reviewChecks(frame, active, spec, grant, checks, lines, binding, fullCoverage);
         coverage=fullCoverage();
         requireDisputedProof(active,coverage.records,true);
+        const outcomeContract = deliveryOutcomeContract(frame, spec, goal);
+        const oldOutcomes = previous && active.pendingReceipt.deliveryOutcomes?.items;
+        const outcomeInput = args.outcomes ?? oldOutcomes;
+        const deliveryOutcomes = reviewDeliveryOutcomes(outcomeContract, bytes, coverage, frame.agent.id, outcomeInput);
+        if (holdOutcomeClarification(active, deliveryOutcomes, goal)) {
+          trackUnit(frame,id,active,true);
+          frame.changed = true;
+          return {unit:id, phase:active.phase, parent:active.owner, outcomeClarification:active.outcomeClarification};
+        }
+        const outcomeIssues = deliveryOutcomes?.items.filter(row => row.status !== "decided") ?? [];
         rememberDirectCoverage(frame,active,spec,coverage);
         if(active.assessment?.hash===hash)consistentUnlisted(frame,active,spec,bytes,active.assessment.unlisted,coverage);
         // Evaluate each configured number even when another claim has already failed.
@@ -2671,13 +2715,14 @@ export function apply(ctx, config = {}) {
           throw new Error("资料核验须覆盖每份支持结论的实际原文，请重新提交 sourceRefs");
         }
         const qualityRejected = qualityChecks ? Object.keys(qualityChecks).filter(field => !qualityChecks[field].pass) : [];
-        const decision = unsupported.length || qualityRejected.length || coverage.rejected.length || preservation.issues.length ? "reject" : "pending-audit";
+        const decision = unsupported.length || qualityRejected.length || coverage.rejected.length || preservation.issues.length || outcomeIssues.length ? "reject" : "pending-audit";
         active.rejected = rejectedClaims(frame.root, spec, lines, checked.filter(check => check.status !== "supported"), frame.reads);
         const receipt = {
           unit: id, phase: active.phase, reviewer: exec.agent.id, decision, candidateSha256: hash,
           ...(codeRegression ? { codeRegression } : {}),
           candidatePositions:candidatePositionSummary(spec.candidate,bytes),
           goal: active.goal, goalFit: active.assessment?.goalFit,
+          ...(deliveryOutcomes ? {deliveryOutcomes} : {}),
           unsupported, qualityRejected, checks: checked, calculations, coverage: coverageReceipt(coverage),
           formatIssues: [...layout,...preservation.issues], ...(preservation.proof?{requiredLines:preservation.proof}:{}),
           ...(active.quality ? { quality: active.quality } : {}),
@@ -2698,6 +2743,7 @@ export function apply(ctx, config = {}) {
         active.rejectedCandidate = decision === "reject" ? hash : null;
         active.unlisted = qualityChecks ? active.assessment.unlisted : [];
         active.coverageRejections = coverage.rejected;
+        active.outcomeIssues = outcomeIssues;
         active.phase = "supplement-ready";
         if (decision === "pending-audit") {
           // Save while the original reviewer phase/identity is still available;
@@ -2718,7 +2764,9 @@ export function apply(ctx, config = {}) {
       if (active.phase !== "blocked") active.seen = {};
       frame.changed = true;
       return { unit: id, phase: active.phase, receipt: active.receipt, unsupported: active.unsupported,
-        qualityRejected: active.qualityRejected, parent: active.owner,...reconciliationNotice(frame,active) };
+        qualityRejected: active.qualityRejected, parent: active.owner,
+        ...(active.outcomeIssues?.length ? { outcomeIssues: active.outcomeIssues.map(({id,status})=>({id,status})) } : {}),
+        ...(active.outcomeClarification ? { outcomeClarification: active.outcomeClarification } : {}), ...reconciliationNotice(frame,active) };
     }, { claim: args.action !== "block" });
   }
 
@@ -3204,6 +3252,7 @@ export function apply(ctx, config = {}) {
       }, required: ["id", "status", "basis"], additionalProperties: false,
     } },
     quality: { type: "object", properties: qualityFields, required: qualityNames, additionalProperties: false },
+    outcomes: deliveryOutcomeSchema,
   }, workflow), {when:visible(["coordinator","executor","reviewer","auditor","diagnostician"], frame => !codeReviewRole(frame))});
 
   ctx.systemPrompt.context({
@@ -3263,7 +3312,7 @@ export function apply(ctx, config = {}) {
           ...architectureRule,
           ...(!codeReview && frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
           ...(!codeReview && frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 完成后最终只提交 building_loop {"action":"audit"}，unit可省略；不要重复发送 checks、quality、note 或全文。宿主从已落盘证明生成回执。'] : []),
-          ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, ASSERTION_PROOF_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
+          ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, ASSERTION_PROOF_RULE, OUTCOME_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
           ...(!codeReview && (phase === "supplement" || frame.role === "reviewer") ? [QUALITY_RULE] : []),
           ...(codeReview || frame.role === "executor" && assignment?.[1].codeIntake ? [CODE_COMMENT_RULE] : []),
           ...(frame.managed && frame.role === "coordinator" ? [

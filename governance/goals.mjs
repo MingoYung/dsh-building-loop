@@ -5,6 +5,7 @@ import { candidateCitationProfiles, requireStoredCalculations, requireStoredFoot
 import { reviewedCodeArtifactsCurrent } from "./code-intake.mjs";
 import { currentCodeReview } from "./code-review.mjs";
 import { engineeringArchitectureCurrent } from "./engineering-architecture.mjs";
+import { deliveryOutcomeContract, requireAcceptedDeliveryOutcomes, reviewDeliveryOutcomes } from "./delivery-outcomes.mjs";
 
 const REQUIRED_MARKERS = new Set(["[稿件自述]", "[摘录范围]"]);
 const LEADING_MARKER = /^ {0,3}(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)?(\[(?:稿件自述|摘录范围)\])(?!\(|\[|:)/u;
@@ -245,6 +246,9 @@ export function acceptedVersion(frame, id, active) {
   }
   requireProofSources(frame, id, active);
   const coverages=[active.proof.reviewerCoverage, active.proof.auditorCoverage];
+  if(active.phase!=="closed"||receipt.deliveryOutcomes) {
+    requireAcceptedDeliveryOutcomes(deliveryOutcomeContract(frame,spec,current),candidate,receipt,active.proof);
+  }
   requireStoredCalculations(frame, spec, coverages, candidate);
   requireStoredObjectChecks(frame, spec, coverages, candidate, receipt.phase);
   // Do not retroactively reinterpret a completed historical receipt. Open
@@ -276,7 +280,13 @@ export function needsRevalidation(frame, id, active) {
     if (pending.codeReview) {
       if (!currentCodeReview(frame, id, active, frame.policy.units[id], pending)) return true;
     } else {
-      try { requireStoredFootnoteBindings(frame.policy.units[id],[pending.coverage],candidate,pending.phase,active.goal); }
+      try {
+        const unit=frame.policy.units[id];
+        requireStoredFootnoteBindings(unit,[pending.coverage],candidate,pending.phase,active.goal);
+        const contract=deliveryOutcomeContract(frame,unit,active.goal);
+        const outcomes=reviewDeliveryOutcomes(contract,candidate,pending.coverage,pending.reviewer,pending.deliveryOutcomes?.items);
+        if(outcomes&&JSON.stringify(outcomes)!==JSON.stringify(pending.deliveryOutcomes))return true;
+      }
       catch { return true; }
       for (const ref of [...(pending.checks ?? []), ...(pending.observedSources ?? [])]) {
         if (ref.file && ref.sha256 && !sourceVersionCurrent(frame.root, ref)) return true;

@@ -19,6 +19,7 @@
 | 0.7.29 同模型难题自然完成三组对照 | [G3/G4 与 H1/H2 同模型三组冻结盲评](results-0.7.29-hard-completion.md) |
 | 0.7.30 同模型难题自然完成三组复验 | [G3/G4 与 H1/H2 三组复验](results-0.7.30-hard-completion.md) |
 | 0.7.31 Building-loop 自身缺陷 | [Windows 深路径、架构实证与目标覆盖回归](results-0.7.31-own-defects.md) |
+| 0.7.35 核验逐项交付结果 | [冻结的误放稿、目标变更和双审核关单](results-0.7.35-delivery-outcomes.md) |
 | 0.7.34 逐条断言证据复核 | [冻结八块和 DeepSeek Flash 目标变更验收](results-0.7.34-assertion-proof.md) |
 | 0.7.33 Building-loop 综合验收 | [总纲证据、编号、计数和账本：从变更到关单](results-0.7.33-integrated.md) |
 | 0.7.32 Building-loop 自身缺陷 | [核验恢复、案例来源与目标变更原生验收](results-0.7.32-own-defects.md) |
