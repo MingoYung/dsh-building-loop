@@ -260,6 +260,21 @@ function reconciliationNotice(frame,unit) {
     reasonNote:"这是核验分类分歧的正常重核流程，尚未认定系统故障；只按当前争议重核，不凭阶段回转编造故障原因。"};
 }
 
+/** Carry only the host's version transition to a reused verifier. The
+ * previous turn's disagreements and the other role's evidence stay private. */
+function reviewRestartPacket(frame, active) {
+  const restart = active?.reviewRestart;
+  if (!["reviewer", "auditor"].includes(frame.role) || !restart ||
+      restart.currentVersion !== CLASSIFICATION_VERSION || active.reconciliation?.length ||
+      active.codeReviewRoute === "code" ||
+      restart.goalSha256 !== active.goal?.sha256 ||
+      restart.candidateSha256 !== active.materialBinding?.candidateSha256) return null;
+  return { previousVersion: restart.previousVersion, currentVersion: restart.currentVersion,
+    mode: "independent-reassessment",
+    next: { tool: COVERAGE, action: "inventory" },
+    note: "旧版本的阻塞已失效，当前没有待重核的旧争议。按本阶段 inventory 返回的当前块和本角色已读资料独立核验。无需旧裁决或另一角色的理由。若发现当前材料的真实问题，按现行覆盖与退回规则提交。" };
+}
+
 /** Give the owner of a stale or empty plan a supported write action before registration. */
 function architectureNext(frame, unit) {
   const status = engineeringArchitectureStatus(frame, unit);
@@ -1102,6 +1117,7 @@ export function apply(ctx, config = {}) {
       const phase = assignment?.[1].phase ?? current?.phase ?? "dispatch";
       const clarification = ownerClarificationPacket(frame, current, unit);
       if(spec)refreshCheckpoints(frame,current,spec);
+      const reviewRestart = reviewRestartPacket(frame, current);
       if (frame.role === "diagnostician" && current.stallDiagnostic.preparedSerial !== current.serial) {
         // A new activation must expose its own version before a probe or
         // receipt can rely on source reads from that diagnostic session.
@@ -1285,6 +1301,7 @@ export function apply(ctx, config = {}) {
         ...(outcomeContract ? { outcomeContract:deliveryOutcomeInstructions(outcomeContract) } : {}),
         ...(outcomeFields ? { outcomeFields } : {}),
         ...(clarification ? { outcomeClarification: clarification } : {}),
+        ...(reviewRestart ? { reviewRestart } : {}),
         ...(frame.role==="executor" && current?.outcomeIssues?.length ? {outcomeIssues: current.outcomeIssues} : {}),
         ...reconciliationNotice(frame,current),
         ...(codeReview ? { codeReview } : {}),...(coverage?{coverage}:{}),...(spec?{claims:actualClaims??spec.claims,plainLast:spec.plainLast}:{}),next,
@@ -1911,6 +1928,16 @@ export function apply(ctx, config = {}) {
         // Current hashes are rechecked by every evidence/goal/candidate consumer.
         seen: resumeSame ? plan.prior.seen ?? {} : {}, goal: goalSnapshot(frame),
       };
+      const priorBinding = plan.prior?.materialBinding;
+      const previousVersion = plan.prior?.reconciliationBinding?.classificationVersion ?? priorBinding?.classificationVersion;
+      const sameReviewMaterial = priorBinding?.goalSha256 === binding.goalSha256 &&
+        priorBinding?.candidateSha256 === binding.candidateSha256;
+      if (sameReviewMaterial && !isCodeReviewUnit(frame, record, spec) &&
+          Number.isSafeInteger(previousVersion) && previousVersion < CLASSIFICATION_VERSION &&
+          (plan.role === "reviewer" || plan.role === "auditor")) {
+        record.reviewRestart = {previousVersion, currentVersion: CLASSIFICATION_VERSION, goalSha256: binding.goalSha256,
+          candidateSha256: binding.candidateSha256};
+      } else if (!sameReviewMaterial) delete record.reviewRestart;
       if (plan.rollbackRepair) record.rollbackRepairActive = true;
       else delete record.rollbackRepairActive;
       // A stalled implementation may not parse. Reconcile the architecture
@@ -3324,6 +3351,7 @@ export function apply(ctx, config = {}) {
         const closed = units?.length && units.every(unit => TERMINAL.has(unit.phase));
         const phase = assignment?.[1].phase ?? (units ? current?.phase ?? (closed ? "closed" : "dispatch") : "idle");
         const codeReview = codeReviewRole(frame);
+        const reviewRestart = reviewRestartPacket(frame, assignment?.[1]);
         const rule = frame.role === "coordinator"
           ? (DIAGNOSIS_WAIT.has(phase) ? COORDINATOR[phase] :
             current?.reason==="classification-reconciliation-unresolved"?current.reasonNote:current?.goalStale ? COORDINATOR["goal-review-ready"] : COORDINATOR[phase] ?? "等待当前阶段交付或核验回执。") + " 总控只读写白名单内的中央文件和回执。"
@@ -3360,6 +3388,7 @@ export function apply(ctx, config = {}) {
         const architectureRule = frame.role === "coordinator" && Object.values(frame.policy.units).some(unit => unit.architecture)
           ? ["架构稿由总控按自己白名单维护。按 prepare 返回的架构状态写计划。改已有小节用 file edit 指定 heading，生成章节由宿主保留。调用 architecture 后看实际派单回执或 next。总控用目标与宿主投影，执行方读源码；架构退回按宿主位置修。"] : [];
         return [descriptor, rule, "本阶段先 " + (codeReview ? CODE_REVIEW : WORKFLOW) + " prepare 获取真实可见读包和参数契约；pending仍有页就继续prepare或按行read。已读且版本未变不需重复读。交付后宿主结束本轮，不额外收尾或通知。",
+          ...(reviewRestart ? [reviewRestart.note] : []),
           ...(assignment && confirmed?.instruction ? ["prepare 的 instruction 是所有者开工时的完整任务指令，补足当时的摘要；后续已确认变更以当前目标为准。它不是证据文件，权限仍由现有授权决定。"] : []),
           ...architectureRule,
           ...(!codeReview && frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),

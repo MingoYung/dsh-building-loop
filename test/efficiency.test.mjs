@@ -444,13 +444,14 @@ test("an exhausted reconciliation persisted before the classification upgrade ca
   assert.equal((await h.flow(auditor,"audit")).phase,"blocked");
   await assert.rejects(h.flow("root","advance"),/定向重核已结束/);
 
-  // Simulate 0.7.2 persisted state without changing any project input.
+  // Simulate a persisted previous classification and keep all project bytes.
   const directory=path.join(process.env.DSH_HOME,"building-loop-state");
   const file=path.join(directory,fs.readdirSync(directory).find(name=>name.endsWith(".json")));
   const state=JSON.parse(fs.readFileSync(file,"utf8")),unit=state.units.K01;
-  for(const binding of [unit.reconciliationBinding,unit.restoredCheckpointBinding,
+  const previousVersion=unit.materialBinding.classificationVersion-1;
+  for(const binding of [unit.materialBinding,unit.reconciliationBinding,unit.restoredCheckpointBinding,
     unit.reviewerCheckpoint?.binding,unit.auditorCheckpoint?.binding]) {
-    if(binding)delete binding.classificationVersion;
+    if(binding)binding.classificationVersion=previousVersion;
   }
   fs.writeFileSync(file,JSON.stringify(state));
   const status=(await h.flow("root","status")).units[0];
@@ -459,6 +460,18 @@ test("an exhausted reconciliation persisted before the classification upgrade ca
   const packet=await h.flow(reviewer,"prepare");
   assert.equal(packet.reconciliation,undefined);assert.equal(packet.coverage.pendingCount,packet.coverage.total);
   assert.ok(packet.files.some(file=>file.path==="candidate.md"));
+  assert.equal(packet.reviewRestart.currentVersion,previousVersion+1);
+  assert.equal(packet.reviewRestart.previousVersion,previousVersion);
+  assert.match(h.prompt(reviewer), /旧版本的阻塞已失效/u);
+  await h.coverage(reviewer,"record",{entries:packet.coverage.blocks.map((row,i)=>({block:row.id,parts:[i?fact:nonfact]}))});
+  await h.assess(reviewer,quality());
+  await h.flow(reviewer,"review",{checks});
+  assert.equal((await h.flow("root","advance")).childId,auditor);
+  const blind=await h.flow(auditor,"prepare");
+  assert.equal(blind.reviewRestart.mode,"independent-reassessment");
+  assert.deepEqual(blind.reviewRestart.next,{tool:"building_loop_coverage",action:"inventory"});
+  assert.match(h.prompt(auditor),/无需旧裁决或另一角色的理由/u);
+  assert.ok(!blind.files.some(file=>file.path==="first.json"));
 }));
 
 test("changed candidate, goal, source or instructions retire reconciliation checkpoints before reuse",async()=>{
