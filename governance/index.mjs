@@ -11,7 +11,7 @@ import {
   QUALITY, citation, claimRow, deliveryQuality, lineList, numericChecks, plainLastIssues,
   rejectedClaims, reviewedQuality, supplementChecks, repairBaseline, requiredClaimRowIssues,
 } from "./preflight.mjs";
-import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory } from "./evidence.mjs";
+import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory, registeredSourceRows } from "./evidence.mjs";
 import { currentHostResults, hostResultSlots, renderHostResults } from "./host-results.mjs";
 import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
@@ -243,6 +243,56 @@ function checkpointBinding(frame,spec) {
       .map(file=>{const bytes=readBytes(frame.root,file);return {file,sha256:bytes?digest(bytes):null};})};
 }
 
+/** A maintainer may refresh registered bytes in place. Hash the entire grant
+ * except the source/receipt digests so no permissions or source identity move. */
+function authorityVersions(policy) {
+  const { hash, sourcePins, ...grants } = policy;
+  const identity = Object.fromEntries(Object.entries(sourcePins).map(([file, { kind, locator, observation }]) =>
+    [file, { kind, locator, ...(observation ? { observation: observation.file } : {}) }]));
+  return {
+    shape: digest(buffer({ ...grants, sourcePins: identity })),
+    pins: Object.fromEntries(Object.entries(sourcePins).map(([file, pin]) =>
+      [file, digest(buffer([pin.sha256, pin.observation?.sha256 ?? null]))])),
+  };
+}
+
+/** Host-only version check. It projects IDs/status to the coordinator, never
+ * source contents or the verifier's read stamps. */
+function hostSourceUpdate(frame, active, spec) {
+  if (!spec.hostResults || !active?.executor || !active.hostResultRows?.length ||
+      TERMINAL.has(active.phase)) return null;
+  const files = new Map((active.materialBinding?.sources ?? []).map(row => [keyOf(row.file), row.sha256]));
+  const slots = hostResultSlots(spec);
+  const changed = slots.filter(({ source }) => {
+    const observation = frame.policy.sourcePins[keyOf(source)]?.observation;
+    return [source, ...(observation ? [observation.file] : [])].some(file => {
+      if (!files.has(keyOf(file))) return false;
+      const bytes = readBytes(frame.root, file);
+      return (bytes ? digest(bytes) : null) !== files.get(keyOf(file));
+    });
+  });
+  // A candidate produced by an older renderer may itself need refresh after
+  // an upgrade, even when every source hash stayed the same.
+  if (!changed.length && active.hostResultFormat === 2) return null;
+  try {
+    const bytes = readBytes(frame.root, spec.candidate);
+    if (!bytes) throw new Error("missing candidate");
+    const next = renderHostResults({ ...frame, reads: spec.phases.supplement.read }, active, spec, text(bytes), bytes);
+    if (!changed.length) {
+      const prior = new Map(active.hostResultRows.map(row => [row.id, row.fingerprint]));
+      for (const row of next.rows) if (prior.get(row.id) !== row.fingerprint) changed.push(row);
+      if (!changed.length) return null;
+    }
+  } catch {
+    // A source replacement requires authenticated input. A legacy draft that
+    // cannot be rendered safely remains in its own review/repair route.
+    return changed.length ? { status: "needs-maintainer", ids: changed.map(slot => slot.id) } : null;
+  }
+  const current = checkpointBinding(frame, spec);
+  return { status: "ready", ids: changed.map(slot => slot.id), sources: current.sources,
+    binding: digest(buffer(current)) };
+}
+
 /** A finding is reusable only within the same actor, phase and exact material. */
 function findingBinding(frame,active,material) {
   return digest(buffer({actor:frame.agent.id,phase:active.phase,material}));
@@ -356,12 +406,14 @@ function viewUnits(frame) {
       ...(architecture ? { architecture } : {}) };
     const { phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions } = unit;
     const notice=reconciliationNotice(frame,unit);
+    const sourceUpdate = unit.owner === frame.agent.id && hostSourceUpdate(frame, unit, frame.policy.units[id]);
     const stale=needsRevalidation(frame,id,unit)||!!unit.reconciliationExhausted&&!notice.reason;
     const waiting=(unit.metricClarification ?? unit.outcomeClarification)?.goalSha256===goalSnapshot(frame).sha256;
     return {
       unit: id, phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions,
       ...(currentUnit ? { current: true } : {}),
       ...notice,
+      ...(sourceUpdate ? { sourceUpdate: { status: sourceUpdate.status, ids: sourceUpdate.ids } } : {}),
       ...(waiting && unit.owner===frame.agent.id ? {outcomeClarification:ownerClarificationPacket(frame, unit, id)} : {}),
       ...(unit.owner === frame.agent.id && unit.stallDiagnostic && !TERMINAL.has(phase)
         ? { stallDiagnostic: diagnosisPacket(unit, "coordinator") } : {}),
@@ -369,7 +421,9 @@ function viewUnits(frame) {
         cacheReadTokens:unit.executorUsage?.[executor]?.cacheReadTokens??0,
         threshold:frame.policy.units[id].cacheReadRotationThreshold,rotations:unit.rotations??[]}} : {}),
       next: diagnosisNext(unit) ?? (phase === "architecture-sync" && unit.rollbackFailure ? "advance"
-        : ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" : waiting||notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
+        : ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" :
+          waiting ? null : sourceUpdate ? sourceUpdate.status === "ready" ? "supplement" : null
+            : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
       goalStale: stale,
       owned: unit.owner === frame.agent.id,
       ...(architecture ? { architecture } : {}),
@@ -722,12 +776,23 @@ export function apply(ctx, config = {}) {
     }
     let state = old ? JSON.parse(text(old)) : { spec: "building-loop-state/1", policy: policy.hash, units: {}, markers: {} };
     if (state.spec !== "building-loop-state/1") throw new Error("工作台账版本无效");
+    const versions = authorityVersions(policy);
     if (state.policy !== policy.hash) {
-      if (Object.values(state.units).some(unit => !TERMINAL.has(unit.phase))) throw new Error("运行期间授权清单发生变化，需项目维护者核对");
+      const activeUnits = Object.entries(state.units).filter(([, unit]) => !TERMINAL.has(unit.phase));
+      if (activeUnits.length) {
+        const previous = state.authorityVersions;
+        const refreshed = Object.keys(versions.pins).filter(file => previous?.pins?.[file] !== versions.pins[file]);
+        const metricSources = new Set(activeUnits.flatMap(([id]) => hostResultSlots(unitOf({ policy }, id)).map(({ source }) => keyOf(source))));
+        if (previous?.shape !== versions.shape || !refreshed.length || refreshed.some(file => !metricSources.has(file))) {
+          throw new Error("运行期间授权清单发生变化，需项目维护者核对");
+        }
+        for (const file of refreshed) registeredSourceRows(root, file, readBytes(root, file), policy.sourcePins[file]);
+      }
       // Terminal units and their receipts remain historical evidence even after
       // the maintainer changes the grant. A new unit needs a distinct ID.
       state = { ...state, policy: policy.hash };
     }
+    state.authorityVersions = versions;
     state.units = Object.assign(Object.create(null), state.units);
     state.markers = Object.assign(Object.create(null), state.markers);
     const parent = agent.session.header.parentSession;
@@ -1322,7 +1387,11 @@ export function apply(ctx, config = {}) {
         ...(manuscriptCounts?.length?{citationLineCounts:manuscriptCounts}:{}),
         ...(spec?.hostResults && frame.role === "executor" ? {
           hostResultSlots: hostResultSlots(spec),
-          hostResultInstructions: "用上述占位符写可见正文，由宿主填数字、单位和出处。引用统计独占一段，前后留空行。写完读回当前稿再 submit。若口径不清，用 block 的 metricClarification 提出具体问题。",
+          hostResultInstructions: "在正文沿用 template 的编号、冒号和占位符。把“原始记录中的指标”换成简短指标名，数值、比较限定、单位和出处均由宿主填写。指标占位符放在本行末尾，引用统计占位符独占一段，前后留空行。用 building_loop_file write 附 path、content、note；落盘后读回再 submit。口径不清用 block 的 metricClarification 提问。",
+          ...(current.hostResultRefresh ? { hostResultRefresh: {
+            ids: current.hostResultRefresh.ids, next: { tool: WORKFLOW, action: "refresh-results" },
+            note: "先读本轮原始材料，refresh-results 从当前稿自动重算已授权字段。读回后检查正文解释是否仍符合新证据。",
+          } } : {}),
         } : {}),
         ...(spec?.hostResults && ["reviewer", "auditor"].includes(frame.role) ? {
           hostResultReview: "inventory 的 hostMeasurement 只交本角色的判断和依据。已完成判断的宿主指标由宿主带进 review checks、sourceRefs 和回执。口径不清用 block 的 metricClarification 提问。",
@@ -1365,7 +1434,7 @@ export function apply(ctx, config = {}) {
   }
 
   /** 文件入口集中执行白名单、实际已读行记录、日志和滚动备份。 */
-  function fileAction(args, exec) {
+  function fileAction(args, exec, refreshResults = false) {
     if (args.action === "add-module") return addModule(args, exec);
     let diagnosticJob, readbackJob;
     const result = change(exec.agent, frame => {
@@ -1395,7 +1464,13 @@ export function apply(ctx, config = {}) {
           matchLocations:matches.map(({path,line})=>({path,line}))});
         return { matches, searchObservation };
       }
-      const file = relativeName(args.path);
+      const refreshUnit = refreshResults && frame.role === "executor" && frame.assignment?.[1].hostResultRefresh &&
+        unitOf(frame, frame.assignment[0]);
+      if (refreshResults && !refreshUnit) throw new Error("只有被派回的原执行方可以重算新版资料");
+      const hostCandidate = frame.role === "executor" && frame.assignment && unitOf(frame, frame.assignment[0]);
+      const requested = refreshUnit ? refreshUnit.candidate : relativeName(args.path);
+      const renderResults = hostCandidate?.hostResults && keyOf(requested) === keyOf(hostCandidate.candidate);
+      const file = renderResults ? hostCandidate.candidate : requested;
       if (args.action === "write" || args.action === "edit") {
         if(frame.policy.ledgerDocument&&keyOf(file)===keyOf(frame.policy.ledgerDocument))throw new Error("该文件由宿主生成，只能由 building_loop_ledger export/review 更新");
         if (!includes(frame.writes, file)) throw new Error("该文件不在当前写白名单");
@@ -1420,7 +1495,7 @@ export function apply(ctx, config = {}) {
           }
           if (!includes(frame.reads, file)) throw new Error("该文件不在当前读白名单");
           if (args.content !== undefined) throw new Error("局部编辑不能使用整文件 content");
-        } else if (typeof args.content !== "string") throw new Error("需要 UTF-8 正文");
+        } else if (!refreshUnit && typeof args.content !== "string") throw new Error("需要 UTF-8 正文");
         const note = requireText(args.note, "改动理由", 500);
         const requiresEdit = frame.role === "executor" && frame.assignment?.[1].codeIntake?.regression && isImplementationPath(file);
         const architecture = architectureUnit && frame.policy.units[architectureUnit].architecture;
@@ -1428,9 +1503,7 @@ export function apply(ctx, config = {}) {
           engineeringArchitectureLinkIssues(frame, frame.policy.units[architectureUnit], undefined, frame.state.units[architectureUnit]).length);
         let plan;
         let hostResults;
-        const hostCandidate = frame.role === "executor" && frame.assignment &&
-          unitOf(frame, frame.assignment[0]);
-        const renderResults = hostCandidate?.hostResults && keyOf(file) === keyOf(hostCandidate.candidate);
+        let stagedResults;
         const validate = next => {
           checkHierarchyWrite(frame, file, next, args.heading);
           requireHostImportSectionUnchanged(frame, file, next);
@@ -1445,17 +1518,41 @@ export function apply(ctx, config = {}) {
           }
           const sectionBody = edit && architectureUnit && args.heading !== undefined && args.oldText === undefined && args.edits === undefined;
           const next = sectionBody ? coordinatorArchitectureSectionContent(before, args)
-            : edit ? scopedEditContent(before, args, splice => { plan = splice; }) : args.content;
+            : edit ? scopedEditContent(before, args, splice => { plan = splice; })
+              : refreshUnit ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(before) : args.content;
           if (edit && architectureUnit) validateCoordinatorArchitectureEdit(frame, architectureUnit, file, before, next, args.heading);
-          if (renderResults) hostResults = renderHostResults(frame, frame.assignment[1], hostCandidate, next, before);
+          if (renderResults) {
+            const active = frame.assignment[1];
+            if (active.hostResultRefresh) {
+              const approved = active.hostResultRefresh.sources;
+              if (JSON.stringify(checkpointBinding(frame, hostCandidate).sources) !== JSON.stringify(approved)) {
+                throw new Error("新版资料在重算阶段又发生变化，请暂停并由总控重新核验新版");
+              }
+              const sources = hostResultSlots(hostCandidate).filter(slot => active.hostResultRefresh.ids.includes(slot.id));
+              if (sources.some(({ source }) => {
+                const raw = readBytes(frame.root, source);
+                return !raw || !candidateReadComplete(active, source, raw);
+              })) throw new Error("重新生成前须完整读取本轮已核实的原始数据文件");
+            }
+            hostResults = renderHostResults(frame, active, hostCandidate, next, before);
+          }
           return validate(hostResults?.content ?? next);
         } : validate(args.content);
-        const result = replaceWithHistory(frame.root, file, content, note, tag(frame), frame.state.markers);
+        const result = replaceWithHistory(frame.root, file, content, note, tag(frame), frame.state.markers,
+          renderResults ? writes => { stagedResults = writes; } : undefined);
         frame.changed ||= result.changed;
         if (hostResults) {
           const active = frame.assignment[1];
+          if (stagedResults) {
+            frame.hostResultWrites = { unit: frame.assignment[0], candidate: file, writes: stagedResults };
+            active.hostResultCommit = randomUUID();
+          }
           if (JSON.stringify(active.hostResultRows) !== JSON.stringify(hostResults.rows)) {
             active.hostResultRows = hostResults.rows;
+            frame.changed = true;
+          }
+          if (active.hostResultFormat !== 2) {
+            active.hostResultFormat = 2;
             frame.changed = true;
           }
         }
@@ -1905,6 +2002,12 @@ export function apply(ctx, config = {}) {
     if(waiting?.goalSha256 === goalSnapshot(frame).sha256) {
       throw new Error("当前逐项处置等待用户澄清，请核实并更新总纲后继续");
     }
+    const sourceUpdate = hostSourceUpdate(frame, prior, spec);
+    if (sourceUpdate) {
+      if (sourceUpdate.status !== "ready") throw new Error("宿主结果来源待核实。请维护者核对新原文、已登记摘要及取证回执后再推进");
+      return { prior, phase: "supplement", role: "executor", reusable: prior.executor,
+        serial: prior.serial + 1, sourceUpdate };
+    }
     const planned = metricWaiting ? (prior?.resumePhase === "intake" ? "intake" : "supplement")
       : (revalidating || waiting) ? "final-review"
       : prior?.phase === "blocked" ? prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
@@ -1955,7 +2058,7 @@ export function apply(ctx, config = {}) {
       const plan = prepare(frame, id);
       if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable ||
         plan.regressionRetry !== prepared.regressionRetry || plan.stallId !== prepared.stallId ||
-        plan.rollbackFailureId !== prepared.rollbackFailureId) {
+        plan.rollbackFailureId !== prepared.rollbackFailureId || plan.sourceUpdate?.binding !== prepared.sourceUpdate?.binding) {
         throw new Error("工作单元已经由其他调用推进");
       }
       const spec = unitOf(frame, id),binding=checkpointBinding(frame,spec);
@@ -2036,6 +2139,14 @@ export function apply(ctx, config = {}) {
         for (const key of ["proof", "pendingReceipt", "reviewerCheckpoint", "auditorCheckpoint", "reconciliation", "reconciliationBinding",
           "reconciliationRound", "reconciliationExhausted"]) delete record[key];
       }
+      if (plan.sourceUpdate) {
+        // Preserve historical receipt files and identities. The old approvals
+        // and read stamps cannot contribute to acceptance of different data.
+        for (const key of ["proof", "pendingReceipt", "reviewerCheckpoint", "auditorCheckpoint", "reviewerProofMemo", "auditorProofMemo",
+          "reconciliation", "reconciliationBinding", "reconciliationRound", "reconciliationExhausted", "ledgerDecision", "ledgerSeen",
+          "quality", "qualityRejected", "unsupported", "rejected", "coverageRejections", "unlisted", "outcomeIssues", "rejectedCandidate"]) delete record[key];
+        record.hostResultRefresh = { ids: plan.sourceUpdate.ids, sources: plan.sourceUpdate.sources };
+      }
       const saved=record[plan.role+"Checkpoint"];
       if(record.reconciliation?.length&&saved?.actor===childId&&saved.phase===plan.phase&&plan.prior?.phase!=="blocked") {
         // Restore only this role's own observed lines and proofs. The disputed
@@ -2071,6 +2182,7 @@ export function apply(ctx, config = {}) {
       frame.changed = true;
       const ownerTableIntake = plan.phase === "intake" && frame.managed && privateProjectUsesOwnerTable(frame.root);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
+        + (plan.sourceUpdate ? "。原始资料新版本已经宿主核对。原执行方先用 prepare 打开新材料，按提示用同一候选正文重新保存宿主结果，再读回、预检和提交。旧审核回执已失效。" : "")
         + (plan.rollbackRepair ? "。原执行方只读补正回退方案。先用 prepare 领取失败实证，再用 rollback-proposal 登记新的最小方案。" : "")
         + (plan.repair ? "。原执行会话继续定点修复。prepare 会返回总控核实的诊断、修法和可重跑输入。" : "")
         + (plan.regressionRetry ? "。当前代码或目标需要重新取得受信回归回执并提交，改前通过的用例集合保持固定。" : "")
@@ -2516,7 +2628,13 @@ export function apply(ctx, config = {}) {
       // They do not certify any other part of the author's claim or the source.
       const evidence=spec.phases[active.phase].evidence??spec.phases["final-review"].evidence;
       const files=evidence.filter(file=>includes(frame.reads,file)&&selfClaims.some(line=>citation(line,file)));
-      return citationLineCounts(bytes,files).map(({source,lines:citedLines})=>{
+      // The generated statistic and the prepared preview must use the same
+      // visible, authenticated locations. Older hand-authored profiles retain
+      // their own contract until the maintainer elects a host measurement.
+      const generated = new Map(currentHostResults(frame, active, spec, bytes, { complete: false })
+        .filter(row => row.kind === "citation-lines").map(row => [keyOf(row.source), row.lines]));
+      return citationLineCounts(bytes,files).map(({source,lines:legacyLines})=>{
+        const citedLines = generated.get(keyOf(source)) ?? legacyLines;
         const summary={source,...manuscriptLinePreview(citedLines)};
         if(frame.role!=="executor")return summary;
         // Preflight exposes only marker predicates named by this source's
@@ -2642,6 +2760,12 @@ export function apply(ctx, config = {}) {
         if (links) return links;
       }
       const binding=refreshCheckpoints(frame,active,spec);
+      if (args.action !== "block" && ["reviewer", "auditor"].includes(frame.role) && hostSourceUpdate(frame, active, spec)) {
+        pause(active, "当前宿主结果的来源已变化，请总控核对新版本并派回原执行方");
+        trackUnit(frame, id, active, true);
+        frame.changed = true;
+        return { unit: id, phase: active.phase, parent: active.owner, reason: active.blocked };
+      }
       if (args.action !== "block" && ["reviewer", "auditor"].includes(frame.role) && active.goal?.sha256 !== goalSnapshot(frame).sha256) {
         active.phase = "goal-review-ready";
         active.seen = {};
@@ -2770,6 +2894,7 @@ export function apply(ctx, config = {}) {
           }
           active.quality = deliveryQuality(args.quality, active.quality, active.qualityRejected);
           active.phase = "final-review-ready";
+          delete active.hostResultRefresh;
         } else {
           if(frame.policy.requiredLinesGoal){
             const goal=requireGoalRead(frame,active,true);
@@ -3019,6 +3144,7 @@ export function apply(ctx, config = {}) {
   async function workflow(args, exec) {
     if (args.action === "architecture") return registerArchitecture(args, exec);
     if (args.action === "rollback-proposal") return registerRollbackProposal(args, exec);
+    if (args.action === "refresh-results") return fileAction({ action: "write", note: "按已核验的新来源重新生成宿主结果" }, exec, true);
     if (args.action === "prepare") {
       const frame = scope(exec.agent, { inspection: true });
       await recoverOrphanedActivation(frame, exec.signal, frame.started?.binding.checkpoint?.unit);
@@ -3367,7 +3493,7 @@ export function apply(ctx, config = {}) {
       basis: {...string,description:LEDGER_BASIS_RULE}, evidence: referenceSchema, coveredBy: string,
     }, required: ["id", "outcome", "basis"], additionalProperties: false } },
   }, (args, exec) => change(exec.agent, frame => ledgerAction(frame, args))), {when:visible(["coordinator"])});
-  register(tool(WORKFLOW, "每阶段先prepare获取授权读包、版本、待读页和契约；重复prepare只给未读或变化内容。architecture 和 advance 仅总控。已登记架构义务的单元，派单前先写实际架构稿并用 architecture 登记版本。preflight/submit/rollback-proposal仅执行，review仅文稿核验，audit仅文稿独立反证。", ["prepare", "status", "architecture", "advance", "preflight", "submit", "rollback-proposal", "review", "audit", "block"], {
+  register(tool(WORKFLOW, "每阶段先 prepare 获取授权读包。architecture 和 advance 仅总控。原执行方按 prepare 提示用 refresh-results 重算新版资料，再读回提交。preflight/submit/rollback-proposal 仅执行，review 仅文稿核验，audit 仅文稿独立反证。", ["prepare", "status", "architecture", "advance", "refresh-results", "preflight", "submit", "rollback-proposal", "review", "audit", "block"], {
     unit: { ...string, description: "工程总控和子会话省略时沿用宿主唯一授权单元；无绑定的总控 advance 需填授权单元。" }, note: string,
     metricClarification: { type: "object", description: "仅 block 使用。已授权指标口径不明确时，填写该指标 id 和具体问题，等待用户确认。",
       properties: { id: string, question: string }, required: ["id", "question"], additionalProperties: false },

@@ -7,7 +7,7 @@ import { currentHostResults } from "./host-results.mjs";
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 12;
+export const CLASSIFICATION_VERSION = 13;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -1092,7 +1092,7 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
   if (!Array.isArray(parts) || !parts.length || parts.length > 20) throw new Error(block.id + " 需 parts，复合句请拆出各独立判断");
   if (measurement && (parts.length !== 1 || parts[0].measurement !== measurement.id ||
       parts[0].kind !== "direct" || (parts[0].quote !== undefined && parts[0].quote !== block.text) ||
-      ["objectCheck", "inference", "evidence", "assertion", "manuscript"].some(key => parts[0][key] !== undefined))) {
+      ["objectCheck", "inference", "assertion", "manuscript"].some(key => parts[0][key] !== undefined))) {
     throw new Error("宿主结果块用单个 direct 判断覆盖完整行，填 measurement=" + measurement.id + " 和本角色的口径依据，来源和计算由宿主带入");
   }
   if (!measurement && parts.some(part => part.measurement !== undefined)) {
@@ -1152,6 +1152,7 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
       if (part.status !== "supported") throw new Error("非事实分类须明确 supported；含事实的标题或说明按 direct/inference 核验");
     } else if (measurement) {
       const refs = measurementEvidence(frame, active, spec, measurement);
+      requireRedundantMeasurementEvidence(part.evidence, refs);
       result.hostMeasurement = measurement;
       if (refs.length) result.evidence = refs;
     } else if (part.objectCheck) {
@@ -1210,7 +1211,7 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
         result.repair = result.finding.fix;
         if (finding.kind === "contradiction" && !part.evidence?.length && !result.evidence?.length && !result.inference?.policy?.length && result.objectCheck?.result.matches!==false) throw new Error("矛盾退回须给实际原文反证、当前项目条款证明或已验证为 false 的 objectCheck");
       }
-      if (part.evidence?.length) result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
+      if (!measurement && part.evidence?.length) result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
     }
     // These describe different objects. A manuscript measurement or a local
     // excerpt registry cannot establish a fact about the external world.
@@ -1271,6 +1272,27 @@ function measurementEvidence(frame, active, spec, measurement) {
   }
   return measurement.sourceRows.map(({ line, quote }) =>
     sourceQuote(frame, active, spec, { file: measurement.source, start: line, end: line, quote }));
+}
+
+/** Ignore only repetitions of this role's already verified measurement rows.
+ * A grouped quote is redundant if every physical row belongs to the result. */
+function requireRedundantMeasurementEvidence(supplied, approved) {
+  if (supplied === undefined) return;
+  const invalid = () => new Error("[building-loop/host-measurement] evidence 与该宿主结果实际核过的原文行不完全相同。请删除重复 evidence，保留 measurement 和本角色的判断；独立事实仍分块核验。");
+  if (!Array.isArray(supplied) || supplied.length > 12) throw invalid();
+  const rows = new Map(approved.map(ref => [JSON.stringify([keyOf(ref.file), ref.start]), ref.quote]));
+  for (const ref of supplied) {
+    if (!ref || typeof ref.file !== "string" || typeof ref.quote !== "string" ||
+        !Number.isSafeInteger(ref.start) || !Number.isSafeInteger(ref.end) || ref.start < 1 || ref.end < ref.start ||
+        ref.end - ref.start >= approved.length || Object.keys(ref).some(key => !["file", "start", "end", "quote"].includes(key))) throw invalid();
+    const quotes = [];
+    for (let line = ref.start; line <= ref.end; line++) {
+      const quote = rows.get(JSON.stringify([keyOf(ref.file), line]));
+      if (quote === undefined) throw invalid();
+      quotes.push(quote);
+    }
+    if (quotes.join("\n") !== ref.quote) throw invalid();
+  }
 }
 
 /** Each generated line must be visible as one whole review block. No
@@ -1982,6 +2004,60 @@ function agreedFootnoteMarkerSpans(first,second,record,other) {
   });
 }
 
+const literalQuoteIntroduction = /^(?:[-*+]\s+)?(?:(?:依据|引用|引自)\s*(?:原文|原句|原始(?:范围)?声明|原始记录)|(?:according\s+to|quoting|from)\s+(?:the\s+)?(?:original\s+(?:text|statement|record)|source\s+statement))\s+`([^`\r\n]{1,500})`\s*[:：]\s*([“"])/iu;
+const sha256Pattern = /^[a-f0-9]{64}$/u;
+
+/** Treat only a fixed, literal quotation introduction as presentation syntax.
+ * Both independent records must already support the complete literal from the
+ * same exact source. The source text and any additional assertion remain facts. */
+function agreedQuoteIntroductionEnd(first, second, record, other) {
+  if (!sha256Pattern.test(first.candidateSha256 ?? "") || first.candidateSha256 !== second.candidateSha256 ||
+      ![first, second].every(summary => summary.pending?.length === 0 && summary.rejected?.length === 0) ||
+      record.text !== other.text || record.line !== other.line || typeof record.lineText !== "string" ||
+      record.lineText !== other.lineText) return 0;
+  const intro = literalQuoteIntroduction.exec(record.text);
+  if (!intro) return 0;
+  const blockStart = record.lineText.indexOf(record.text);
+  if (blockStart < 0 || blockStart !== record.lineText.lastIndexOf(record.text)) return 0;
+  const quoteStart = intro[0].length;
+  const closer = intro[2] === "“" ? "”" : '"';
+  const rest = record.lineText.slice(blockStart + quoteStart);
+  const close = rest.indexOf(closer);
+  if (close < 1 || close > 2000 || quoteStart + close > record.text.length) return 0;
+  const literal = rest.slice(0, close);
+  const file = intro[1];
+  const proofRef = ref => ref?.file === file && ref.quote === literal && sha256Pattern.test(ref.sha256 ?? "") &&
+    sha256Pattern.test(ref.evidenceSpan ?? "") && Number.isSafeInteger(ref.start) && Number.isSafeInteger(ref.end) &&
+    ref.start > 0 && ref.end >= ref.start;
+  const refIdentity = ref => JSON.stringify([ref.file, ref.start, ref.end, ref.sha256, ref.evidenceSpan,
+    ref.quote, ref.sourceIdentity, ref.origin]);
+  const literalEnd = quoteStart + literal.length;
+  let shared;
+  for (const review of [record, other]) {
+    const covered = new Uint8Array(literal.length);
+    for (const part of review.parts) {
+      if (part.end <= 0 || part.start >= literalEnd) continue;
+      if (!Number.isSafeInteger(part.start) || !Number.isSafeInteger(part.end) || part.start < 0 ||
+          part.end <= part.start || part.end > record.text.length || part.quote !== record.text.slice(part.start, part.end) ||
+          part.status !== "supported" || part.finding) return 0;
+      const start = Math.max(quoteStart, part.start);
+      const end = Math.min(literalEnd, part.end);
+      if (part.kind === "nonfactual" && start >= end) continue;
+      if (part.kind !== "direct" || !positiveProof(part) || part.assertion && part.assertion !== "original-fact" ||
+          part.objectCheck || part.hostMeasurement || part.evidence?.length !== 1 || !proofRef(part.evidence[0])) return 0;
+      const current = refIdentity(part.evidence[0]);
+      if (shared !== undefined && shared !== current) return 0;
+      shared = current;
+      if (start < end) covered.fill(1, start - quoteStart, end - quoteStart);
+    }
+    // A role may split punctuation separately, but may not skip quoted words.
+    for (let i = 0; i < literal.length; i++) {
+      if (!covered[i] && !/[\s\p{P}]/u.test(literal[i])) return 0;
+    }
+  }
+  return shared ? quoteStart : 0;
+}
+
 /** Return differing spans and the stable factual union required of both roles. */
 export function classificationDisagreements(first,second,equivalentOutcomeSummaries = new Map()) {
   return first.records.flatMap(record=>{
@@ -1990,6 +2066,9 @@ export function classificationDisagreements(first,second,equivalentOutcomeSummar
     const obligations=new Map(),find=(row,i)=>row.parts.find(part=>(part.start??0)<=i&&(part.end??row.text.length)>i);
     let recheckEvidence=false;
     for(const [start,end] of agreedFootnoteMarkerSpans(first,second,record,other)){a.fill(0,start,end);b.fill(0,start,end);}
+    const introEnd = agreedQuoteIntroductionEnd(first, second, record, other);
+    a.fill(0, 0, introEnd);
+    b.fill(0, 0, introEnd);
     for(let i=0;i<a.length;i++) {
       required[i]=a[i]||b[i];different[i]=a[i]!==b[i]?1:0;
       const left=a[i]?find(record,i):null,right=b[i]?find(other,i):null;
@@ -2092,7 +2171,8 @@ export function coverageSchema() {
       sourceRelation: { type: "string", enum: ["supports", "contradicts", "insufficient"], description: "direct/inference 必填：原始证据对该断言字面含义的关系。error-example 核展示的错误推理，只能 contradicts/insufficient，并提供 evidence；明确错例的状态由宿主固定，不作为已证前提。" },
       finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence", "contradiction", "scope", "invalid-inference"] }, quote: string, fix: string }, required: ["kind", "quote", "fix"], additionalProperties: false },
       measurement: { ...string, description: "仅用于 inventory 的 hostMeasurement；取其 id。对整个块独立判断口径和证据，宿主自动保存数值及来源。" },
-      evidence: { type: "array", items: ref }, inference: {...inference,description:"常规推导填结构证据；inventory 明示 bounded-non-entailment inferenceHint 的同源段只填事实判定与依据，宿主复算并保存推导；未支持仍给实际 finding。"}, objectCheck,
+      evidence: { type: "array", items: ref, description: "普通事实填写已读原文。宿主结果请省略 evidence；如重复提交，只有与宿主已核原文行完全相同的引用可以去重。" },
+      inference: {...inference,description:"常规推导填结构证据；inventory 明示 bounded-non-entailment inferenceHint 的同源段只填事实判定与依据，宿主复算并保存推导；未支持仍给实际 finding。"}, objectCheck,
     }, required: ["kind", "status", "basis"], additionalProperties: false } },
   }, required: ["block", "parts"], additionalProperties: false } } };
 }

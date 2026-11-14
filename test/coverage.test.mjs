@@ -26,6 +26,93 @@ const nonfact = {kind:"nonfactual",status:"supported",basis:"这是文档结构�
 const ref = {file:"functional.csv",start:2,end:2,quote:"19,20"};
 const fact = {kind:"direct",status:"supported",sourceRelation:"supports",basis:"只转述该样例的通过和总数。",evidence:[ref]};
 
+test("frozen B9 reconciles only the fixed introduction when both roles verify the same complete literal", () => {
+  const archive = JSON.parse(fs.readFileSync(new URL("../experiments/observations-0.7.37-host-results.json", import.meta.url)));
+  const frozen = archive.artifacts.frozenQuotationRecheck.record;
+  const { block, line, text, roles } = frozen.disputes[0];
+  assert.equal(block, "B9-cca61760");
+  const make = parts => ({ candidateSha256: frozen.candidateSha256, pending: [], rejected: [], records: [{
+    block, line, text, lineText: text + '"', parts: parts.map(part => ({ ...part, quote: part.text,
+      ...(part.kind === "direct" ? { sourceRelation: "supports", evidence: part.refs } : {}) })),
+  }] });
+  const [first, second] = roles.map(make);
+  assert.deepEqual(classificationDisagreements(first, second), []);
+  assert.equal(first.records[0].parts[0].kind, "direct");
+  assert.equal(second.records[0].parts[0].kind, "nonfactual");
+
+  for (const change of [
+    ref => ({ ...ref, file: "sources/different.md" }),
+    ref => ({ ...ref, start: 2, end: 2 }),
+    ref => ({ ...ref, sha256: "0".repeat(64) }),
+    ref => ({ ...ref, evidenceSpan: "0".repeat(64) }),
+    ref => ({ ...ref, quote: "这份数据只记录单次离线校准演练。" }),
+  ]) {
+    const altered = structuredClone(second);
+    altered.records[0].parts[1].evidence[0] = change(altered.records[0].parts[1].evidence[0]);
+    assert.equal(classificationDisagreements(first, altered).length, 1);
+  }
+  const factChanged = structuredClone(second);
+  factChanged.records[0].parts[1].kind = "nonfactual";
+  assert.ok(classificationDisagreements(first, factChanged)[0].factualSpans.some(([, end]) => end > 41));
+
+  const scopeChanged = structuredClone(second);
+  const scopeFinding = { kind: "scope", quote: "未采集生产环境数据。", fix: "确认原始材料记录的实际范围" };
+  scopeChanged.records[0].parts[1].finding = scopeFinding;
+  scopeChanged.records[0].parts[1].sourceRelation = "contradicts";
+  scopeChanged.records[0].parts[1].status = "unsupported";
+  scopeChanged.rejected = [scopeFinding];
+  assert.equal(classificationDisagreements(first, scopeChanged).length, 1);
+  assert.deepEqual(scopeChanged.rejected, [scopeFinding]);
+
+  const extra = "已验证适用于线上。";
+  const naive = [first, second].map(summary => ({ ...summary, records: summary.records.map(record => ({
+    ...record, text: extra + record.text, lineText: extra + record.lineText,
+    parts: record.parts.map((part, index) => ({ ...part, start: index ? part.start + extra.length : 0, end: part.end + extra.length })),
+  })) }));
+  assert.ok(classificationDisagreements(...naive)[0].factualSpans.some(([start]) => start === 0));
+});
+
+test("measurement admits exact redundant source rows, and rejects unrelated or altered evidence", () => fixture(async (root, write) => {
+  const p = structuredClone(policy);
+  const unit = p.units.K01;
+  unit.claims = ["C2"];
+  unit.hostResults = { calculations: ["C2"], citationLines: ["timing.csv"] };
+  unit.phases.intake = { read: ["candidate.md", "timing.csv"], write: ["candidate.md"] };
+  unit.phases["first-review"].read.push("timing.csv");
+  unit.phases["first-review"].evidence.push("timing.csv");
+  write("BUILDING-LOOP.json", JSON.stringify(p));
+  const h = host(root, { automaticCoverage: false });
+  const executor = (await h.flow("root", "advance")).childId;
+  await h.file(executor, "write", "candidate.md", { content: "- C2：本次对照耗时降幅 {{building-loop:metric:C2}}。\n\n{{building-loop:citation-lines:timing.csv}}\n",
+    note: "由宿主计算本轮对照耗时降幅" });
+  await h.file(executor, "read", "candidate.md");
+  await h.flow(executor, "submit");
+  const reviewer = (await h.flow("root", "advance")).childId;
+  for (const file of ["overview.md", "candidate.md", "timing.csv"]) await h.file(reviewer, "read", file);
+  const { blocks } = await h.coverage(reviewer, "inventory");
+  const metric = blocks.find(row => row.hostMeasurement?.id === "C2");
+  const count = blocks.find(row => row.hostMeasurement?.kind === "citation-lines");
+  const direct = { kind: "direct", status: "supported", sourceRelation: "supports",
+    basis: "原始表的基准列与对照列支持本次耗时降幅，引用统计仅覆盖当前稿。" };
+  const record = (block, evidence) => h.coverage(reviewer, "record", { entries: [{ block: block.id,
+    parts: [{ ...direct, measurement: block.hostMeasurement.id, evidence }] }] });
+  const before = { file: "timing.csv", start: 2, end: 2, quote: "before,120" };
+  const grouped = { file: "timing.csv", start: 2, end: 3, quote: "before,120\nafter,96" };
+  assert.deepEqual((await record(metric, [before, grouped])).recorded, [metric.id]);
+  const { record: accepted } = await h.coverage(reviewer, "status", { block: metric.id });
+  assert.deepEqual(accepted.parts[0].evidence.map(({ file, start, end, quote }) => ({ file, start, end, quote })),
+    [before, { file: "timing.csv", start: 3, end: 3, quote: "after,96" }]);
+  assert.deepEqual((await record(count, [])).recorded, [count.id]);
+  for (const conflicting of [
+    { ...before, quote: "before,121" },
+    { ...before, file: "functional.csv" },
+    { ...grouped, start: 1, quote: "phase,mean_ms\n" + grouped.quote },
+    { ...grouped, end: 100, quote: "before,120" },
+  ]) await assert.rejects(record(metric, [conflicting]), /host-measurement.*不完全相同/u);
+  await assert.rejects(record(count, [before]), /host-measurement.*不完全相同/u);
+  assert.deepEqual((await record(metric)).recorded, [metric.id]);
+}));
+
 test("project-policy proofs bind the current read goal and keep external evidence separate", () => fixture(async (root, write) => {
   const clause = "待补件按当前项目规则进入复核。";
   const rule = { file: "overview.md", start: 2, end: 2, quote: clause };

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { authority, digest } from "../governance/policy.mjs";
-import { configuredNumericMeasurements, numericChecks } from "../governance/preflight.mjs";
-import { fixture, policy } from "./helpers.mjs";
+import { configuredNumericMeasurements, numericChecks, QUALITY } from "../governance/preflight.mjs";
+import { fixture, host, policy } from "./helpers.mjs";
 
 const csv = "group,amount,passed,total\nA,10.4,1,2\nB,80,9,10\nA,-1.2,9,10\n";
 const source = "summary.csv";
@@ -112,4 +114,120 @@ test("legacy measurements keep raw before-after values and direct source aliases
       [`- C2：观测为 ${raw}（出处：timing.csv 第 1 行）。`], ["timing.csv"])[0].ok, true);
     assert.equal(numericChecks(root, spec,
       ["- C2：观测为 24%（出处：timing.csv 第 1 行）。"], ["timing.csv"])[0].ok, false);
+  }));
+
+test("direct extraction retains the literal relation across units and document scope", () =>
+  fixture((root, write) => {
+    install(write, spec => {
+      spec.calculations.C5 = { kind: "source-number", source: "reading.md", line: 2,
+        sourceUnit: "ms", units: ["毫秒", "ms"], scope: "document" };
+    });
+    const spec = authority(root).units.K01;
+    const readable = ["reading.md"];
+    const measurement = () => configuredNumericMeasurements(root, spec, readable).at(-1);
+    const check = (value, ...rest) => numericChecks(root, spec,
+      [`- C5：实测耗时 ${value}（出处：reading.md 第 2 行）。`, ...rest], readable).at(-1);
+    const cases = [
+      ["Elapsed under 24 ms.", "lt", "<24 毫秒", "低于 24.0 毫秒", "不超过 24 ms"],
+      ["耗时不超过 24 ms。", "lte", "≤24 毫秒", "24毫秒以内", "不足 24 ms"],
+      ["耗时 > 24 ms。", "gt", ">24 毫秒", "More than 24 ms", "至少 24 ms"],
+      ["Elapsed at least 24 ms.", "gte", "≥24 毫秒", "24 毫秒以上", "超过 24 ms"],
+      ["耗时 24 ms 左右。", "approximate", "≈24 毫秒", "About 24 ms", "低于 24 ms"],
+      ["耗时大约 24 ms。", "approximate", "≈24 毫秒", "约为 24 毫秒", "超过 24 ms"],
+      ["Elapsed ≈24 ms.", "approximate", "≈24 毫秒", "24 毫秒附近", "大于 24 ms"],
+      ["Elapsed exactly 24 ms.", "exact", "精确为 24 毫秒", "精确值是 24 毫秒", "大约 24 毫秒"],
+    ];
+    for (const [original, relation, expected, same, different] of cases) {
+      write("reading.md", "# Timing\n" + original + "\n");
+      assert.equal(measurement().relation, relation, original);
+      assert.equal(measurement().expected, expected, original);
+      assert.deepEqual(measurement().sourceRows, [{ line: 2, quote: original }]);
+      assert.equal(check(same).ok, true, same);
+      assert.equal(check(expected).ok, true, expected);
+      assert.equal(check(different).ok, false, different);
+      assert.equal(check("24 ms").ok, false, original);
+      if (relation !== "exact") assert.equal(check("精确为 24 ms").ok, false, original);
+      assert.equal(check(expected, "附注重新转述：" + different + "。").documentIssues[0].line, 2);
+    }
+    write("reading.md", "# Timing\nElapsed 24 ms.\n");
+    assert.equal(Object.hasOwn(measurement(), "relation"), false, "retain unqualified proof shape");
+    for (const value of ["不到 24 ms", "约 24 ms", "精确为 24 ms"]) assert.equal(check(value).ok, false, value);
+  }));
+
+test("ambiguous source quantities and rounded bounds fail closed", () =>
+  fixture((root, write) => {
+    install(write);
+    const spec = authority(root).units.K01;
+    const readable = ["reading.md"];
+    const read = original => {
+      write("reading.md", "# Timing\n" + original + "\n");
+      return configuredNumericMeasurements(root, spec, readable).at(-1);
+    };
+    const check = value => numericChecks(root, spec,
+      [`- C5：耗时 ${value}（出处：reading.md 第 2 行）。`], readable).at(-1);
+    for (const original of ["约 <24 ms", "至少 <24 ms", "no fewer than roughly 24 ms", "12 to 24 ms", "20～24 ms",
+      "20−24 ms", "12 <24 ms", "12 24 ms", "24 ms ±2", "24 ms +/- 2", "2 × 24 ms", "不等于 24 ms", "接近 24 ms", "24 ms only if <30"]) {
+      assert.equal(read(original).available, false, original);
+    }
+    for (const symbol of ["<", "≤", ">", "≥", "≈"]) {
+      assert.equal(read(`延迟 ${symbol}24.04 ms`).available, false, symbol);
+      assert.match(read(`延迟 ${symbol}24.04 ms`).issue, /不能在当前精度下原样保留/u);
+      assert.equal(read(`延迟 ${symbol}24 ms`).expected, `${symbol}0.024 s`, symbol);
+      assert.equal(check(`${symbol}0.024 s`).ok, true, symbol);
+      assert.equal(check("0.024 s").ok, false, symbol);
+      assert.equal(check("精确为 0.024 s").ok, false, symbol);
+      assert.equal(check(`至少 ${symbol}0.024 s`).ok, false, symbol);
+    }
+    assert.equal(read("校正后计时差 <−24 ms").expected, "<-0.024 s");
+    assert.equal(check("<−0.024 s").ok, true);
+    assert.equal(read("P95 <24 ms").expected, "<0.024 s");
+    assert.equal(check("P95 <0.024 s").ok, true);
+    assert.equal(read("P95 24 ms").expected, "0.024 s");
+    assert.equal(check("P95 0.024 s").ok, true);
+    assert.equal(read("Elapsed 24.04 ms.").expected, "0.024 s", "unqualified conversion keeps its declared rounding");
+  }));
+
+test("qualified conversion is rendered and carried through the two review receipts", () =>
+  fixture(async (root, write) => {
+    install(write, spec => {
+      spec.claims = ["C5"];
+      spec.calculations = { C5: spec.calculations.C5 };
+      spec.hostResults = { calculations: ["C5"] };
+    });
+    const original = "Elapsed less than 24 ms.";
+    write("reading.md", "# Timing\n" + original + "\n");
+    const h = host(root, { automaticCoverage: false });
+    const executor = (await h.flow("root", "advance")).childId;
+    const draft = scope => `- C5：${scope} {{building-loop:metric:C5}}。\n`;
+    const save = scope => h.file(executor, "write", "candidate.md", { content: draft(scope), note: "按原始不等式换算单位" });
+    for (const wrong of ["该样例至少", "该样例小于", "该样例精确为", "该样例约为"]) {
+      await assert.rejects(save(wrong), /限定/u, wrong);
+    }
+    const saved = await save("该样例实测耗时");
+    assert.match(saved.hostResults[0].text, /<0\.024 s（出处：reading\.md 第 2 行）/u);
+    await h.file(executor, "read", "candidate.md");
+    assert.equal((await h.flow(executor, "submit")).phase, "review-ready");
+    for (const [action, next] of [["review", "first-audit-ready"], ["audit", "ledger-review"]]) {
+      const reviewer = (await h.flow("root", "advance")).childId;
+      for (const file of ["overview.md", "candidate.md", "reading.md"]) await h.file(reviewer, "read", file);
+      const { blocks } = await h.coverage(reviewer, "inventory");
+      const [block] = blocks;
+      assert.match(block.text, /<0\.024 s/u);
+      const basis = "原文唯一实测耗时是严格小于二十四毫秒，换算到秒不改变这一边界";
+      await h.coverage(reviewer, "record", { entries: [{ block: block.id, parts: [{
+        kind: "direct", status: "supported", sourceRelation: "supports", measurement: "C5", basis,
+      }] }] });
+      if (action === "review") await h.assess(reviewer, {
+        ...Object.fromEntries(Object.keys(QUALITY).map(key => [key, basis])),
+        goalFit: { pass: true, basis }, sourceRefs: [], revise: [], unverifiedSources: [], unlisted: [],
+      });
+      assert.equal((await h.flow(reviewer, action)).phase, next);
+    }
+    const receipt = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
+    for (const review of [receipt, receipt.independentAudit]) {
+      const [metric] = review.hostMeasurements;
+      assert.equal(metric.relation, "lt");
+      assert.equal(metric.expected, "<0.024 s");
+      assert.deepEqual(metric.sourceRows, [{ line: 2, quote: original }]);
+    }
   }));

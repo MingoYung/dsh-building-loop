@@ -551,13 +551,20 @@ function computeNumeric(root, id, rule, readable) {
   const sourceLines = lineList(bytes);
   let details, units;
   if (rule.kind === "source-number" || rule.kind === "unit-conversion") {
-    const sourceValue = lineQuantity(sourceLines, rule);
-    details = { value: sourceValue, line: rule.line, sourceRows: [rule.line], formula: "原文直接取数" };
+    const { value: sourceValue, relation } = lineQuantity(sourceLines, rule);
+    details = { value: sourceValue, line: rule.line, sourceRows: [rule.line], formula: "原文直接取数",
+      ...(relation ? { relation } : {}) };
     units = rule.units;
     if (rule.kind === "unit-conversion") {
       const { from, to } = numericUnitConversion(rule.sourceUnit, rule.targetUnit);
       const number = decimal(sourceValue);
-      details = { ...details, value: roundedDecimal(number.n * from, number.scale * to, rule.decimals),
+      const numerator = number.n * from, denominator = number.scale * to;
+      // All supported conversions have a positive scale. Rounding a literal
+      // endpoint can strengthen or weaken either side of the original bound.
+      if (relation && numerator * 10n ** BigInt(rule.decimals) % denominator !== 0n) {
+        throw new Error("单位换算不能在当前精度下原样保留数值限定，请保留原始单位或明确授权足够的换算精度");
+      }
+      details = { ...details, value: roundedDecimal(numerator, denominator, rule.decimals),
         sourceValue, formula: rule.sourceUnit + "×" + from + "/" + to + "=" + rule.targetUnit };
       units = [rule.targetUnit];
     }
@@ -571,7 +578,7 @@ function computeNumeric(root, id, rule, readable) {
   const { value, sourceRows, ...fields } = details;
   const unit = units[0];
   return { id, kind: rule.kind, source: rule.source, sourceHash: digest(bytes), sourceLineCount: sourceLines.length,
-    basis: rule, ...fields, value, unit, expected: value + (unit === "%" && rule.kind !== "source-number" ? unit : " " + unit),
+    basis: rule, ...fields, value, unit, expected: formatQuantity(value, unit, fields.relation, rule.kind === "source-number"),
     sourceRows: sourceRows.map(line => ({ line, quote: sourceLines[line - 1] })) };
 }
 
@@ -641,16 +648,88 @@ function quantityScanner(aliases) {
   });
 }
 
+// A declared original line can prove a scalar, a one-sided bound or an
+// explicitly approximate result. The comparison is part of the result, not
+// punctuation that may be dropped when restating or changing its unit.
+const quantityRelations = [
+  ["lte", "≤", /(?:<=|[≤≦⩽]|不超过|不(?:大|高|多)于|至多|最多|\b(?:at\s+most|up\s+to|(?:no|not)\s+(?:more|greater)\s+than|not\s+exceed))$/iu,
+    /^(?:或更少|或以下|以下|以内|\bor\s+(?:less|fewer|below)\b)/iu],
+  ["gte", "≥", /(?:>=|[≥≧⩾]|不(?:小|低|少)于|至少|最少|\b(?:at\s+least|(?:no|not)\s+(?:less|fewer)\s+than))$/iu,
+    /^(?:或更多|或以上|以上|\bor\s+(?:more|above)\b)/iu],
+  ["lt", "<", /(?:<|不足|不到|未满|不满|(?:小|少|低)于|\b(?:(?:less|fewer|shorter)\s+than|under|below))$/iu],
+  ["gt", ">", /(?:>|超过|(?:大|多|高)于|\b(?:more\s+than|greater\s+than|longer\s+than|over|above))$/iu],
+  ["approximate", "≈", /(?:[≈≃~∼]|约(?:为|等于)?|大概(?:为|是)?|粗略(?:为|估计为)?|\b(?:approximately|approx\.?|about|around|roughly|circa))$/iu,
+    /^(?:左右(?!以[内外])|上下|附近|-ish\b|\bor\s+so\b)/iu],
+  ["exact", "精确为 ", /(?:精确(?:值|数值)?|准确值|确切值)(?:\s*(?:等于|为|是|[:：]))?$|\b(?:exact(?:ly)?|precisely)(?:\s*(?:equals?|is|[:：]))?$/iu,
+    /^(?:,\s*)?(?:就是|即为|是|为|为其)\s*(?:精确值|精确数值|准确值|确切值)/u],
+];
+
+function formatQuantity(value, unit, relation, spacePercent = false) {
+  const prefix = quantityRelations.find(([kind]) => kind === relation)?.[1] ?? "";
+  return prefix + value + (unit === "%" && !spacePercent ? unit : " " + unit);
+}
+
+const numericRangePrefix = /(?<![\d\p{Script=Latin}\p{Script=Greek}.])\d+(?:\.\d+)?\s*(?:[-–—~/∼,、+±×÷^*]|\.{2,}|e[+-]|至|到|及|和|或|\b(?:to|and|or))\s*$/iu;
+const terminalOperand = /(?<![\d\p{Script=Latin}\p{Script=Greek}.])\d+(?:\.\d+)?$/u;
+const numericRangeSuffix = /^(?:[-–—~/∼+±×÷^]|\.{2,}|至|到|或|\b(?:to|and|or)\b)\s*[+-]?\s*\d/iu;
+const unsupportedQuantityPrefix = /(?:[<>≤≥≦≧⩽⩾≈≃~∼≠±!](?:\s*=)?|不是|并非|并不|不等于|不确定|不[应能会可]|非|可能(?:为|是)?|将近|接近|略[高低长短]|(?:精确值|精确数值|准确值|确切值)[^,。;!?]{0,24}|\b(?:not(?:\s+(?:necessarily|actually|be))?|isn't|nearly|almost|possibly|probably|may\s+be|cannot\s+(?:say|guarantee)|close\s+to|min(?:imum)?|max(?:imum)?))\s*[:=(\[]?$/iu;
+const unsupportedQuantitySuffix = /^(?:[,;:]?\s*(?:[<>≤≥≦≧⩽⩾≈≃≠±]|\+\s*\/\s*-|\b(?:only\s+if|unless|given\s+that)\b|仅当|除非)|以外|左右以外|(?:略|稍|更|还|要|偏|稍微|略微)+\s*(?:长|短|多|少|大|小|高|低)|\b(?:min(?:imum)?|max(?:imum)?)\b)/iu;
+
+/** A recognized adjacent spelling supplies a typed qualifier; null means the
+ * nearby arithmetic or competing qualifiers do not describe one scalar. */
+function quantityRelation(body, { start, end }) {
+  const tail = body.slice(end);
+  const previous = body.slice(0, start);
+  const before = previous.replace(/(\*{1,3}|_{1,3}|`{1,3})$/u, mark => tail.startsWith(mark) ? "" : mark).trimEnd();
+  const after = tail.replace(/^(?:\*{1,3}|_{1,3}|`{1,3})/u, "").trimStart();
+  const prefix = quantityRelations.find(([, , pattern]) => pattern.test(before));
+  const suffix = quantityRelations.find(([, , , pattern]) => pattern?.test(after));
+  const left = prefix ? before.replace(prefix[2], "").trimEnd() : before;
+  const right = suffix ? after.replace(suffix[3], "").trimStart() : after;
+  if (prefix && suffix || numericRangePrefix.test(left) || terminalOperand.test(left) ||
+    numericRangeSuffix.test(after) ||
+    quantityRelations.some(([, , pattern]) => prefix && pattern.test(left)) ||
+    unsupportedQuantityPrefix.test(left) || unsupportedQuantitySuffix.test(right) ||
+    /比\s*$/u.test(left) && /^(?:长|短|多|少|大|小|高|低)/u.test(right)) return null;
+  return prefix?.[0] ?? suffix?.[0];
+}
+
 /** Bind one unique numeral and a whole unit to the declared original line. */
 function lineQuantity(sourceLines, rule) {
   const source = quantityText(sourceLines[rule.line - 1] ?? "");
   const matches = quantityScanner([rule.sourceUnit])(source).filter(quantity => quantity.unit);
   if (matches.length !== 1 || !matches[0].complete) throw new Error("原文指定行须含唯一的数值与完整单位");
-  return matches[0].value;
+  const [quantity] = matches;
+  const relation = quantityRelation(source, quantity);
+  if (relation === null) throw new Error("原文数值的限定、范围或运算无法明确解析为单个量");
+  return { value: quantity.value, relation };
+}
+
+function quantityMatches(body, quantity, measured, preserveRelation = true) {
+  return quantity.complete && equalNumber(quantity.value, measured.value) &&
+    (!preserveRelation || quantityRelation(body, quantity) === measured.relation);
+}
+
+/** Validate the host-owned literal against qualifiers in the surrounding scope
+ * before publishing, without borrowing a matching numeral elsewhere in the row. */
+export function generatedQuantityMatches(line, owned, measurement) {
+  if (!["source-number", "unit-conversion"].includes(measurement.kind)) return true;
+  const lineBody = claimRow([line], measurement.id)?.body;
+  const ownedAt = lineBody?.lastIndexOf(owned) ?? -1;
+  if (ownedAt < 0) return false;
+  const prefix = quantityText(lineBody.slice(0, ownedAt));
+  const literal = quantityText(measurement.expected);
+  const scan = quantityScanner([measurement.unit]);
+  const result = scan(literal).find(quantity => quantity.complete);
+  if (!result) return false;
+  const body = prefix + literal;
+  const candidates = scan(body);
+  return candidates.length === 1 && candidates[0].start === prefix.length + result.start &&
+    quantityMatches(body, candidates[0], measurement);
 }
 
 function checkComputedNumber(rule, lines, measured) {
-  const { id, expected, value, unit, sourceRows, sourceLineCount } = measured;
+  const { id, expected, unit, sourceRows, sourceLineCount } = measured;
   const row = claimRow(lines, id);
   const cited = row && citation(row.body, rule.source);
   const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
@@ -664,33 +743,33 @@ function checkComputedNumber(rule, lines, measured) {
   // Legacy percent-decrease has always allowed operands in the same claim.
   const unexpectedNumber = rule.kind !== "percent-decrease" && scanned.some(quantity => !quantity.unit);
   const correct = !unexpectedNumber && quantities.length > 0 &&
-    quantities.every(quantity => quantity.complete && equalNumber(quantity.value, value));
+    quantities.every(quantity => quantityMatches(body, quantity, measured, rule.kind === "unit-conversion"));
   const coversRows = cited?.start && cited.end <= sourceLineCount &&
     sourceRows.every(line => cited.start <= line && line <= cited.end);
   const issue = !correct ? (rule.kind === "percent-decrease" ? "结论中的降幅应为 " : "结论中的复算结果应为 ") + expected
     : !coversRows ? "出处须引用 " + rule.source +
       (rule.kind === "percent-decrease" ? " 中两条原始数据行" : " 中实际参与复算的全部原始行") : null;
   return { ...measured, ok: issue === null, issue, reported: quantities.map(quantity =>
-    unit === "%" ? quantity.value + "%" : quantity.value + " " + quantity.unit) };
+    formatQuantity(quantity.value, quantity.unit, rule.kind === "unit-conversion" ? quantityRelation(body, quantity) : undefined)) };
 }
 
 /** Check direct numerical restatements; conversions use a declared formula. */
 function checkSourceNumber(rule, lines, measured, evidence) {
-  const { id, value: expected, sourceLineCount } = measured;
+  const { id, expected, sourceLineCount } = measured;
   const row = claimRow(lines, id);
   const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
   const quantities = quantityScanner(rule.units)(body);
   const values = quantities.map(quantity => quantity.value);
   const cited = row && citation(row.body,rule.source);
-  const rowOk = quantities.length > 0 && quantities.every(quantity => quantity.complete && equalNumber(quantity.value, expected))
+  const rowOk = quantities.length > 0 && quantities.every(quantity => quantityMatches(body, quantity, measured))
     && cited?.start <= rule.line && cited?.end >= rule.line && cited.end <= sourceLineCount;
   // This opt-in contract is for one scalar per declared unit across the document.
   // It deliberately does not infer quantities or support arbitrary conversions.
-  const documentIssues = rule.scope === "document" ? directQuantityIssues(lines, rule, expected, evidence) : [];
+  const documentIssues = rule.scope === "document" ? directQuantityIssues(lines, rule, measured, evidence) : [];
   const ok = rowOk && documentIssues.length === 0;
   return { ...measured, ok,
     reported:values,scope:rule.scope ?? "claim",documentIssues,
-    issue:ok?null:!rowOk?"本条直接转述须为原文的 "+expected+" "+rule.units[0]+"，引用原文第 "+rule.line+" 行；转换或旧错数不要混在当前事实行"
+    issue:ok?null:!rowOk?"本条直接转述须为原文的 "+expected+"，引用原文第 "+rule.line+" 行；保留原文数值限定，转换或旧错数不要混在当前事实行"
       :documentIssues.map(item=>"候选第 "+item.line+" 行："+item.issue).join("；") };
 }
 
@@ -699,11 +778,8 @@ function checkSourceNumber(rule, lines, measured, evidence) {
  * that the source gives no finer value are allowed; other semantic claims still
  * require independent full-document review, not a regex claim of general truth.
  */
-function directQuantityIssues(lines, rule, expected, evidence) {
+function directQuantityIssues(lines, rule, measured, evidence) {
   const scan = quantityScanner([...rule.units, rule.sourceUnit]);
-  const beforeBound = /(?:[<>≤≥]=?|超过|不足|至少|至多|大于|小于|多于|少于|高于|低于|不满|不超过|不低于|more\s+than|less\s+than|longer\s+than|shorter\s+than|at\s+least|at\s+most|over|under)\s*(?:约|大约)?\s*$/i;
-  const afterBound = /^\s*(?:以上|以下|以外|以内|左右以外|或更多|或更少|[<>≤≥]=?)/;
-  const compareAfter = /^\s*(?:略|稍|更|还|要|偏|稍微|略微)*\s*(?:长|短|多|少|大|小|高|低)/;
   const issues = [];
   for (const [index,line] of lines.entries()) {
     const body = conclusion(line, evidence, quantityText);
@@ -712,27 +788,17 @@ function directQuantityIssues(lines, rule, expected, evidence) {
     // the same line. Locators and URLs are metadata, not arithmetic operands.
     const statement = body.replace(/https?:\/\/[^\s）)\]】>"'“”]+/gi, "");
     const additionalNumbers = quantities.length ? scan(statement)
-      .map(quantity => quantity.value).filter(value => !equalNumber(value, expected)) : [];
+      .map(quantity => quantity.value).filter(value => !equalNumber(value, measured.value)) : [];
     if (additionalNumbers.length) issues.push({line:index+1,text:line,reported:additionalNumbers,
       issue:"直接转述同一行包含其他操作数或结果；换算须另行登记原始量、单位与复算规则，不能混入本条直接转述"});
     for (const match of quantities) {
-      const before = body.slice(0, match.start).split(/[，,。；;!?！？\n]/).at(-1);
-      const after = body.slice(match.end).split(/[，,。；;!?！？\n]/)[0];
-      const comparison = beforeBound.test(before) || afterBound.test(after)
-        || /比\s*$/.test(before) && compareAfter.test(after);
-      // A bare source numeral provides no warrant for an "exact" value. Only
-      // positive precision labels adjacent to this quantity are checked here;
-      // "the excerpt provides no finer value" has no such quantity-label pair.
-      const exactness = /(?:精确值|精确数值|准确值|确切值|exact(?:ly)?|precisely)[^。；;，,!?！？]{0,24}$/i.test(before)
-        || /^\s*(?:就是|即为|是|为|为其)\s*(?:精确值|精确数值|准确值|确切值)/.test(after);
-      if (!match.complete || !equalNumber(match.value, expected) || comparison || exactness) {
+      const relation = quantityRelation(body, match);
+      if (!match.complete || !equalNumber(match.value, measured.value) || relation !== measured.relation) {
         issues.push({line:index+1,text:line,reported:match.value,issue:!match.complete
           ? "全文直接转述的完整单位须与已登记单位一致，不能将乘除、指数或后缀留在单位之外"
-          : exactness
-          ? "原文给出数字不等于证明精确值；直接转述不得自行升级精度，改为说明原文给出的数值与未知边界"
-          :comparison
-          ? "直接转述契约没有授权给原文数值添加上下界或长短比较；删去无据推断，或先登记支持该关系的证据与核验规则"
-          : "全文直接转述应为原文的 "+expected+" "+rule.units[0]+"，不能在说明段另添未经支持的数字"});
+          : relation !== measured.relation
+          ? "全文直接转述须保留原文的数值限定，不能自行升高精度、添加或删除上下界"
+          : "全文直接转述应为原文的 "+measured.expected+"，不能在说明段另添未经支持的数字"});
       }
     }
   }

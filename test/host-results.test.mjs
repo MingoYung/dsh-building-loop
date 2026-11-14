@@ -34,11 +34,16 @@ test("host writes approved values once and both blind reviews receive bound rece
   const preparation = await h.flow(executor, "prepare");
   assert.deepEqual(preparation.hostResultSlots.map(slot => slot.id), ["C1", countId]);
   const save = content => h.file(executor, "write", "candidate.md", { content, note: "撰写两次校准的结果和引用统计" });
+  const [metricExample, countExample] = preparation.hostResultSlots.map(slot => slot.template);
+  await assert.rejects(save(metricExample + "\n\n引用统计：" + countExample + "\n"), /第 3 行.*这行只写占位符/u);
   for (const value of ["19%", "20 ms", "20%"]) {
     await save(draft.replace(metric, value + "（出处：timing.csv 第 2-3 行）"));
     await h.file(executor, "read", "candidate.md");
     await assert.rejects(h.flow(executor, "submit"), /缺少宿主生成结果：C1/u);
   }
+  const copyable = await save(metricExample + "\n\n" + countExample + "\n");
+  assert.match(copyable.hostResults[0].text, /20%/u);
+  assert.match(copyable.hostResults[1].text, /第1行/u);
   const rendered = await save(draft);
   assert.match(rendered.hostResults[0].text, /20%（出处：timing\.csv 第 2-3 行）/u);
   assert.match(rendered.hostResults[1].text, /1行可识别同行引用（第3行）/u);
@@ -169,4 +174,88 @@ test("a classified and already sourced fact with no same-line locator goes back 
     await h.file(writer, "read", "candidate.md");
     const preflight = await h.flow(writer, "preflight");
     assert.equal(preflight.ok, true, JSON.stringify(preflight));
+  }));
+
+test("approved source refresh discards old approvals and has the original executor recompute before both fresh reviews", () =>
+  fixture(async (root, write) => {
+    setup(write);
+    const original = fs.readFileSync(path.join(root, "BUILDING-LOOP.json"), "utf8");
+    const h = host(root, { automaticCoverage: false });
+    const exec = (await h.flow("root", "advance")).childId;
+    await h.file(exec, "write", "candidate.md", { content: draft, note: "初版结果" });
+    await h.file(exec, "read", "candidate.md");
+    await h.flow(exec, "submit");
+    const reviewer = (await h.flow("root", "advance")).childId;
+    let auditor;
+    async function independentlyReview(role, basis) {
+      for (const file of ["overview.md", "candidate.md", "timing.csv"]) await h.file(role, "read", file);
+      const inv = await h.coverage(role, "inventory");
+      assert.equal(inv.pending.length, inv.total);
+      await h.coverage(role, "record", { entries: inv.blocks.map(block => ({ block: block.id, parts: [block.hostMeasurement ? {
+        kind: "direct", status: "supported", sourceRelation: "supports", measurement: block.hostMeasurement.id, basis,
+      } : { kind: "nonfactual", status: "supported", basis: "标题仅标示校准样例。" }] })) });
+    }
+    const quality = Object.fromEntries(Object.keys(QUALITY).map(key => [key, "对照当前样例原始记录、单位和范围。"]));
+    async function assess() {
+      await h.assess(reviewer, { ...quality, goalFit: { pass: true, basis: "符合本次样例的范围。" },
+        sourceRefs: [], revise: [], unverifiedSources: [], unlisted: [] });
+    }
+    await independentlyReview(reviewer, "初版首审独立读取并判断");
+    await assess();
+    assert.equal((await h.flow(reviewer, "review")).phase, "first-audit-ready");
+    auditor = (await h.flow("root", "advance")).childId;
+    await independentlyReview(auditor, "初版盲核独立读取并判断");
+    assert.equal((await h.flow(auditor, "audit")).phase, "ledger-review");
+    const old = fs.readFileSync(path.join(root, "first.json"));
+    const fresh = source.replace("96", "84");
+    write("timing.csv", fresh);
+    assert.equal((await h.flow("root", "status")).units[0].sourceUpdate.status, "needs-maintainer");
+    await assert.rejects(h.flow("root", "advance"), /待核实/u);
+    const approved = JSON.parse(original);
+    approved.sourcePins["timing.csv"].sha256 = digest(fresh);
+    const expanded = structuredClone(approved);
+    expanded.coordinator.read.push("timing.csv");
+    write("BUILDING-LOOP.json", JSON.stringify(expanded));
+    await assert.rejects(h.flow("root", "advance"), /授权清单发生变化/u);
+    write("BUILDING-LOOP.json", JSON.stringify(approved));
+    assert.equal((await h.flow("root", "status")).units[0].sourceUpdate.status, "ready");
+    const resume = await h.flow("root", "advance");
+    assert.deepEqual([resume.phase, resume.childId], ["supplement", exec]);
+    await assert.rejects(h.flow("root", "refresh-results"), /原执行方/u);
+    await assert.rejects(h.flow(exec, "refresh-results"), /完整读取/u);
+    const preparation = await h.flow(exec, "prepare");
+    assert.deepEqual(preparation.hostResultRefresh.ids, ["C1", countId]);
+    const updated = await h.flow(exec, "refresh-results");
+    assert.match(updated.hostResults[0].text, /30%/u);
+    await h.file(exec, "read", "candidate.md");
+    assert.equal((await h.flow(exec, "submit", { quality })).phase, "final-review-ready");
+    assert.equal((await h.flow("root", "advance")).childId, reviewer);
+    await independentlyReview(reviewer, "新版首审独立读取更新的校准材料");
+    await assess();
+    assert.equal((await h.flow(reviewer, "review")).phase, "final-audit-ready");
+    assert.equal((await h.flow("root", "advance")).childId, auditor);
+    await independentlyReview(auditor, "新版盲核独立阅读全文和新原始材料");
+    assert.equal((await h.flow(auditor, "audit")).phase, "ledger-review");
+    const receipt = JSON.parse(fs.readFileSync(path.join(root, "final.json"), "utf8"));
+    assert.equal(receipt.hostMeasurements[0].sourceHash, digest(fresh));
+    assert.equal(receipt.independentAudit.hostMeasurements[0].sourceHash, digest(fresh));
+    assert.deepEqual(fs.readFileSync(path.join(root, "first.json")), old);
+    const ledger = await h.ledger("root", "read");
+    await h.file("root", "read", "overview.md");
+    await h.file("root", "read", "final.json");
+    const decisions = ledger.items.map(item => ({
+      id: item.id, outcome: "completed", basis: "本单元按新版原始数据完成两道独立验收。",
+      evidence: { file: "final.json", start: 1, end: 10 },
+    }));
+    assert.equal((await h.ledger("root", "review", { decisions })).phase, "closed");
+  }));
+
+test("host citation counts exclude fenced examples, hidden text and out-of-range source rows", () =>
+  fixture(async (root, write) => {
+    setup(write);
+    const h = host(root, { automaticCoverage: false });
+    const executor = (await h.flow("root", "advance")).childId;
+    const examples = "\n```text\ntiming.csv#L2\n```\n\n<!-- timing.csv#L2 -->\n\n[错例] 假结论（出处：timing.csv 第 2 行）。\n\n超过原始文件（出处：timing.csv 第 99 行）。\n\n原始文件尾部换行（出处：timing.csv 第 4 行）。\n";
+    const written = await h.file(executor, "write", "candidate.md", { content: draft + examples, note: "添加定位正反例" });
+    assert.match(written.hostResults[1].text, /1行可识别同行引用（第3行）/u);
   }));

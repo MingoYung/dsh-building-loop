@@ -11,6 +11,7 @@ const FILE_LIMIT = 256 * 1024;
 const JOURNAL_SPEC = "building-loop-ledger-transaction/1";
 const VOLUME_JOURNAL_SPEC = "building-loop-ledger-transaction/2";
 const MODULE_JOURNAL_SPEC = "building-loop-module-transaction/1";
+const HOST_RESULT_JOURNAL_SPEC = "building-loop-host-result-transaction/1";
 const EVENT_SPEC = "building-loop-ledger-event/1";
 const EVENT_LIMIT = 4096;
 const EVENT_NAME = /^[a-f0-9]{64}\.[a-f0-9-]{36}\.json$/u;
@@ -226,6 +227,13 @@ export function recoverLedgerJournal(home, file, root, policy, managed = false) 
   if (journal.spec === MODULE_JOURNAL_SPEC && policy.hierarchy && (!policy.hierarchy.private || managed)) {
     required = [hierarchyBodyPath(policy.hierarchy, journal.module, managed), policy.hierarchy.index.path];
     optional = [policy.hierarchy.overview.path];
+  } else if (journal.spec === HOST_RESULT_JOURNAL_SPEC) {
+    const unit = Object.hasOwn(policy.units, journal.unit) && policy.units[journal.unit];
+    if (!unit?.hostResults || unit.candidate !== journal.candidate ||
+        !["intake", "supplement"].every(phase => unit.phases[phase].write.includes(unit.candidate))) {
+      throw new Error("未完成数值稿件事务与当前候选授权不匹配");
+    }
+    required = [unit.candidate];
   } else if (journal.spec === JOURNAL_SPEC && typeof policy.ledgerDocument === "string" && journal.ledger === policy.ledgerDocument) {
     required = [journal.ledger];
   } else if (journal.spec === VOLUME_JOURNAL_SPEC && typeof policy.ledgerDocument === "string" && journal.ledger === policy.ledgerDocument
@@ -284,8 +292,8 @@ export function recoverLedgerJournal(home, file, root, policy, managed = false) 
  */
 export function commitWorkspaceState(home, frame, next, warnCleanup) {
   if (next.length > STATE_LIMIT) throw new Error("内容超过受控工具的大小上限");
-  const { file, root, policy, old, ledgerWrites, hierarchyWrites } = frame;
-  const writes = hierarchyWrites?.writes ?? ledgerWrites;
+  const { file, root, policy, old, ledgerWrites, hierarchyWrites, hostResultWrites } = frame;
+  const writes = hostResultWrites?.writes ?? hierarchyWrites?.writes ?? ledgerWrites;
   // Idempotent retry must not replace the one rolling pre-commit backup.
   if (!writes?.length && old?.equals(next)) return;
   const backup = file + ".bak";
@@ -296,8 +304,10 @@ export function commitWorkspaceState(home, frame, next, warnCleanup) {
     return;
   }
   const name = journalName(file);
-  const volumes = !hierarchyWrites && writes.map(item => item.file).filter(name => isLedgerVolume(policy.ledgerDocument, frame.agent.id, name));
-  const operation = hierarchyWrites ? { spec: MODULE_JOURNAL_SPEC, module: hierarchyWrites.module }
+  const volumes = !hierarchyWrites && !hostResultWrites &&
+    writes.map(item => item.file).filter(name => isLedgerVolume(policy.ledgerDocument, frame.agent.id, name));
+  const operation = hostResultWrites ? { spec: HOST_RESULT_JOURNAL_SPEC, unit: hostResultWrites.unit, candidate: hostResultWrites.candidate }
+    : hierarchyWrites ? { spec: MODULE_JOURNAL_SPEC, module: hierarchyWrites.module }
     : volumes.length ? { spec: VOLUME_JOURNAL_SPEC, ledger: policy.ledgerDocument, owner: frame.agent.id, volumes }
     : { spec: JOURNAL_SPEC, ledger: policy.ledgerDocument };
   const raw = Buffer.from(JSON.stringify({ ...operation, policy: policy.hash,
@@ -312,14 +322,14 @@ export function commitWorkspaceState(home, frame, next, warnCleanup) {
     }
     if (old) replaceBytes(home, backup, old, backupBefore, STATE_LIMIT);
     policyCurrent(root, policy.hash);
-    if (hierarchyWrites || volumes.length) {
+    if (hostResultWrites || hierarchyWrites || volumes.length) {
       // The workspace lock serializes host tools. Verify published targets again
       // because another editor can still change them before the state commit.
       const expected = [...(hierarchyWrites ? [{ file: policy.hierarchy.overview.path, sha256: hierarchyWrites.overviewSha256 }] : []),
         ...writes.map(item => ({ file: item.file, sha256: digest(item.after) }))];
       for (const item of expected) {
         if (stateDigest(readBytes(root, item.file, FILE_LIMIT)) !== item.sha256) {
-          throw new Error("新增模块期间文件发生外部修改，请核对后重试 " + item.file);
+          throw new Error("提交期间文件发生外部修改，请核对后重试 " + item.file);
         }
       }
     }

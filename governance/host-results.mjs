@@ -1,6 +1,7 @@
 import { markdownStructure } from "./markdown-structure.mjs";
 import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
-import { citation, claimRow, configuredNumericMeasurements } from "./preflight.mjs";
+import { citation, claimRow, configuredNumericMeasurements, errorExample, generatedQuantityMatches, lineList } from "./preflight.mjs";
+import { registeredSourceRows } from "./evidence.mjs";
 
 const marker = "{{building-loop:";
 const metricTemplate = /^(.*?)[\t ]*\{\{building-loop:metric:([\w-]{1,48})\}\}[\t ]*([。.]?)[\t ]*$/u;
@@ -23,12 +24,18 @@ function declarations(spec) {
 
 /** Expose the owner-authorized slots without projecting data across role boundaries. */
 export function hostResultSlots(spec) {
-  return declarations(spec).map(row => ({ ...row, template: row.kind === "metric"
-    ? "- " + row.id + "：<说明指标范围> {{building-loop:metric:" + row.id + "}}"
-    : "{{building-loop:citation-lines:" + row.source + "}}" }));
+  return declarations(spec).map(row => ({ ...row, template: slotTemplate(row) }));
 }
 
-function slotAt(text, rows) {
+function slotMarker(row) {
+  return marker + (row.kind === "metric" ? "metric:" + row.id : row.id) + "}}";
+}
+
+function slotTemplate(row) {
+  return (row.kind === "metric" ? "- " + row.id + "：原始记录中的指标 " : "") + slotMarker(row);
+}
+
+function slotAt(text, rows, line) {
   const metric = metricTemplate.exec(text);
   if (metric && !metric[1].includes(marker)) {
     const row = rows.find(item => item.kind === "metric" && item.id === metric[2]);
@@ -48,7 +55,10 @@ function slotAt(text, rows) {
       if (row) return { ...row, template: text };
     }
   }
-  throw new Error("宿主结果占位符未获授权或所在行格式错误：指标须使用同编号的独立结果行；引用统计须单独占一行");
+  const matched = rows.find(row => text.includes(slotMarker(row)));
+  const hint = matched ? "。该结果的模板是 " + slotTemplate(matched)
+    + (matched.kind === "citation-lines" ? "，这行只写占位符，前后留空行" : "，占位符放在该编号行的末尾") : "";
+  throw new Error("第 " + line + " 行的宿主结果占位符未获授权或格式错误" + hint);
 }
 
 function showLineRange(lines) {
@@ -69,12 +79,19 @@ function rowLocations(lines) {
  * still verifies the source's scope and records its own evidence reads. */
 function checkSourcePin(frame, spec, source, sha256) {
   const pin = frame.policy?.sourcePins?.[keyOf(source)];
-  if (spec.requireSourcePins && !pin) throw new Error("宿主结果缺少原始来源凭据：" + source);
-  if (pin && pin.sha256 !== sha256) throw new Error("宿主结果的原文与登记版本不一致：" + source);
-  if (!pin?.observation) return;
-  const receipt = readBytes(frame.root, pin.observation.file);
-  if (!receipt || digest(receipt) !== pin.observation.sha256) throw new Error("宿主结果的来源获取回执已变化：" + source);
-  return pin.observation;
+  if (!pin) {
+    if (spec.requireSourcePins) throw new Error("宿主结果缺少原始来源凭据：" + source);
+    return {};
+  }
+  const bytes = readBytes(frame.root, source);
+  if (!bytes || digest(bytes) !== sha256 || pin.sha256 !== sha256) throw new Error("宿主结果的原文与登记版本不一致：" + source);
+  return { observation: pin.observation, registered: registeredSourceRows(frame.root, source, bytes, pin) };
+}
+
+function registeredRange(registered, range) {
+  if (!registered) return true;
+  for (let line = range.start; line <= range.end; line++) if (!registered.has(line)) return false;
+  return true;
 }
 
 /** Metrics are ordinary citation-bearing manuscript lines. Citation summaries
@@ -93,11 +110,18 @@ function renderRows(frame, spec, draft, slots, readable) {
     if (!measurement?.available) throw new Error(slot.id + " 宿主复算失败：" + (measurement?.issue ?? "没有可用数据"));
     const { available, id, kind: calculationKind, ...fields } = measurement;
     if (blockBreak.test(measurement.expected)) throw new Error(id + " 的格式化结果包含正文分隔符");
-    const sourceObservation = checkSourcePin(frame, spec, slot.source, measurement.sourceHash);
-    const locator = "（出处：" + slot.source + " 第 " + showLineRange(measurement.sourceRows.map(row => row.line)) + " 行）";
+    const { observation: sourceObservation, registered } = checkSourcePin(frame, spec, slot.source, measurement.sourceHash);
+    const usedLines = measurement.sourceRows.map(row => row.line);
+    if (!registeredRange(registered, { start: usedLines[0], end: usedLines.at(-1) })) {
+      throw new Error("宿主指标的引用跨度包含未登记的外部原文：" + slot.source);
+    }
+    const locator = "（出处：" + slot.source + " 第 " + showLineRange(usedLines) + " 行）";
     const owned = measurement.expected + locator;
     const start = slot.scope.length + 1;
     const result = slot.scope + " " + owned + slot.ending;
+    if (!generatedQuantityMatches(result, owned, measurement)) {
+      throw new Error(id + " 的指标文字改动了原文限定，请只写指标范围，并让宿主填入完整数值限定");
+    }
     lines[slot.line - 1] = result;
     proofs.push({ ...fields, id, kind: slot.kind, calculationKind, line: slot.line, text: result,
       span: { start, end: start + owned.length }, ...(sourceObservation ? { sourceObservation } : {}) });
@@ -106,14 +130,20 @@ function renderRows(frame, spec, draft, slots, readable) {
   // Preserve physical rows even when a statistics slot is positioned between citations.
   const projected = [...lines];
   for (const { line } of citationSlots) projected[line - 1] = "";
+  const { visible } = citationSlots.length ? markdownStructure(projected) : {};
   for (const { id, kind, source, line } of citationSlots) {
     if (!includes(readable, source)) throw new Error("当前阶段无引用统计来源的读授权：" + source);
     const sourceBytes = readBytes(frame.root, source);
     if (!sourceBytes) throw new Error("引用统计来源文件不存在：" + source);
     const sourceHash = digest(sourceBytes);
-    const sourceObservation = checkSourcePin(frame, spec, source, sourceHash);
-    // Match the existing citationLineCounts definition, including its exact locator parser.
-    const citedLines = projected.flatMap((text, index) => citation(text, source)?.start ? [index + 1] : []);
+    const { observation: sourceObservation, registered } = checkSourcePin(frame, spec, source, sourceHash);
+    // Count a visible, non-example line once, and require its explicit locator
+    // to actually resolve to this version of the authorized original material.
+    const sourceLength = lineList(sourceBytes).filter((_, index, rows) => index < rows.length - 1 || rows[index] !== "").length;
+    const citedLines = visible.flatMap((text, index) => {
+      const range = !errorExample(text) && citation(text, source);
+      return range?.start && range.end <= sourceLength && registeredRange(registered, range) ? [index + 1] : [];
+    });
     const result = citedLines.length ? "[稿件自述] 本稿对 " + source + " 有" + citedLines.length +
       "行可识别同行引用（第" + citedLines.join("、") + "行）。" : "[稿件自述] 本稿带 " + source + " 行号定位的共0行。";
     lines[line - 1] = result;
@@ -147,7 +177,7 @@ export function renderHostResults(frame, active, spec, content, before) {
   const slots = [];
   const lines = [...draft.lines];
   for (const [index, line] of lines.entries()) {
-    if (line.includes(marker)) slots.push({ ...slotAt(line, declared), line: index + 1 });
+    if (line.includes(marker)) slots.push({ ...slotAt(line, declared, index + 1), line: index + 1 });
   }
   const previous = before == null || !prior.length ? [] : manuscript(before).lines;
   const locations = rowLocations(lines);
@@ -162,7 +192,7 @@ export function renderHostResults(frame, active, spec, content, before) {
     if (previous[row.line - 1] !== row.text || !line) {
       throw new Error(row.id + " 的宿主结果已变更或无法唯一定位，请在正文重新放置该结果占位符");
     }
-    const next = slotAt(row.template, declared);
+    const next = slotAt(row.template, declared, line);
     if (next.id !== row.id || next.source !== row.source || next.kind !== row.kind) throw new Error("旧宿主结果与当前授权不一致");
     lines[line - 1] = next.template;
     slots.push({ ...next, line });
@@ -199,7 +229,7 @@ export function currentHostResults(frame, active, spec, bytes, { host = false, c
       throw new Error(row.id + " 的宿主结果已偏离当前稿件，请由执行方重新生成");
     }
     locations.add(row.line);
-    const slot = slotAt(row.template, declared);
+    const slot = slotAt(row.template, declared, row.line);
     if (slot.id !== row.id || slot.kind !== row.kind || slot.source !== row.source) throw new Error("宿主结果登记与当前授权不一致");
     lines[row.line - 1] = slot.template;
     return { ...slot, line: row.line };

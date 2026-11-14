@@ -54,6 +54,15 @@ function observedExcerpt(root, file, bytes, pin, start, end) {
   return result.observation;
 }
 
+/** Validate registered material without recording a model read. Generation and
+ * version adoption use the same acquisition registry as independent review. */
+export function registeredSourceRows(root, file, bytes, pin) {
+  if (!bytes || pin.sha256 !== digest(bytes)) throw new Error("资料与登记的原始版本不符，须重新核验来源 " + file);
+  if (!pin.observation) return null;
+  const { registered } = observationRegistry(root, file, bytes, pin);
+  return new Set(registered.map(row => row.line));
+}
+
 /** Recheck both source and optional acquisition receipt before using a saved proof. */
 export function sourceVersionCurrent(root, ref) {
   const bytes = readBytes(root, ref.file);
