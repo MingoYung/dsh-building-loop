@@ -61,3 +61,32 @@
 | `httpbody_empty_for_get_requests` | 200、正文 `body::end` → 200、正文 `:end` | 空请求体已正确渲染为空字符串。解析器丢了动作前的字面前缀 `body:`，保留了动作后的后缀。 |
 
 评分副本主文件 SHA-256 为 `c9a2f2c7b91962b83fa67af46821479d30d52cc6abb9b84e285855341cea4258`。原生冻稿主文件 SHA-256 仍为 `2b1eb29319b09e51befc7287552d379a99dbf373b511a464ec082c7e7eea71c9`。官方 pytest JSON 的 SHA-256 为 `6d34ad474e05b4b204a0c66f212920d6121dab51ce022c4876c760c67eac842f`。原始逐项结果、注释副本、哈希复核和日志读取复现均留在 G 盘。后两关和大测试未运行。
+
+## 2026-11-16 HTTP 实现补修及首关回归
+
+现存档案没有标准模式、标准加清单或 ClearAI 对这套 `mocked_http` C1 的评分记录。可核对的历史最高分为 Building-loop 0.7.39 的 `r-tw58FO`，24/29（82.76%）。Building-loop 0.7.39 兼容配对轮及 0.7.43 的对应记录都是 19/29。上游参考实现 29/29 属于评分对照。此次 28/29 来自对冻结交付副本的人工源码修复，无法用来估计任何模式的独立完成率。
+
+定位到的九项程序失败来自模板解释器和配置加载器。模板中的已授权请求方法沿用原函数调用与管道参数处理。解析器在分派动作前直接保留字面文本。条件仅清理表达式源外围的空白，渲染结果仍须精确等于小写 `true`。YAML 优先走安全解析，只有报错点是整段引号包围的 Go 模板标量时才尝试处理冲突的引号。配置无法读取、解析或通过校验时在监听前返回退出码 2。Building-loop 提示词、双审规则与日志输出实现保持原样。
+
+`r-T30oq2` 冻稿与上轮 19/29 的注释修正版均保留在 G 盘，各自保持原哈希。另建评分副本 `http-c1-product-repair-r-T30oq2`，仅改 `hmock.py`，评分用文件 SHA-256 为 `89fc6347c01611c4fbae8aa1b8657219b3e0886b65fa04ca90763102bf810880`。本轮复用同一评分器、运行器、上游测试和 29 个相同用例 ID，核对每一项的前后状态。
+
+| 旧状态 → 新状态 | 用例数 |
+| --- | ---: |
+| 通过 → 通过 | **19** |
+| 通过 → 失败 | **0** |
+| 失败 → 通过 | **9** |
+| 失败 → 失败 | **1** |
+
+本轮 **28/29（96.55%）**，较上轮 19/29（65.52%）增加 **31.03 个百分点**。最初发生公共入口 500 的冻结稿为 0/29。九条转为通过的用例如下，沿用上表中的名称。
+
+| 修复点 | 从失败转为通过的用例 |
+| --- | --- |
+| 模板方法及响应渲染 | `first_matching_condition_wins`、`context_includes_path_query_header`、`content_length_reflects_rendered_template` |
+| 保留字面文本 | `template_helpers_registered`、`httpbody_empty_for_get_requests` |
+| 条件源外围空白 | `normalizes_whitespace_in_condition` |
+| YAML 模板引号兼容 | `normalizes_whitespace_in_body_template` |
+| 非法配置启动失败 | `rejects_behavior_with_multiple_reply_http`、`rejects_empty_key` |
+
+`http_log_required_fields` 仍按官方失败计。用本轮同一评分副本及同一日志输入做单项采集，对应请求返回 200 和 `ok`。`select` 加 `readline` 只取到首条启动日志。结束后读出此前缓冲的剩余内容，五字段 HTTP 日志齐全，包含 `GET /logs?trace=1`、空请求正文和 `ok` 响应正文。该现象已有当轮直接证据，业务日志或评分器均未改动。
+
+评分耗时 17.121 秒，原始官方 pytest JSON SHA-256 为 `5d3f4c4b62741ad83e0ea7df7aac17efef86cd82ab595378766843c008f18c89`。G 盘留有原始逐项报告、29 项对照 `comparison.json` 及定点日志 `log-pipe-control.json`。模型调用 0 次，Token 0。后两关和大测试未运行。
