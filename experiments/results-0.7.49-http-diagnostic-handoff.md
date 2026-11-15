@@ -33,3 +33,31 @@
 四次上游请求均完成，逐个匹配到原执行会话的新原生日志响应。继承的 87 条模型响应与 1 条旧尝试、续跑期间的 17 条本地脚本响应均单独处理。此次真实用量无缺项。整次续跑到停止及冻结后复验为 21.506 秒。上轮包含真实总控和诊断轮次，本轮由本地脚本重放这些节点，两轮用量按各自运行口径记录。
 
 两次零模型预检分别发现克隆测试器未传入状态文件路径、角色匹配未读取 DSH 实际提供的位置。修正后零模型预检 `r-c4sKJg` 成功交接原执行方，再进行唯一一次真实模型续跑。运行器按请求数、观测用量和重复失败设限。达到公开用例验收即停止，隔离宿主已退出，正式 Profile 受检指纹相同。旧运行的签名私钥只在原宿主内存中，本次证据为受控运行与冻稿复验，未执行新签名送审。
+
+## 2026-11-16 官方首关复评
+
+保留 `r-T30oq2` 实测冻稿，在新的 G 盘评分副本中只修正注释。`ctx_map` 直接继承 `GoMap`，声明 `__slots__ = ()`。`header_map` 是另一个 `GoMap` 子类，自己声明会被构造函数写入的 `_canonical`。注释前后 Python AST 一致，原冻稿和两个其他运行文件的 SHA-256 均复核一致。
+
+用与 `r-5Daoew` 相同的上游题库 `9cd9ca3a51c3d3e2a99d2488a25baf73a2204451`、运行器 `af5a9cbc311605b5cceb80200ca9832bdff2d7b1`、本地隔离评分器和 29 个相同用例 ID 评分。只运行 `checkpoint_1`。评分耗时 35.281 秒，模型调用与 Token 均为 **0**。
+
+| 版本 | 通过 | 失败 | 通过率 |
+| --- | ---: | ---: | ---: |
+| 旧冻稿 `r-5Daoew` | 0/29 | 29 | 0.00% |
+| 修复后、只改注释的评分副本 | **19/29** | **10** | **65.52%** |
+
+29 项都运行了断言。通过的 19 项包括递归加载 YAML/YML、默认类型、重复键覆盖与警告、拒绝条件非精确真值、条件渲染错误回落、默认响应头与空正文、路由未命中、方法与路径组合、POST 请求体渲染、非零延时、六种单位的零延时和忽略非 YAML 文件。未通过项保留上游用例名，统一省略 `test_` 前缀。 [固定的上游首关用例](https://github.com/gabeorlanski/scb-problems/blob/9cd9ca3a51c3d3e2a99d2488a25baf73a2204451/mocked_http/tests/test_checkpoint_1.py)
+
+| 未通过用例 | 预期 → 实测 | 证据与原因 |
+| --- | --- | --- |
+| `first_matching_condition_wins` | 正确令牌应命中首条规则返回 200 → 落到备用规则返回 401 | 模板执行器拒绝带参数的点号方法 `.HTTPHeader.Get "X-Token"`，条件渲染失败，首条规则不匹配。 |
+| `context_includes_path_query_header` | 200 并渲染路径、查询串和请求头 → 500 | 正文渲染也遇到带参数的 `.HTTPHeader.Get`。从解析器源码还可见，即使方法能调用，字段之间的字面分隔符仍会被丢掉。 |
+| `rejects_behavior_with_multiple_reply_http` | 两个 `reply_http` 应导致进程非零退出 → 服务继续运行 | 配置验证抛出了对应错误，加载器捕获后丢弃该条定义并继续启动。 |
+| `template_helpers_registered` | `3\|3\|a,b\|GO\|YWJj\|token\|fallback\|ab` → `33a,bGOYWJjtokenfallbackab` | 辅助函数结果正确。模板解析器处理带动作的词组时漏发前面的字面文本，故分隔符全部消失。 |
+| `http_log_required_fields` | 读到含五个必需字段的 JSON → 评分器读到空结果，HTTP 已为 200 | 独立小复现捕获到了完整 HTTP 日志。判断逻辑用 `select` 看底层管道，却用带缓冲的文本流 `readline` 读，未读到已被预读进缓冲区的请求记录。 |
+| `normalizes_whitespace_in_condition` | 带制表符的条件应匹配返回 200 → 404 | YAML 被正常读入。条件里的 `.HTTPHeader.Get "X-Mode"` 仍在方法调用阶段失败。源码还显示折叠标量带换行时会被严格的 `true` 比较拒绝。 |
+| `rejects_empty_key` | 空 `key` 应导致进程非零退出 → 服务继续运行 | 校验检测到空键，加载器同样记录错误并跳过条目，没有退出。 |
+| `content_length_reflects_rendered_template` | 200、正文 `abc`、长度 3 → 500 | `.HTTPHeader.Get "X-Val"` 先在模板调用阶段失败，断言在检查正常响应正文和长度之前就停下。 |
+| `normalizes_whitespace_in_body_template` | 200、正文 `HELLO` → 404 | 评分输入实际写出的 YAML 双引号标量含未转义的内层引号。用同一 PyYAML 读取原始输入复现了解析错误。加载器跳过文件，路由没有注册。 |
+| `httpbody_empty_for_get_requests` | 200、正文 `body::end` → 200、正文 `:end` | 空请求体已正确渲染为空字符串。解析器丢了动作前的字面前缀 `body:`，保留了动作后的后缀。 |
+
+评分副本主文件 SHA-256 为 `c9a2f2c7b91962b83fa67af46821479d30d52cc6abb9b84e285855341cea4258`。原生冻稿主文件 SHA-256 仍为 `2b1eb29319b09e51befc7287552d379a99dbf373b511a464ec082c7e7eea71c9`。官方 pytest JSON 的 SHA-256 为 `6d34ad474e05b4b204a0c66f212920d6121dab51ce022c4876c760c67eac842f`。原始逐项结果、注释副本、哈希复核和日志读取复现均留在 G 盘。后两关和大测试未运行。
