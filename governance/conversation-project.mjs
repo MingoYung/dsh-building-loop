@@ -55,8 +55,9 @@ export function privateProjectUsesOwnerTable(root) {
 }
 
 /** Keep every permission fixed by the host. Model text is used only for the goal and acceptance criteria. */
-function privatePolicy(sessionId, input) {
-  const evidence = input ? [MATERIALS] : [];
+function privatePolicy(sessionId, input, research) {
+  const researchSources = research ? Array.from({ length: 8 }, (_, i) => "sources/source-" + (i + 1) + ".txt") : [];
+  const evidence = [...(input ? [MATERIALS] : []), ...researchSources];
   const read = [DELIVERY, INDEX, ...evidence];
   return {
     spec: "building-loop/1",
@@ -64,7 +65,7 @@ function privatePolicy(sessionId, input) {
     goalContext: [GOAL], ledgerContext: [GOAL, INDEX], ledgerDocument: BOOK,
     hierarchy: { private: true, overview: { path: GOAL, heading: "分块入口" }, index: { path: INDEX, heading: "模块正文" } },
     ...(input ? { sourcePins: { [MATERIALS]: { sha256: digest(input), kind: "primary", locator: "dsh-session/" + encodeURIComponent(sessionId) } } } : {}),
-    units: { K01: { candidate: DELIVERY, requireSourcePins: true, phases: {
+    units: { K01: { candidate: DELIVERY, requireSourcePins: true, ...(research ? { kind: "research", researchSources } : {}), phases: {
       intake: { read, write: [DELIVERY] },
       "first-review": { read, receipt: FIRST, evidence },
       supplement: { read: [...read, FIRST, FINAL], write: [DELIVERY] },
@@ -120,7 +121,10 @@ function createPrivateProject(hostHome, sessionId, proposal) {
     // quotable owner input for both reviewers, even if no excerpts were selected.
     const instruction = ownerTable && { seq: proposal.userSeq, sha256: digest(proposal.instruction), text: proposal.instruction };
     const input = materialDocument(proposal.materials, instruction);
-    const manifest = JSON.stringify(privatePolicy(sessionId, input), null, 2) + "\n";
+    // Only explicit owner wording opts a new private workspace into external
+    // research. Existing project permissions remain maintainer-owned.
+    const research = !ownerTable && /^(?:请\s*)?(?:现在\s*)?(?:开始|启动)(?:调研|研究)\s*[:：]/u.test(proposal.instruction ?? "");
+    const manifest = JSON.stringify(privatePolicy(sessionId, input, research), null, 2) + "\n";
     parseAuthority(Buffer.from(manifest));
     const files = {
       [GOAL]: goalDocument(proposal, ownerTable),

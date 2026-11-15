@@ -7,7 +7,7 @@ import { currentHostResults } from "./host-results.mjs";
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
 // source/proof storage stays compatible while obsolete classification loops reset.
-export const CLASSIFICATION_VERSION = 13;
+export const CLASSIFICATION_VERSION = 14;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
@@ -2058,6 +2058,82 @@ function agreedQuoteIntroductionEnd(first, second, record, other) {
   return shared ? quoteStart : 0;
 }
 
+/** Only independently submitted, positive proofs with exact versioned refs
+ * participate in the grouping check. Keep premises and policies distinct. */
+function fragmentProof(part) {
+  if (!positiveProof(part) || part.finding || part.objectCheck || part.hostMeasurement) return null;
+  const inference = policyProof(part);
+  const type = assertionRequirement(part) ?? (part.kind === "direct" ? "original-fact" : null);
+  const premises = factEvidence(part);
+  const policy = inference?.policy ?? [];
+  if (inference) {
+    const requiredType = premises.length ? "project-application" : "project-rule";
+    if (!policy.length || typeof inference.scope !== "string" || !inference.scope.trim() ||
+        type !== requiredType || inference.assumptions?.length !== 0 || inference.counterexample?.possible !== false) return null;
+  } else if (part.kind !== "direct" || type !== "original-fact" || !premises.length) return null;
+
+  const refs = new Set();
+  for (const [domain, rows] of [["policy", policy], ["premise", premises]]) {
+    for (const ref of rows) {
+      if (typeof ref.file !== "string" || typeof ref.quote !== "string" || !ref.quote.trim() ||
+          !sha256Pattern.test(ref.sha256 ?? "") || !sha256Pattern.test(ref.evidenceSpan ?? "") ||
+          !Number.isSafeInteger(ref.start) || !Number.isSafeInteger(ref.end) || ref.start < 1 || ref.end < ref.start ||
+          (domain === "policy" && !sha256Pattern.test(ref.goalSha256 ?? ""))) return null;
+      refs.add(JSON.stringify([domain, ref.file, ref.start, ref.end, ref.quote, ref.evidenceSpan,
+        provenanceKey(ref), ref.goalSha256, ref.origin?.locator, ref.origin?.observation?.responseSha256]));
+    }
+  }
+  return { type, scope: inference?.scope, refs };
+}
+
+/** Compare two valid readings of one continuous span. If one reviewer split
+ * it further, each subpart must supply its own proof and their union must be
+ * exactly the wider proof. Do not use the other review to fill any missing ref. */
+function matchingFragments(text, wide, fineParts) {
+  const exact = part => Number.isSafeInteger(part.start) && Number.isSafeInteger(part.end) &&
+    part.start >= 0 && part.end <= text.length && part.start < part.end && part.quote === text.slice(part.start, part.end);
+  const whole = exact(wide) && fragmentProof(wide);
+  if (!whole) return [];
+  const pieces = fineParts.filter(part => part.end > wide.start && part.start < wide.end);
+  if (pieces.length < 2 || pieces[0].start !== wide.start || pieces.at(-1).end !== wide.end) return [];
+
+  let at = wide.start;
+  const refs = new Set();
+  const facts = [];
+  for (const part of pieces) {
+    if (!exact(part) || part.start !== at || part.status !== "supported" || part.finding) return [];
+    at = part.end;
+    if (part.kind === "nonfactual" && /^[\s\p{P}]+$/u.test(part.quote)) continue;
+    const proof = fragmentProof(part);
+    if (!proof || proof.type !== whole.type || proof.scope !== whole.scope) return [];
+    for (const ref of proof.refs) {
+      if (!whole.refs.has(ref)) return [];
+      refs.add(ref);
+    }
+    facts.push(part);
+  }
+  return facts.length > 1 && refs.size === whole.refs.size ? facts : [];
+}
+
+function equivalentProofFragments(first, second, record, other) {
+  const pairs = new Map();
+  if (!sha256Pattern.test(first.candidateSha256 ?? "") || first.candidateSha256 !== second.candidateSha256 ||
+      ![first, second].every(summary => summary.pending?.length === 0 && summary.rejected?.length === 0) ||
+      record.text !== other.text || record.line !== other.line || typeof record.lineText !== "string" ||
+      record.lineText !== other.lineText) return pairs;
+
+  for (const [wide, fine] of [[record, other], [other, record]]) {
+    for (const part of wide.parts) {
+      for (const piece of matchingFragments(record.text, part, fine.parts)) {
+        const [left, right] = wide === record ? [part, piece] : [piece, part];
+        if (!pairs.has(left)) pairs.set(left, new Set());
+        pairs.get(left).add(right);
+      }
+    }
+  }
+  return pairs;
+}
+
 /** Return differing spans and the stable factual union required of both roles. */
 export function classificationDisagreements(first,second,equivalentOutcomeSummaries = new Map()) {
   return first.records.flatMap(record=>{
@@ -2069,11 +2145,12 @@ export function classificationDisagreements(first,second,equivalentOutcomeSummar
     const introEnd = agreedQuoteIntroductionEnd(first, second, record, other);
     a.fill(0, 0, introEnd);
     b.fill(0, 0, introEnd);
+    const equivalent = equivalentProofFragments(first, second, record, other);
     for(let i=0;i<a.length;i++) {
       required[i]=a[i]||b[i];different[i]=a[i]!==b[i]?1:0;
       const left=a[i]?find(record,i):null,right=b[i]?find(other,i):null;
       const sameSummary = left && right && equivalentOutcomeSummaries.get(left) === right;
-      if(a[i]&&b[i]&&!sameSummary&&!assertionsAgree(left,right,record,other)){different[i]=1;objects[i]=1;}
+      if(a[i]&&b[i]&&!sameSummary&&!equivalent.get(left)?.has(right)&&!assertionsAgree(left,right,record,other)){different[i]=1;objects[i]=1;}
       if(different[i]) {
         const kinds=[assertionRequirement(left),assertionRequirement(right)];
         if(left&&right&&positiveProof(left)&&positiveProof(right)&&kinds[0]&&kinds[0]===kinds[1])recheckEvidence=true;

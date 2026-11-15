@@ -4,7 +4,7 @@ import { hasConditionalContext, isGroundedRuntimeProof } from "./code-review-pro
 import { expectedClaims } from "./evidence.mjs";
 import { inputContractCases } from "./input-contracts.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
-import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
+import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName, unitUsesSourcePins } from "./policy.mjs";
 import { lineList } from "./preflight.mjs";
 import { architectureImportsSection } from "./project-hierarchy.mjs";
 import { parser as pythonParser } from "./vendor/python-parser.cjs";
@@ -119,7 +119,7 @@ export function isCodeReviewUnit(frame, active, spec) {
   if (!active?.codeIntake?.regression || active.codeReviewRoute === "text" ||
     !spec?.codeTask?.tests?.regression || !isImplementationPath(spec.candidate) ||
     spec.plainLast || spec.claims.length || Object.keys(spec.calculations).length || spec.requireSourcePins ||
-    Object.keys(frame.policy.sourcePins ?? {}).length || frame.policy.requiredLinesGoal ||
+    unitUsesSourcePins(spec, frame.policy.sourcePins ?? {}) || frame.policy.requiredLinesGoal ||
     ["first-review", "final-review"].some(phase => spec.phases[phase].evidence.length)) return false;
   // Older versions could submit signed code only through the text workflow.
   // A qualification without the explicit new route carries that original debt.

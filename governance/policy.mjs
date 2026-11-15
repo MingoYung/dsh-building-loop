@@ -430,7 +430,12 @@ export function parseAuthority(bytes) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "hostResults", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "hostResults", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture", "kind", "instructions", "researchDependencies", "researchSources"]);
+    if (value.kind !== undefined && value.kind !== "research") throw new Error("工作单元 kind 当前只接受 research；工程仍使用 codeTask");
+    const scopedInstructions = value.instructions === undefined ? undefined : pathList(value.instructions);
+    if (scopedInstructions?.some(file => !includes(instructions, file))) {
+      throw new Error("工作单元规则须选自项目授权的只读指令，不得扩大读权");
+    }
     if (value.architecture !== undefined) architectureEntries.set(id, value.architecture);
     if (value.plainLast !== undefined && typeof value.plainLast !== "boolean") throw new Error("plainLast 须为布尔值；非文字产物由项目维护者明确关闭");
     if (value.cacheReadRotationThreshold !== undefined && (!Number.isSafeInteger(value.cacheReadRotationThreshold) || value.cacheReadRotationThreshold < 1)) {
@@ -479,6 +484,22 @@ export function parseAuthority(bytes) {
     }
     const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases);
     const hostResults = value.hostResults === undefined ? undefined : hostResultPolicy(value.hostResults, candidate, phases, calculations, codeTask);
+    if (value.kind === "research" && (codeTask || value.architecture || value.requireSourcePins !== true ||
+        !/\.md$/iu.test(candidate) || claims.some(claim => !/^C\d+$/u.test(claim)) ||
+        ["intake", "supplement"].some(phase => phases[phase].write.some(file => keyOf(file) !== keyOf(candidate))))) {
+      throw new Error("资料单元须使用 C数字断言和来源凭据，且与工程实现及架构写入分开");
+    }
+    const researchSources = value.researchSources === undefined ? [] : pathList(value.researchSources);
+    if (researchSources.length && (value.kind !== "research" || researchSources.length > 12 ||
+        researchSources.some(file => !/\.txt$/iu.test(file) || !file.startsWith("sources/") ||
+          !["intake", "supplement"].every(phase => includes(phases[phase].read, file)) ||
+          !["first-review", "final-review"].every(phase => includes(phases[phase].evidence, file))))) {
+      throw new Error("资料采集限于已授权两审的 sources/ 文本位置，且执行方须可读取原文");
+    }
+    const researchDependencies = Object.entries(object(value.researchDependencies ?? {}, "资料依赖"));
+    if (researchDependencies.length && (!codeTask || value.kind === "research" || researchDependencies.length > 12)) {
+      throw new Error("资料依赖只可登记在工程单元，最多十二个来源单元");
+    }
     for (const contract of codeTask?.diagnostics?.inputContracts ?? []) {
       for (const { requirement, diagnosticCases } of contract.examples ?? []) {
         if (requirement && (relativeName(requirement.file) !== requirement.file || !includes(goalContext, requirement.file))) {
@@ -494,7 +515,19 @@ export function parseAuthority(bytes) {
     units[id] = { candidate, claims, continuation, phases, calculations, covers,
       requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
       cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}),
-      ...(hostResults ? { hostResults } : {}) };
+      ...(hostResults ? { hostResults } : {}), ...(value.kind ? { kind: value.kind } : {}),
+      ...(scopedInstructions ? { instructions: scopedInstructions } : {}),
+      ...(researchDependencies.length ? { researchDependencies } : {}),
+      ...(researchSources.length ? { researchSources } : {}) };
+  }
+  // Dependencies are declared once by the maintainer. Restrict the graph to
+  // code -> research, so it cannot cycle or authorize a sibling code unit.
+  for (const unit of Object.values(units)) for (const [researchId, ids] of unit.researchDependencies ?? []) {
+    const producer = units[researchId];
+    if (producer?.kind !== "research" || !Array.isArray(ids) || !ids.length ||
+        new Set(ids).size !== ids.length || ids.some(id => !producer.claims.includes(id))) {
+      throw new Error("工程资料依赖须指向已登记的资料单元及其独立结论编号");
+    }
   }
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
@@ -517,14 +550,28 @@ export function parseAuthority(bytes) {
     }
     sourcePins[keyOf(file)] = { sha256: entry.sha256, kind: entry.kind, locator: entry.locator.trim(), ...(observation ? { observation } : {}) };
   }
+  const acquisitionOwners = new Set();
   for (const unit of Object.values(units)) {
+    for (const file of unit.researchSources ?? []) {
+      if (sourcePins[keyOf(file)] || acquisitionOwners.has(keyOf(file))) {
+        throw new Error("资料采集位置须归属唯一单元，且不能覆盖已登记来源");
+      }
+      acquisitionOwners.add(keyOf(file));
+    }
     if (unit.requireSourcePins && ["first-review", "final-review"].some(phase =>
-      unit.phases[phase].evidence.some(file => !sourcePins[keyOf(file)]))) throw new Error("本单元要求每份原始证据登记来源凭据");
+      unit.phases[phase].evidence.some(file => !sourcePins[keyOf(file)] && !includes(unit.researchSources ?? [], file)))) {
+      throw new Error("本单元要求每份原始证据登记来源凭据");
+    }
   }
-  const protectedFiles = [...instructions, ...Object.values(sourcePins).flatMap(pin => pin.observation ? [pin.observation.file] : []), ...Object.values(units).flatMap(unit => [
+  const acquiredReceipts = [...acquisitionOwners].map(researchReceiptPath);
+  const protectedFiles = [...instructions, ...acquiredReceipts, ...Object.values(sourcePins).flatMap(pin => pin.observation ? [pin.observation.file] : []), ...Object.values(units).flatMap(unit => [
     unit.phases["first-review"].receipt, unit.phases["final-review"].receipt,
     ...unit.phases["first-review"].evidence, ...unit.phases["final-review"].evidence,
   ])];
+  if (Object.values(units).some(unit => unit.codeTask && Object.values(unit.phases).some(grant =>
+    grant.read.some(file => acquisitionOwners.has(keyOf(file)))))) {
+    throw new Error("工程单元通过已验收结论取得资料，采集中的源文件不能加入工程读包");
+  }
   if (mutable.some(file => includes(protectedFiles, file))) throw new Error("指令、原始证据和核验回执不能授予模型写权");
   if(requiredLinesGoal&&includes(mutable,requiredLinesGoal))throw new Error("requiredLinesGoal 须对总控和执行、核验角色只读");
   if (Object.values(units).some(unit => includes(goalContext, unit.candidate)
@@ -567,7 +614,7 @@ export function parseAuthority(bytes) {
     const review = [unit.phases["first-review"], unit.phases["final-review"]];
     const editable = [...unit.phases.intake.write, ...unit.phases.supplement.write];
     if (!goalContext.length || hierarchy.private || !unit.codeTask?.tests?.regression || unit.plainLast || unit.claims.length ||
-      unit.requireSourcePins || Object.keys(sourcePins).length || requiredLinesGoal ||
+      unit.requireSourcePins || unitUsesSourcePins(unit, sourcePins) || requiredLinesGoal ||
       review.some(grant => !includes(grant.read, file) || grant.evidence.length || editable.some(path => !includes(grant.read, path))) ||
       editable.some(path => !isImplementationPath("reviewed" + path.slice(path.lastIndexOf("."))))) {
       throw new Error("架构验收须登记三级项目中的签名纯代码单元，架构由总控写且两道核验可精确读取");
@@ -654,6 +701,19 @@ export function parseAuthority(bytes) {
       ...(ownerExamples ? { ownerExamples } : {}) };
   }
   return { hash: digest(bytes), sessionOptIn: source.sessionOptIn === true, coordinator, instructions, units, sourcePins, ledgerContext, goalContext, ledgerDocument, requiredLinesGoal, hierarchy };
+}
+
+/** Unrelated research sources must not route an engineering unit through prose
+ * review. A source available in this unit's own grant still keeps its full gate.
+ */
+export function unitUsesSourcePins(unit, pins) {
+  return Object.values(unit.phases).some(grant => grant.read.some(file => Object.hasOwn(pins, keyOf(file))));
+}
+
+/** Keep generated metadata beside the snapshots for relative receipt parsing. */
+export function researchReceiptPath(file) {
+  const prefix = file.slice(0, file.lastIndexOf("/") + 1);
+  return prefix + ".building-loop-source-" + digest(keyOf(file)).slice(0, 20) + ".json";
 }
 
 /** Return only the managed history paths derived from an exact project file. */

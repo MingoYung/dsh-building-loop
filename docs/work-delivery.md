@@ -7,6 +7,7 @@
 | 一眼看清从对话到关单，以及谁负责哪一步 | [当前流程图](building-loop-flow.md) |
 | 看 DSH 预设、工具和模式约束 | [预设配置](../cordis.patch.yml) |
 | 设置文件授权与阶段 | [项目配置和工具说明](../governance/README.md) · [宿主机制](../governance/index.mjs) · [路径与权限检查](../governance/policy.mjs) |
+| 把资料结论交给工程并定位影响范围 | [资料与工程接力](../governance/README.md#资料与工程接力) · [原文采集](../governance/research-acquisition.mjs) · [结论版本绑定](../governance/research-handoff.mjs) |
 | 排查同一版本的反复失败，核实只读诊断并交回原会话 | [停滞诊断与签名回归](../governance/code-regression.md#执行停滞的分层诊断) · [触发与复现回执](../governance/stall-diagnostics.mjs) |
 | 检查退回项、数字复算和交付质量 | [提交预检](../governance/preflight.mjs) |
 | 写必要注释并核对注释与实际行为 | [代码注释验收](code-comment-acceptance.md) |

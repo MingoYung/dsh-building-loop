@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { QUALITY } from "../governance/preflight.mjs";
+import { QUALITY, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
+import { documentCoverage } from "../governance/coverage.mjs";
 import { fixture, host, policy } from "./helpers.mjs";
 
 const judgement = {
@@ -54,5 +55,33 @@ test("a source-free draft still returns an unsupported factual assertion for rep
     { block: blocks[0].id, parts: [nonfactual] }, { block: blocks[1].id, parts: [fact] },
   ] });
   await runner.assess(reviewer, judgement);
+  // A full-text block is a location in this draft, never a numbered check.
+  const pseudoClaim = { id: blocks[1].id, status: "unsupported", line: blocks[1].line,
+    basis: fact.basis, finding: fact.finding };
+  await assert.rejects(runner.flow(reviewer, "review", { checks: [pseudoClaim] }), /checks 仅提交/u);
+  assert.equal((await runner.flow("root", "status")).units[0].phase, "first-review");
   assert.equal((await runner.flow(reviewer, "review", { checks: [] })).phase, "supplement-ready");
 }));
+
+test("an old duplicate coverage check returns to review only after its recorded span is repaired", () => {
+  const sentence = "此服务的请求全部成功。";
+  const lines = ["# 复盘", sentence];
+  const block = documentCoverage(Buffer.from(lines.join("\n"))).blocks[1];
+  const spec = { claims: [], calculations: {}, plainLast: false, phases: { "final-review": { evidence: [] } } };
+  const rejected = rejectedClaims("", spec, lines, [{ id: block.id, line: block.line }], []);
+  const active = { unsupported: [block.id], rejected, coverageRejections: [
+    { block: block.id, line: block.line, lineText: sentence, finding: { quote: sentence } },
+  ] };
+  const unchanged = supplementChecks("", spec, ["# 另一个标题", sentence], [], active);
+  assert.equal(unchanged.ok, false);
+  assert.deepEqual(unchanged.repairs[0].unresolved, [2]);
+  const repairedLines = ["# 复盘", "没有记录可判断所有请求的结果。"];
+  const repaired = supplementChecks("", spec, repairedLines, [], active);
+  assert.equal(repaired.ok, true);
+  assert.equal(repaired.repairs[0].resolution, "removed-or-rewritten");
+  const required = { ...spec, claims: [block.id] };
+  assert.equal(supplementChecks("", required, repairedLines, [], active).ok, false);
+  for (const coverageRejections of [[], [{ ...active.coverageRejections[0], lineText: "没有对应旧行。" }]]) {
+    assert.equal(supplementChecks("", spec, repairedLines, [], { ...active, coverageRejections }).ok, false);
+  }
+});

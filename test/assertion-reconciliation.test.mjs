@@ -107,6 +107,50 @@ const exactParts = testCase => [
   ...testCase.atoms.map(evidencePart),
 ];
 
+test("independent proof grouping converges only on the same continuous facts and versioned evidence", () => {
+  const text = "A 记录为有效；B 记录为有效。";
+  const block = "B1-proof-split";
+  const candidateSha256 = digest(text);
+  const split = text.indexOf("B");
+  const reference = (file, line, quote) => ({ file, start: line, end: line, quote,
+    sha256: digest(file), evidenceSpan: digest(`${file}:${line}:${quote}`) });
+  const [leftRef, rightRef] = [reference("sources/results.md", 2, "A 有效"), reference("sources/results.md", 3, "B 有效")];
+  const goal = { ...reference("PROJECT.md", 4, "已有效的记录可纳入。"), goalSha256: digest("goal") };
+  const proof = (start, end, premises) => ({ start, end, quote: text.slice(start, end),
+    status: "supported", sourceRelation: "supports", kind: "inference", assertion: "project-application",
+    inference: { rule: "project-policy", premises, policy: [goal], scope: "本次已登记的记录", assumptions: [],
+      counterexample: { possible: false, reason: "核对同一条总纲和本项原始记录" } } });
+  const summary = parts => ({ candidateSha256, pending: [], rejected: [],
+    records: [{ block, line: 1, lineText: text, text, parts }] });
+  const coarse = summary([proof(0, text.length, [leftRef, rightRef])]);
+  const fine = summary([proof(0, split, [leftRef]), proof(split, text.length, [rightRef])]);
+  assert.deepEqual(classificationDisagreements(coarse, fine), []);
+  assert.deepEqual(classificationDisagreements(fine, coarse), []);
+
+  // A presentational delimiter may be recorded separately. A nonfactual label
+  // crossing into an actual premise never receives the wide review's proof.
+  const punct = { ...neutral("；"), start: split - 1, end: split };
+  const detached = summary([proof(0, split - 1, [leftRef]), punct, fine.records[0].parts[1]]);
+  assert.deepEqual(classificationDisagreements(coarse, detached), []);
+  const controls = [
+    local => { local.candidateSha256 = digest("stale candidate"); },
+    local => { local.pending.push(block); },
+    (local, parts) => { parts[1].inference.premises = [leftRef]; },
+    (local, parts) => { parts[1].inference.premises[0].sha256 = digest("new source bytes"); },
+    (local, parts) => { parts[1].inference.policy[0].goalSha256 = digest("different goal"); },
+    (local, parts) => { parts[1].inference.scope = "只核另一情形"; },
+    (local, parts) => { parts[1].inference.assumptions = ["此项来自未核对的批次"]; },
+    (local, parts) => { parts[1].inference.counterexample.possible = true; },
+    (local, parts) => { parts[1].status = "unsupported"; },
+    (local, parts) => { parts[1].kind = "nonfactual"; },
+  ];
+  for (const alter of controls) {
+    const different = structuredClone(fine);
+    alter(different, different.records[0].parts);
+    assert.ok(classificationDisagreements(coarse, different).some(row => row.block === block));
+  }
+});
+
 test("independent delivery summaries converge only on additional format references", () =>
   fixture(async root => {
     // Exact business and format clauses from the native decision dispute.

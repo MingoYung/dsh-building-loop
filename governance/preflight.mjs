@@ -843,6 +843,7 @@ export function plainLastIssues(spec, lines) {
 export function supplementChecks(root, spec, lines, readable, active) {
   const issues = plainLastIssues(spec, lines);
   const repairs=[],legacy=[];
+  const coverageRepairLines = new Map();
   const footnotes=active.coverageRejections?.some(finding=>finding.repairBaseline?.footnote||finding.repairBaseline?.attribution?.footnote)
     ? footnoteQuoteIndex(lines,spec.phases["final-review"].evidence) : null;
   // New receipts bind the actual rejected substring, not surrounding correct
@@ -850,6 +851,7 @@ export function supplementChecks(root, spec, lines, readable, active) {
   for (const finding of active.coverageRejections ?? []) {
     const repair=checkRepairSpan(root,spec,lines,readable,active,finding,footnotes);
     if(repair){repairs.push({...repair,channel:"coverage",block:finding.block});
+      coverageRepairLines.set(finding.block, finding.lineText);
       if(repair.unresolved.length)issues.push("全文退回 "+finding.block+" 的实际片段仍未修订或补入已读新证据，当前第 "+repair.unresolved.join("、")+" 行："+repair.quote
         +"。修改正确前缀或文件其他行不算落实；可删除/实质修订、在该句明确否定或标为错例，或同行引用本轮已读的新证据后重核。"+(repair.baseline.startsWith("legacy")?"旧回执无证据快照，不能据文件变化宣称补证成功。":""));
     }else{
@@ -879,6 +881,11 @@ export function supplementChecks(root, spec, lines, readable, active) {
       continue;
     }
     if (!row) {
+      // Older reviews could also file a block as a numbered check when there
+      // were no claims. Only the persisted repair for the same old line and
+      // block supersedes that duplicate. The new draft still needs full review.
+      if (before.version === 2 && typeof before.body === "string" && !spec.claims?.includes(id) &&
+          coverageRepairLines.get(id) === before.body) continue;
       issues.push(id + " 需要保留唯一的编号断言行");
       continue;
     }

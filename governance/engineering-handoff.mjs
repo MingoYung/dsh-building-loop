@@ -1,10 +1,11 @@
 import path from "node:path";
-import { goalSnapshot } from "./goals.mjs";
+import { acceptedVersion, goalSnapshot } from "./goals.mjs";
 import { TERMINAL } from "./ledger.mjs";
 import { isImplementationPath, keyOf, readBytes, text } from "./policy.mjs";
 import { workspaceStateFile } from "./session-mode.mjs";
 import { STATE_LIMIT } from "./transactions.mjs";
 import { DIAGNOSIS_WAIT } from "./stall-diagnostics.mjs";
+import { researchInputs, researchPrerequisites } from "./research-handoff.mjs";
 
 const UNIT = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -92,13 +93,13 @@ export function bindEngineeringCheckpoint(hostHome, root, policy, proposal) {
 export function resolveBoundUnit(frame, requested) {
   const checkpoint = frame.started?.binding.checkpoint;
   if (!checkpoint) return requested;
-  if (requested !== undefined && requested !== checkpoint.unit) {
+  if (requested !== undefined && requested !== checkpoint.unit && !researchPrerequisites(frame.policy, checkpoint.unit).includes(requested)) {
     throw new Error("所有者已确认工作单元 " + checkpoint.unit + "；当前调用不能推进 " + requested);
   }
   if (checkpoint.policySha256 !== frame.policy.hash || checkpoint.goalSha256 !== goalSnapshot(frame).sha256) {
     throw new Error("已确认的工程目标或授权版本已变化，请在新的主会话按当前目标和单元重新确认开工");
   }
-  return checkpoint.unit;
+  return requested ?? checkpoint.unit;
 }
 
 /** A previously confirmed contender cannot seize a lease that changed after its confirmation. */
@@ -164,11 +165,31 @@ export function engineeringStatus(frame) {
   const checkpoint = frame.started?.binding.checkpoint;
   if (!checkpoint || frame.role !== "coordinator") return undefined;
   let blocked;
-  try { resolveBoundUnit(frame); blocked = assessClaim(frame).issue; }
+  let nextUnit = checkpoint.unit;
+  let dependencies;
+  try {
+    resolveBoundUnit(frame);
+    blocked = assessClaim(frame).issue;
+    if (!blocked && frame.policy.units[checkpoint.unit]?.researchDependencies) {
+      dependencies = researchInputs(frame, checkpoint.unit, acceptedVersion).blocked;
+      const waiting = dependencies[0];
+      if (waiting) {
+        const prior = frame.state.units[waiting.unit];
+        if (waiting.status === "unproven") {
+          blocked = "资料 " + waiting.unit + " 的依赖断言没有两道有效原文证明：" + waiting.claims.join("、");
+        } else if (prior && prior.owner !== frame.agent.id) {
+          blocked = "资料 " + waiting.unit + " 需要由其授权总控先核对当前版本";
+        } else {
+          nextUnit = waiting.unit;
+        }
+      }
+    }
+  }
   catch (error) { blocked = error.message; }
   return { unit: checkpoint.unit, goalSha256: checkpoint.goalSha256, policySha256: checkpoint.policySha256,
     ...(checkpoint.replaceUnit ? { replaceUnit: checkpoint.replaceUnit } : {}),
-    ...(blocked ? { blocked } : { advance: { action: "advance", unit: checkpoint.unit } }) };
+    ...(dependencies?.length ? { researchDependencies: dependencies } : {}),
+    ...(blocked ? { blocked } : { advance: { action: "advance", unit: nextUnit } }) };
 }
 
 /** Transfer future administration, never old accepted ownership, inside the workspace transaction. */
