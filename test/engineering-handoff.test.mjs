@@ -72,6 +72,12 @@ test("confirmed opening activates exactly one executor when the coordinator turn
   assert.equal(native.activations.length, 1);
   const activation = native.activations[0];
   assert.equal(activation.request.parent.id, "root");
+  // rc.3 takes these fields directly, while older hosts read request.
+  assert.equal(activation.parent, activation.request.parent);
+  assert.equal(activation.cwd, activation.request.cwd);
+  assert.equal(activation.prompt, activation.request.prompt);
+  assert.equal(activation.agentPreset, activation.request.agentPreset);
+  assert.equal(activation.maxDepth, activation.request.maxDepth);
   assert.equal(state().units.K02.executor, activation.childId);
   assert.equal(state().units.K02.phase, "intake");
   assert.equal(native.followups.length, 0);
