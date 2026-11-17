@@ -8,14 +8,15 @@ import {
   relativeName, replaceWithHistory, scopedEditContent, text, workspaceRoot,
 } from "./policy.mjs";
 import {
-  QUALITY, citation, claimRow, deliveryQuality, lineList, numericChecks, plainLastIssues,
+  QUALITY, citation, claimRow, deliveryQuality, lineList, numberedCitationRanges, numericChecks, plainLastIssues,
   rejectedClaims, reviewedQuality, supplementChecks, repairBaseline, requiredClaimRowIssues,
 } from "./preflight.mjs";
-import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, readInventory, registeredSourceRows } from "./evidence.mjs";
+import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, originalDraftIssues, readInventory, registeredSourceRows, sourceVersionCurrent, workingClaimLocations } from "./evidence.mjs";
 import { currentHostResults, hostResultSlots, renderHostResults } from "./host-results.mjs";
+import { arithmeticSources, calculateFromSources, sourceArithmeticSchema } from "./source-arithmetic.mjs";
 import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
-import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage, projectPolicyContract } from "./coverage.mjs";
+import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage, originalReviewGate, projectPolicyContract, captureNumberedEvidence, numberedEvidenceRegressions } from "./coverage.mjs";
 import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
   pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
 import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
@@ -27,22 +28,22 @@ import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./
 import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
   currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview,
-  signedAnnotationCandidates, signedLocalImportBoundary, unreadAnnotationCandidates, verifyCodeReview } from "./code-review.mjs";
+  rememberCodeReview, resumeCodeReview, signedAnnotationCandidates, signedLocalImportBoundary, unreadAnnotationCandidates, verifyCodeReview } from "./code-review.mjs";
 import { codeDiagnosticsCurrent, compareInputContract, diagnosticRunnerConfig, inputContractBatchCurrent, prepareCodeDiagnostics, prepareCodeReproduction,
   prepareInputContractBatch, prepareReviewReproduction, prepareRollbackBatch, runCodeDiagnostics, runInputContractBatch } from "./code-diagnostics.mjs";
 import { visibleRecipeInputs } from "./diagnostic-recipe-inputs.mjs";
 import { diagnosticInputExamples, inputContractCases, publicInputExamples } from "./input-contracts.mjs";
 import { architectureResponsibilityResult, signedExplicitResponsibilityIssues } from "./architecture-responsibilities.mjs";
 import { finishRollbackRehearsal, prepareRollbackProposal } from "./architecture-rollback.mjs";
-import { compareReviewProbe, diagnosticRuntimeExpectation, requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, saveReviewProbe } from "./code-review-probes.mjs";
-import { createStallReproductionProof, DIAGNOSIS_WAIT, diagnosisProofIdentity, diagnosisProofNext, observeExecutionDiagnostic,
+import { compareReviewProbe, diagnosticRuntimeExpectation, isGroundedRuntimeProof, requireReviewProbeCapacity, reviewProbeId, reviewProbeRequest, reviewProbeRows, reviewReproduction, saveReviewProbe } from "./code-review-probes.mjs";
+import { createStallReproductionProof, DIAGNOSIS_WAIT, diagnosisObservedSource, diagnosisProofIdentity, diagnosisProofNext, observeExecutionDiagnostic,
   requireDiagnosisProofScope, requireStallReproductionProof,
   requireStallTriage, stallArtifactSha256, stallDiagnosticSummary, STALL_LAYERS } from "./stall-diagnostics.mjs";
 import { deliverableTableContract, deliverableTableIssues } from "./deliverable-table.mjs";
 import { deliveryOutcomeContract, deliveryOutcomeFields, deliveryOutcomeInstructions, deliveryOutcomeLayoutIssues, deliveryOutcomeProofGaps, deliveryOutcomeSchema,
   reviewDeliveryOutcomes, deliveryOutcomeDisagreements, equivalentOutcomeSummaries } from "./delivery-outcomes.mjs";
 import { addHierarchyModule, architectureDocument, checkHierarchyWrite, hierarchyReadPaths, ownerModuleApproval } from "./project-hierarchy.mjs";
-import { engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
+import { currentPausedCodeRepair, engineeringArchitectureStatus, engineeringRepair, registerEngineeringArchitecture, requireEngineeringArchitecture,
   requireHostImportSectionUnchanged, inspectEngineeringArchitectureClaims, engineeringArchitectureSourceFacts,
   architectureLinkRepairAction, coordinatorArchitectureSectionContent, engineeringArchitectureLinkIssues,
   validateCoordinatorArchitectureEdit } from "./engineering-architecture.mjs";
@@ -58,9 +59,10 @@ const ASSESS = "building_loop_quality";
 const CODE_REVIEW = "building_loop_code_review";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
+const CALCULATE = "building_loop_calculate";
 const START = "building_loop_propose";
 const dedicatedCodeReview = Symbol("dedicated-code-review");
-const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, CODE_REVIEW, LEDGER, COVERAGE, START, REPRODUCE, DIAGNOSE, DIAGNOSTIC_PROBE];
+const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, CODE_REVIEW, LEDGER, COVERAGE, START, REPRODUCE, DIAGNOSE, DIAGNOSTIC_PROBE, CALCULATE];
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
@@ -126,7 +128,9 @@ const BEGIN = {
   "first-audit-ready": "first-audit",
   "final-audit-ready": "final-audit",
 };
-const REVIEW_HANDOFFS = new Set(["review-ready", "final-review-ready", "first-audit-ready", "final-audit-ready"]);
+// A recorded review return uses the same durable delivery as the next review.
+const REVIEW_HANDOFFS = new Set(["review-ready", "final-review-ready", "first-audit-ready", "final-audit-ready", "supplement-ready"]);
+const REVIEW_HANDOFF_STAGES = new Set([...REVIEW_HANDOFFS].map(phase => BEGIN[phase]));
 const LEDGER_BASIS_RULE="账本 basis 只说明本项处置与当前目标或验收结果的关系；不要复述运行历史、宿主已有计数或哈希，宿主字段由账本导出负责。确需涉及数量时沿用原字段单位，全文块数不是行数。这是写作约束，不代替对依据内容的核实。";
 
 const RULES = {
@@ -139,7 +143,7 @@ const RULES = {
   diagnosis: "只读诊断。先 prepare 获取现行目标和源码。语法、参数、运行器用 building_loop_reproduce。行为用 building_loop_diagnosis_probe 比较一个可见字段，附已读条款。得到 proofId 后按 next 提交原因和定点修法。若实测落在另一层，用 reroute 交总控重新分层。",
 };
 const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
-const REVIEW_FORMAT = '先完整读当前目标、候选和引用原文。有据事实给 supported。事实退回提供 finding，定位实际错句和最小修正；contradiction 的编号核验还须 file/start/end 指向已读反证。用 building_loop_quality assess 记录六项依据、sourceRefs、unverifiedSources、unlisted、revise；goalFit={pass,basis} 独立填写。质量退回用 revisions 引已读目标或项目规则，选做建议放 suggestions。最后按 prepare 的实际 claims 提交 review checks。支持项可给同行 file/start/end；正文自动发现的编号用已保存全文证明时填 useCoverage:true。';
+const REVIEW_FORMAT = '先完整读当前目标、候选和引用原文。有据事实给 supported。事实退回提供 finding，定位实际错句和最小修正；contradiction 的编号核验还须 file/start/end 指向已读反证。用 building_loop_quality assess 记录六项依据、sourceRefs、unverifiedSources、unlisted、revise；goalFit={pass,basis} 独立填写。质量退回用 revisions 引已读目标或项目规则，选做建议放 suggestions。最后按 prepare 的实际 claims 提交 review checks。支持项可给同行 file/start/end；本角色已核完整编号行及其同行出处时填 useCoverage:true，由宿主沿用原文定位。';
 const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
 const CODE_SUBMIT_RULE = "落实已确认目标后，用 prepare 查看当前候选的签名和送审条件。submission.status 为 ready 就提交当前版本。返回 read-back 时核对当前行并按 submission.next 完成读回，再提交同一版。有实际需求缺口时修订并重新测试当前版本。";
 const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据。没有授权原始资料时填 []，仍须逐块判断，缺源事实应退回。候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
@@ -460,11 +464,14 @@ function diagnosisPacket(active, role) {
   const { evidence, triageReason, retryReason, verificationReason } = row;
   const summary = stallDiagnosticSummary(active);
   if (!summary) return;
+  const replay = role === "executor" ? row.replay : undefined;
+  const next = evidence?.proof?.scope === "signed-case" && replay?.exampleId
+    ? { tool: REPRODUCE, action: "example", exampleId: replay.exampleId } : undefined;
   return { ...summary, ...(row.emptyCompletions ? { emptyCompletions: row.emptyCompletions } : {}),
     ...(row.replacements ? { replacements: row.replacements } : {}),
     ...(triageReason ? { triageReason } : {}), ...(retryReason ? { retryReason } : {}),
     ...(verificationReason ? { verificationReason } : {}),
-    ...(evidence ? { evidence: { ...evidence, ...(role === "executor" && row.replay ? { replay: row.replay } : {}) } } : {}) };
+    ...(evidence ? { evidence: { ...evidence, ...(replay ? { replay: { ...replay, ...(next ? { next } : {}) } } : {}) } } : {}) };
 }
 
 /** Prioritize the owner-published reproduction of the failing signed case. */
@@ -706,7 +713,7 @@ export function apply(ctx, config = {}) {
     if (hostSourceUpdate(frame, active, spec) || needsRevalidation(frame, id, active)) return;
     if (REVIEW_HANDOFFS.has(active.phase)) return "dispatch";
     const host = previousActivationHost(active.activationHost);
-    if (active.reviewHandoff && ["first-review", "final-review", "first-audit", "final-audit"].includes(active.phase) &&
+    if (active.reviewHandoff && REVIEW_HANDOFF_STAGES.has(active.phase) &&
         (host === "dead" || host === "live" && active.activationHost?.instance === activationHost.instance &&
           active.reviewHandoff.retry === "scheduled")) return "recover";
   }
@@ -1084,11 +1091,25 @@ export function apply(ctx, config = {}) {
     return !!active && ["reviewer", "auditor"].includes(frame.role) && isCodeReviewUnit(frame, active, unitOf(frame, id));
   }
 
+  function publicBehaviorContract(spec, id) {
+    const check = inputContractCases(spec.codeTask?.diagnostics?.inputContracts)
+      .find(row => row.id === id && row.publicExample && row.requirement);
+    return check && digest(JSON.stringify(check));
+  }
+
+  function currentCodeRejection(active, spec, goalSha256) {
+    const rejection = active.codeReviewRejection;
+    if (rejection?.goalSha256 !== goalSha256) return;
+    const behavior = rejection.publicBehavior;
+    if (behavior && publicBehaviorContract(spec, behavior.id) !== behavior.contractSha256) return;
+    return rejection;
+  }
+
   function signedSubmission(frame, id, active, spec) {
     const goal = goalSnapshot(frame);
     const qualification = verifySignedCodeSubmission(frame, id, active, spec, goal);
-    const rejection = active.codeReviewRejection;
-    if (rejection?.goalSha256 === goal.sha256 && rejection.artifactsSha256 === digest(JSON.stringify(qualification.artifacts))) {
+    const rejection = currentCodeRejection(active, spec, goal.sha256);
+    if (rejection?.artifactsSha256 === digest(JSON.stringify(qualification.artifacts))) {
       throw new Error("代码核验已退回此版本，请落实退回项后重新签名送审");
     }
     const pending = codeSubmissionReadback(frame, active, spec, goal, qualification);
@@ -1107,10 +1128,10 @@ export function apply(ctx, config = {}) {
 
   /** The executor receives only host-authorized repair instructions, not
    * access to the review receipt or to the reviewer's private evidence. */
-  function codeRepairPacket(frame, active) {
-    const rejection = active.codeReviewRejection;
-    if (frame.role !== "executor" || active.phase !== "supplement" || !rejection?.repair ||
-      rejection.goalSha256 !== goalSnapshot(frame).sha256) return;
+  function codeRepairPacket(frame, active, spec) {
+    if (frame.role !== "executor" || active.phase !== "supplement") return;
+    const rejection = currentCodeRejection(active, spec, goalSnapshot(frame).sha256);
+    if (!rejection?.repair) return;
     return { receipt: active.receipt, sha256: rejection.receiptSha256, ...rejection.repair };
   }
 
@@ -1248,6 +1269,7 @@ export function apply(ctx, config = {}) {
       const phase = assignment?.[1].phase ?? current?.phase ?? "dispatch";
       const clarification = ownerClarificationPacket(frame, current, unit);
       if(spec)refreshCheckpoints(frame,current,spec);
+      const originalReads = spec && pendingOriginalReads(frame,current,spec);
       const reviewRestart = reviewRestartPacket(frame, current);
       if (frame.role === "diagnostician" && current.stallDiagnostic.preparedSerial !== current.serial) {
         // A new activation must expose its own version before a probe or
@@ -1256,6 +1278,7 @@ export function apply(ctx, config = {}) {
         frame.changed = true;
       }
       const codeReviewMode = codeReviewRole(frame);
+      if (codeReviewMode) resumeCodeReview(frame, assignment[0], current, spec);
       const annotationCandidates = codeReviewMode && current.annotationCandidatesSent !== current.serial
         ? signedAnnotationCandidates(frame, spec, current.codeIntake.qualification).filter(({ file }) => includes(frame.reads, file)).slice(0, 8) : [];
       // Goals, architecture and current changed-source evidence share one
@@ -1264,12 +1287,13 @@ export function apply(ctx, config = {}) {
       const codeRanges = new Map(codePaths.map(({ file, ranges }) => [keyOf(file), ranges]));
       const order = checkpoint ? coordinatorPacketPaths(frame, checkpoint.unit, current) : [...new Set([...frame.policy.goalContext,...frame.policy.instructions,
         ...(codeReviewMode && spec.architecture ? [spec.architecture.file] : []),
-        ...(codeReviewMode ? codePaths.map(({ file }) => file) : [...(spec?[spec.candidate]:[]),...frame.reads])])].filter(file=>includes(frame.reads,file));
+        ...(codeReviewMode ? codePaths.map(({ file }) => file) : [...(spec?[spec.candidate]:[]),...frame.reads])])]
+        .filter(file=>includes(originalReads ?? frame.reads,file));
       const seen = assignment ? current.seen : !checkpoint || phase === "ledger-review" ? current?.ledgerSeen : coordinatorPacketCursor(frame)?.seen;
       const files=[], pending=[];
       let bytesUsed=0, instruction, deliverableTable;
       const original = frame.started?.proposal.instruction;
-      if (assignment && original && current.instructionReadSerial !== current.serial) {
+      if (assignment && !originalReads && original && current.instructionReadSerial !== current.serial) {
         // The owner command comes from the host state, outside workspace grants and evidence.
         // Count it in the same packet limit and only mark it when the complete text is returned.
         instruction = { seq: frame.started.source.seq, sha256: frame.started.source.sha256, text: original };
@@ -1306,6 +1330,11 @@ export function apply(ctx, config = {}) {
         if (nextLine !== undefined) pending.push({path:file,start:nextLine,
           next:returned.length?"再次 prepare 或按行 read":"单行超过读包限额，请用 building_loop_file read 显式读取"});
       }
+      if (originalReads) {
+        const originalReview = coverageAction(frame,current,spec,{action:"originals"});
+        return { role:frame.role,phase,unit:assignment[0],files,pending,
+          ...(instruction ? { instruction } : {}),originalReview,next:originalReview.next };
+      }
       let coverage, manuscriptCounts, candidatePositions, actualClaims, codeReview;
       if (codeReviewMode) {
         if (current.goal?.sha256 !== goalSnapshot(frame).sha256) throw new Error("项目目标已变，请总控 advance 重启当前代码的独立验收");
@@ -1325,7 +1354,7 @@ export function apply(ctx, config = {}) {
           runtimeRecipes: reviewRecipes.filter(recipe => recipe !== syntaxRecipe), syntax: Boolean(syntaxRecipe),
           ...(recipeInputs ? { recipeInputs } : {}),
           ...(publicExamples.length ? { publicExamples } : {}),
-          requirement: "阻塞退回的 runtime 探针带 {file,start,end,quote}。自拟探针 quote 引用完整规格句，明确支持预期字段和值。登记示例只需用 exampleId 和匹配的 requirement，省略 recipe、stdin 和已登记的预期。",
+          requirement: "行为复现用 assertion:'runtime' 和 requirement:{file,start,end,quote}。登记示例另给 exampleId，已登记的输入和预期由宿主读取。自拟探针引用支持预期字段和值的完整规格句。",
           architectureExamples: (current.engineeringArchitecture?.examples?.cases ?? []).map(({ id }) => id) };
       } else if(spec&&["reviewer","auditor"].includes(frame.role)) {
         try {
@@ -1350,14 +1379,23 @@ export function apply(ctx, config = {}) {
       const availableNext = availableProofs.findLast(({ next }) => next.action === "submit" || next.action === "reroute")?.next;
       const stallDiagnostic = ["executor", "diagnostician"].includes(frame.role) ||
         frame.role === "coordinator" && current?.owner === frame.agent.id ? diagnosisPacket(current, frame.role) : undefined;
+      const repair = frame.role === "executor" && stallDiagnostic?.status === "resolved" && stallDiagnostic.evidence?.source;
+      const located = repair && diagnosisObservedSource(stallDiagnostic.evidence.proof);
+      const repairSeen = located && current.seen?.[keyOf(repair.file)];
+      const repairRead = located && includes(frame.reads, repair.file) &&
+        !(repairSeen?.hash === repair.sha256 && repairSeen.ranges.some(([a, b]) => a <= repair.start && b >= repair.end)) &&
+        sameStallVersion(current.stallDiagnostic, currentStallVersion(frame, spec))
+        ? { tool: FILE, action: "read", path: repair.file, start: Math.max(1, repair.start - 4), count: repair.end - repair.start + 9 }
+        : undefined;
       const codeTask = frame.role === "executor" && assignment && current.codeIntake &&
         (phase === "intake" || current.codeIntake.regression) ? prepareCodeIntake(frame, assignment[0], current, spec, goalSnapshot(frame)) : null;
-      const codeRepair = codeTask && codeRepairPacket(frame, current);
+      const codeRepair = codeTask && codeRepairPacket(frame, current, spec);
       const recipeInputs = codeTask && visibleRecipeInputs(reproductionPolicy(frame));
       if (codeTask) {
         const publicExamples = publicInputExamples(spec.codeTask?.diagnostics?.inputContracts);
         if (recipeInputs || publicExamples.length) codeTask.reproduction = { tool: REPRODUCE,
-          ...(recipeInputs ? { recipeInputs } : {}), ...(publicExamples.length ? { publicExamples } : {}) };
+          ...(recipeInputs ? { recipeInputs } : {}), ...(publicExamples.length ? { publicExamples,
+            note: "登记示例对应不同目标条款。修改实现时先检查相应示例。宿主还会按当前签名工件复跑全部登记的输入契约。" } : {}) };
         if (spec.architecture?.allowedLocalImports) codeTask.allowedLocalImports = spec.architecture.allowedLocalImports;
         if (spec.architecture?.responsibilities) codeTask.architectureResponsibilities = spec.architecture.responsibilities
           .map(({ id, mode, trigger, owner, exampleId }) => ({ id, mode, trigger, owner, exampleId }));
@@ -1380,20 +1418,22 @@ export function apply(ctx, config = {}) {
             { status: pending.length ? "read-back" : "ready", receiptSha256: qualification.receiptSha256,
             pending: submissionGaps(pending, current), next: { tool: WORKFLOW, action: "submit" } };
         } catch (error) {
-          submission = { status: "blocked", reason: error.message };
+          submission = { status: "blocked", reason: error.message,
+            ...(recipeInputs ? { next: { tool: REPRODUCE, action: "check" } } : {}) };
         }
       }
       const checkpointAdvance = checkpoint?.advance && (["dispatch", "blocked"].includes(phase) || BEGIN[phase])
         ? { tool: WORKFLOW, ...checkpoint.advance } : undefined;
       const next = codeReview ? codeReview.next : current?.rollbackRepairActive && frame.role === "executor"
         ? { tool: WORKFLOW, action: "rollback-proposal" } : diagnosisNext(current)
-        ?? targetedNext ?? availableNext ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
+        ?? repairRead ?? targetedNext ?? availableNext ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
         ?? architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
         : submission?.status === "rollback-proposal-required" ? submission.next
         : submission?.status === "ready" ? "当前签名回归和读回已齐，直接 submit"
         : submission?.status === "read-back" ? "当前签名回归已通过，submit 会返回待读回的准确页"
         : submission?.status === "architecture-import-boundary" ? "按 violations 修正实际越界导入，读回并获取新的签名后 submit"
+        : submission?.status === "blocked" && submission.next ? submission.next
         : codeTask?.regressionProof ? "落实当前目标，读回改动和候选，取得当前版本的签名回归回执后 submit"
         : phase==="supplement" ? "按退回项修改，读回、preflight、submit"
         : frame.role==="executor"&&phase==="intake" ? (frame.managed ? "按当前目标写出首稿，完整读回后 submit" : "保留原稿 submit")
@@ -1408,6 +1448,11 @@ export function apply(ctx, config = {}) {
       const outcomeDraft = outcomeContract && readBytes(frame.root,spec.candidate);
       const outcomeFields = outcomeDraft && candidateReadComplete(current,spec.candidate,outcomeDraft)
         ? deliveryOutcomeFields(outcomeContract,outcomeDraft) : null;
+      const numericSources = arithmeticSources(frame, current, spec);
+      const workingMaterials = spec?.phases[phase]?.materials;
+      // Editorial inventory already pairs each decision with its submitted source.
+      const editorialInventory = Boolean(coverage?.editorialReview);
+      const originalClaims = workingMaterials?.length && !editorialInventory ? workingClaimLocations(frame, current, spec) : [];
       return {role:frame.role,phase,unit:assignment?.[0] ?? checkpoint?.unit,files,pending,complete:pending.length===0,
         ...(checkpoint ? { checkpoint } : {}),
         ...(instruction ? { instruction } : {}),
@@ -1431,6 +1476,19 @@ export function apply(ctx, config = {}) {
         ...(deliverableTable ? { deliverableTable } : {}),
         ...(outcomeContract ? { outcomeContract:deliveryOutcomeInstructions(outcomeContract) } : {}),
         ...(outcomeFields ? { outcomeFields } : {}),
+        ...(workingMaterials?.length ? { workingMaterials: {
+          files: workingMaterials,
+          attribution: "核对待核材料本身写了什么，单独以 [材料转述] 开头并给出材料文件和行号；外部事实另引独立原文。",
+          ...(originalClaims.length ? { originalClaims } : {}),
+          ...(editorialInventory ? {} : { verdict: "先定位来稿中实际需要更正的原句并核原始证据，再核改写后的事实。补充背景可以和保留并存，不能据未写过的说法更正来稿。" }),
+          ...(frame.role === "reviewer" ? { numbered: "核完编号行的所有事实段后可在 checks 用 useCoverage:true。待核材料只证明它本身的转述，外部事实仍须同行独立出处。" } : {}),
+          ...(["reviewer","auditor"].includes(frame.role) ? { coverage: {
+            kind: "direct", assertion: "material-attribution", status: "supported", sourceRelation: "supports",
+            basis: "仅支持该材料自身的文字内容", evidence: [{ file: workingMaterials[0], start: 1, end: 1, quote: "替换为本轮实际读到的对应材料原文" }],
+          } } : {}),
+        } } : {}),
+        ...(numericSources.length ? { sourceArithmetic: { tool: CALCULATE, action: "evaluate", sources: numericSources,
+          use: "原文摘句不足时检查获授权的原始数据。口径明确的差值、当前占比和基准以来增量占比分别按原始行列复算；结论仍需核对象、分母、单位和范围。" } } : {}),
         ...(clarification ? { outcomeClarification: clarification } : {}),
         ...(reviewRestart ? { reviewRestart } : {}),
         ...(frame.role==="executor" && current?.outcomeIssues?.length ? {outcomeIssues: current.outcomeIssues} : {}),
@@ -1485,17 +1543,50 @@ export function apply(ctx, config = {}) {
     return change(agent, frame => addHierarchyModule(frame, args, approval, requireText(args.note, "改动理由", 500)));
   }
 
+  function fragmentAssignment(frame, file) {
+    const [unit, active] = frame.assignment ?? [];
+    if (frame.role === "executor" && active?.phase === "supplement" && /\.(?:md|markdown)$/iu.test(file) &&
+        keyOf(unitOf(frame, unit).candidate) === keyOf(file) && includes(frame.writes, file)) return active;
+  }
+
+  /** Resolve coverage blocks or whole lines only on the executor's actual
+   * current read. A line replaces its text without consuming its newline. */
+  function draftFragmentResolver(frame, file, before) {
+    const active = fragmentAssignment(frame, file);
+    if (!active) return;
+    const seen = active.seen?.[keyOf(file)];
+    let blocks, lines;
+    return ({ block, line }) => {
+      if (seen?.hash !== digest(before)) throw new Error("请先读取当前版本的候选文稿再按位置编辑");
+      let target;
+      if (block !== undefined) {
+        blocks ??= new Map(documentCoverage(before).blocks.map(block => [block.id, block]));
+        target = blocks.get(block);
+      } else {
+        lines ??= lineList(before);
+        const text = lines[line - 1];
+        if (text) target = { line, start: 0, end: text.length, text };
+      }
+      if (!target || !seen.ranges.some(([start, end]) => start <= target.line && target.line <= end)) {
+        throw new Error("文稿定位不在当前实际已读范围，请使用 read 返回的当前块编号或非空行号");
+      }
+      return target;
+    };
+  }
+
   /** 文件入口集中执行白名单、实际已读行记录、日志和滚动备份。 */
   function fileAction(args, exec, refreshResults = false) {
     if (args.action === "add-module") return addModule(args, exec);
     let diagnosticJob, readbackJob;
     const result = change(exec.agent, frame => {
       if (frame.role === "idle") throw new Error("当前子会话没有已授权的工作阶段");
-      if (args.action === "list") return { read: frame.reads, write: frame.writes };
+      const originalReads = frame.assignment && pendingOriginalReads(frame,frame.assignment[1],unitOf(frame,frame.assignment[0]));
+      const reads = originalReads ?? frame.reads;
+      if (args.action === "list") return { read: reads, write: frame.writes };
       if (args.action === "search") {
         const query = requireText(args.query, "搜索字面量", 120);
-        const paths = args.path === undefined ? frame.reads : [relativeName(args.path)];
-        for(const file of paths)if(!includes(frame.reads,file))throw new Error("该文件不在当前读白名单");
+        const paths = args.path === undefined ? reads : [relativeName(args.path)];
+        for(const file of paths)if(!includes(reads,file))throw new Error(originalReads ? "改稿尚未开放，请先独立核验原稿" : "该文件不在当前读白名单");
         const matches = [],files=[];
         for (const file of paths) {
           const bytes = readBytes(frame.root, file);
@@ -1520,9 +1611,20 @@ export function apply(ctx, config = {}) {
         unitOf(frame, frame.assignment[0]);
       if (refreshResults && !refreshUnit) throw new Error("只有被派回的原执行方可以重算新版资料");
       const hostCandidate = frame.role === "executor" && frame.assignment && unitOf(frame, frame.assignment[0]);
-      const requested = refreshUnit ? refreshUnit.candidate : relativeName(args.path);
+      let requested = refreshUnit?.candidate ?? args.path;
+      if (requested === undefined && args.action === "edit" && frame.role === "executor" && frame.assignment?.[1].codeIntake?.regression) {
+        // Recover an omitted path only when the supplied preimage identifies
+        // one previously read and currently writable implementation file.
+        const seen = frame.assignment[1].seen;
+        const matches = frame.writes.filter(file => isImplementationPath(file) && includes(frame.reads, file) &&
+          seen?.[keyOf(file)] && seen[keyOf(file)].hash === args.beforeSha256);
+        if (matches.length !== 1) throw new Error("edit 需要 path。先读取要改的文件，沿用 read 返回的 path 和 beforeSha256");
+        [requested] = matches;
+      }
+      requested = relativeName(requested);
       const renderResults = hostCandidate?.hostResults && keyOf(requested) === keyOf(hostCandidate.candidate);
       const file = renderResults ? hostCandidate.candidate : requested;
+      if (originalReads && !includes(originalReads,file)) throw new Error("改稿尚未开放，请先独立核验原稿");
       if (args.action === "write" || args.action === "edit") {
         if(frame.policy.ledgerDocument&&keyOf(file)===keyOf(frame.policy.ledgerDocument))throw new Error("该文件由宿主生成，只能由 building_loop_ledger export/review 更新");
         if (!includes(frame.writes, file)) throw new Error("该文件不在当前写白名单");
@@ -1570,7 +1672,7 @@ export function apply(ctx, config = {}) {
           }
           const sectionBody = edit && architectureUnit && args.heading !== undefined && args.oldText === undefined && args.edits === undefined;
           const next = sectionBody ? coordinatorArchitectureSectionContent(before, args)
-            : edit ? scopedEditContent(before, args, splice => { plan = splice; })
+            : edit ? scopedEditContent(before, args, splice => { plan = splice; }, draftFragmentResolver(frame, file, before))
               : refreshUnit ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(before) : args.content;
           if (edit && architectureUnit) validateCoordinatorArchitectureEdit(frame, architectureUnit, file, before, next, args.heading);
           if (renderResults) {
@@ -1637,8 +1739,13 @@ export function apply(ctx, config = {}) {
         throw new Error("行范围无效，单次最多 250 行");
       }
       seenLines(frame,file,bytes,start,Math.min(start+count-1,lines.length));
+      const page = lines.slice(start - 1, start - 1 + count);
+      const fragments = fragmentAssignment(frame, file) && page.some(line => line.trim())
+        ? documentCoverage(bytes).blocks.filter(block => start <= block.line && block.line < start + count) : [];
       return { path: file, totalLines: lines.length, sha256: digest(bytes),
-        lines: lines.slice(start - 1, start - 1 + count).map((line, index) => [start + index, line]) };
+        lines: page.map((line, index) => [start + index, line]),
+        ...(fragments.length ? { fragments: fragments.slice(0, 250).map(({ id, line, start, end }) => ({ block: id, line, start, end })) } : {}),
+        ...(fragments.length > 250 ? { fragmentsTruncated: true } : {}) };
     });
     const respond = reply => {
       const readback = readbackJob && completeEditReadback(readbackJob, exec);
@@ -1762,7 +1869,11 @@ export function apply(ctx, config = {}) {
         const comparison = investigation?.expected && (investigation.exampleId ? compareInputContract(investigation, diagnostics)
           : compareReviewProbe({ type: "runtime", ...investigation }, diagnostics));
         const evidence = { ...observation, ...investigation, result: diagnostics, comparison };
-        const layers = [record.layer, ...STALL_LAYERS.filter(layer => layer !== record.layer)];
+        // Accepted arguments can also show a failure against the exact public
+        // contract. Keep that authenticated behavior receipt available to reroute.
+        const preferred = record.layer === "parameters" && investigation?.exampleId && comparison?.outcome === "mismatch"
+          ? "behavior" : record.layer;
+        const layers = [preferred, ...STALL_LAYERS.filter(layer => layer !== preferred)];
         const observed = layers.map(layer => createStallReproductionProof({ ...record, layer }, evidence)).find(Boolean);
         const previous = observed && record.probes?.find(item => diagnosisProofIdentity(item.proof) === diagnosisProofIdentity(observed));
         const proof = previous?.proof ?? observed;
@@ -1783,9 +1894,11 @@ export function apply(ctx, config = {}) {
         }
         // Replay arguments stay available to the repairing executor; the
         // coordinator receives hashes and locators, never candidate stdout.
-        const replay = { ...(observation.input ? { input: observation.input } : {}),
+        const registered = proof.scope === "signed-case";
+        const replay = { ...(!registered && observation.input ? { input: observation.input } : {}),
           ...(investigation ? { expected: investigation.expected, requirement: investigation.requirement,
-            ...(investigation.exampleId ? { exampleId: investigation.exampleId } : {}) } : {}) };
+            ...(investigation.exampleId ? { exampleId: investigation.exampleId } : {}) } : {}),
+          ...(registered && comparison?.actual ? { actual: comparison.actual } : {}) };
         // Persist the bounded comparison only. Raw runner output stays local
         // to this invocation and does not get replayed on a duplicate call.
         const savedComparison = comparison ? { outcome: comparison.outcome, reason: comparison.reason,
@@ -1947,24 +2060,35 @@ export function apply(ctx, config = {}) {
         const targeted = registeredDiagnosis(active, spec, layer);
         requireDiagnosisProofScope(record, proof, targeted);
         if (args.action === "reroute" && layer === record.layer) throw new Error("同一层的复现须用 submit");
-        const cause = requireText(args.cause, "可核实的具体原因", 600);
-        const fix = args.action === "submit" ? requireText(args.fix, "原执行方的定点修法或解阻条件", 600) : undefined;
+        const measured = args.action === "submit" && [args.file, args.start, args.end].every(value => value === undefined) &&
+          diagnosisObservedSource(proof);
+        const cause = measured && args.cause === undefined ? undefined : requireText(args.cause, "可核实的具体原因", 600);
+        const fix = args.action === "submit" && (!measured || args.fix !== undefined)
+          ? requireText(args.fix, "原执行方的定点修法或解阻条件", 600) : undefined;
         let source;
-        if (["syntax", "behavior"].includes(layer) && !proof.recovery) {
+        if (measured) {
+          if (!includes(spec.codeTask.sources, measured.file) || !includes(frame.reads, measured.file) ||
+            !version.artifacts.some(row => row.path === measured.file && row.sha256 === measured.sha256)) {
+            throw new Error("复现源码定位不属于当前授权工件");
+          }
+          source = measured;
+        } else if (["syntax", "behavior"].includes(layer) && !proof.recovery) {
           const file = relativeName(args.file);
           const artifact = version.artifacts.find(item => keyOf(item.path) === keyOf(file));
           const seen = active.seen?.[keyOf(file)], { start, end } = args;
           if (!artifact?.sha256 || !includes(spec.codeTask.sources, file) || !includes(frame.reads, file) ||
             seen?.hash !== artifact.sha256 || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) ||
-            start < 1 || end < start || end - start > 64 || !seen.ranges.some(([a, b]) => a <= start && end <= b) ||
-            proof.path && keyOf(proof.path) !== keyOf(file)) {
-            throw new Error("诊断须定位本会话实际读过的当前授权源码行；编译报错行和原因行可不同，但必须在同一文件");
+            start < 1 || end < start || end - start > 64 || !seen.ranges.some(([a, b]) => a <= start && end <= b)) {
+            throw new Error("诊断须定位本会话实际读过的当前授权源码行");
+          }
+          if (layer === "syntax" && proof.path && keyOf(proof.path) !== keyOf(file)) {
+            throw new Error("编译报错行和原因行可不同，但必须在同一文件");
           }
           source = { file, start, end, sha256: artifact.sha256 };
         } else if ([args.file, args.start, args.end].some(value => value !== undefined)) {
           throw new Error("参数、运行器或恢复回执用实际宿主结果定位");
         }
-        const evidence = { id: randomUUID(), proof, cause, ...(fix ? { fix } : {}), ...(source ? { source } : {}),
+        const evidence = { id: randomUUID(), proof, ...(cause ? { cause } : {}), ...(fix ? { fix } : {}), ...(source ? { source } : {}),
           ...(entry.replay.requirement ? { requirement: entry.replay.requirement } : {}) };
         delete record.probes;
         if (args.action === "reroute") {
@@ -2062,9 +2186,11 @@ export function apply(ctx, config = {}) {
       return { prior, phase: "supplement", role: "executor", reusable: prior.executor,
         serial: prior.serial + 1, sourceUpdate };
     }
+    const pausedCodeRepair = prior?.codeReviewRejection?.pausedReviewReceiptSha256 &&
+      currentPausedCodeRepair(frame, id, spec, prior, goalSnapshot(frame));
     const planned = metricWaiting ? (prior?.resumePhase === "intake" ? "intake" : "supplement")
       : (revalidating || waiting) ? "final-review"
-      : prior?.phase === "blocked" ? prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
+      : prior?.phase === "blocked" ? pausedCodeRepair ? "supplement" : prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
     const priorPhase = prior?.phase === "blocked" ? prior.resumePhase : prior?.phase;
     const isReviewPhase = phase => typeof phase === "string" && (isAudit(phase) || isReview(phase));
     const codeReview = prior?.codeIntake?.regression && (isReviewPhase(planned) || isReviewPhase(priorPhase));
@@ -2081,11 +2207,12 @@ export function apply(ctx, config = {}) {
     const role = isAudit(phase) ? "auditor" : isReview(phase) ? "reviewer" : "executor";
     const threshold=spec.cacheReadRotationThreshold;
     const used=prior?.executorUsage?.[prior.executor]?.cacheReadTokens??0;
+    const mandatoryRepair = phase === "supplement" && (pausedCodeRepair || currentCodeRejection(prior, spec, goalSnapshot(frame).sha256)?.publicBehavior);
     // Rotation occurs only between completed executor stages. An interrupted
-    // checkpoint, reviewer or auditor always resumes its bound identity.
-    const rotate=phase==="supplement" && prior?.phase!=="blocked" && spec.continuation==="reuse"
+    // checkpoint or an exact public-behavior repair keeps its bound actor.
+    const rotate=phase==="supplement" && !mandatoryRepair && prior?.phase!=="blocked" && spec.continuation==="reuse"
       && threshold!==undefined && used>=threshold;
-    const reusable = regressionRetry || metricWaiting ? prior.executor : revalidating||waiting ? prior?.reviewer : prior?.phase === "blocked" ? prior.actor
+    const reusable = regressionRetry || metricWaiting || mandatoryRepair ? prior.executor : revalidating||waiting ? prior?.reviewer : prior?.phase === "blocked" ? prior.actor
       : rotate ? undefined
       : phase === "supplement" && spec.continuation === "fresh" ? undefined : prior?.[role];
     return { prior, phase, role, reusable, rotate, used, threshold, regressionRetry, serial: (prior?.serial ?? 0) + 1 };
@@ -2303,10 +2430,13 @@ export function apply(ctx, config = {}) {
       await ctx.subagents.sendMessage(agent, childId, content, { signal });
     } else {
       const selection = agent.model.current();
+      const request = { parent: agent, cwd: next.workspace, agentPreset: presetId, prompt: content, maxDepth: 1,
+        ...(selection ? { agentOptions: selection } : {}) };
+      // DSH rc.3 reads the request fields at the top level. Earlier hosts
+      // use the nested request. Keep both shapes in a single activation.
       await ctx.subagents.startActivation({
         provider: "spawn", childId, label: unit + " " + next.phase, delivery: "parent", signal,
-        request: { parent: agent, cwd: next.workspace, agentPreset: presetId, prompt: content, maxDepth: 1,
-          ...(selection ? { agentOptions: selection } : {}) },
+        ...request, request,
       });
     }
   }
@@ -2362,7 +2492,7 @@ export function apply(ctx, config = {}) {
           current.reviewHandoff.id !== row.reviewHandoff.id || current.serial !== row.serial ||
           current.actor !== row.actor || ctx.agents.get(row.actor) !== resident ||
           JSON.stringify(current.materialBinding) !== JSON.stringify(checkpointBinding(locked, unitOf(locked, unit)))) return;
-      const role = isAudit(row.phase) ? "auditor" : "reviewer";
+      const role = isAudit(row.phase) ? "auditor" : isReview(row.phase) ? "reviewer" : "executor";
       if (actor !== row.actor) current.actor = current[role] = actor;
       current.activationHost = activationHost;
       if (!cold) current.reviewHandoff.retry = "used";
@@ -2376,10 +2506,12 @@ export function apply(ctx, config = {}) {
         await deliverStage(agent, unit, actor, { workspace: frame.root, phase: row.phase, brief: claimed.brief },
           continuable, claimed.id, signal);
       } else if (cold) {
-        // The old inbox entry may be queued or already consumed. Waking its
-        // session continues the persisted review without a second work order.
+        // The native inbox already admitted this work order. Wake the actor
+        // with its current stage without issuing a duplicate assignment.
         await ctx.subagents.sendMessage(agent, actor, [{ type: "text", text:
-          "宿主恢复了原审核会话。先用 prepare 继续当前核验阶段，沿用已登记的本角色证据与当前版本。" }], { signal });
+          row.phase === "supplement"
+            ? "宿主恢复了原补查会话。先用 prepare 核对当前版本及已登记的退回项，再继续补查。"
+            : "宿主恢复了原审核会话。先用 prepare 继续当前核验阶段，沿用已登记的本角色证据与当前版本。" }], { signal });
       }
     } catch (error) {
       if (cold) retryReviewDelivery(agent, unit, claimed.id);
@@ -2592,6 +2724,7 @@ export function apply(ctx, config = {}) {
       const spec = unitOf(frame, id);
       if (isCodeReviewUnit(frame, active, spec)) throw new Error("当前代码任务用 building_loop_code_review prepare 获取变更范围");
       const binding=refreshCheckpoints(frame,active,spec);
+      if (args.action === "originals" || args.action === "original-record") return coverageAction(frame,active,spec,args);
       const bytes = reviewCandidate(frame, active, spec);
       const contract = args.action === "status" && args.block === undefined ? deliveryOutcomeContract(frame, spec, goal) : null;
       const result=coverageAction(frame, active, spec, args, contract ? {
@@ -2657,6 +2790,7 @@ export function apply(ctx, config = {}) {
     }
     const unsupported = calculations.filter(row => !row.ok).map(row => row.id);
     const decision = coverage.rejected.length || unsupported.length || formatIssues.length || outcomeIssues.length ? "reject" : "accept";
+    if (decision === "reject") captureNumberedEvidence(frame, active, spec, lineList(bytes), coverage);
     const receipt = { ...pending, decision, calculations, unsupported, coverage: coverageReceipt(pending.coverage),
       // Recompute for legacy pending receipts too, after matching the exact candidate bytes.
       candidatePositions:candidatePositionSummary(spec.candidate,bytes),
@@ -2716,6 +2850,7 @@ export function apply(ctx, config = {}) {
     }
     const proof = verifyCodeReview(frame, active, spec, signed);
     requireEngineeringArchitecture(frame, id, spec, active);
+    rememberCodeReview(frame, active, spec, signed, proof);
     delete active.codeReviewDraft;
     delete active.codeReviewProbes;
     const rejected = proof.decision === "reject";
@@ -2821,12 +2956,15 @@ export function apply(ctx, config = {}) {
     }
     if(preservation.proof)result={...result,requiredLines:preservation.proof,
       ok:result.ok&&preservation.issues.length===0,issues:[...result.issues,...preservation.issues]};
+    const evidenceRegressions = numberedEvidenceRegressions(frame,active,spec,lines,goal ?? goalSnapshot(frame));
+    if(evidenceRegressions.length)result={...result,ok:false,evidenceRegressions,
+      issues:[...result.issues,...evidenceRegressions.map(row=>row.issue)]};
     const outcomeLayout=deliveryOutcomeLayoutIssues(deliveryOutcomeContract(frame,spec,goal??goalSnapshot(frame)),bytes);
     if(outcomeLayout.length)result={...result,ok:false,issues:[...result.issues,...outcomeLayout]};
     if(active.outcomeIssues?.length&&active.rejectedCandidate===digest(bytes)){
       result={...result,ok:false,issues:[...result.issues,"逐项交付退回仍未修订，请按 prepare 的 outcomeIssues 修改正文或大白话"]};
     }
-    const claimIssues=requiredClaimRowIssues(lines,spec.claims);
+    const claimIssues=[...requiredClaimRowIssues(lines,spec.claims),...originalDraftIssues(spec,lines)];
     if(claimIssues.length)result={...result,ok:false,issues:[...result.issues.filter(issue=>
       !claimIssues.some(message=>message.startsWith(issue+"，"))),...claimIssues]};
     // Review cannot certify a scope marker that the draft attaches to more
@@ -2932,6 +3070,7 @@ export function apply(ctx, config = {}) {
           active.metricClarification = { goalSha256: goalSnapshot(frame).sha256,
             items: [{ id: slot, status: "clarify", question: question.trim() }] };
         }
+        if (!args.metricClarification) preservePausedRuntimeRejection(frame, id, active);
         pause(active, reason);
         if(active.reconciliationRound)active.reconciliationExhausted=true;
         trackUnit(frame, id, active, true);
@@ -2944,7 +3083,7 @@ export function apply(ctx, config = {}) {
           requireEngineeringArchitecture(frame, id, spec, active, false);
           if (!codeRoute) throw new Error("当前候选含文稿核验义务，维护者须用独立文稿单元保留事实和资料核验");
         }
-        if (!codeRoute && active.codeReviewRejection?.goalSha256 === goalSnapshot(frame).sha256) {
+        if (!codeRoute && currentCodeRejection(active, spec, goalSnapshot(frame).sha256)) {
           throw new Error("此目标下已有代码核验退回项，请先按代码回执修订；涉及文稿或证据的范围变更由维护者核定");
         }
         let signed;
@@ -2971,8 +3110,12 @@ export function apply(ctx, config = {}) {
             // author finding or notifying the next role.
             const inputContracts = current || observed?.status === "unavailable" || observed?.status === "busy"
               ? observed : { status: "superseded" };
+            // A real behavioral mismatch needs a correction on the same
+            // implementation. Repeating submit would only run the same input.
+            const next = current && observed?.status === "failed" ? { tool: FILE, action: "edit",
+              reason: "根据失败的实际返回和当前条款修复实现，读回并获取当前签名后再提交。" } : { tool: WORKFLOW, action: "submit" };
             return { unit: id, phase: active.phase, submission: { status: "input-check",
-              inputContracts, next: { tool: WORKFLOW, action: "submit" } } };
+              inputContracts, next } };
           }
           const artifacts = inputCheck.batch[0].job.request.artifacts.map(({ path, sha256 }) => ({ path, sha256 }));
           inputProof = { status: observed.status, passed: observed.passed, receipts: observed.receipts,
@@ -3025,7 +3168,8 @@ export function apply(ctx, config = {}) {
           if (issues.length) throw new Error("[building-loop/deliverable-table] " + issues.join("；"));
         }
         if (active.phase === "intake" && !codeRoute) {
-          const issues=requiredClaimRowIssues(lineList(bytes),spec.claims);
+          const lines=lineList(bytes);
+          const issues=[...requiredClaimRowIssues(lines,spec.claims),...originalDraftIssues(spec,lines)];
           if(issues.length)throw new Error("[building-loop/preflight] "+issues.join("；"));
         }
         if (active.phase === "supplement" && codeRoute) {
@@ -3078,7 +3222,7 @@ export function apply(ctx, config = {}) {
         const fullCoverage=()=>coverage??=coverageSummary(frame,active,spec);
         const checks = args.checks ?? previous?.map(check => check.supportOrigin?.kind === "same-reviewer-coverage"
           ? { id: check.id, status: check.status, basis: check.basis, useCoverage: true } : check);
-        let checked = reviewChecks(frame, active, spec, grant, checks ?? (spec.hostResults ? [] : undefined), lines, binding, fullCoverage);
+        let checked = reviewChecks(frame, active, spec, grant, checks ?? (spec.hostResults || spec.originalFirst ? [] : undefined), lines, binding, fullCoverage);
         coverage=fullCoverage();
         requireDisputedProof(active,coverage.records,true);
         const outcomeContract = deliveryOutcomeContract(frame, spec, goal);
@@ -3115,12 +3259,13 @@ export function apply(ctx, config = {}) {
         // A source-free design can pass independent review. Supported factual
         // spans and numbered claims still require their own verified evidence.
         if (!unsupported.length && ((grant.evidence.length > 0 && !observedSources?.length) || checked.some(check =>
-          check.supportOrigin?.proofObject !== "project-policy" && !observedSources.some(ref =>
+          !["project-policy","working-material"].includes(check.supportOrigin?.proofObject) && !observedSources.some(ref =>
             keyOf(ref.file) === keyOf(check.file) && ref.sha256 === check.sha256 && ref.start <= check.end && ref.end >= check.start)))) {
           throw new Error("资料核验须覆盖每份支持结论的实际原文，请重新提交 sourceRefs");
         }
         const qualityRejected = qualityChecks ? Object.keys(qualityChecks).filter(field => !qualityChecks[field].pass) : [];
         const decision = unsupported.length || qualityRejected.length || coverage.rejected.length || preservation.issues.length || outcomeIssues.length ? "reject" : "pending-audit";
+        if (decision === "reject") captureNumberedEvidence(frame, active, spec, lines, coverage);
         active.rejected = rejectedClaims(frame.root, spec, lines, checked.filter(check => check.status !== "supported"), frame.reads);
         const receipt = {
           unit: id, phase: active.phase, reviewer: exec.agent.id, decision, candidateSha256: hash,
@@ -3351,7 +3496,70 @@ export function apply(ctx, config = {}) {
       throw new Error("待复核代码、架构、目标或签名结果已经变化，须重新核验");
     }
     const binding = codeReviewBinding(frame, active, signed);
-    return { active, spec, signed, architecture, binding };
+    return { id, active, spec, goal, signed, architecture, binding };
+  }
+
+  function ownerBehaviorCheck(frame, active, spec, architecture, check) {
+    if (check.type !== "architecture") return;
+    const owner = spec.architecture?.ownerExamples?.find(row => row.id === check.exampleId);
+    if (!owner) return;
+    const requirement = codeReviewRequirement(frame, active, owner.requirement);
+    const runtime = reviewProbeRequest({ assertion: "runtime", exampleId: check.exampleId, file: spec.candidate },
+      frame, active, spec, architecture, requirement);
+    if (runtime.grounding?.kind === "registered-example" &&
+        JSON.stringify([runtime.input, runtime.expected]) === JSON.stringify([check.input, check.expected])) return runtime;
+  }
+
+  function rejectPublicBehavior(frame, { id, active, spec, goal, signed }, row) {
+    // Only the maintainer's fixed input and expected outcome can trigger this
+    // transition. Models can still explore arbitrary probes without routing.
+    if (!row.contractCase || row.grounding?.kind !== "registered-example" || !isGroundedRuntimeProof(row)) return;
+    const contractSha256 = publicBehaviorContract(spec, row.contractCase);
+    if (!contractSha256) return;
+    const finding = { id: row.id, kind: "behavior", file: row.file, contractCase: row.contractCase,
+      issue: row.summary.actual, fix: "修复已登记的公开行为并重新运行当前版本的签名回归。",
+      requirement: row.requirement, ...row.summary, snapshotSha256: row.snapshotSha256 };
+    const file = persistRuntimeRejection(frame, { id, active, spec, goal, signed }, [finding],
+      { publicBehavior: { id: row.contractCase, contractSha256 } }, { publicBehavior: finding });
+    for (const key of ["codeReviewDraft", "codeReviewProbes", "pendingReceipt", "assessment", "proof"]) delete active[key];
+    active.phase = "supplement-ready";
+    trackUnit(frame, id, active);
+    frame.changed = true;
+    return { unit: id, phase: active.phase, receipt: file, parent: active.owner,
+      next: { tool: WORKFLOW, action: "advance", unit: id } };
+  }
+
+  function persistRuntimeRejection(frame, { id, active, spec, goal, signed }, findings, binding, details) {
+    const phase = active.phase;
+    const auditor = frame.role === "auditor";
+    const file = auditor ? active.receipt : spec.phases[phase].receipt;
+    const candidateSha256 = active.codeIntake.qualification.artifacts.find(item => keyOf(item.path) === keyOf(spec.candidate)).sha256;
+    const receipt = buffer({ unit: id, phase, goal, candidateSha256, decision: "reject", codeRegression: signed,
+      reviewer: active.reviewer, ...(auditor ? { auditor: frame.agent.id } : {}), ...details });
+    replaceWithHistory(frame.root, file, text(receipt), "代码行为复现失败", tag(frame), frame.state.markers);
+    active.receipt = file;
+    active.codeReviewRejection = { artifactsSha256: signed.artifactsSha256, goalSha256: goal.sha256,
+      receiptSha256: digest(receipt), ...binding, repair: { findings, comments: [], constraints: [] } };
+    return file;
+  }
+
+  function preservePausedRuntimeRejection(frame, id, active) {
+    const draft = active.codeReviewDraft;
+    if (!codeReviewRole(frame) || draft?.actor !== frame.agent.id || draft.role !== frame.role || draft.serial !== active.serial) return;
+    const findings = draft.findings.filter(row => row.owner === "executor" && row.kind === "behavior" &&
+      ["runtime", "requirement"].includes(row.violation?.type) && isGroundedRuntimeProof(row.violation.reproduction));
+    if (!findings.length) return;
+    let current;
+    try { current = currentReviewProbe(frame, id); }
+    catch { return; }
+    if (draft.binding !== current.binding) return;
+    // The pause remains paused. Promote only completed validation, so a later
+    // document edit cannot erase its code repair when a new review opens.
+    const repair = findings.map(({ id, kind, file, start, end, issue, fix, violation }) => ({
+      id, kind, file, start, end, issue, fix, requirement: violation.reproduction.requirement, ...violation.reproduction.summary,
+    }));
+    persistRuntimeRejection(frame, current, repair, { pausedReviewReceiptSha256: current.signed.receiptSha256 },
+      { validatedRuntimeFindings: repair });
   }
 
   async function probeCodeReview(args, exec) {
@@ -3372,34 +3580,44 @@ export function apply(ctx, config = {}) {
           : undefined;
         const requirement = codeReviewRequirement(frame, active, input.requirement ?? registered?.requirement);
         const check = reviewProbeRequest(input, frame, active, spec, architecture, requirement);
+        const ownerCheck = ownerBehaviorCheck(frame, active, spec, architecture, check);
         const id = reviewProbeId(binding, check);
         const cached = rows.find(row => row.id === id);
         requireReviewProbeCapacity(rows, id, check.type);
-        return { check, id, cached, job: cached ? null : prepareReviewReproduction(frame, check.input, diagnosticRunner) };
+        return { check, ownerCheck, id, cached, job: cached ? null : prepareReviewReproduction(frame, check.input, diagnosticRunner) };
       });
       return { jobs, binding };
     }, warnCleanup);
     reproductions.add(agent);
     try {
       const rows = [];
-      for (const { check, id, cached, job } of jobs) {
+      for (const { check, ownerCheck, id, cached, job } of jobs) {
         signal?.throwIfAborted();
         if (cached) { rows.push(cached); continue; }
         const result = await completeDiagnostics(job, exec);
-        const registeredTimeout = result.status === "execution-timeout" && check.type === "runtime" &&
-          check.grounding?.kind === "registered-example";
+        const behavior = ownerCheck ?? check;
+        const registeredTimeout = result.status === "execution-timeout" && behavior.type === "runtime" &&
+          behavior.grounding?.kind === "registered-example";
         if (!result.probe && !registeredTimeout) {
           if (!batch || result.status === "superseded") return result;
           rows.push({ exampleId: check.exampleId, id, outcome: "unavailable", status: result.status, reason: result.reason,
             ...(result.status === "invalid-input" ? { field: result.field, message: result.message } : {}) });
           continue;
         }
-        const row = change(agent, frame => {
+        const saved = change(agent, frame => {
           const current = currentReviewProbe(frame, args.unit);
           if (current.binding !== binding || !codeDiagnosticsCurrent(frame, job) || signal?.aborted) return { status: "superseded" };
-          return saveReviewProbe(frame, current.active, binding, id, check, result);
+          // The very same runner response can also prove an owner-authorized
+          // service contract. Reuse it without requiring a second probe call.
+          const provedOwnerFailure = ownerCheck && compareReviewProbe(ownerCheck, result).outcome === "mismatch";
+          const row = provedOwnerFailure
+            ? saveReviewProbe(frame, current.active, binding, reviewProbeId(binding, ownerCheck), ownerCheck, result)
+            : saveReviewProbe(frame, current.active, binding, id, check, result);
+          return { row, transition: rejectPublicBehavior(frame, current, row) };
         }, { claim: false });
-        if (row.status === "superseded") return row;
+        if (saved.status === "superseded") return saved;
+        const { row, transition } = saved;
+        if (transition) return { ...row, ...await notifyPhase(exec, transition) };
         rows.push({ ...(batch ? { exampleId: check.exampleId } : {}), ...row });
       }
       return batch ? { examples: rows } : rows[0];
@@ -3556,21 +3774,36 @@ export function apply(ctx, config = {}) {
     materials: { type: "array", maxItems: 4, items: { ...string, maxLength: 1200 }, description: "可选。与任务直接相关的用户消息逐字摘录；不填模型生成内容或文件路径。" },
   }, propose, ["goal", "deliverable", "scope"]), { when: ({ agent }) => mayPropose(agent) });
 
-  const editFragment = {
-    type: "object", properties: {
-      oldText: { ...string, description: "当前文件中恰好出现一次的逐字片段，含缩进和换行；空文件可传空字符串" },
-      newText: { ...string, description: "替换片段，空字符串表示删除该片段" },
-    }, required: ["oldText", "newText"], additionalProperties: false,
+  const editText = {
+    oldText: { ...string, description: "当前文件中恰好出现一次的逐字片段，含缩进和换行；空文件可传空字符串" },
+    newText: { ...string, description: "替换片段，空字符串表示删除该片段" },
   };
-  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。已有回归代码和已登记的逐段核验架构用 edit；新建文件和改已授权总纲用 write。总纲用完整 content 并给现有 heading（有三级导航时）。代码局部编辑用 beforeSha256 和唯一旧片段；架构按 heading、beforeSha256、newText 替换该节正文（坏引用按宿主 next）。写入保留一个滚动备份及逐文件日志。add-module 仅在所有者明确批准后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
-    path: string, query: string, content: string, note: string, start: number, count: number,
+  const editFragment = {
+    type: "object", properties: { ...editText,
+      block: { ...string, description: "文稿补查时 read 返回的当前块编号，仅替换该块。与 oldText、line 互斥。" },
+      line: { ...number, description: "文稿补查时 read 返回的当前非空行号。替换整行，newText 不含换行，与 oldText、block 互斥。" },
+    }, required: ["newText"], additionalProperties: false,
+  };
+  register(tool(FILE, "按准确路径白名单读写 UTF-8 文件。已有回归代码和已登记的逐段核验架构用 edit；新建文件和改已授权总纲用 write。总纲用完整 content 并给现有 heading（有三级导航时）。局部编辑用 beforeSha256 和唯一旧片段；候选文稿补查可用 read 返回的 line 整行替换或用 block 替换一块，均在 edits 中给 newText。架构按 heading、beforeSha256、newText 替换该节正文（坏引用按宿主 next）。写入保留一个滚动备份及逐文件日志。add-module 仅在所有者明确批准后使用。", ["list", "read", "search", "write", "edit", "history", "add-module"], {
+    path: { ...string, description: "读写、历史与局部编辑的项目相对路径。代码 edit 仅在 beforeSha256 唯一匹配本角色已读可写文件时可省略。" },
+    query: string, content: string, note: string, start: number, count: number,
     beforeSha256: { ...string, description: "edit 必填：当前目标文件的完整 SHA-256，可从 read 获取" },
-    ...editFragment.properties,
+    ...editText,
     edits: { type: "array", items: editFragment, minItems: 1, maxItems: 32 },
     module: { ...string, description: "add-module：所有者明确指定的小写模块编号" },
     title: { ...string, description: "add-module：所有者明确指定的模块标题" },
     heading: { ...string, description: "架构按节编辑或受管中央文件写入时，填写唯一可见的现有正文标题" },
   }, fileAction), {when:visible(["coordinator","executor","reviewer","auditor","diagnostician"])});
+
+  register(tool(CALCULATE, "从本角色已读的登记原文行精确复算。difference 计算 a-b，share 计算 a/b，change-share 计算 (a-b)/(c-d)。占比结果带百分号单位。结果携带原始数值、行列和摘要。", ["evaluate"], sourceArithmeticSchema,
+    (args, exec) => change(exec.agent, frame => {
+      const assignment = frame.assignment;
+      if (!assignment || !["executor", "reviewer", "auditor"].includes(frame.role)) throw new Error("当前角色没有原文复算授权");
+      const [id, active] = assignment;
+      requireGoalRead(frame, active);
+      return calculateFromSources(frame, active, unitOf(frame, id), args);
+    }, { claim: false }), ["operation", "operands"]), { when: visible(["executor", "reviewer", "auditor"], frame =>
+      Boolean(frame.assignment && arithmeticSources(frame, frame.assignment[1], unitOf(frame, frame.assignment[0])).length)) });
 
   const reproductionInput = {
     recipe: { ...string, maxLength: 128, description: "probe 的配方编号和参数形状，见 prepare 或 check 返回的 recipeInputs，旧授权见 recipes" },
@@ -3594,7 +3827,7 @@ export function apply(ctx, config = {}) {
   }, (args, exec) => reproduce(args, exec, true)),
   { when: visible(["diagnostician"], reproductionPolicy) });
 
-  register(tool(DIAGNOSE, "执行停滞诊断。总控 triage 给 layer 和 reason，然后 advance。只读诊断方用真实复现 proofId、已读源码行、cause 和 fix 提交 submit。发现另一层用 reroute 带该层 proofId 和 cause。总控 verify 给 evidenceId、decision 和 reason。确认后 advance 回原执行会话。", ["triage", "submit", "reroute", "verify"], {
+  register(tool(DIAGNOSE, "执行停滞诊断。总控 triage 给 layer 和 reason 后 advance。关联失败签名用例的复现已有源码定位时，submit 只填 proofId。其余 submit 或 reroute 按 prepare 返回的 next。总控 verify 给 evidenceId、decision 和 reason 后 advance 回原执行会话。", ["triage", "submit", "reroute", "verify"], {
     unit: string, layer: { enum: STALL_LAYERS }, reason: { ...string, maxLength: 500 },
     evidenceId: string, proofId: string, decision: { enum: ["confirmed", "retry"] },
     file: string, start: number, end: number, cause: { ...string, maxLength: 600 }, fix: { ...string, maxLength: 600 },
@@ -3604,7 +3837,7 @@ export function apply(ctx, config = {}) {
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
   const proseReview = frame => !isCodeReviewUnit(frame, frame.assignment[1], unitOf(frame, frame.assignment[0]));
-  register(tool(COVERAGE, "按宿主全文清单逐块核验。inventory分页取全文；record每次1–12块，部分错误只重交invalid块；status默认只给进度，可用block取单块证明。", ["inventory", "record", "status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"], proseReview)});
+  register(tool(COVERAGE, "按宿主全文清单逐块核验。已启用原稿先核时，改稿开放前用 originals 查看来稿、original-record 保存独立判断。inventory 分页取全文；record 每次 1–12 块，部分错误只重交 invalid 块；status 默认只给进度，可用 block 取单块证明。", ["originals", "original-record", "inventory", "record", "status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"], proseReview)});
   const qualityNames = Object.keys(QUALITY);
   const referenceSchema = { type: "object", properties: { file: string, start: number, end: number }, required: ["file", "start", "end"], additionalProperties: false };
   register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
@@ -3662,7 +3895,7 @@ export function apply(ctx, config = {}) {
       type: "object", properties: {
         id: string, status: { type: "string", enum: ["supported", "unsupported"] },
         line: { ...number, description: "退回项在候选中没有编号行时填写候选行号" },
-        useCoverage: { type: "boolean", description: "仅用于正文自动发现的编号，用当前角色、当前稿该行的已验全文证明；与 file/start/end 二选一。" },
+        useCoverage: { type: "boolean", description: "支持项可复用本审核员在当前阶段、当前稿件上保存的编号行证明。项目明确编号的事实段须有同行已核出处。不再填 file/start/end。" },
         file: { ...string, description: "用直接出处支持或反驳断言时，填写实际已读原文路径，与 id/status 同级。" },
         start: { ...number, description: "直接引用原文的起始行，1 起计。" },
         end: { ...number, description: "直接引用原文的结束行，1 起计。" },
@@ -3719,6 +3952,10 @@ export function apply(ctx, config = {}) {
           const bytes = readBytes(frame.root, file, 12 * 1024);
           return bytes ? "当前目标（高于旧派单说明） " + file + "\n" + text(bytes) : "当前目标缺失 " + file;
         });
+        const originalReads = assignment && pendingOriginalReads(frame,assignment[1],unitOf(frame,assignment[0]));
+        if (originalReads) return [descriptor,
+          "当前只核原稿。先用 building_loop prepare 读授权来稿及来源，按 originalReview.next 保存判断。改正须逐字定位原稿争议；待证只说明证据范围。已登记的复算由宿主处理。改稿将在来稿判断保存后开放。",
+          JSON.stringify({read:originalReads,write:[]}),...shared,...goals].join("\n");
         const detail = assignment ? {
           unit: assignment[0], candidate: unitOf(frame, assignment[0]).candidate,
           ...(frame.role !== "auditor" ? { receipt: assignment[1].receipt } : {}),
@@ -3797,11 +4034,22 @@ function candidateReadComplete(active,file,bytes,lineCount=lineList(bytes).lengt
 
 /** 验收必须完整读过当前候选，禁止沿用旧版本阅读记录。 */
 function reviewCandidate(frame, active, spec) {
+  if (pendingOriginalReads(frame,active,spec)) throw new Error("改稿尚未开放，请先独立核验原稿");
   const bytes = readBytes(frame.root, spec.candidate);
   if (!bytes || !candidateReadComplete(active,spec.candidate,bytes)) {
     throw new Error("验收前须完整读取当前候选正文");
   }
+  const issues = originalDraftIssues(spec,lineList(bytes));
+  if (issues.length) throw new Error(issues.join("；"));
   return bytes;
+}
+
+function pendingOriginalReads(frame, active, spec) {
+  const gate = originalReviewGate(frame,active,spec);
+  if (!gate?.pending.length) return;
+  const grant = spec.phases[active.phase];
+  const allowed = [...frame.policy.goalContext,...frame.policy.instructions,...(grant.materials ?? []),...gate.sources];
+  return frame.reads.filter(file => includes(allowed,file) && keyOf(file) !== keyOf(spec.candidate));
 }
 
 /** Retain the full measured count while bounding physical line previews. */
@@ -3915,8 +4163,15 @@ function carryNumberedFinding(frame,active,grant,row,material,fullCoverage) {
   return {finding:part.finding,basis:part.basis,origin:{kind:"same-reviewer-coverage",block:record.block}};
 }
 
-/** Reuse the reviewer's substantive proof on exactly this inferred row.
- * Keep project rules distinct from external sources, even on mixed rows. */
+/** A multi-range citation is a list of authored alternatives, not a span
+ * from the first location to the last. Legacy singleton picks allow context. */
+function numberedRangeAllows(seen, ranges, proof, exact = false) {
+  return ranges.some(({ start, end }) => !start ? !exact :
+    seen?.ranges.some(([first, last]) => first <= start && last >= end) && (exact || ranges.length > 1
+      ? proof.start >= start && proof.end <= end : proof.start <= end && proof.end >= start));
+}
+
+/** Reuse the current reviewer's proof on this exact numbered row. */
 function numberedCoverageSupport(frame, active, spec, grant, id, candidate, material, fullCoverage) {
   const unavailable = reason => new Error(id + " 无法复用本次全文核验：" + reason);
   const row = claimRow(candidate, id);
@@ -3929,36 +4184,77 @@ function numberedCoverageSupport(frame, active, spec, grant, id, candidate, mate
   if (coverage.candidateSha256 !== material.candidateSha256 || coverage.rejected.some(item => item.line === row.line)) {
     throw unavailable("该编号行存在实际退回，请按保存的事实发现提交");
   }
-  const cited = grant.evidence.flatMap(file => {
-    const range = citation(row.body, file);
-    return range ? [{ file, ...range }] : [];
-  });
+  const configured = spec.claims.includes(id);
+  const cited = new Map(grant.evidence.flatMap(file => {
+    const ranges = numberedCitationRanges(row.body, file);
+    return ranges.length ? [[keyOf(file), ranges]] : [];
+  }));
   const usable = ref => ref?.file && keyOf(ref.file) !== keyOf(spec.candidate) &&
-    (!cited.length || cited.some(source => keyOf(source.file) === keyOf(ref.file) &&
-      (!source.start || ref.start <= source.end && ref.end >= source.start &&
-        active.seen[keyOf(ref.file)]?.ranges.some(([a, b]) => a <= source.start && b >= source.end))));
+    (!configured && !cited.size || numberedRangeAllows(active.seen?.[keyOf(ref.file)], cited.get(keyOf(ref.file)) ?? [], ref, configured));
   const assessment = active.assessment?.hash === material.candidateSha256 ? active.assessment : null;
   const observed = ref => assessment?.refs?.some(source => keyOf(source.file) === keyOf(ref.file) &&
     source.sha256 === ref.sha256 && source.start <= ref.end && source.end >= ref.start);
-  const facts = coverage.records.filter(record => !record.reusedProof &&
-    record.line === row.line && record.lineText === candidate[row.line - 1]).flatMap(record =>
-    record.parts.filter(part => ["direct", "inference"].includes(part.kind)).map(part => ({ part, block: record.block })));
+  const facts = coverage.records.filter(record => record.line === row.line && record.lineText === candidate[row.line - 1])
+    .flatMap(record => record.parts.filter(part => ["direct", "inference"].includes(part.kind))
+      .map(part => ({ part, block: record.block, reusedProof: record.reusedProof })));
+  const ownFacts = facts.filter(item => !item.reusedProof);
   const supported = part => part.status === "supported" && part.sourceRelation === "supports" && !part.objectCheck &&
     !part.inference?.counterexample?.possible;
+  const materialFact = part => supported(part) && part.assertion === "material-attribution" && part.proofObject === "working-material" &&
+    part.evidence?.some(ref => includes(grant.materials ?? [], ref.file) &&
+      numberedRangeAllows(active.seen?.[keyOf(ref.file)], numberedCitationRanges(row.body, ref.file), ref, true) &&
+      (!configured || ref.evidenceSpan && sourceVersionCurrent(frame.root, ref)));
+  if (configured && ownFacts.length !== facts.length) throw unavailable("项目明确编号须使用本阶段各事实段的独立证明");
+  if (!cited.size && ownFacts.length && ownFacts.every(({ part }) => materialFact(part))) {
+    return {line:row.line,supportOrigin:{kind:"same-reviewer-coverage",proofObject:"working-material",
+      blocks:[...new Set(ownFacts.map(({block})=>block))]}};
+  }
   // `coverageSummary` already validates each exact project-policy quote and
   // current goal version. Its premises, if present, are external references.
   const policyFact = part => supported(part) && part.proofObject === "project-policy" &&
     part.inference?.rule === "project-policy" && part.inference.policy?.length > 0;
-  const supports = facts.flatMap(({ part, block }) => {
-    if (!(supported(part) && part.proofObject === "external") && !policyFact(part)) return [];
-    return [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? [])]
-      .filter(usable).map(ref => ({ ref, block }));
+  const factEvidence = part => !(supported(part) && part.proofObject === "external") && !policyFact(part) ? [] :
+    [...(part.evidence ?? []), ...(part.inference?.premises ?? []), ...(part.inference?.warrant ?? []),
+      ...(configured ? (part.inference?.assumptions ?? []).flatMap(item => item.evidence ? [item.evidence] : []) : [])];
+  const omitted = new Map();
+  let omittedQuote;
+  const supports = ownFacts.flatMap(({ part, block }) => {
+    // The original disposition is a role-bound decision about the incoming
+    // claim, not an extra factual assertion that the author must cite again.
+    if (spec.originalFirst && part.originalDisposition && policyFact(part)) return [];
+    const refs = factEvidence(part), selected = refs.filter(usable);
+    if (configured && (selected.length !== refs.length || !selected.length && !materialFact(part))) {
+      const unmatched = refs.filter(ref => !usable(ref));
+      if (!spec.originalFirst || !unmatched.length) {
+        throw unavailable("每个事实段都须先核验同行对应的实际原文，缺少 " + block);
+      }
+      for (const ref of unmatched) {
+        // An authored but unread range is the reviewer's work. Only evidence
+        // already read and revalidated can prove an omission by the author.
+        const located = cited.get(keyOf(ref.file))?.some(({ start, end }) =>
+          start && ref.start >= start && ref.end <= end);
+        if (located) throw unavailable("须先完整读取同行标记的原文范围，缺少 " + block);
+        const proof = evidenceReference(frame, active, spec, ref);
+        if (!ref.evidenceSpan || ref.sha256 !== proof.sha256 || ref.sourceIdentity !== proof.sourceIdentity ||
+            !sourceVersionCurrent(frame.root, ref)) throw unavailable("待补定位须来自当前已核逐字原文");
+        omittedQuote ??= part.quote;
+        omitted.set(JSON.stringify([keyOf(proof.file), proof.start, proof.end]), proof);
+      }
+    }
+    return selected.map(ref => ({ ref, block }));
   });
-  if (!supports.length && !cited.length && facts.length && facts.every(({ part }) =>
+  if (omitted.size) {
+    const sources = [...omitted.values()];
+    const locators = sources.map(({ file, start, end }) => `${file} 第 ${start === end ? start : `${start}-${end}`} 行`);
+    return { line: row.line, status: "unsupported", basis: "已逐段核实原文，当前编号行缺少其中的证据定位。",
+      finding: { kind: "missing-evidence", quote: omittedQuote, fix: "在本编号行补写已核原文定位 " + locators.join("；") },
+      findingOrigin: { kind: "host-missing-numbered-locator", source: sources[0], sources } };
+  }
+  if (!configured && !supports.length && !cited.size && ownFacts.length && ownFacts.every(({ part }) =>
       policyFact(part) && !part.inference.premises.length && !part.evidence?.length &&
       !part.inference.assumptions?.some(item => item.evidence))) {
     return { line: row.line, supportOrigin: { kind: "same-reviewer-coverage", proofObject: "project-policy",
-      blocks: [...new Set(facts.map(({ block }) => block))] } };
+      blocks: [...new Set(ownFacts.map(({ block }) => block))] } };
   }
   if (!supports.length) throw unavailable("须先保存支持该行实际断言的原文和逐字证据");
   // Full coverage already revalidates every source here. The numbered receipt
@@ -3967,8 +4263,28 @@ function numberedCoverageSupport(frame, active, spec, grant, id, candidate, mate
   // of the original evidence does not decide whether the old source gate passes.
   const primary = supports.find(({ ref }) => observed(ref)) ?? supports[0];
   const proof = evidenceReference(frame, active, spec, primary.ref);
-  return { ...proof, line: row.line, supportOrigin: { kind: "same-reviewer-coverage",
-    blocks: [...new Set(supports.map(({ block }) => block))] } };
+  const supportOrigin = { kind: "same-reviewer-coverage", blocks: [...new Set(supports.map(({ block }) => block))] };
+  if (configured) {
+    // Keep the exact signed references and their contributing coverage blocks
+    // without copying quotes already retained in the underlying proof.
+    const evidence = new Map();
+    for (const { ref, block } of supports) {
+      const key = JSON.stringify([keyOf(ref.file), ref.evidenceSpan]);
+      let saved = evidence.get(key);
+      if (!saved) {
+        const current = evidenceReference(frame, active, spec, ref);
+        if (!ref.evidenceSpan || ref.sha256 !== current.sha256 || ref.sourceIdentity !== current.sourceIdentity ||
+            !sourceVersionCurrent(frame.root, ref)) throw unavailable("编号证据须沿用实际读过且未变更的逐字原文跨度");
+        saved = { file: current.file, start: current.start, end: current.end, sha256: current.sha256,
+          sourceIdentity: current.sourceIdentity, provenance: current.provenance, evidenceSpan: ref.evidenceSpan, blocks: [] };
+        evidence.set(key, saved);
+      }
+      if (!saved.blocks.includes(block)) saved.blocks.push(block);
+    }
+    supportOrigin.blocks = [...new Set(ownFacts.map(({ block }) => block))];
+    supportOrigin.evidence = [...evidence.values()];
+  }
+  return { ...proof, line: row.line, supportOrigin };
 }
 
 /** Route a proven missing same-line locator to the author. */
@@ -4021,13 +4337,29 @@ function reviewChecks(frame, active, spec, grant, checks, candidate, material, f
         ? { ...part.evidence[0], id, status, line: record.line, basis: part.basis, supportOrigin: origin }
         : { id, status, line: record.line, basis: part.basis, finding: part.finding, findingOrigin: origin };
     }
+    if (spec.originalFirst) {
+      const row = claimRow(candidate,id);
+      const records = fullCoverage().records;
+      for (const record of records) {
+        if (record.line !== row?.line) continue;
+        const part = record.parts.find(item => item.originalDisposition?.owner.actor === frame.agent.id &&
+          item.originalDisposition.owner.phase === active.phase && item.status === "unsupported");
+        if (!part) continue;
+        // This rejection and its original evidence are already held by the
+        // current role. Never require another model-written contradiction.
+        const counterEvidence = part.inference.premises[0];
+        return { id, status:"unsupported", line:record.line, basis:part.basis, finding:part.finding,
+          counterEvidence, findingOrigin:{kind:"same-reviewer-original-disposition",block:record.block} };
+      }
+    }
     if (supplied?.useCoverage === true) {
-      if (supplied.status !== "supported" || !declared.includes(id) || spec.claims.includes(id) ||
+      if (supplied.status !== "supported" || !declared.includes(id) ||
           ["file", "start", "end", "line", "finding"].some(field => Object.hasOwn(supplied, field))) {
-        throw new Error(id + " 的 useCoverage 仅用于正文自动识别的支持项；不与项目明确编号、原文参数、行号或退回理由混用");
+        throw new Error(id + " 的 useCoverage 仅用于已核验的编号支持项，不与原文参数、行号或退回理由混用");
       }
       const basis = requireText(supplied.basis, "核验依据", 600);
-      return { id, status: "supported", ...numberedCoverageSupport(frame, active, spec, grant, id, candidate, material, fullCoverage), basis };
+      const result = numberedCoverageSupport(frame, active, spec, grant, id, candidate, material, fullCoverage);
+      return result.status === "unsupported" ? { id, ...result } : { id, status: "supported", ...result, basis };
     }
     const carried=!supplied||supplied.status==="unsupported"&&!Object.hasOwn(supplied,"finding")
       ? carryNumberedFinding(frame,active,grant,claimRow(candidate,id),material,fullCoverage):null;
@@ -4065,8 +4397,8 @@ function reviewChecks(frame, active, spec, grant, checks, candidate, material, f
     let line = Number.isSafeInteger(check.line) ? check.line : null;
     if (declared.length) {
       const row = claimRow(candidate, id);
-      const cited = row && citation(row.body, file);
-      if (!cited) {
+      const cited = row ? numberedCitationRanges(row.body, file) : [];
+      if (!cited.length) {
         if (spec.hostResults) {
           const proof = evidenceReference(frame, active, spec, check);
           const missing = missingNumberedLocator(frame, spec, grant, row, proof, material, fullCoverage);
@@ -4074,8 +4406,9 @@ function reviewChecks(frame, active, spec, grant, checks, candidate, material, f
         }
         return invalid("所选原文未出现在候选断言的同行出处");
       }
-      if (cited.start && (check.end < cited.start || check.start > cited.end
-        || !coverage.ranges.some(([a, b]) => a <= cited.start && b >= cited.end))) return invalid("候选所引原文行与核验位置不一致或未完整读取");
+      if (!numberedRangeAllows(coverage, cited, check)) {
+        return invalid("候选所引原文行与核验位置不一致或未完整读取");
+      }
       line = row.line;
     }
     const proof = evidenceReference(frame, active, spec, check);

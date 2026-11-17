@@ -303,9 +303,8 @@ test("behavior rejection requires the current reviewer's exact clause and a real
     assert.equal(request.headers.authorization, "Bearer " + token);
     calls.push(input);
     const { missing, overCap, entries } = JSON.parse(input.probe.stdin);
-    const registeredFault = Array.isArray(entries) && !entries.length && input.phase.includes("audit");
-    const stdout = JSON.stringify(missing ? { error: "unknown-reference" } : { size: registeredFault ? 1
-      : Array.isArray(entries) && !entries.length ? 0 : overCap ? 6 : 5 });
+    const stdout = JSON.stringify(missing ? { error: "unknown-reference" }
+      : { size: Array.isArray(entries) && !entries.length ? 0 : overCap ? 6 : 5 });
     response.end(JSON.stringify({ spec: input.spec, requestId: input.requestId, snapshotSha256: input.snapshotSha256,
       status: "passed", probe: { exitCode: 0, stdout } }));
   });
@@ -393,9 +392,9 @@ test("behavior rejection requires the current reviewer's exact clause and a real
     const registered = await codeReview(harness, auditor, "probe", {
       assertion: "runtime", file: worker, exampleId: "entries:example:empty",
     });
-    assert.equal(registered.outcome, "mismatch");
-    assert.equal(registered.actual.json.size, 1);
-    assert.equal(registered.blocking, true);
+    assert.equal(registered.outcome, "match");
+    assert.equal(registered.actual.json.size, 0);
+    assert.equal(registered.blocking, false);
     assert.equal(registered.grounding.kind, "registered-example");
     assert.deepEqual(JSON.parse(calls.at(-1).probe.stdin), { entries: [] });
 

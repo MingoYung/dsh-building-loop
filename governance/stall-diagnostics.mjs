@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { digest } from "./policy.mjs";
+import { digest, keyOf } from "./policy.mjs";
+import { boundedJson } from "./input-contracts.mjs";
 
 export const STALL_LAYERS = Object.freeze(["parameters", "runner", "syntax", "behavior"]);
 export const DIAGNOSIS_WAIT = new Set(["diagnosis-ready", "diagnosis-verify", "diagnosis-repair-ready"]);
@@ -36,13 +37,33 @@ function errorClass(message) {
   return /^\s*([A-Z][A-Za-z]*(?:Error|Exception))(?::|\s*$)/mu.exec(message)?.[1];
 }
 
+/** A trusted check can report a structured observation independently of
+ * how its author words the diagnostic. Keep only canonical identity in state. */
+export function caseComparisonFingerprint(comparison) {
+  if (!comparison || typeof comparison !== "object" || Array.isArray(comparison) ||
+      Object.keys(comparison).length !== 2 || !Object.hasOwn(comparison, "expected") || !Object.hasOwn(comparison, "actual") ||
+      !boundedJson(comparison.expected, 4096) || !boundedJson(comparison.actual, 4096)) return;
+  const canonical = value => JSON.stringify(value, (_, nested) => nested && typeof nested === "object" && !Array.isArray(nested)
+    ? Object.fromEntries(Object.keys(nested).sort().map(key => [key, nested[key]])) : nested);
+  const expected = canonical(comparison.expected), actual = canonical(comparison.actual);
+  if (expected !== actual) return digest(JSON.stringify([expected, actual]));
+}
+
 function caseFailure(error, sourceKind, fallbackPath) {
   const exception = errorClass(error.message);
   const layer = SYNTAX_ERRORS.has(exception) ? "syntax" : "behavior";
+  const message = typeof error.message === "string" ? error.message.trim() : "";
+  const path = error.path ?? error.stack?.at(-1)?.path;
+  const detail = exception && message.startsWith(exception + ":") ? message.slice(exception.length + 1).trim() : message;
+  const generic = /^(?:(?:result|test|check|case|assertion|behavior|output)\s+)?(?:error|failed|failure|mismatch|differed|different|unknown|invalid|unavailable|unexpected(?: result(?: shape)?)?)[.!]?$/iu;
+  const comparison = /\b(?:expected[\s\S]+(?:got|actual|received)\b|differs for fields?:\s*\S)|预期[\s\S]+(?:实测|实际)/iu;
+  const structured = layer === "behavior" && caseComparisonFingerprint(error.comparison);
+  const actionable = structured || !!detail && detail !== exception && !generic.test(detail) &&
+    (exception || path || comparison.test(detail));
   return {
     layer, kind: sourceKind, caseId: safeId(error.caseId), exception,
-    outputSha256: typeof error.message === "string" ? digest(error.message.trim()) : undefined,
-    path: error.path ?? error.stack?.at(-1)?.path, fallbackPath,
+    outputSha256: structured || (message ? digest(message) : undefined),
+    path, fallbackPath, actionable: !!actionable, ...(structured ? { comparisonVerified: true } : {}),
   };
 }
 
@@ -108,6 +129,30 @@ function observeOscillation(window, artifactSha256, key) {
   return next.every((row, index) => row.key === key && row.artifactSha256 === next[index % 2].artifactSha256);
 }
 
+/** Distinct product revisions are comparable only within the same assignment
+ * and with the same read-only materials and exact observed behavior failure. */
+function repeatedBehavior(window, active, artifacts, failure, key) {
+  if (failure.layer !== "behavior" || !failure.actionable) {
+    delete window.behaviorRevisions;
+    return false;
+  }
+  const sourcePaths = active.codeIntake?.sources?.map(({ path }) => keyOf(path));
+  const paths = new Set(sourcePaths);
+  const product = paths.size ? artifacts.filter(({ path }) => paths.has(keyOf(path))) : artifacts;
+  const inputs = paths.size ? artifacts.filter(({ path }) => !paths.has(keyOf(path))) : [];
+  const productSha256 = stallArtifactSha256(product);
+  if (!productSha256 || paths.size && product.length !== paths.size) {
+    delete window.behaviorRevisions;
+    return false;
+  }
+  const signature = digest(JSON.stringify([active.actor, key, stallArtifactSha256(inputs)]));
+  const previous = window.behaviorRevisions;
+  const hashes = previous?.signature === signature ? previous.hashes : [];
+  const distinct = hashes.includes(productSha256) ? hashes : [...hashes, productSha256];
+  window.behaviorRevisions = { signature, hashes: distinct };
+  return distinct.length >= REPEATED_FAILURES;
+}
+
 function freezeDiagnostic(active, artifactSha256, failure, repeatCount, trigger) {
   const { layer, kind, caseId, path, fallbackPath, recipe } = failure;
   const { priorRepair } = active.stallObservations;
@@ -160,9 +205,11 @@ export function observeExecutionDiagnostic(active, observation) {
     // A nonqualifying observation on different bytes breaks the source trail.
     const attempts = sameAssignment ? window.attempts : [];
     const failedRevisions = sameAssignment && trustedSourceFailure ? window.failedRevisions : undefined;
+    const behaviorRevisions = sameAssignment && trustedSourceFailure ? window.behaviorRevisions : undefined;
     const priorRepair = sameAssignment ? window.priorRepair : resumedRepair;
     window = { artifactSha256, goalSha256, phase: active.phase, serial: active.serial,
       attempts, failures: [], probes: 0, ...(failedRevisions?.length ? { failedRevisions } : {}),
+      ...(behaviorRevisions ? { behaviorRevisions } : {}),
       ...(priorRepair ? { priorRepair } : {}) };
     if (resumedRepair) active.stallObservations = window;
     else if (active.stallObservations) delete active.stallObservations;
@@ -185,6 +232,7 @@ export function observeExecutionDiagnostic(active, observation) {
     window.probes = 0;
     delete window.pendingCheck;
     delete window.failedRevisions;
+    delete window.behaviorRevisions;
     delete window.priorRepair;
     return undefined;
   }
@@ -198,10 +246,19 @@ export function observeExecutionDiagnostic(active, observation) {
     }
     row.count++;
     if (row.count >= REPEATED_FAILURES) {
+      // Invalid exploratory requests should not replace a verified required
+      // behavior mismatch on these same candidate bytes.
+      const lastCheck = window.pendingCheck?.failure;
+      if (operation === "probe" && failure.layer === "parameters" && lastCheck?.comparisonVerified) {
+        return freezeDiagnostic(active, artifactSha256, lastCheck, row.count, "unchanged-after-probes");
+      }
       return freezeDiagnostic(active, artifactSha256, failure, row.count, "repeated-failure");
     }
     if (trustedSourceFailure && observeOscillation(window, artifactSha256, oscillationKey(failure))) {
       return freezeDiagnostic(active, artifactSha256, failure, OSCILLATION_LENGTH, "recurring-failed-versions");
+    }
+    if (trustedSourceFailure && repeatedBehavior(window, active, artifacts, failure, key)) {
+      return freezeDiagnostic(active, artifactSha256, failure, REPEATED_FAILURES, "repeated-behavior-across-revisions");
     }
     if (operation === "check" && result.status === "failed") {
       if (window.pendingCheck?.key !== key) {
@@ -210,7 +267,7 @@ export function observeExecutionDiagnostic(active, observation) {
       }
       window.pendingCheck.count++;
       window.pendingCheck.eligible ||= Boolean(fallbackPath) || window.pendingCheck.count >= 2;
-      window.pendingCheck.failure = failure;
+      window.pendingCheck.failure = trustedSourceFailure ? failure : { ...failure, comparisonVerified: false };
     }
   }
 
@@ -260,7 +317,7 @@ function syntaxProof({ artifacts, recipe, syntaxRecipe, input, result, sourceLin
   return { kind: status, path, line, fileSha256: source.sha256, exitCode: result.probe.exitCode };
 }
 
-function behaviorProof({ expected, exampleId, comparison, result, requirement, grounding }, signedCaseId) {
+function behaviorProof({ expected, exampleId, comparison, result, requirement, grounding, artifacts, sourceLineCounts }, signedCaseId) {
   const scope = signedCaseId ? "signed-case" : "independent";
   const { file, start, end, quote, sha256 } = requirement ?? {};
   const authority = { scope, ...(signedCaseId ? { signedCaseId } : {}),
@@ -272,16 +329,30 @@ function behaviorProof({ expected, exampleId, comparison, result, requirement, g
   if (!expected || comparison?.outcome !== "mismatch" || !["passed", "failed"].includes(result.status) ||
     !result.probe || !Number.isSafeInteger(result.probe.exitCode) || result.probe.truncated ||
     !Number.isSafeInteger(expected.exitCode) || comparison.actual?.exitCode !== result.probe.exitCode) return undefined;
-  // Pin only the comparator's projection. Stdout, parameters and source
-  // excerpts may be confidential even when the reproduction is valid.
+  // The coordinator may see one location authenticated against the tested
+  // artifact, without receiving the runner's output or full stack.
+  const frame = signedCaseId && result.probe.stack?.at(-1);
+  const source = frame && artifacts.find(({ path, sha256 }) => path === frame.path && sha256);
+  const located = source && Number.isSafeInteger(frame.line) && frame.line > 0 &&
+    frame.line <= sourceLineCounts?.get(source.path);
   const { actual } = comparison;
   return {
     kind: "runtime-mismatch", expectedExitCode: expected.exitCode, exitCode: actual.exitCode,
     ...(safeId(exampleId) ? { exampleId } : {}),
     ...(actual.output === "missing-field" ? { output: "missing-field", ...(actual.responseStatus === "ok" ? { responseStatus: "ok" } : {}) } : {}),
+    ...(located ? { path: source.path, line: frame.line, fileSha256: source.sha256 } : {}),
     expectedSha256: digest(JSON.stringify(expected)), actualSha256: digest(JSON.stringify(actual)),
     ...authority,
   };
+}
+
+/** A registered mismatch may hand off the observed line without asking the
+ * diagnosing session to guess a root cause or copy back a source locator. */
+export function diagnosisObservedSource(proof) {
+  if (proof?.scope === "signed-case" && proof.kind === "runtime-mismatch" && typeof proof.path === "string" &&
+    SHA256.test(proof.fileSha256 ?? "") && Number.isSafeInteger(proof.line) && proof.line > 0) {
+    return { file: proof.path, start: proof.line, end: proof.line, sha256: proof.fileSha256 };
+  }
 }
 
 /** Proof IDs include the individual runner request. This separate key lets
@@ -315,14 +386,15 @@ export function requireDiagnosisProofScope(record, proof, targeted) {
  * Emit the admissible next action rather than inviting repeated invalid calls. */
 export function diagnosisProofNext(record, proof, targeted) {
   const problem = proofScopeProblem(record, proof, targeted);
-  if (problem && targeted?.mismatch) return diagnosisProofNext(record, {
-    id: targeted.mismatch.proofId, layer: "behavior",
-  });
-  if (problem && targeted?.pending) return { action: "example", exampleId: targeted.pending.id };
-  if (problem) return { action: "probe", reason: problem };
+  if (problem && targeted?.mismatch) {
+    const id = targeted.mismatch.proofId;
+    proof = record.probes?.find(row => row.proof.id === id)?.proof ?? { id, layer: "behavior" };
+  } else if (problem && targeted?.pending) return { action: "example", exampleId: targeted.pending.id };
+  else if (problem) return { action: "probe", reason: problem };
   const submit = proof.layer === record.layer;
+  const observed = submit && diagnosisObservedSource(proof);
   return { action: submit ? "submit" : "reroute", proofId: proof.id,
-    required: ["cause", ...(submit ? ["fix"] : []),
+    required: observed ? [] : ["cause", ...(submit ? ["fix"] : []),
       ...(!proof.recovery && ["syntax", "behavior"].includes(proof.layer) ? ["file", "start", "end"] : [])],
     ...(submit && proof.scope === "independent" ? { scope: "independent" } : {}) };
 }

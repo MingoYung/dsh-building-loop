@@ -492,6 +492,16 @@ export function architectureLinkRepairAction(file, issue) {
     required: ["beforeSha256", "note", "edits"], lines: issue.editLines ?? [issue.line, issue.end] };
 }
 
+/** A document edit cannot supersede an already reproduced source failure. */
+export function currentPausedCodeRepair(frame, unit, spec, active, goal) {
+  const rejected = active?.codeReviewRejection;
+  if (!rejected?.pausedReviewReceiptSha256 || rejected.goalSha256 !== goal.sha256) return false;
+  try {
+    const signed = requireCodeRegressionCurrent(frame, unit, active, spec, goal);
+    return signed?.receiptSha256 === rejected.pausedReviewReceiptSha256 && signed.artifactsSha256 === rejected.artifactsSha256;
+  } catch { return false; }
+}
+
 /** A plan is published by the coordinator under the same lock as dispatch. */
 export function registerEngineeringArchitecture(frame, unit, spec, tag, rollbackProof) {
   const active = frame.state.units[unit];
@@ -596,7 +606,7 @@ export function registerEngineeringArchitecture(frame, unit, spec, tag, rollback
       active.phase = "final-review-ready";
     } else if (active.phase === "blocked" && ["first-review", "first-audit", "final-review", "final-audit"].includes(active.resumePhase) &&
       previous?.sha256 !== snapshot.sha256) {
-      active.phase = "final-review-ready";
+      active.phase = currentPausedCodeRepair(frame, unit, spec, active, goal) ? "supplement-ready" : "final-review-ready";
       delete active.pendingReceipt;
       delete active.resumePhase;
     }

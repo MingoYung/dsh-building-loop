@@ -19,6 +19,7 @@ const RANGE_LIMIT = 48;
 const MAX_FINDINGS = 24;
 const PLAN_PAGE_BYTES = 16 * 1024;
 const PROOF_BYTES = 96 * 1024;
+const CHECKPOINT_BYTES = 48 * 1024;
 const RECORD_LIMIT = 32;
 const COMPACT_REF_LIMIT = 6;
 const COMPACT_FIELDS = ["id", "basis", "status", "refs", "obligation"];
@@ -372,7 +373,8 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     used += size;
   }
   const nextOffset = offset + page.length;
-  const progress = reviewProgress(frame, active, current, reviewDraft(frame, active, binding));
+  const draft = reviewDraft(frame, active, binding);
+  const progress = reviewProgress(frame, active, current, draft);
   const refs = reviewRefs(frame, active, current);
   const pending = pendingReviewRows(frame, current, progress, page, refs);
   const proseReview = proseSummary(current, progress);
@@ -394,6 +396,7 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
     ...(signed.architectureResponsibilities ? { architectureResponsibilities: signed.architectureResponsibilities.rows } : {}),
     ...(proseReview ? { proseReview } : {}),
     ...(rollback ? { rollback } : {}),
+    ...(draft.reused ? { reused: draft.reused } : {}),
     progress: visibleReviewProgress(progress), pending, refs,
     ...(architectureProbe ? { architectureProbe } : {}),
     submission: { tool: "building_loop_code_review", action: "record", fields: {
@@ -1018,6 +1021,72 @@ function reviewDraft(frame, active, binding) {
   if (saved && Object.keys(identity).every(key => saved[key] === identity[key])) return { observations: [], proseCoverage: [], proseFactReview: [], ...saved };
   return { ...identity, files: [], constraints: [], findings: [], observations: [], findingsDone: false, pendingCorrections: [],
     proseCoverage: [], proseFactReview: [] };
+}
+
+function codeCheckpointBinding(signed, active, spec) {
+  // The architecture manuscript can change. The acceptance policy, signed
+  // artifacts, current goal, registered checks and their results must match.
+  return digest(JSON.stringify([proofBinding(signed, active.goal), spec.codeTask, spec.architecture, spec.phases]));
+}
+
+function checkpointReads(frame, active) {
+  const pins = [...active.goal.files, ...active.codeIntake.qualification.artifacts.map(({ path, sha256 }) => ({ file: path, sha256 }))];
+  return Object.fromEntries(pins.flatMap(({ file, sha256 }) => {
+    if (!sha256 || !includes(frame.reads, file)) return [];
+    const key = keyOf(file), stamp = active.seen?.[key];
+    return stamp?.hash === sha256 ? [[key, stamp]] : [];
+  }));
+}
+
+/** Save the submitting actor's own complete proof before the host advances.
+ * A prior source failure must go through execution and a fresh review. */
+export function rememberCodeReview(frame, active, spec, signed, proof) {
+  const { role, agent } = frame;
+  if (!active.engineeringArchitecture || !["reviewer", "auditor"].includes(role) ||
+      active[role] !== agent.id || proof.actor !== agent.id) return;
+  const architecture = reviewArchitecture(frame, active, true);
+  if (proof.binding !== proofBinding(signed, active.goal, architecture)) return;
+  if (proof.findings.some(row => row.owner !== "coordinator") || proof.constraints.some(row => row.status !== "pass") ||
+      proof.files.some(row => (row.comments ?? [row.comment]).some(comment => comment.status === "missing"))) {
+    delete active.codeReviewCheckpoint;
+    return;
+  }
+  const checkpoints = active.codeReviewCheckpoint ??= {};
+  delete checkpoints[role];
+  const checkpoint = { version: 1, actor: agent.id, material: codeCheckpointBinding(signed, active, spec),
+    architecture: { file: architecture.file, sha256: architecture.sha256 },
+    reads: checkpointReads(frame, active), files: proof.files, constraints: proof.constraints };
+  if (measuredBytes(checkpoint) <= CHECKPOINT_BYTES) checkpoints[role] = checkpoint;
+}
+
+/** Reuse only this actor's work on unchanged signed inputs. The new draft
+ * must cover the latest architecture and findings. Even identical prose can
+ * depend on changed wording elsewhere in that document. */
+export function resumeCodeReview(frame, id, active, spec) {
+  const saved = active.codeReviewCheckpoint?.[frame.role];
+  if (saved?.version !== 1 || saved.actor !== frame.agent.id || active[frame.role] !== frame.agent.id ||
+      !["final-review", "final-audit"].includes(active.phase) || active.codeReviewDraft || active.codeReviewRejection) return;
+  const signed = requireCodeRegressionCurrent(frame, id, active, spec, active.goal);
+  if (saved.material !== codeCheckpointBinding(signed, active, spec)) return;
+  const current = plan(frame, active, spec, signed);
+  if (current.architecture?.file !== saved.architecture.file || current.architecture.sha256 === saved.architecture.sha256) return;
+  const seen = { ...checkpointReads(frame, { ...active, seen: saved.reads }), ...active.seen };
+  const readers = reviewReaders(frame, { ...active, seen }, current);
+  const validLocator = locator => {
+    try { return readers.read(locator, [...readers.goals, ...readers.sources]).sha256 === locator.sha256; }
+    catch { return false; }
+  };
+  const files = saved.files.filter(row => current.changes.some(change => change.path === row.file &&
+    change.ranges.every(range => validLocator({ file: row.file, ...range, sha256: change.sha256 }))) &&
+    (row.comments ?? [row.comment]).every(validLocator));
+  const constraints = saved.constraints.filter(row => current.requiredCases.includes(row.caseId) &&
+    current.signedCases.some(item => item.id === row.caseId && item.status === "passed") &&
+    validLocator(row.requirement) && validLocator(row.code));
+  if (!files.length && !constraints.length) return;
+  active.seen = seen;
+  active.codeReviewDraft = { ...reviewDraft(frame, active, current.binding), files, constraints,
+    reused: { files: files.length, constraints: constraints.length } };
+  frame.changed = true;
 }
 
 function proseSnapshot(current, draft) {

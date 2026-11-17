@@ -80,6 +80,91 @@ test("recurring exact behavior failures escalate, while new bytes and different 
   }
 });
 
+test("three genuinely different products with the same authenticated behavior failure require diagnosis", () => {
+  const active = { phase: "intake", serial: 1, codeIntake: { sources: [{ path: "parser.py" }] } };
+  const third = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("third product attempt") } : row);
+  const failure = suiteFailure("TimeoutError: GET /ping timed out while reading the response body", "http-ping");
+  const incident = (index, artifacts, result = failure, extra = {}) => observe(active, index, result,
+    { artifacts, goalSha256: digest("current HTTP goal"), ...extra });
+  assert.equal(incident(1, versions), undefined);
+  assert.equal(incident(1, changed), undefined, "a replayed request cannot count again after a code edit");
+  assert.equal(incident(2, changed), undefined);
+  const inputsOnly = changed.map(row => row.path === "helper.py" ? { ...row, sha256: digest("changed check input") } : row);
+  assert.equal(incident("inputs-only", inputsOnly, failure), undefined, "an input edit does not count as another product");
+  assert.equal(incident("same-inputs-restored", changed), undefined);
+  assert.equal(incident("exploration", changed, { status: "passed", snapshotSha256, probe: { exitCode: 0 } },
+    { operation: "probe" }), undefined);
+  assert.equal(incident("second-check", changed), undefined, "checking one revision twice does not add another revision");
+  // The controlled input changed above, so re-establish the first comparison in the original scope.
+  assert.equal(incident(3, versions), undefined);
+  const record = incident(4, third);
+  assert.equal(record.trigger, "repeated-behavior-across-revisions");
+  assert.equal(record.suggestedLayer, "behavior");
+  assert.equal(record.repeatCount, 3);
+  assert.equal(record.caseId, "http-ping");
+  assert.equal(record.artifactSha256, stallArtifactSha256(third));
+  assert.doesNotMatch(JSON.stringify(active), /GET \/ping/u);
+});
+
+test("typed case evidence survives wording and object order and takes priority over malformed exploratory probes", () => {
+  const third = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("third source variant") } : row);
+  const observed = (message, actual) => {
+    const result = suiteFailure(message, "ordered-input");
+    result.required[0].error.comparison = { expected: { status: 0, body: [] }, actual };
+    return result;
+  };
+  const first = observed("Observed something else", { status: 1, body: ["a"] });
+  const same = observed("Different descriptive language", { body: ["a"], status: 1 });
+  const active = { phase: "intake", serial: 1 };
+  assert.equal(observe(active, 1, first), undefined);
+  assert.equal(observe(active, 2, same, { artifacts: changed }), undefined);
+  const behavior = observe(active, 3, first, { artifacts: third });
+  assert.equal(behavior.trigger, "repeated-behavior-across-revisions");
+  assert.equal(behavior.caseId, "ordered-input");
+  assert.doesNotMatch(JSON.stringify(active), /Different descriptive language/u);
+
+  const diagnostics = { phase: "intake", serial: 1 };
+  observe(diagnostics, 1, first);
+  const bad = { status: "invalid-input", field: "stdin" };
+  const probe = { operation: "probe", recipe: "known-recipe" };
+  observe(diagnostics, 2, bad, probe);
+  observe(diagnostics, 3, bad, probe);
+  const restored = observe(diagnostics, 4, bad, probe);
+  assert.equal(restored.suggestedLayer, "behavior");
+  assert.equal(restored.trigger, "unchanged-after-probes");
+  assert.equal(restored.caseId, "ordered-input");
+});
+
+test("different or generic results, a full pass and assignment changes cannot supply a third failure revision", () => {
+  const third = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("third source") } : row);
+  const fourth = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("fourth source") } : row);
+  const failure = suiteFailure("Expected HTTP status 200, got 404", "http-ping");
+  for (const interruption of ["different-error", "different-case", "full-pass", "goal", "phase", "serial", "other-probe"]) {
+    const active = { phase: "intake", serial: 1 };
+    let goalSha256 = digest("first public goal");
+    const incident = (index, artifacts, result = failure, extra = {}) => observe(active, index, result,
+      { artifacts, goalSha256, ...extra });
+    incident(1, versions);
+    incident(2, changed);
+    if (interruption === "different-error") incident(3, changed, suiteFailure("Expected HTTP status 200, got 500", "http-ping"));
+    if (interruption === "different-case") incident(3, changed, suiteFailure("Expected HTTP status 200, got 404", "other-case"));
+    if (interruption === "full-pass") incident(3, changed, { status: "passed", snapshotSha256 });
+    if (interruption === "goal") goalSha256 = digest("second public goal");
+    if (interruption === "phase") active.phase = "supplement";
+    if (interruption === "serial") active.serial++;
+    if (interruption === "other-probe") incident(3, fourth,
+      { status: "passed", snapshotSha256, probe: { exitCode: 0 } }, { operation: "probe" });
+    assert.equal(incident(4, third), undefined, interruption);
+  }
+  for (const result of [suiteFailure("result differed"), suiteFailure("AssertionError: assertion failed"),
+    { status: "failed", snapshotSha256 }, { ...failure, snapshotSha256: undefined }]) {
+    const active = {};
+    for (const [index, artifacts] of [versions, changed, third].entries()) {
+      assert.equal(observe(active, index, result, { artifacts }), undefined);
+    }
+  }
+});
+
 test("a full pass, another observed version, or a new assignment breaks the recurring-version trail", () => {
   const failure = suiteFailure("SyntaxError: invalid syntax");
   const newVersion = versions.map(row => row.path === "parser.py" ? { ...row, sha256: digest("another revision") } : row);

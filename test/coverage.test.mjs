@@ -364,6 +364,16 @@ test("modus ponens accepts a bounded valid proof and rejects converse or changed
   const inference={rule:"modus-ponens",premises:[{file:"functional.csv",start:1,end:1,quote:"若本样本为A级则进入复核。"},{file:"functional.csv",start:2,end:2,quote:"本样本为A级。"}],scope:"本规则中的同一个样本，A级仅指本例的分级。",assumptions:[],counterexample:{possible:false,reason:"给定同一个样本满足A级且规则明确A级蕴含复核，不能同时不复核。"},formal:{premises:[{relation:"implies",left:"本样本A级",right:"本样本复核"},{relation:"asserts",left:"本样本A级"}],conclusion:{relation:"asserts",left:"本样本复核"}}};
   const put=value=>e.invoke("record",{entries:[{block,parts:[{kind:"inference",status:"supported",sourceRelation:"supports",basis:"对同一对象应用原文的充分条件。",inference:value}]}]});
   put(inference);assert.equal(e.finish().rejected.length,0);
+  const oneEndpoint = structuredClone(inference);
+  delete oneEndpoint.premises[1].start;
+  put(oneEndpoint);
+  assert.equal(e.finish().records[0].parts[0].inference.premises[1].start, 2);
+  const wrongEndpoint = structuredClone(oneEndpoint);
+  wrongEndpoint.premises[1].end = 1;
+  assert.throws(() => put(wrongEndpoint), /逐字/u);
+  const missingRange = structuredClone(oneEndpoint);
+  missingRange.premises[1].quote = "若本样本为A级则进入复核。\n本样本为A级。";
+  assert.throws(() => put(missingRange), /多行须同时填写起止行/u);
   put({...inference,scope:{objects:["本例样本 X"],conditions:["仅本例 A 级送复核的规则"]}});
   assert.deepEqual(e.finish().records[0].parts[0].inference.scope.objects,["本例样本 X"]);
   for(const changed of ["另一个样本复核","本样本成功"]) {

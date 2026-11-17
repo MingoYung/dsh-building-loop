@@ -24,7 +24,7 @@ function validJson(value, depth = 0) {
   return Object.entries(value).every(([key, child]) => key.isWellFormed() && validJson(child, depth + 1));
 }
 
-function boundedJson(value, bytes) {
+export function boundedJson(value, bytes) {
   return validJson(value) && Buffer.byteLength(JSON.stringify(value)) <= bytes;
 }
 

@@ -334,8 +334,9 @@ test("the real code-review path requires two independent block receipts and rout
           "final-review": { read: [...sources, architecture], receipt: "final.json" } } } } };
       const wrong = "A non-object is rejected at the CLI, and remaining values are sent downstream.";
       const fixed = "[Non-object rejection](#bl-fact-request-shape) is owned by the worker and returned by the CLI.";
+      const rollback = "Plan to restore the preceding unit at the boundary described in the preceding section.";
       const doc = "# Architecture\n\n## Implementation\n\n1. Keep the caller's interface simple.\n2. " + wrong +
-        "\n\n## Rollback\n\nPlan to restore the preceding unit if the new check regresses.\n\n## Verified\n\nPending host evidence.\n";
+        "\n\n## Rollback\n\n" + rollback + "\n\n## Verified\n\nPending host evidence.\n";
       write(goal, "# Goal\n\n" + clause + "\n\n## Navigation\n\n- [Index](INDEX.md)\n");
       write("INDEX.md", "# Index\n\n## Modules\n\n- [Architecture](modules/architecture.md)\n");
       fs.mkdirSync(path.join(root, "modules"));
@@ -389,16 +390,27 @@ test("the real code-review path requires two independent block receipts and rout
       await assert.rejects(harness.file("root", "read", worker), /读白名单/u);
       const invoke = (actor, action, input = {}) => harness.invoke(actor, "building_loop_code_review", { action, ...input });
 
-      async function prepare(actor) {
-        const { codeReview } = await invoke(actor, "prepare");
+      async function prepare(actor, resumed = false) {
+        const { codeReview, files } = await invoke(actor, "prepare");
         const { pendingBlocks, pendingFacts } = codeReview.proseReview;
         assert.deepEqual(codeReview.proseReview.factLocations, [{ id: "request-shape", anchor: "#bl-fact-request-shape",
           clause: { file: goal, start: 3, end: 3 }, decision: { file: worker, line: 4, mode: "business" } }]);
-        const fileId = codeReview.pending.find(row => row.kind === "file").id;
-        const testId = codeReview.pending.find(row => row.kind === "test").id;
         assert.ok(!codeReview.pending.some(row => row.kind === "section"));
         assert.equal(pendingBlocks.length, 3);
         assert.equal(pendingFacts.length, 2);
+        if (resumed) {
+          assert.deepEqual(codeReview.reused, { files: 1, constraints: 1 });
+          assert.deepEqual(codeReview.pending, []);
+          assert.equal(codeReview.progress.findingsDone, false);
+          assert.deepEqual(files.map(row => row.path), [architecture]);
+          // The unchanged phrase in Rollback depends on the revised section.
+          // It must remain pending without an explicit Markdown link.
+          assert.ok(pendingBlocks.some(row => row.heading === "Rollback"));
+          return { codeReview, decisions: [], pendingBlocks, pendingFacts };
+        }
+        assert.equal(codeReview.reused, undefined);
+        const fileId = codeReview.pending.find(row => row.kind === "file").id;
+        const testId = codeReview.pending.find(row => row.kind === "test").id;
         const aliases = name => codeReview.refs.find(row => row.file === name).prefix;
         const decisions = [{ id: fileId, status: "verified", basis: "The comment explains the ownership boundary.",
           refs: [aliases(worker) + ":2"] }, { id: testId, status: "pass", basis: "The test covers the actual rejection branch.",
@@ -444,7 +456,17 @@ test("the real code-review path requires two independent block receipts and rout
       assert.equal(fs.readFileSync(path.join(root, architecture), "utf8"), verifiedDoc.toString("utf8").replace(wrong, fixed));
       assert.equal((await harness.flow("root", "architecture")).phase, "final-review-ready");
       const reviewer = (await harness.flow("root", "advance")).childId;
-      const current = await prepare(reviewer);
+      assert.equal(reviewer, initialReviewer);
+      const signedWorker = fs.readFileSync(path.join(root, worker), "utf8");
+      write(worker, signedWorker.replace("return value", "return None"));
+      await assert.rejects(invoke(reviewer, "prepare"), /签名|变更|变化/u);
+      write(worker, signedWorker);
+      const signedGoal = fs.readFileSync(path.join(root, goal), "utf8");
+      write(goal, signedGoal + "\nA new public requirement.\n");
+      await assert.rejects(invoke(reviewer, "prepare"), /签名|改变|变化/u);
+      write(goal, signedGoal);
+      const current = await prepare(reviewer, true);
+      assert.equal((await invoke(reviewer, "submit")).status, "needs-review");
       const updated = prose(current, "consistent");
       assert.notEqual(updated.conflict.id, conflict.id);
       const stale = await invoke(reviewer, "record", { proseCoverage: coverage.filter(row => row.id === conflict.id) });
@@ -456,7 +478,8 @@ test("the real code-review path requires two independent block receipts and rout
       const auditor = (await harness.flow("root", "advance")).childId;
       assert.notEqual(auditor, reviewer);
       const blind = await prepare(auditor);
-      const blocked = await invoke(auditor, "record", { decisions: blind.decisions, findingsDone: true });
+      const blindDecisions = blind.decisions.map(row => ({ ...row, basis: "Independent: " + row.basis }));
+      const blocked = await invoke(auditor, "record", { decisions: blindDecisions, findingsDone: true });
       assert.equal(blocked.progress.ready, false);
       assert.equal((await invoke(auditor, "submit")).status, "needs-review");
       const own = prose(blind, "consistent");
@@ -472,6 +495,27 @@ test("the real code-review path requires two independent block receipts and rout
         assert.equal(row.proof[0].decision.start, 4);
         assert.equal(row.proof[0].clause.file, goal);
       }
+
+      async function editRollback(oldText, newText) {
+        const before = fs.readFileSync(path.join(root, architecture));
+        await harness.file("root", "edit", architecture, { beforeSha256: digest(before), heading: "Rollback",
+          oldText, newText, note: "Change the registered rollback plan for the same signed code." });
+        assert.equal((await harness.flow("root", "architecture")).phase, "final-review-ready");
+      }
+      const newPlan = "Plan to run the preceding unit's regression before restoring it.";
+      await editRollback(rollback, newPlan);
+      // Both auditors now have a prior receipt of their own on these bytes.
+      for (const [actor, done] of [[reviewer, "final-audit-ready"], [auditor, "ledger-review"]]) {
+        assert.equal((await harness.flow("root", "advance")).childId, actor);
+        const reopened = prose(await prepare(actor, true), "consistent");
+        assert.equal((await invoke(actor, "record", { proseCoverage: reopened.coverage,
+          proseFactReview: reopened.factReview, findingsDone: true })).progress.ready, true);
+        assert.equal((await invoke(actor, "submit")).phase, done);
+      }
+      const renewed = JSON.parse(fs.readFileSync(path.join(root, "final.json"), "utf8"));
+      assert.equal(renewed.codeReview.constraints[0].basis, finalReceipt.codeReview.constraints[0].basis);
+      assert.equal(renewed.independentAudit.codeReview.constraints[0].basis, blindDecisions[1].basis);
+      assert.notEqual(renewed.codeReview.constraints[0].basis, renewed.independentAudit.codeReview.constraints[0].basis);
     } finally {
       for (const [key, value] of Object.entries(prior)) {
         if (value === undefined) delete process.env[key];

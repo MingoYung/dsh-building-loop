@@ -31,25 +31,113 @@ export function requiredClaimRowIssues(lines, ids) {
     id+" 需要保留唯一的编号断言行，格式为 `"+id+"：正文`。业务标签放在冒号之后，例如 `"+id+"：E1 的判断……`");
 }
 
-/** 识别准确路径及原文行范围，排除同名前缀和备份别名。 */
-export function citation(body, file) {
-  const pattern = new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、；;])" + escape(file)
+function citationPath(file) {
+  return new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、；;])" + escape(file)
     + "(?=$|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "gi" : "g");
+}
+
+function citationRange(after) {
+  const match = /^\s*(?:\x60\s*)?(?:#L(\d+)(?:-L?(\d+))?|[:：](\d+)(?:[-–—](\d+))?|第\s*(\d+)(?:\s*[-–—、至到]\s*(\d+))?\s*行)/i.exec(after);
+  if (!match) return;
+  const start = Number(match[1] ?? match[3] ?? match[5]);
+  const end = Number(match[2] ?? match[4] ?? match[6] ?? start);
+  const range = Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start ? { start, end } : null;
+  return { range, length: match[0].length };
+}
+
+/** 识别准确路径及首个原文行范围，排除同名前缀和备份别名。 */
+export function citation(body, file) {
   const row = body.replaceAll("\\", "/");
   let mentioned = false;
   // A filename may first appear as a topic and only later carry its locator.
   // Prefer the first explicit range, but never hide an invalid explicit range
   // behind a later good one. Bare mentions retain their existing no-range shape.
-  for (const match of row.matchAll(pattern)) {
+  for (const match of row.matchAll(citationPath(file))) {
     mentioned = true;
     const after = row.slice(match.index + match[0].length);
-    const range = /^\s*(?:\x60\s*)?(?:#L(\d+)(?:-L?(\d+))?|[:：](\d+)(?:[-–—](\d+))?|第\s*(\d+)(?:\s*[-–—、至到]\s*(\d+))?\s*行)/i.exec(after);
-    if (!range) continue;
-    const start = Number(range[1] ?? range[3] ?? range[5]);
-    const end = Number(range[2] ?? range[4] ?? range[6] ?? start);
-    return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start ? { start, end } : null;
+    const range = citationRange(after);
+    if (range) return range.range;
   }
   return mentioned ? { start: null, end: null } : null;
+}
+
+function numberedCitationEntry(after, grouped) {
+  const list = grouped && /^\s*(?:\x60\s*)?第\s*([-+−]?\s*\d+(?:\s*、\s*[-+−]?\s*\d+)+)\s*行/u.exec(after);
+  if (list) {
+    // An enumerated line does not cite anything between its members, even
+    // when they appear in reverse order. Dash/至 ranges retain their meaning.
+    const values = list[1].split("、").map(value => value.trim());
+    const lines = values.map(Number);
+    const valid = values.every(value => /^\d+$/u.test(value)) && lines.every(line => Number.isSafeInteger(line) && line > 0);
+    return { ranges: valid ? lines.map(line => ({ start: line, end: line })) : [], length: list[0].length };
+  }
+  const entry = citationRange(after);
+  if (entry) return { ranges: entry.range ? [entry.range] : [], length: entry.length };
+}
+
+const locatorStart = String.raw`(?:\x60\s*)?(?:第\s*[-+−]?\s*\d|#L[-+−]?\d|[:：][-+−]?\d)`;
+const locatorLead = new RegExp("^" + locatorStart, "iu");
+const labelledSeparator = new RegExp(String.raw`^([^、，,；;\r\n]*?)(?:[、，,]|以及|与|及|和)[ \t]*(?=${locatorStart})`, "iu");
+
+/** Inline labels may describe the cited row. The label cannot supply a new
+ * locator or source, and compound units must be recognized by the host. */
+function labelledCitationSeparator(remainder) {
+  const separator = labelledSeparator.exec(remainder);
+  const label = separator?.[1].trim();
+  if (!separator || label.length > 24) return;
+  if (/^[\p{L}\p{M} \t]*$/u.test(label)) return separator;
+  const quantity = /^(?:[\p{L}\p{M}]+[ \t]*)?[-+−±]?\d+(?:\.\d+)?(?:[eE][-+−]?\d+)?[ \t]*(.*)$/u.exec(label);
+  if (!quantity) return;
+  const unit = quantity[1];
+  if (!unit || /^(?:[%％‰]|[\p{L}\p{M}°]+[²³]?)$/u.test(unit) || numericUnitConversion(unit, unit)) return separator;
+}
+
+/** A marked citation can start a sentence without surrounding brackets.
+ * Its locators may only continue within that sentence and source group. */
+function numberedCitationGroups(row) {
+  const bracketed = [...row.matchAll(/（[^（）\r\n]*）|\([^()\r\n]*\)|【[^【】\r\n]*】|\[[^\[\]\r\n]*\]/gu)]
+    .filter(match => /^\s*(?:出处|来源|证据|source|evidence)\s*[:：]/iu.test(match[0].slice(1)))
+    .map(match => ({ start: match.index + 1, end: match.index + match[0].length - 1 }));
+  const standalone = [...row.matchAll(/(?:^|[。！？!?；;]|\.[ \t]+)[ \t]*(?:出处|来源|证据|source|evidence)[ \t]*[:：]/giu)]
+    .map(match => {
+      const after = match.index + match[0].length;
+      const boundary = row.slice(after).search(/[。！？!?；;）)】\]\r\n]|\.(?=\s|$)/u);
+      return { start: match.index, end: boundary < 0 ? row.length : after + boundary };
+    });
+  return [...bracketed, ...standalone];
+}
+
+/** For numbered review, preserve disjoint locations on the same authored row.
+ * An adjacent list can repeat line locations without repeating the path. A new
+ * path, sentence or source-group separator cannot inherit the prior path. */
+export function numberedCitationRanges(body, file) {
+  const row = body.replaceAll("\\", "/"), ranges = [];
+  const groups = numberedCitationGroups(row);
+  let mentioned = false;
+  for (const match of row.matchAll(citationPath(file))) {
+    mentioned = true;
+    const afterPath = match.index + match[0].length;
+    const group = groups.find(({ start, end }) => match.index >= start && afterPath <= end);
+    // Group and source boundaries cannot be crossed by a locator list or by
+    // a descriptive label. The information in a label never proves a fact.
+    let tail = group ? row.slice(afterPath, group.end).split(/[；;]/u, 1)[0] : row.slice(afterPath);
+    while (tail) {
+      const entry = numberedCitationEntry(tail, group);
+      if (!entry) {
+        if (group && locatorLead.test(tail.trimStart())) return [];
+        break;
+      }
+      if (!entry.ranges.length) return [];
+      ranges.push(...entry.ranges);
+      const remainder = tail.slice(entry.length);
+      const separator = group
+        ? labelledCitationSeparator(remainder)
+        : /^\s*(?:标题|表头|说明)?\s*[、，,]\s*(?=(?:第\s*\d|#L\d))/iu.exec(remainder);
+      if (!separator || group && !locatorLead.test(remainder.slice(separator[0].length))) break;
+      tail = remainder.slice(separator[0].length);
+    }
+  }
+  return ranges.length ? ranges : mentioned ? [{ start: null, end: null }] : [];
 }
 
 const exactLineRange = "(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)";
@@ -439,7 +527,7 @@ export function rejectedClaims(root, spec, lines, rejected, readable) {
 }
 
 /** 把普通十进制拆成整数比，复算不依赖浮点近似。 */
-function decimal(value, computed = false) {
+export function decimal(value, computed = false) {
   const parsed = (computed ? /^([+-]?)(\d{1,32})(?:\.(\d{1,9}))?$/ : /^([+-]?)(\d{1,18})(?:\.(\d{1,9}))?$/).exec(value);
   if (!parsed) throw new Error("原始数值需要普通十进制数字");
   const fraction = parsed[3] ?? "";
@@ -481,7 +569,7 @@ function numericCsv(lines) {
 }
 
 /** Round exactly once on the final rational result, ties away from zero. */
-function roundedDecimal(numerator, denominator, decimals) {
+export function roundedDecimal(numerator, denominator, decimals) {
   const scaled = numerator * 10n ** BigInt(decimals);
   const absolute = scaled < 0n ? -scaled : scaled;
   const rounded = ((2n * absolute + denominator) / (2n * denominator)) * (scaled < 0n ? -1n : 1n);

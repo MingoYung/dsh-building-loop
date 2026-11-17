@@ -16,19 +16,21 @@ const policyGrounding = { ...direct, basis: "只转述本项目的规则。", ki
   inference: { rule: "project-policy", policy: [rule], premises: [], scope: "当前项目待补件",
     assumptions: [], counterexample: { possible: false, reason: "当前总纲直接给待补件指定复核动作。" } } };
 
-async function firstReview(root, write, { body, parts, configured = false, external = true, assessment = true }) {
+async function firstReview(root, write, { body, parts, configured = false, external = true, assessment = true,
+  materials = [{ reference: source, text: source.quote + "\n" }] }) {
   const manifest = structuredClone(policy);
   const unit = manifest.units.K01;
   unit.claims = configured ? ["C1"] : [];
   unit.calculations = {};
   for (const phase of ["first-review", "final-review"]) {
-    unit.phases[phase].read.push(source.file);
-    unit.phases[phase].evidence = external ? [source.file] : [];
+    const files = materials.map(({ reference }) => reference.file);
+    unit.phases[phase].read.push(...files);
+    unit.phases[phase].evidence = external ? files : [];
   }
   write("BUILDING-LOOP.json", JSON.stringify(manifest));
   write(rule.file, "# 总纲\n" + rule.quote + "\n");
   write("candidate.md", body);
-  write(source.file, source.quote + "\n");
+  for (const { reference, text } of materials) write(reference.file, text);
   const h = host(root, { automaticCoverage: false });
   const executor = (await h.flow("root", "advance")).childId;
   await h.flow(executor, "prepare");
@@ -44,7 +46,7 @@ async function firstReview(root, write, { body, parts, configured = false, exter
     sourceRefs, goalFit: { pass: true, basis: "交付符合目标。" },
     unverifiedSources: [], unlisted: [], revise: [],
   });
-  if (assessment) await assess(external ? [{ file: source.file, start: 1, end: 1 }] : []);
+  if (assessment) await assess(external ? materials.map(({ reference: { file, start, end } }) => ({ file, start, end })) : []);
   return { h, reviewer, blocks: packet.coverage.blocks, assess };
 }
 
@@ -61,13 +63,38 @@ test("inferred numbered support reuses only the current reviewer's own proven li
   assert.deepEqual(receipt.checks[0].supportOrigin, { kind: "same-reviewer-coverage", blocks: [blocks[0].id] });
 }));
 
-test("explicitly configured numbered claims still require the declared source path", () => fixture(async (root, write) => {
-  const { h, reviewer } = await firstReview(root, write,
-    { ...scenario, body: "C1：试验一记录 24 ms（出处：samples.md 第1行）。\n", configured: true });
-  await assert.rejects(h.flow(reviewer, "review", { checks: [numbered] }), /不与项目明确编号/u);
-  const { useCoverage, ...legacy } = numbered;
-  assert.equal((await h.flow(reviewer, "review", { checks: [{ ...legacy, file: source.file, start: 1, end: 1 }] })).phase,
-    "first-audit-ready");
+const records = [{ ...source, start: 5, end: 5 }, { file: "other-samples.md", start: 5, end: 5, quote: "试验二记录 35 ms。" }];
+const bodyWithSecondCitation = "C1：试验一记录 24 ms（出处：samples.md 第 1 行标题、第 5 行）。"
+  + "试验二记录 35 ms（出处：other-samples.md 第 1 行标题、第 5 行）。\n";
+const separatedProof = {
+  body: bodyWithSecondCitation, configured: true,
+  parts: block => [{ ...direct, evidence: [records[block.text.startsWith("试验二") ? 1 : 0]] }],
+  materials: records.map(reference => ({ reference, text: "# 测试记录\n记录元数据\n版本说明\n数据\n" + reference.quote + "\n" })),
+};
+
+test("configured numbered support carries two signed noncontiguous author citations without retyping source fields", () => fixture(async (root, write) => {
+  const { h, reviewer, blocks } = await firstReview(root, write, separatedProof);
+  const accepted = await h.flow(reviewer, "review", { checks: [numbered] });
+  assert.equal(accepted.phase, "first-audit-ready");
+  const receipt = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
+  const { evidence } = receipt.checks[0].supportOrigin;
+  assert.deepEqual(evidence.map(({ file, start, end, blocks }) => ({ file, start, end, blocks })),
+    records.map(({ file, start, end }, index) => ({ file, start, end, blocks: [blocks[index].id] })));
+  assert.ok(evidence.every(ref => /^[a-f0-9]{64}$/u.test(ref.evidenceSpan) && /^[a-f0-9]{64}$/u.test(ref.sha256)));
+  assert.equal(receipt.checks[0].file, source.file);
+  assert.equal(receipt.checks[0].start, 5);
+  const auditor = (await h.flow("root", "advance")).childId;
+  assert.notEqual(auditor, reviewer);
+  const packet = await h.flow(auditor, "prepare");
+  assert.deepEqual(packet.coverage.pending, blocks.map(block => block.id));
+  await assert.rejects(h.flow(auditor, "audit"), /未核块/u);
+}));
+
+test("configured numbered support requires an authored source for each factual part", () => fixture(async (root, write) => {
+  const { h, reviewer } = await firstReview(root, write, { ...separatedProof,
+    body: bodyWithSecondCitation.replace("（出处：other-samples.md 第 1 行标题、第 5 行）", "") });
+  await assert.rejects(h.flow(reviewer, "review", { checks: [numbered] }), /每个事实段都须先核验同行对应的实际原文/u);
+  assert.equal(fs.existsSync(path.join(root, "first.json")), false);
 }));
 
 test("a submission reports all missing or malformed configured IDs before handing off to review", () => fixture(async (root, write) => {

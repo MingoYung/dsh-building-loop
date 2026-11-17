@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { apply } from "../governance/index.mjs";
-import { QUALITY, citation, lineList, numericChecks, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
+import { QUALITY, citation, lineList, numberedCitationRanges, numericChecks, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import { evidenceReference, expectedClaims, checkSourceNarrative } from "../governance/evidence.mjs";
 import { citationLineCounts } from "../governance/coverage.mjs";
@@ -314,6 +314,92 @@ test("same-line locators after either semicolon are recognized without accepting
     assert.deepEqual(citation(line,"sources/nist-scatter.md"),{start:6,end:6});
     assert.deepEqual(citationLineCounts(Buffer.from(line),["sources/nist-scatter.md"]),[{source:"sources/nist-scatter.md",count:1,lines:[1]}]);
     assert.equal(citation(`${separator}old/sources/nist-scatter.md 第6行。`,"sources/nist-scatter.md"),null);
+  }
+});
+
+test("the frozen C2 row retains separate numbered citation lines for each labelled source",()=>{
+  const mauna="sources/mauna-loa-growth.md", global="sources/global-annual-growth.md";
+  const row="- C2：改正。2.23 ppm 是 Mauna Loa 单站年的增长率，不是全球值；全球海洋边界层同年的年增长为 2.06 ppm。标注应改为「2025 年 Mauna Loa 站 CO₂ 年增长 2.23 ppm」，若指全球则写 2.06 ppm，两者不可混称。（出处：" +
+    mauna + " 第 2 行列说明、第 5 行；" + global + " 第 2 行列说明、第 5 行）";
+  const separated=[{start:2,end:2},{start:5,end:5}];
+  assert.deepEqual(numberedCitationRanges(row,mauna),separated);
+  assert.deepEqual(numberedCitationRanges(row,global),separated);
+  assert.deepEqual(numberedCitationRanges(`[source: ${global} #L2 column definition, #L5]`,global),separated);
+  assert.deepEqual(numberedCitationRanges(`【证据：${global} 第2行数据字段、第5行】`,global),separated);
+});
+
+test("compact lists preserve singleton order and conventional ranges remain inclusive",()=>{
+  const method="sources/noaa-aggi-method.md", table="sources/noaa-aggi-table.md";
+  const c3=`（出处：${method} 第 10、17 行；${table} 第 2 行字段说明、第 7 行 544）`;
+  const c4=`（出处：${method} 第 7、6 行；${table} 第 4、7 行）`;
+  const singleton = (...positions) => positions.map(line => ({start:line,end:line}));
+  assert.deepEqual(numberedCitationRanges(c3,method),singleton(10,17));
+  assert.deepEqual(numberedCitationRanges(c3,table),singleton(2,7));
+  assert.deepEqual(numberedCitationRanges(c4,method),singleton(7,6));
+  assert.deepEqual(numberedCitationRanges(c4,table),singleton(4,7));
+  assert.deepEqual(numberedCitationRanges(`（出处：${table} 第 4、7、11 行）`,table),singleton(4,7,11));
+  for (const separator of ["-","至","到"]) {
+    assert.deepEqual(numberedCitationRanges(`（出处：${table} 第4${separator}7行）`,table),[{start:4,end:7}]);
+  }
+  assert.deepEqual(citation(c4,table),{start:4,end:7});
+  assert.deepEqual(numberedCitationRanges(`${table} 第4、7行`,table),[{start:4,end:7}]);
+});
+
+test("short quantities in an explicit source annotation do not hide the following locator",()=>{
+  const method="sources/noaa-aggi-method.md", table="sources/noaa-aggi-table.md";
+  const frozen=`（出处：${method} 第 3 行限定强迫基准、第 7 行 81%、第 6 行 66%；${table} 第 4、7 行）`;
+  const singleton = (...positions) => positions.map(line => ({start:line,end:line}));
+  assert.deepEqual(numberedCitationRanges(frozen,method),singleton(3,7,6));
+  assert.deepEqual(numberedCitationRanges(frozen,table),singleton(4,7));
+  for (const label of ["全球年增长 2.06 ppm","44 mW/m²","±0.08 ppm","-3.2 °C","5.4‰","1.8e-3 kg","2025 年"]) {
+    assert.deepEqual(numberedCitationRanges(`【证据：${method} 第7行 ${label}、第6行】`,method),singleton(7,6),label);
+  }
+  for (const separator of ["与", "及", "以及", "和"]) {
+    assert.deepEqual(numberedCitationRanges(`（出处：${table} 第 3 行表头${separator}第 7 行 1.559）`,table),singleton(3,7));
+    assert.deepEqual(numberedCitationRanges(`（出处：${table} 第3行表头${separator}${method} 第7行）`,table),singleton(3));
+    assert.deepEqual(numberedCitationRanges(`（出处：${table} 第3行表头${separator}第0行）`,table),[]);
+  }
+  for (const row of [
+    `${method} 第7行 81%、第6行`,
+    `（编辑备注：${method} 第7行 81%、第6行）`,
+    `（出处：${method} 第7行 81%）、第6行`,
+    `（出处：${method} 第7行 81%；第6行）`,
+    `（出处：${method} 第7行 81%。另见、第6行）`,
+    `（出处：${method} 第7行 81% 另见 ${table} 第6行）`,
+    `（出处：${method} 第7行 81 data/raw、第6行）`,
+    `（出处：${method} 第7行 81 other.md、第6行）`,
+  ]) assert.deepEqual(numberedCitationRanges(row,method),singleton(7),row);
+  for (const invalid of ["第0行","第-1行","第3-2行","#L-4"]) {
+    assert.deepEqual(numberedCitationRanges(`（出处：${method} 第7行 81%、${invalid}）`,method),[],invalid);
+  }
+});
+
+test("standalone source sentences preserve explicit disjoint locations without borrowing later prose",()=>{
+  const source="sources/archive.md";
+  const locations=[{start:3,end:3},{start:4,end:4},{start:6,end:6}];
+  assert.deepEqual(numberedCitationRanges(`此稿核对了对象与周期。出处：${source} 第 3、4、6 行。`,source),locations);
+  assert.deepEqual(numberedCitationRanges(`出处：${source} 第 3 行说明、第 4、6 行；第 8 行`,source),locations);
+  assert.deepEqual(numberedCitationRanges(`Claim. Source: ${source} #L4. 第6行`,source),[{start:4,end:4}]);
+  assert.deepEqual(numberedCitationRanges(`此处写到 ${source} 第 3、4、6 行`,source),[{start:null,end:null}]);
+  assert.deepEqual(numberedCitationRanges(`出处：${source} 第 3 行，sources/other.md 第 6 行`,source),[{start:3,end:3}]);
+  assert.deepEqual(numberedCitationRanges(`出处：${source} 第 3、0、6 行`,source),[]);
+});
+
+test("numbered locator lists stay within an explicit source group and reject invalid locators",()=>{
+  const source="sources/primary.md", other="sources/other.md", onlyTwo=[{start:2,end:2}];
+  for (const row of [
+    `${source} 第2行列说明、第5行`,
+    `（编辑注：${source} 第2行字段定义、第5行）`,
+    `（出处：${source} 第2行字段定义）、第5行`,
+    `（出处：${source} 第2行字段定义；第5行）`,
+    `（出处：${source} 第2行字段定义、另见 ${other} 第5行）`,
+    `（出处：${source} 第2行字段定义、${other} 第5行）`,
+    `（出处：${source} 第2行。另见同一文件的第5行）`,
+  ]) assert.deepEqual(numberedCitationRanges(row,source),onlyTwo,row);
+  assert.deepEqual(numberedCitationRanges(`（出处：${source} 第2行字段定义、${other} 第5行）`,other),[{start:5,end:5}]);
+  for (const invalid of ["第0行","第 -1 行","第2--1行","第3-2行","第3、0行","第3、-2行","第3、、2行","#L-2","#L0",":0"]) {
+    assert.deepEqual(numberedCitationRanges(`（出处：${source} ${invalid}）`,source),[],invalid);
+    assert.deepEqual(numberedCitationRanges(`（出处：${source} 第2行列说明、${invalid}）`,source),[],invalid);
   }
 });
 

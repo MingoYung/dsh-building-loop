@@ -61,7 +61,7 @@ test("signed explicit outcome ownership distinguishes a local guard from importe
   }));
 
 function project(root, write, { importsHeading, examplesHeading, ownerExamples, diagnostics, allowedLocalImports,
-  responsibilitiesHeading, responsibilities, rollback, goalClause = "预算最多五项。" } = {}) {
+  responsibilitiesHeading, responsibilities, rollback, continuation, goalClause = "预算最多五项。" } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const sources = importsHeading ? [candidate, "limits.py"] : [candidate];
   const files = [...sources, architecture];
@@ -81,7 +81,7 @@ function project(root, write, { importsHeading, examplesHeading, ownerExamples, 
     hierarchy: { overview: { path: goal, heading: "入口" }, index: { path: "INDEX.md", heading: "模块" },
       modules: { architecture } },
     coordinator: { read: [goal, "INDEX.md", architecture, "first.json", "final.json"], write: [architecture] },
-    units: { K01: { candidate, plainLast: false, architecture: {
+    units: { K01: { candidate, plainLast: false, continuation, architecture: {
       module: "architecture", headings: [...headings, ...(examplesHeading ? [examplesHeading] : [])], importsHeading,
       examplesHeading, ownerExamples, allowedLocalImports, responsibilitiesHeading, responsibilities, rollback,
     },
@@ -413,16 +413,22 @@ test("labeled import clauses distinguish direct imports from continued design pr
   ]);
 });
 
-async function approve(harness, actor, changed) {
+async function approve(harness, actor, changed, examplesHeading) {
   const review = (action, fields) => harness.invoke(actor, "building_loop_code_review", { action, ...fields });
   await review("prepare");
   const note = await harness.file(actor, "read", architecture);
   await harness.file(actor, "read", candidate);
+  if (examplesHeading) {
+    const { examples } = await review("probe", { assertion: "architecture" });
+    assert.ok(examples.every(example => example.outcome === "match"));
+  }
   const result = await review("record", { files: [fileJudgment], constraints: [constraint], findingsDone: true,
     architecture: { source: ref(architecture, 1, note.totalLines), status: changed ? "revise" : "pass", basis: "Review the rollback impact against the approved scope.",
       sections: [{ heading: "职责", basis: "The entrypoint implements the bound.", evidence: [{ ...ref(candidate, 3), relation: "supports" }] },
         { heading: "回退", basis: "The owner goal sets the budget that remains covered after rollback.",
-          evidence: [{ ...ref(goal, 3), relation: "supports" }] }] },
+          evidence: [{ ...ref(goal, 3), relation: "supports" }] }, ...(examplesHeading ? [{ heading: examplesHeading,
+          basis: "The exact owner-registered verification ran and matched the public contract.",
+          evidence: [{ ...ref(goal, 3), relation: "supports" }] }] : [])] },
     ...(changed ? { findings: [{ id: "rollback", kind: "architecture", ...ref(architecture, 9), observation: "Rollback only repeats the old budget check.",
       issue: "The plan does not cover replaying already submitted work.", fix: "Reproduce a replay against the reverted entrypoint.",
       violation: { type: "architecture", expected: "The rollback procedure checks a replayed request against the reverted entrypoint.",
@@ -463,6 +469,146 @@ test("a signed delivery waits for the coordinator architecture and sends archite
   assert.equal(receipt.independentAudit.codeReview.architecture.source.sha256, digest(revised));
   write(architecture, plan);
   assert.equal((await harness.flow("root", "status")).units[0].goalStale, true);
+}));
+
+for (const entry of ["first-review", "first-audit", "owner-example", "blocked-clause"]) test("a reproduced mandatory service failure goes back to its original executor from " + entry, () => fixture(async (root, write) => {
+  const blocked = entry === "blocked-clause";
+  const detectingPhase = entry === "first-audit" || blocked ? "first-audit" : "first-review";
+  const examplesHeading = entry === "owner-example" ? "公开验证" : undefined;
+  const clause = blocked ? "Output field `status` equals 200." : "A GET /ping returns HTTP 200 and the body OK.";
+  const expected = { status: 200, body: "OK" };
+  const wrong = { status: 404, body: "not found" };
+  const serviceInput = { method: "GET", path: "/ping" };
+  const code = result => "def handle(method, path):\n    # The service owns the status selection.\n    return " + JSON.stringify(result) + "\n";
+  const token = "isolated-mandatory-service-probe-token";
+  let firstIntake = true;
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const packet = JSON.parse(Buffer.concat(chunks));
+    assert.equal(request.headers.authorization, "Bearer " + token);
+    const bytes = Buffer.from(packet.artifacts.find(row => row.path === candidate).contentBase64, "base64");
+    const output = packet.phase === "intake" && firstIntake ? expected :
+      bytes.toString().includes('"status":200') ? expected : wrong;
+    if (packet.phase === "intake") firstIntake = false;
+    calls.push({ phase: packet.phase, input: JSON.parse(packet.probe.stdin), output });
+    response.end(JSON.stringify({ spec: packet.spec, requestId: packet.requestId, snapshotSha256: packet.snapshotSha256,
+      status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(output) } }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const env = { DSH_BUILDING_LOOP_DIAGNOSTICS_URL: "http://127.0.0.1:" + server.address().port + "/run",
+    DSH_BUILDING_LOOP_DIAGNOSTICS_TOKEN: token };
+  const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    const id = "service:example:get-ping";
+    const diagnostics = { checkSet: "service-smoke", protocol: 2, recipes: ["entry"], reviewRecipes: ["entry"],
+      ...(!blocked ? { inputContracts: [{ id: "service", recipe: "entry", examples: [{ id: "get-ping", input: serviceInput,
+        expectedJson: expected, requirement: { ...ref(goal, 3), quote: clause } }] }] } : {}) };
+    const { harness, save } = project(root, write, { goalClause: clause, diagnostics, continuation: "fresh",
+      examplesHeading, ...(examplesHeading ? { ownerExamples: [id] } : {}) });
+    const arch = examplesHeading ? plan + "\n## " + examplesHeading + "\n\n~~~json\n" +
+      JSON.stringify([{ id, expectedExitCode: 0, expectedJson: expected }]) + "\n~~~\n" : plan;
+    await harness.file("root", "write", architecture, { content: arch, note: "Register the service responsibility." });
+    await harness.flow("root", "architecture");
+    const executor = (await harness.flow("root", "advance")).childId;
+    const signCandidate = async runId => {
+      const { codeTask } = await harness.flow(executor, "prepare");
+      const { file, previousCases, requiredCases, protectedCases, ...challenge } = codeTask.regressionProof;
+      save(file, { ...challenge, runId, cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+      return file;
+    };
+    write(candidate, code(wrong));
+    await signCandidate("initial-candidate");
+    // The runner reports a pass once at admission. The independently repeated
+    // public check must defeat this previous result for the same exact bytes.
+    assert.equal((await harness.flow(executor, "submit")).phase, "review-ready");
+    const reviewer = (await harness.flow("root", "advance")).childId;
+    let detector = reviewer;
+    if (detectingPhase === "first-audit") {
+      assert.equal((await approve(harness, reviewer, false)).phase, "first-audit-ready");
+      detector = (await harness.flow("root", "advance")).childId;
+      assert.notEqual(detector, reviewer);
+    }
+    const probe = fields => harness.invoke(detector, "building_loop_code_review", { action: "probe", assertion: "runtime", file: candidate, ...fields });
+    await harness.flow(detector, "prepare");
+    await harness.file(detector, "read", goal);
+    const optional = await probe({ recipe: "entry", stdin: '{"method":"GET","path":"/optional"}', expectedExitCode: 0,
+      expectedPointer: "/status", expectedJson: "200" });
+    assert.equal(optional.outcome, "mismatch");
+    assert.equal(optional.blocking, false);
+    assert.equal((await harness.flow("root", "status")).units[0].phase, detectingPhase);
+    const failed = blocked ? await probe({ recipe: "entry", stdin: JSON.stringify(serviceInput), expectedExitCode: 0,
+      expectedPointer: "/status", expectedJson: "200", requirement: { ...ref(goal, 3), quote: clause } }) : examplesHeading
+        ? await harness.invoke(detector, "building_loop_code_review", { action: "probe", assertion: "architecture" })
+        : await probe({ exampleId: id });
+    assert.equal(failed.outcome, "mismatch");
+    if (blocked) {
+      const finding = { id: "ping-status", kind: "behavior", ...ref(candidate, 3),
+        observation: "The runner observed a 404 for the current implementation.", issue: "The service misses the required 200 response.",
+        fix: "Fix the response branch exercised by the verified input.",
+        evidence: [{ ...ref(candidate, 3), relation: "supports" }], violation: { type: "runtime",
+          expected: "200", actual: "404", requirement: ref(goal, 3), reproduction: failed.id } };
+      await harness.file(detector, "read", candidate);
+      const recorded = await harness.invoke(detector, "building_loop_code_review", { action: "record", findings: [finding] });
+      assert.deepEqual(recorded.errors, []);
+      assert.deepEqual(recorded.progress.findingIds, ["ping-status"]);
+      assert.equal((await harness.flow(detector, "block", { note: "Wait for the owner to restore the architecture before continuing." })).phase, "blocked");
+      assert.equal((await harness.flow("root", "status")).units[0].phase, "blocked");
+      await harness.file("root", "write", architecture, { content: revised, note: "Repair the documentation without changing the service." });
+      assert.equal((await harness.flow("root", "architecture")).phase, "supplement-ready");
+    } else {
+      assert.equal(failed.phase, "supplement-ready");
+      assert.deepEqual(failed.next, { tool: "building_loop", action: "advance", unit: "K01" });
+    }
+    const rejection = JSON.parse(fs.readFileSync(path.join(root, "first.json"), "utf8"));
+    assert.equal(rejection.decision, "reject");
+    if (blocked) assert.equal(rejection.validatedRuntimeFindings[0].id, "ping-status");
+    else assert.equal(rejection.publicBehavior.contractCase, id);
+    assert.equal(rejection.auditor, detectingPhase === "first-audit" ? detector : undefined);
+    await assert.rejects(harness.ledger("root", "review", { unit: "K01", decisions: [] }), /账本复核阶段/u);
+    const repair = await harness.flow("root", "advance");
+    assert.equal(repair.childId, executor);
+    assert.equal(repair.phase, "supplement");
+    const packet = await harness.flow(executor, "prepare");
+    if (blocked) {
+      assert.equal(packet.codeRepair.findings[0].id, "ping-status");
+      assert.equal(packet.codeRepair.findings[0].requirement.start, 3);
+    } else {
+      assert.equal(packet.codeRepair.findings[0].requirement.quote, clause);
+      assert.equal(packet.codeRepair.findings[0].contractCase, id);
+    }
+    await assert.rejects(harness.flow(executor, "submit"), /代码核验已退回/u);
+    assert.equal(calls.filter(({ phase }) => phase === detectingPhase).length, 2);
+    write(candidate, code(expected));
+    const proofFile = await signCandidate("fixed-candidate");
+    assert.equal((await harness.flow(executor, "submit")).phase, "final-review-ready");
+    const finalReviewer = (await harness.flow("root", "advance")).childId;
+    assert.equal((await approve(harness, finalReviewer, false, examplesHeading)).phase, "final-audit-ready");
+    const auditor = (await harness.flow("root", "advance")).childId;
+    assert.notEqual(auditor, finalReviewer);
+    assert.equal((await approve(harness, auditor, false, examplesHeading)).phase, "ledger-review");
+    const book = await harness.ledger("root", "read");
+    await harness.file("root", "read", goal);
+    await harness.file("root", "read", "final.json");
+    const decisions = book.items.map(({ id }) => id === "unit-K01"
+      ? { id, outcome: "completed", basis: "The corrected delivery passed the mandatory public check and two reviews.", evidence: ref("final.json", 1) }
+      : { id, outcome: "keep", basis: "Keep other recorded work available for the next task." });
+    const goodProof = fs.readFileSync(path.join(root, proofFile), "utf8");
+    write(proofFile, goodProof.replace("fixed-candidate", "tampered-receipt"));
+    await assert.rejects(harness.ledger("root", "review", { decisions }), /代码、目标或签名/u);
+    write(proofFile, goodProof);
+    assert.equal((await harness.ledger("root", "review", { decisions })).phase, "closed");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
 }));
 
 test("only the coordinator checkpoint renders the generated import section after signed source changes", () => fixture(async (root, write) => {

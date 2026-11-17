@@ -148,7 +148,7 @@ function configure(root, write, kind, { architecture = false, registered = false
 }
 
 /** Fixture runner validates host pinning and returns controlled replay evidence. */
-async function runWithRunner(kind, run) {
+async function runWithRunner(kind, run, { locateMismatch = false } = {}) {
   const scenario = stallCases[kind];
   const requests = [], errors = [];
   let forcePass;
@@ -191,7 +191,8 @@ async function runWithRunner(kind, run) {
         else if (windowProbe) Object.assign(reply, { status: "passed", probe: { exitCode: 0, stdout: '{"status":"ok"}' } });
         else Object.assign(reply, { status: "passed", probe: { exitCode: 0, stdout: JSON.stringify(fixed
           ? { status: "ok", results: [{ actions: [], units: 0 }], units: 0 }
-          : { status: "ok", results: [{ actions: ["a"], units: 2 }], units: 2 }) } });
+          : { status: "ok", results: [{ actions: ["a"], units: 2 }], units: 2 }),
+          ...(locateMismatch && !fixed ? { stack: [{ path: scenario.path, line: scenario.reportedLine, function: "retained_closure" }] } : {}) } });
       }
       response.end(JSON.stringify(reply));
     } catch (error) {
@@ -326,7 +327,9 @@ async function signCurrent(harness, executor, write, keys, oldStatus = "passed")
     cases: [{ id: oldCase, status: oldStatus }, { id: newCase, status: "passed" }] }, keys);
 }
 
-test("signed failure selects its public behavior replay and only that mismatch can route the repair", () =>
+for (const locateMismatch of [false, true]) test(locateMismatch
+  ? "located public mismatch sends an exact read and replay to the original executor without transposing proof or output"
+  : "signed failure selects its public behavior replay and only that mismatch can route the repair", () =>
   fixture(async (root, write) => runWithRunner("behavior", async ({ requests }) => {
     configure(root, write, "behavior", { registered: true });
     const harness = diagnosticHost(root);
@@ -353,19 +356,34 @@ test("signed failure selects its public behavior replay and only that mismatch c
     assert.equal(requests.length, count);
     const prepared = await harness.flow(investigator, "prepare");
     assert.equal(prepared.next.proofId, proof.proofId);
+    assert.deepEqual(prepared.reproduction.availableProofs.find(row => row.id === exploratory.proofId).next, prepared.next);
     await assert.rejects(harness.invoke(investigator, diagnosis, { ...finding, proofId: exploratory.proofId }), /真实回执/u);
-    const submitted = await harness.invoke(investigator, diagnosis, { ...finding, proofId: proof.proofId });
+    const minimal = { action: "submit", unit, proofId: proof.proofId };
+    if (locateMismatch) assert.deepEqual(prepared.next.required, []);
+    else await assert.rejects(harness.invoke(investigator, diagnosis, minimal), /具体原因/u);
+    const submitted = await harness.invoke(investigator, diagnosis, locateMismatch ? minimal : { ...finding, proofId: proof.proofId });
     const { evidence } = submitted.stallDiagnostic;
     assert.equal(evidence.proof.exampleId, exampleId);
     assert.equal(evidence.proof.scope, "signed-case");
     assert.equal(evidence.proof.signedCaseId, newCase);
     assert.ok(!JSON.stringify(submitted).includes(JSON.stringify(publicRequest)));
-    await harness.invoke("root", diagnosis, { action: "verify", unit, evidenceId: evidence.id,
+    assert.ok(!JSON.stringify(submitted).includes('"actions":["a"]'));
+    const located = stallCases.behavior.reportedLine;
+    assert.deepEqual(evidence.source, { file: behaviorPath, start: locateMismatch ? located : finding.start,
+      end: locateMismatch ? located : finding.end, sha256: digest(closureSource) });
+    if (locateMismatch) assert.equal(evidence.cause, undefined);
+    const verified = await harness.invoke("root", diagnosis, { action: "verify", unit, evidenceId: evidence.id,
       decision: "confirmed", reason: "The registered case and exact source location identify the dependency traversal defect." });
+    assert.ok(!JSON.stringify(verified).includes('"actions":["a"]'));
     const repair = await harness.flow("root", "advance");
     assert.equal(repair.childId, executor);
     assert.equal(repair.reused, true);
-  })));
+    const packet = await harness.flow(executor, "prepare");
+    assert.deepEqual(packet.stallDiagnostic.evidence.replay.actual.json.results[0].actions, ["a"]);
+    assert.deepEqual(packet.stallDiagnostic.evidence.replay.expected.json.results[0].actions, []);
+    assert.deepEqual(packet.stallDiagnostic.evidence.replay.next, { tool: reproduction, ...replay });
+    assert.equal(packet.stallDiagnostic.evidence.replay.input, undefined);
+  }, { locateMismatch })));
 
 test("alternate success gives a usable independent proof and a bad proof ID returns specific guidance", () =>
   fixture(async (root, write) => runWithRunner("behavior", async ({ requests }) => {
@@ -760,3 +778,53 @@ test("repeated invalid parameters require actual corrected execution of the same
     assert.equal(resumed.reused, true);
     assert.equal((await harness.flow(executor, "prepare")).stallDiagnostic.evidence.replay.input.args[0], syntaxPath);
   })));
+
+for (const matches of [false, true]) {
+  test("a registered public example " + (matches ? "keeps parameter recovery when it matches" : "reroutes a parameter stall on a real behavior mismatch"),
+    () => fixture(async (root, write) => runWithRunner("behavior", async ({ requests, forceCheckPass }) => {
+      configure(root, write, "behavior", { registered: true });
+      forceCheckPass(matches);
+      const harness = diagnosticHost(root);
+      const { childId: executor } = await harness.flow("root", "advance");
+      await harness.flow(executor, "prepare");
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const result = await harness.invoke(executor, reproduction, { action: "probe", recipe: behaviorRecipe });
+        assert.equal(result.status, "invalid-input");
+        assert.equal(result.field, "stdin");
+      }
+      assert.equal(requests.length, 0);
+      await harness.invoke("root", diagnosis, { action: "triage", unit, layer: "parameters",
+        reason: "The initial failed calls omitted the required JSON input." });
+      const { childId: investigator } = await harness.flow("root", "advance");
+      await harness.flow(investigator, "prepare");
+      const plain = await harness.invoke(investigator, reproduction, stallCases.behavior.probe);
+      assert.equal(plain.provenLayer, "parameters");
+      assert.equal(plain.next.action, "submit");
+      const args = { action: "example", exampleId: "retained-closure:example:through-unapplied" };
+      const registered = await harness.invoke(investigator, behaviorProbe, args);
+      assert.equal(registered.outcome, matches ? "match" : "mismatch");
+      assert.equal(registered.provenLayer, matches ? "parameters" : "behavior");
+      assert.equal(registered.next.action, matches ? "submit" : "reroute");
+      const report = { action: registered.next.action, unit, proofId: registered.proofId };
+      if (matches) {
+        const submitted = await harness.invoke(investigator, diagnosis, { ...report,
+          cause: "The previously omitted input is accepted and the registered result now matches.",
+          fix: "Use the registered public example instead of the incomplete probe." });
+        assert.equal(submitted.phase, "diagnosis-verify");
+        assert.equal(submitted.stallDiagnostic.evidence.proof.kind, "parameters-recovered");
+        return;
+      }
+      const { path: file, range: [start, end], cause } = stallCases.behavior;
+      const read = await harness.file(investigator, "read", file, { start, count: end - start + 1 });
+      const options = { ...report, cause, file, start, end };
+      const prepared = await harness.flow(investigator, "prepare");
+      assert.equal(prepared.next.proofId, registered.proofId);
+      assert.ok(prepared.reproduction.availableProofs.some(row => row.id === plain.proofId && row.next.action === "submit"));
+      const rerouted = await harness.invoke(investigator, diagnosis, options);
+      assert.equal(rerouted.phase, "diagnosis-ready");
+      assert.equal(rerouted.stallDiagnostic.suggestedLayer, "behavior");
+      assert.equal(rerouted.stallDiagnostic.evidence.proof.id, registered.proofId);
+      assert.equal(rerouted.stallDiagnostic.evidence.proof.kind, "runtime-mismatch");
+      assert.deepEqual(rerouted.stallDiagnostic.evidence.source, { file, start, end, sha256: read.sha256 });
+    })));
+}

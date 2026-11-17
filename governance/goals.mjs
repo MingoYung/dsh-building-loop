@@ -22,6 +22,7 @@ function* proofSources(coverage) {
     yield* record.syntaxSources??[];
     for(const part of record.parts) {
       yield* part.evidence??[];
+      if (part.editorialOriginal) yield part.editorialOriginal;
       yield* part.inference?.premises??[];
       yield* part.inference?.warrant??[];
       yield* (part.inference?.assumptions??[]).map(row=>row.evidence);

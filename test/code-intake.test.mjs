@@ -163,7 +163,9 @@ test("regression executors must edit existing implementation against one exact p
   await assert.rejects(edit({ edits: [head, { oldText: "missing", newText: "extra" }] }), /第 2 项.*anchor-not-found.*未落盘/);
   assert.equal(sourceOnDisk(), original);
   assert.equal(fs.existsSync(backup), false);
-  const changed = await edit({ edits: [tail, head] });
+  const withoutPath = args => harness.invoke(childId, "building_loop_file", { action: "edit", note, ...args });
+  await assert.rejects(withoutPath({ ...head, beforeSha256: digest("not read") }), /edit 需要 path/u);
+  const changed = await withoutPath({ edits: [tail, head], beforeSha256: sha256 });
   const expected = original.replace("value + 1", "value + 2").replace("flag = False", "flag = True");
   assert.equal(sourceOnDisk(), expected);
   assert.equal(changed.sha256, digest(expected));
@@ -178,6 +180,11 @@ test("regression executors must edit existing implementation against one exact p
   await harness.file(childId, "edit", bomOnly, { oldText: "", newText: "filled = True\n", beforeSha256: bomSha256, note });
   assert.equal(fs.readFileSync(path.join(root, bomOnly), "utf8"), "\uFEFFfilled = True\n");
   await harness.file(childId, "write", testArtifact, { content: "assert 1\n", note });
+  // The digest alone cannot choose between two writable observed files.
+  write(fresh, expected);
+  await harness.file(childId, "read", fresh);
+  await harness.file(childId, "read", module);
+  await assert.rejects(withoutPath({ ...tail, beforeSha256: changed.sha256 }), /edit 需要 path/u);
 }));
 
 test("changed code is returned for regression or failed new requirements, and a passing receipt is pinned through review", () => fixture(async (root, write) => {
@@ -377,6 +384,8 @@ test("a signed green submission still stops on registered malformed input and re
     assert.equal(first.phase, "intake");
     assert.equal(first.submission.status, "input-check");
     assert.equal(first.submission.inputContracts.status, "failed");
+    assert.equal(first.submission.next.tool, "building_loop_file");
+    assert.equal(first.submission.next.action, "edit");
     assert.deepEqual(first.submission.inputContracts.failures.map(row => row.id),
       ["settings-shape:1:array", "settings-shape:example:ordered"]);
     assert.equal(seen, 4);

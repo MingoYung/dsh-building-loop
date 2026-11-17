@@ -1,5 +1,6 @@
 import { digest, includes, keyOf, readBytes, relativeName, text } from "./policy.mjs";
-import { citation, lineList } from "./preflight.mjs";
+import { citation, claimRow, lineList } from "./preflight.mjs";
+import { markdownStructure } from "./markdown-structure.mjs";
 
 // This failure belongs to a candidate locator only after the acquisition receipt
 // and the current snapshot have been authenticated against the configured pins.
@@ -12,6 +13,89 @@ export function expectedClaims(spec, lines) {
     return match ? [match[1]] : [];
   });
   return [...new Set([...spec.claims, ...discovered])];
+}
+
+/** Locate the original numbered claim for editorial comparison without
+ * giving the locator any evidentiary weight or recording a read. */
+export function workingClaimLocations(frame, active, spec, limit = 24) {
+  if (!spec.claims.length) return [];
+  const matches = new Map();
+  for (const file of spec.phases[active.phase]?.materials ?? []) {
+    if (!includes(frame.reads, file)) continue;
+    const raw = readBytes(frame.root, file);
+    if (!raw) continue;
+    const { visible } = markdownStructure(lineList(raw));
+    for (const [index, line] of visible.entries()) {
+      const id = /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*)?(C\d+)(?:\*\*)?(?:\s*[:：]\s*|\s+)\S/u.exec(line)?.[1];
+      if (spec.claims.includes(id)) matches.set(id, matches.has(id) ? null : { id, file, line: index + 1 });
+    }
+  }
+  return spec.claims.map(id => matches.get(id)).filter(Boolean).slice(0, limit);
+}
+
+function editorialRule(frame, active) {
+  const rule = active.goal?.files?.flatMap(({ file, sha256 }) => {
+    if (!includes(frame.policy.goalContext ?? [], file) || !includes(frame.reads, file)) return [];
+    const raw = readBytes(frame.root, file);
+    if (!raw || digest(raw) !== sha256) return [];
+    const lines = lineList(raw), { visible } = markdownStructure(lines);
+    // Require an explicit menu and definitions. Mentioning a label in prose,
+    // a code example, or the candidate itself cannot activate this path.
+    return visible.flatMap((line, index) => /保留\s*[/／]\s*改正\s*[/／]\s*待证/u.test(line) &&
+      ["保留", "改正", "待证"].every(label => line.includes(label + "表示"))
+      ? [{ file, start: index + 1, end: index + 1, quote: lines[index].trim() }] : []);
+  });
+  return rule?.length === 1 ? rule[0] : undefined;
+}
+
+/** Bind the original-only pass to today's material, never to the draft. */
+export function originalReviewContract(frame, active, spec) {
+  if (!spec?.originalFirst || !["reviewer", "auditor"].includes(frame.role)) return;
+  const grant = spec.phases[active.phase];
+  const originals = workingClaimLocations(frame, active, spec, spec.claims.length);
+  const rule = editorialRule(frame, active);
+  if (!rule) throw new Error("原稿先核须在当前总纲明确保留／改正／待证的定义");
+  if (originals.length !== spec.claims.length) throw new Error("原稿先核须为每个编号提供唯一的已授权来稿原句");
+  const sources = grant.evidence.filter(file => includes(frame.reads, file));
+  const material = [...new Set([...(grant.materials ?? []), ...sources, ...sources.map(file =>
+    frame.policy.sourcePins[keyOf(file)]?.observation?.file).filter(Boolean)])].map(file => {
+    const bytes = readBytes(frame.root, file);
+    return [file, bytes && digest(bytes)];
+  });
+  const binding = digest(JSON.stringify([active.goal.sha256, rule, originals, material,
+    spec.originalMeasurements ?? {}, sources.map(file => frame.policy.sourcePins[keyOf(file)] ?? null)]));
+  return { originals, sources, rule, binding };
+}
+
+function editorialLabel(line) {
+  return /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*)?(C\d+)(?:\*\*)?\s*[:：]\s*(保留|改正|待证)(?=[。！？；;!?.,，、\s]|$)/u.exec(line);
+}
+
+export function originalDraftIssues(spec, lines) {
+  if (!spec.originalFirst) return [];
+  const { visible } = markdownStructure(lines);
+  const labels = new Set(visible.flatMap(line => editorialLabel(line)?.[1] ?? []));
+  return spec.claims.filter(id => !labels.has(id)).map(id => id + " 的编号行须先写保留、改正或待证，再分开说明正文");
+}
+
+/** A numbered item is editorial only when the current goal defines the choices
+ * and the unit assigns a unique original claim in an authorized working file. */
+export function workingClaimDecisions(frame, active, spec, bytes) {
+  const decisions = new Map();
+  if (!spec.phases[active.phase]?.evidence?.length) return decisions;
+  const originals = workingClaimLocations(frame, active, spec, spec.originalFirst ? spec.claims.length : 24);
+  if (!originals.length) return decisions;
+  const rule = editorialRule(frame, active);
+  if (!rule) return decisions;
+  const lines = lineList(bytes), { visible } = markdownStructure(lines);
+  for (const [index, line] of visible.entries()) {
+    const match = editorialLabel(line);
+    const original = originals.find(row => row.id === match?.[1]);
+    if (!original || claimRow(lines, original.id)?.line !== index + 1) continue;
+    const decision = match[2], end = match[0].length;
+    decisions.set(index + 1, { id: original.id, decision, start: end - decision.length, end, original, rule });
+  }
+  return decisions;
 }
 
 /** Match an independently acquired excerpt receipt to exact snapshot lines. */
@@ -124,9 +208,12 @@ function sourceIdentity(file, pin) {
 
 /** The shared source gate always checks authority and pins. Only the private
  * host revalidation path may omit a new model-read stamp; it never records one. */
-function checkedSource(frame,active,spec,input,{whole=false,host=false}={}) {
+function checkedSource(frame,active,spec,input,{whole=false,host=false,workingMaterial=false}={}) {
   const file=relativeName(input?.file),grant=spec.phases[active.phase];
-  if(!includes(grant.evidence,file)||!includes(grant.read,file))throw new Error("资料引用不在本轮证据授权中 "+file);
+  const allowed = workingMaterial ? grant.materials ?? [] : grant.evidence;
+  if (!includes(allowed,file) || !includes(grant.read,file)) {
+    throw new Error((workingMaterial ? "文件不在本轮待核材料授权中 " : "资料引用不在本轮证据授权中 ") + file);
+  }
   const bytes=readBytes(frame.root,file),lines=bytes&&lineList(bytes),seen=active.seen?.[keyOf(file)];
   const start=whole?1:input.start,end=whole?lines?.length:input.end;
   if(!bytes||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<1||end<start||end>lines.length
@@ -134,19 +221,26 @@ function checkedSource(frame,active,spec,input,{whole=false,host=false}={}) {
     throw new Error("资料引用须对应本轮实际读过的当前原文行 "+file);
   }
   const sha256=digest(bytes),pin=frame.policy.sourcePins[keyOf(file)];
-  if(spec.requireSourcePins&&!pin)throw new Error("资料缺少项目维护者登记的来源凭据 "+file);
+  if(spec.requireSourcePins&&!workingMaterial&&!pin)throw new Error("资料缺少项目维护者登记的来源凭据 "+file);
   if(pin&&pin.sha256!==sha256)throw new Error("资料与登记的原始版本不符，须重新核验来源 "+file);
   return {file,bytes,lines,start,end,sha256,pin};
 }
 
 /** Validate a source against actual reads, current bytes and an optional origin pin. */
 export function evidenceReference(frame, active, spec, input, options) {
-  const {file,bytes,start,end,sha256,pin}=checkedSource(frame,active,spec,input,options);
+  const {file,bytes,start,end,sha256,pin}=checkedSource(frame,active,spec,input,{...options,workingMaterial:false});
   const observation=pin?.observation&&observedExcerpt(frame.root,file,bytes,pin,start,end);
   return {file,start,end,sha256,sourceIdentity:sourceIdentity(file,pin),
     provenance:observation?"maintainer-pinned-acquisition-receipt":pin?"maintainer-pinned-local-material":"observed-local-bytes",origin:pin
     ?{kind:pin.kind,locator:pin.locator,integrity:"matches-pin",...(observation?{observation}:{})}
     :{kind:"unregistered",integrity:"observed-local-bytes"}};
+}
+
+/** Bind what the assigned working material says, without endorsing its claims. */
+export function workingMaterialReference(frame, active, spec, input, options) {
+  const {file,start,end,sha256}=checkedSource(frame,active,spec,input,{...options,workingMaterial:true});
+  return {file,start,end,sha256,sourceIdentity:sourceIdentity(file),
+    provenance:"observed-working-material",origin:{kind:"working-material",integrity:"observed-local-bytes"}};
 }
 
 /** Read the authenticated registered-excerpt set as its own object. Metadata and

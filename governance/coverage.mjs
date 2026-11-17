@@ -1,8 +1,9 @@
 import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
-import { citation, claimRow, lineList, numericChecks, errorExample, repairBaseline, adjacentCitationLocator, exactCitationLocator, footnoteQuoteIndex, verbatimQuotes, requiredLineMarkdown } from "./preflight.mjs";
-import { evidenceReference, evidenceSpan, projectPolicyReference, registeredObservation, UnobservedExcerptError, webSourceLocator } from "./evidence.mjs";
+import { citation, claimRow, lineList, numberedCitationRanges, numericChecks, errorExample, repairBaseline, adjacentCitationLocator, exactCitationLocator, footnoteQuoteIndex, verbatimQuotes, requiredLineMarkdown } from "./preflight.mjs";
+import { evidenceReference, evidenceSpan, originalReviewContract, projectPolicyReference, registeredObservation, sourceVersionCurrent, UnobservedExcerptError, webSourceLocator, workingClaimDecisions, workingMaterialReference } from "./evidence.mjs";
 import { sectionSourceAttribution } from "./assertion-attribution.mjs";
 import { currentHostResults } from "./host-results.mjs";
+import { measuredOriginalDisposition } from "./source-arithmetic.mjs";
 
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
@@ -13,7 +14,9 @@ export const CLASSIFICATION_VERSION = 13;
 export class CoverageRecordError extends Error {}
 const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example"];
 const STATUSES = ["supported", "unsupported", "uncertain"];
-const ASSERTIONS = ["material-identity", "original-fact", "project-rule", "project-application", "manuscript-attribution"];
+const MATERIAL_ATTRIBUTION = "material-attribution";
+const MATERIAL_MARKER = "[材料转述]";
+const ASSERTIONS = ["material-identity", "original-fact", "project-rule", "project-application", "manuscript-attribution", MATERIAL_ATTRIBUTION];
 const INVENTORY_LIMIT = 24;
 const RECORD_LIMIT = 12;
 const INFERENCE_INPUTS = ["rule", "policy", "premises", "scope", "assumptions", "counterexample", "warrant", "formal", "calculation"];
@@ -180,23 +183,36 @@ function explanation(value, label, limit = 1200) {
 }
 
 /** Verify exact quotations against authorized, actually read current source lines. */
-function sourceQuote(frame, active, spec, value) {
+function sourceQuote(frame, active, spec, value, materialOnly = false, takeWholeMaterialLine = false) {
   if (typeof value?.file === "string" && includes(frame.policy.goalContext ?? [], value.file.replaceAll("\\", "/"))) {
     throw new Error("总纲条款可用于项目内规则推导：kind=inference，inference 内填 rule=project-policy、policy（实际总纲引句）、premises（仅转述规则填 []；应用到记录时填该原始记录）、scope、assumptions（无则 []）、counterexample");
   }
   if (typeof value?.file === "string" && keyOf(relativeName(value.file)) === keyOf(spec.candidate)) {
     throw objectFailure("unverifiable", "资料引用不在本轮证据授权中 " + spec.candidate + "：候选稿只能证明稿内结构", candidateProofGuide());
   }
-  const ref = evidenceReference(frame, active, spec, value);
-  const quote=value.quote, span=typeof quote==="string"&&quote.length<=2000
-    ?evidenceSpan(readBytes(frame.root,ref.file),{...ref,quote}):null;
+  const { start, end, quote } = value ?? {};
+  const singleLine = typeof quote === "string" && quote.trim() && !/[\r\n]/u.test(quote);
+  // An explicitly named line can be written with one endpoint. It still
+  // needs the exact same authorization, read stamp and byte-level quote.
+  const locator = singleLine && (start === undefined || end === undefined) && Number.isSafeInteger(start ?? end)
+    ? { file: value.file, start: start ?? end, end: end ?? start } : value;
+  if (!Number.isSafeInteger(locator?.start) || !Number.isSafeInteger(locator?.end) || locator.start < 1 || locator.end < locator.start) {
+    throw new Error("原文引用须给有效 start、end。单行逐字引句可只填一个行号，多行须同时填写起止行");
+  }
+  const ref = materialOnly ? workingMaterialReference(frame, active, spec, locator) : evidenceReference(frame, active, spec, locator);
+  const bytes = readBytes(frame.root,ref.file);
+  // Only a bound author's single-line working-material locator can fill in
+  // an omitted quote. Recheck the hash before taking text from that snapshot.
+  if (takeWholeMaterialLine && (!bytes || digest(bytes) !== ref.sha256)) throw new Error("待核材料已变化，请重新读取 " + ref.file);
+  const exact = takeWholeMaterialLine ? lineList(bytes)[ref.start - 1] : quote;
+  const span=typeof exact==="string"&&exact.length<=2000 ?evidenceSpan(bytes,{...ref,quote:exact}):null;
   if (!span) {
     throw new Error("证据 quote 必须逐字出现在所指原文行，不能用概括或自己补写的桥接条件代替");
   }
   // An acquisition receipt registers independent excerpts, not a continuous page.
   // Preserve per-line citations instead of inventing a bridge between excerpts.
-  if (ref.origin?.observation && /[\r\n]/u.test(quote)) throw new Error("登记的独立来源摘录不能用跨行 quote 拼成连续原话，请逐行分别引用");
-  return { ...ref, quote, evidenceSpan:span };
+  if (ref.origin?.observation && /[\r\n]/u.test(exact)) throw new Error("登记的独立来源摘录不能用跨行 quote 拼成连续原话，请逐行分别引用");
+  return { ...ref, quote:exact, evidenceSpan:span };
 }
 
 /** A single explicit trailing citation is owned by the preceding clause. Do
@@ -234,15 +250,270 @@ function proofReferences(part) {
     ...(part.inference?.assumptions??[]).map(item=>item.evidence)];
 }
 
+function citationReference(frame,active,spec,ref) {
+  return includes(spec.phases[active.phase].materials ?? [],ref.file)
+    ? workingMaterialReference(frame,active,spec,ref)
+    : evidenceReference(frame,active,spec,ref);
+}
+
+/** A declaration owns the text after its marker, never a preceding editorial
+ * disposition. A semicolon continuation must attribute an exact line from
+ * the same uniquely named material, on the same physical line and sentence. */
+function materialAttributionScope(block, grant) {
+  const marker = block.text.indexOf(MATERIAL_MARKER);
+  if (marker >= 0) {
+    const prefix = block.text.slice(0, marker), quote = block.text.slice(marker);
+    // Legacy explicit proofs keep their scope. Quoted or escaped examples
+    // cannot select an automatic split or automatically bind a source.
+    const locator = block.text.lastIndexOf(MATERIAL_MARKER) === marker &&
+      (!prefix.trim() || /[:：]\s*$/u.test(prefix) && !/[“‘「『《`"'\\]/u.test(prefix)) &&
+      markedMaterialLocator(quote, grant.materials ?? []);
+    return { start: marker, quote, ...(marker ? { separateQuote: prefix } : {}), ...(locator ? { locator } : {}) };
+  }
+  const continuation = /^第\s*(\d+)\s*行\s*(?:原文|[明记写]?载|明确|称|写|指出|注明|提到|列出)/u.exec(block.text);
+  if (!continuation) return;
+  const before = block.lineText.slice(0, block.start);
+  const anchor = before.lastIndexOf(MATERIAL_MARKER);
+  if (anchor < 0) return;
+  const attributed = before.slice(anchor + MATERIAL_MARKER.length);
+  if (/[。！？!?]/u.test(attributed) || !/[；;]\s*$/u.test(attributed)) return;
+  const files = (grant.materials ?? []).filter(file => citation(attributed, file)?.start);
+  const line = Number(continuation[1]);
+  if (files.length === 1 && Number.isSafeInteger(line) && line > 0) return { start: 0, quote: block.text, file: files[0], line };
+}
+
+/** Reuse the exact-locator parser on the authored attribution. Only a unique
+ * single line can supply the role's own exact source bytes without retyping. */
+function markedMaterialLocator(quote, files) {
+  const body = quote.slice(MATERIAL_MARKER.length).trimStart();
+  const lead = /^(?:据|见|引自)\s+([^，,\r\n]+)[，,]/u.exec(body);
+  const attribution = explicitAttribution({ text:body }, files);
+  if (lead && attribution) return;
+  const found = lead ? exactCitationLocator(lead[1], files) : attribution;
+  const [source, extra] = found?.locators ?? [];
+  if (!source || extra || found.excludedLocators?.length || source.start !== source.end) return;
+  // Never select between more than one locator in the quoted claim. This
+  // guard can decline shorthand; the explicit proof path still exists.
+  const rest = lead ? body.slice(lead[0].length) : body.slice(0,attribution.start);
+  if (files.some(file => citation(rest, file)?.start) ||
+      /第\s*\d+[^，,。；;]*行|#L\d+|\.[\p{L}\p{N}_-]+`?\s*[:：]\d+|https?:\/\//iu.test(rest)) return;
+  return source;
+}
+
+function materialReviewScope(frame, active, material) {
+  if (!material?.locator) return material;
+  const { locator, ...manual } = material;
+  const { file, start, end } = locator;
+  if (!includes(frame.reads, file)) return manual;
+  const bytes = readBytes(frame.root, file), seen = active.seen?.[keyOf(file)];
+  if (!bytes || end > lineList(bytes).length) return { ...material, locatorIssue:"候选所列的待核材料或行号不存在。" };
+  if (seen?.hash !== digest(bytes) || !seen.ranges?.some(([a,b]) => a <= start && b >= end)) {
+    return { ...material, next:{ tool:"building_loop_file", action:"read", path:file, start, count:1 } };
+  }
+  return material;
+}
+
+function boundMaterialEvidence(frame, active, spec, material, { evidence:submitted, status, finding }) {
+  const { locator, next, locatorIssue } = material;
+  if (locatorIssue) {
+    // An invalid author locator can justify returning the draft for repair.
+    // It supplies no evidence and can never support the cited claim.
+    if (status !== "supported" && ["scope", "missing-evidence"].includes(finding?.kind) &&
+        (submitted === undefined || Array.isArray(submitted) && submitted.length === 0)) return [];
+    throw new Error(locatorIssue + " " + JSON.stringify(locator));
+  }
+  if (next) throw new Error("待核材料必须由本角色实际读过当前行。 next=" + JSON.stringify(next));
+  if (submitted !== undefined) {
+    if (!Array.isArray(submitted) || submitted.length !== 1 || typeof submitted[0]?.file !== "string" ||
+        keyOf(relativeName(submitted[0].file)) !== keyOf(locator.file) ||
+        (submitted[0].start ?? submitted[0].end) !== locator.start ||
+        (submitted[0].end ?? submitted[0].start) !== locator.end) {
+      throw new Error("材料转述的逐字证据只能用候选标出且经授权的同一原文行。" + JSON.stringify(locator));
+    }
+  }
+  const quote = submitted?.[0].quote;
+  return [sourceQuote(frame, active, spec, { ...locator, quote }, true, quote === undefined)];
+}
+
+function editorialOnBlock(decisions, block) {
+  const decision = decisions.get(block?.line);
+  return decision && decision.start < block.end && decision.end > block.start ? decision : undefined;
+}
+
+/** The existing application proof must cover the whole declared decision. The
+ * working line binds what is being judged, while premises prove the facts. */
+function editorialPart(part, decision, block) {
+  if (!decision || block.start + part.start >= decision.end || block.start + part.end <= decision.start) return false;
+  if (block.start + part.start > decision.start || block.start + part.end < decision.end ||
+      /[\p{L}\p{N}]/u.test(block.text.slice(decision.end - block.start, part.end)) ||
+      part.kind !== "inference" || part.assertion !== "project-application" ||
+      part.inference?.rule !== "project-policy" || !part.inference?.premises?.length) {
+    throw new Error(decision.id + " 的处置须单列，用现有 project-application 比较来稿和外部依据。判断的是「" +
+      decision.decision + "」这个处置。原文 " + decision.original.file + " 第 " + decision.original.line + " 行。");
+  }
+  return true;
+}
+
+function editorialOriginal(frame, active, spec, { original }) {
+  return workingMaterialReference(frame, active, spec, { file: original.file, start: original.line, end: original.line });
+}
+
+export function originalReviewGate(frame, active, spec) {
+  const contract = originalReviewContract(frame, active, spec);
+  if (!contract) return;
+  const owner = { actor: frame.agent.id, phase: active.phase, binding: contract.binding };
+  const saved = active.originalReview;
+  const decisions = saved && JSON.stringify(saved.owner) === JSON.stringify(owner) ? saved.decisions : {};
+  const pending = contract.originals.filter(({ id }) => !Object.hasOwn(decisions, id));
+  return { ...contract, owner, decisions, pending };
+}
+
+function originalQuote(frame, ref) {
+  const bytes = readBytes(frame.root, ref.file);
+  if (!bytes || digest(bytes) !== ref.sha256) throw new Error("原稿先核的材料版本已变化");
+  return lineList(bytes).slice(ref.start - 1, ref.end).join("\n");
+}
+
+function originalAction(frame, active, spec, args) {
+  const gate = originalReviewGate(frame, active, spec);
+  if (!gate) throw new Error("当前单元未启用原稿先核");
+  const decisions = { ...gate.decisions };
+  const deferred = new Map();
+  for (const original of gate.pending) {
+    if (!Object.hasOwn(spec.originalMeasurements ?? {}, original.id)) continue;
+    try {
+      const result = measuredOriginalDisposition(frame, active, spec, original.id, original);
+      if (!result) continue; // A different quantity or meaning needs independent semantic review.
+      decisions[original.id] = { decision: result.decision, original: editorialOriginal(frame, active, spec, { original }),
+        quote: result.originalQuote, basis: "按登记口径复算为 " + result.expected + "，来稿为 " + result.originalAmount + "。",
+        evidence: result.sources.map(ref => sourceQuote(frame, active, spec, { ...ref, quote: originalQuote(frame, ref) })),
+        method: "measured-original" };
+    } catch (error) { deferred.set(original.id, error.message); }
+  }
+  if (args.action === "original-record") {
+    if (!Array.isArray(args.originals) || !args.originals.length || args.originals.length > RECORD_LIMIT) {
+      throw new Error("original-record 每次提交 1–12 项来稿判断");
+    }
+    const submitted = new Set();
+    for (const entry of args.originals) {
+      const input = gate.originals.find(({ id }) => id === entry?.id);
+      if (!input || submitted.has(input.id)) throw new Error("原稿编号未知或重复");
+      if (deferred.has(input.id)) throw new Error("本编号先读齐已登记的复算证据：" + deferred.get(input.id));
+      if (Object.hasOwn(decisions, input.id)) throw new Error("本编号已保存来稿判断，读过改稿后不能改写这份原稿凭据");
+      const { decision, basis, evidence } = entry;
+      const original = editorialOriginal(frame, active, spec, { original: input });
+      const line = originalQuote(frame, original);
+      const quote = entry.quote ?? line;
+      if (!["保留", "改正", "待证"].includes(decision) ||
+          decision === "改正" && (entry.quote === undefined || quote === line)) {
+        throw new Error("原稿改正须定位实际争议短句；保留或待证仍要独立说明证据范围");
+      }
+      if (typeof quote !== "string" || quote.length > 2000 || !/[\p{L}\p{N}]/u.test(quote) ||
+          !evidenceSpan(Buffer.from(line), {start:1,end:1,quote,sha256:original.sha256})
+          || line.indexOf(quote) !== line.lastIndexOf(quote)) throw new Error("来稿引句须逐字唯一出现在该编号实际原稿行");
+      if (!Array.isArray(evidence) || !evidence.length || evidence.length > 12) {
+        throw new Error("原稿判断须给本角色实际读过的外部证据；待证仅说明这些依据能核到哪里");
+      }
+      decisions[input.id] = { decision, original, quote, basis: explanation(basis, "原稿判断依据", 640),
+        evidence: evidence.map(ref => sourceQuote(frame, active, spec, ref)), method: "original-only-review" };
+      submitted.add(input.id);
+    }
+  }
+  if (JSON.stringify(decisions) !== JSON.stringify(gate.decisions)) {
+    active.originalReview = { owner: gate.owner, decisions };
+    frame.changed = true;
+  }
+  const pending = gate.originals.filter(({ id }) => !Object.hasOwn(decisions, id));
+  const items = pending.slice(0, RECORD_LIMIT).map(input => {
+    try {
+      const ref = editorialOriginal(frame, active, spec, { original: input });
+      const line = originalQuote(frame, ref);
+      return { ...input, ...(line.length <= 1400 ? { quote: line } : {}),
+        ...(deferred.has(input.id) ? { calculationReadRequired: deferred.get(input.id) } : {}) };
+    } catch {
+      return { ...input, next: { tool: "building_loop_file", action: "read", path: input.file, start: input.line, count: 1 } };
+    }
+  });
+  const nextRead = items.find(item => item.next)?.next;
+  const toPrepare = { tool: "building_loop", action: "prepare" };
+  return { stage: "originals", pending: pending.length, items, sources: gate.sources,
+    recorded: Object.entries(decisions).map(([id, { decision, method }]) => ({ id, decision, method })),
+    next: nextRead ?? (!pending.length || pending.every(item => deferred.has(item.id)) ? toPrepare :
+      { tool: "building_loop_coverage", action: "original-record" }),
+    note: "只核所见来稿与独立原始证据。实际有错才选改正并逐字定位；证据不足只判待证，不能当反证。宿主测量项读齐材料即可复算。保存来稿判断后才开放改稿。"
+  };
+}
+
+function originalDispositionInput(gate, editorial, part) {
+  const receipt = gate.decisions[editorial.id];
+  if (!receipt) throw new Error("先提交 " + editorial.id + " 的原稿独立判断");
+  const match = receipt.decision === editorial.decision;
+  const fix = "按已核来稿把处置改为「" + receipt.decision + "」。" + receipt.basis + "；同步核对对应正文及大白话。";
+  return { ...(part.quote === undefined ? {} : { quote: part.quote }), kind: "inference", assertion: "project-application",
+    status: match ? "supported" : "unsupported", sourceRelation: match ? "supports" : "contradicts",
+    basis: receipt.basis, inference: { rule: "project-policy", premises: receipt.evidence, assumptions: [],
+      scope: "该编号原稿的独立处置及其证据边界；其他正文须分别核验",
+      counterexample: { possible: false, reason: "这里只核标签与本角色在读取改稿前提交的原稿判断是否一致。" } },
+    ...(match ? {} : { finding: { kind: "contradiction", quote: editorial.decision, fix } }) };
+}
+
+/** The inventory relates the same exact working line to every fragment of a
+ * revised numbered item. A visible citation is only a lead until the current
+ * role has read and authenticated the selected lines. */
+function editorialComparison(frame, active, spec, decision, lineText) {
+  const { id, original } = decision;
+  const grant = spec.phases[active.phase];
+  let incoming = { file: original.file, line: original.line };
+  try {
+    const proof = editorialOriginal(frame, active, spec, decision);
+    const bytes = readBytes(frame.root, original.file);
+    if (bytes && digest(bytes) === proof.sha256) {
+      const quote = lineList(bytes)[original.line - 1];
+      incoming = { ...incoming, sha256: proof.sha256, ...(quote.length <= 1400 ? { quote } : {}) };
+    }
+  } catch {
+    // This view must never silently count a source as read for either role.
+    incoming.next = { tool: "building_loop_file", action: "read", path: original.file, start: original.line, count: 1 };
+  }
+  const leads = [...grant.evidence, ...(grant.materials ?? [])].filter(file => includes(frame.reads, file))
+    .flatMap(file => numberedCitationRanges(lineText, file)
+      .filter(({ start }) => start).map(({ start, end }) => ({ file, start, end })));
+  const citations = leads.slice(0, 8).map(lead => {
+    const working = includes(grant.materials ?? [], lead.file);
+    const entry = { ...lead, object: working ? "working-material" : "external" };
+    if (lead.end - lead.start > 2) return entry;
+    try {
+      const proof = working ? workingMaterialReference(frame, active, spec, lead) : evidenceReference(frame, active, spec, lead);
+      const bytes = readBytes(frame.root, lead.file);
+      if (bytes && digest(bytes) === proof.sha256) {
+        const quote = lineList(bytes).slice(lead.start - 1, lead.end).join("\n");
+        if (quote.length <= 320) return { ...entry, quote };
+      }
+    } catch { /* Keep unproven citations as locations without source text. */ }
+    return entry;
+  });
+  return { id, incoming, citations, ...(leads.length > citations.length ? { moreCitations: leads.length - citations.length } : {}) };
+}
+
 /** Validation follows the actual kind and validated references. A caller
  * cannot assign a provenance label to its own evidence. */
-function assertionContract(part) {
+function assertionContract(part, material) {
   const typed=part.assertion;
   if(!ASSERTIONS.includes(typed)||!["direct","inference"].includes(part.kind)) {
     throw new Error("[assertion-proof] assertion 须用于逐字定位的独立事实或规则");
   }
   const policy=part.inference?.rule==="project-policy";
   const refs=proofReferences(part);
+  const materialTextStart = material && material.start + (material.file ? 0 : MATERIAL_MARKER.length);
+  const locator = material?.locator ?? (material?.file ? {file:material.file,start:material.line,end:material.line} : undefined);
+  if (typed === MATERIAL_ATTRIBUTION && (part.kind !== "direct" || !material || part.start > material.start ||
+      /[\p{L}\p{N}]/u.test(part.quote.slice(0, material.start - part.start)) ||
+      !/[\p{L}\p{N}]/u.test(part.quote.slice(materialTextStart - part.start)) ||
+      refs.some(ref => ref.origin?.kind !== "working-material" || locator &&
+        (keyOf(ref.file) !== keyOf(locator.file) || ref.start > locator.start || ref.end < locator.end)))) {
+    throw new Error("[assertion-proof] 待核材料仅支持 [材料转述] 后的文字或明确归给原材料行的同句续项。按原文分开核处置和转述。" +
+      (material ? " materialAttribution=" + JSON.stringify(material) : ""));
+  }
   if(part.status!=="supported"){
     // Rejected assertions still need their original finding. A project rule
     // contrary to supplied material is not a positive proof.
@@ -250,6 +521,7 @@ function assertionContract(part) {
     return;
   }
   if(part.objectCheck)throw new Error("[assertion-proof] 稿件计数/登记集合仍用各自 objectCheck");
+  if (typed === MATERIAL_ATTRIBUTION && !refs.length) throw new Error("[assertion-proof] 材料转述须有实际已读的材料原文引句");
   if(typed==="material-identity"||typed==="manuscript-attribution"){
     if(part.kind!=="direct"||!refs.length||(typed==="manuscript-attribution"&&new Set(refs.map(ref=>keyOf(ref.file))).size!==1)||
         refs.some(ref=>!ref?.sourceIdentity||!["synthetic","primary","secondary"].includes(ref.origin?.kind)||ref.origin.integrity!=="matches-pin")) {
@@ -305,13 +577,107 @@ function bodyVisibility(lines) {
   return line=>(live??=requiredLineMarkdown(lines).live)[line-1];
 }
 
+function numberedEvidenceLocators(frame, active, spec, row, grant, host = false) {
+  const options = { host };
+  const rows = [];
+  for (const [kind, files] of [["external", grant.evidence], ["working-material", grant.materials ?? []]]) {
+    for (const file of files.filter(file => includes(frame.reads,file))) for (const range of numberedCitationRanges(row.body, file)) {
+      if (!range.start) continue;
+      try {
+        const read = kind === "external" ? evidenceReference : workingMaterialReference;
+        rows.push({ kind, ...read(frame, active, spec, { file, ...range }, options) });
+      } catch { /* Unobserved or unauthorized ranges belong to the ordinary citation gate. */ }
+    }
+  }
+  return rows;
+}
+
+/** A list of individually authenticated lines can cover the same original
+ * span as one range. Never bridge a gap or combine different source versions. */
+function locatorsCover(locators, proof) {
+  const matching = locators.filter(citation => citation.kind === proof.kind &&
+    citation.sourceIdentity === proof.sourceIdentity && citation.sha256 === proof.sha256)
+    .sort((a,b) => a.start-b.start);
+  let next = proof.start;
+  for (const cite of matching) {
+    if (cite.start > next) return false;
+    next = Math.max(next,cite.end+1);
+    if (next > proof.end) return true;
+  }
+  return false;
+}
+
+/** Carry already supported, reader-visible locations across a manuscript return.
+ * Working-material locations preserve traceability to the original item only.
+ * They never accredit the claims in that item as independent evidence. */
+export function captureNumberedEvidence(frame, active, spec, lines, summary) {
+  if (!spec.originalFirst) return;
+  const prior = active.numberedEvidence?.goalSha256 === active.goal.sha256 ? active.numberedEvidence.claims : {};
+  const claims = Object.create(null);
+  const visible = bodyVisibility(lines);
+  const grant = spec.phases[active.phase];
+  for (const id of spec.claims) {
+    if (prior[id]) {
+      claims[id] = prior[id];
+      continue;
+    }
+    const row = claimRow(lines, id);
+    if (!row || !visible(row.line)) continue;
+    const parts = summary.records.filter(record => record.line === row.line && !record.reusedProof)
+      .flatMap(record => record.parts).filter(part => part.status === "supported" && part.sourceRelation === "supports");
+    if (!parts.length) continue;
+    const known = numberedEvidenceLocators(frame, active, spec, row, grant);
+    const corroboration = parts.filter(part => part.proofObject === "external").flatMap(proofReferences)
+      .map(proof => ({kind:"external",...proof})).filter(proof => locatorsCover(known,proof));
+    const required = new Map();
+    for (const ref of [...known.filter(locator => locator.kind === "working-material"),...corroboration]) {
+      required.set(JSON.stringify([ref.kind,ref.sourceIdentity,ref.start,ref.end]),ref);
+    }
+    if (required.size) claims[id] = { known, required:[...required.values()] };
+  }
+  if (Object.keys(claims).length) active.numberedEvidence = { goalSha256: active.goal.sha256, claims };
+}
+
+/** Check actual locator survival; genuinely new evidence can go to both
+ * reviewers for semantic judgment but cannot inherit the old proof. */
+export function numberedEvidenceRegressions(frame, active, spec, lines, goal) {
+  const memo = active.numberedEvidence;
+  if (!spec.originalFirst || !memo || memo.goalSha256 !== goal.sha256) return [];
+  // A supplement has write/read scopes but no independent evidence role.
+  // It can only cite the intersection of its actual reads and final review.
+  const evidencePhase = { ...active, phase:"final-review" };
+  const grant = spec.phases[evidencePhase.phase];
+  const visible = bodyVisibility(lines);
+  return Object.entries(memo.claims).flatMap(([id, { known, required }]) => {
+    const row = claimRow(lines,id);
+    if (!row || !visible(row.line)) return [];
+    const current = numberedEvidenceLocators(frame,evidencePhase,spec,row,grant,true);
+    const observed = current.filter(ref => {
+      const stamp = active.seen?.[keyOf(ref.file)];
+      return stamp?.hash === ref.sha256 && stamp.ranges.some(([start,end]) => start <= ref.start && end >= ref.end);
+    });
+    // Use only actually read, newly authored external evidence as a candidate
+    // substitute. Another old citation on a compound row cannot cover a gap.
+    const replacements = observed.filter(ref => ref.kind === "external" && !locatorsCover(known,ref));
+    return required.flatMap(ref => {
+      const allowed = ref.kind === "external" ? grant.evidence : grant.materials ?? [];
+      if (!includes(allowed,ref.file) || !includes(frame.reads,ref.file) || !sourceVersionCurrent(frame.root,ref) || locatorsCover(current,ref)) return [];
+      if (ref.kind === "external" && replacements.length) return [];
+      const range = ref.start === ref.end ? ref.start : `${ref.start}–${ref.end}`;
+      return [{ id, line: row.line, file:ref.file, start:ref.start, end:ref.end, kind:ref.kind,
+        issue:`${id} 第 ${row.line} 行丢失已有出处 ${ref.file} 第 ${range} 行，请恢复原定位` +
+          (ref.kind === "external" ? "，或在同行引用本轮实际读过的新原文交两道审核判断。" : "，以便回查该材料本身。") }];
+    });
+  });
+}
+
 /** The locators a reviewer has access to cannot substitute for the explicit
  * attribution the reader sees. A bad author locator remains an author finding. */
 function validateAttribution(frame,active,spec,block,parts,visible) {
   if(!spec.requireSourcePins)return null;
   const grant=spec.phases[active.phase];
   const policyRefs = parts.filter(part => part.status === "supported").flatMap(part => part.inference?.policy ?? []);
-  const files = [...grant.evidence, ...new Set(policyRefs.map(ref => ref.file))];
+  const files = [...grant.evidence, ...(grant.materials ?? []), ...new Set(policyRefs.map(ref => ref.file))];
   const bound=listedAttribution(block,files)??explicitAttribution(block,files);
   if(!bound||[...verbatimQuotes(block.text)].length||!visible(block.line))return null;
   // Sentence splitting can place the closing punctuation and attached
@@ -356,6 +722,13 @@ function validateAttribution(frame,active,spec,block,parts,visible) {
     if (includes(frame.policy.goalContext ?? [], ref.file)) {
       if (!policyRefs.some(policy => keyOf(policy.file) === keyOf(ref.file) && policy.start >= ref.start && policy.end <= ref.end)) {
         throw new Error("[coverage-attribution] 正文所引总纲位置须与当前 project-policy 的 policy 引句一致");
+      }
+      continue;
+    }
+    if (includes(grant.materials ?? [], ref.file)) {
+      if (!facts.some(part => part.status === "supported" && part.assertion === MATERIAL_ATTRIBUTION &&
+          proofReferences(part).some(source => keyOf(source.file) === keyOf(ref.file) && source.start >= ref.start && source.end <= ref.end))) {
+        throw new Error("[coverage-attribution] 待核材料出处须有当前 [材料转述] 段的逐字原文，不能用来核验外部事实");
       }
       continue;
     }
@@ -1088,7 +1461,7 @@ function spanError(block, part, cursor, quote, reason) {
 }
 
 /** Bind every part to a real, nonoverlapping span; leaving even a suffix unassigned fails. */
-function reviewBlock(frame, active, spec, block, parts, lines, visible, measurement) {
+function reviewBlock(frame, active, spec, block, parts, lines, visible, measurement, editorial, originalGate) {
   if (!Array.isArray(parts) || !parts.length || parts.length > 20) throw new Error(block.id + " 需 parts，复合句请拆出各独立判断");
   if (measurement && (parts.length !== 1 || parts[0].measurement !== measurement.id ||
       parts[0].kind !== "direct" || (parts[0].quote !== undefined && parts[0].quote !== block.text) ||
@@ -1099,19 +1472,37 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
     throw new Error("measurement 仅用于 inventory 明示宿主结果的本块");
   }
   let cursor = 0;const neutral=neutralMask(block.text);
+  const material = materialReviewScope(frame, active, materialAttributionScope(block, spec.phases[active.phase]));
+  // Preserve the original block and its saved ordinal. Only a deliberately
+  // submitted two-part proof can use the authored split with omitted quotes.
+  const split = material?.locator && material.separateQuote && parts.length === 2 &&
+    parts[0]?.assertion !== MATERIAL_ATTRIBUTION && parts[1]?.assertion === MATERIAL_ATTRIBUTION
+    ? [material.separateQuote, material.quote] : [];
   const binding=boundedCase(block,spec.phases[active.phase]);
   const bounded=binding&&measureBoundedCase(frame,active,spec,block,binding);
-  const reviewed = parts.map((part, index) => {
-    const quote = part.quote ?? (parts.length === 1 ? block.text : undefined);
+  const reviewed = parts.map((input, index) => {
+    let part = input;
+    const quote = part.quote ?? (parts.length === 1 ? block.text : split[index]);
     if (typeof quote !== "string" || !quote.trim()) throw spanError(block,index+1,cursor,quote,"missing-quote");
     const start = block.text.indexOf(quote, cursor);
     if (start < 0 || block.text.slice(cursor, start).trim()) {
       throw spanError(block,index+1,cursor,quote,cursor===block.text.length?"past-block-end":start<0?"quote-mismatch":"gap-before-part");
     }
     cursor = start + quote.length;
+    if (originalGate && editorial && block.start + start < editorial.end && block.start + cursor > editorial.start) {
+      part = originalDispositionInput(originalGate, editorial, part);
+    }
     if (!KINDS.includes(part.kind) || !STATUSES.includes(part.status)) throw new Error("每段须声明 kind 与 supported/unsupported/uncertain");
+    const evaluatesDecision = editorialPart({ ...part, start, end: cursor }, editorial, block);
     const basis = explanation(part.basis, "该段的判断依据");
     const result = { quote, start, end: cursor, kind: part.kind, status: part.status, basis };
+    if (evaluatesDecision) {
+      result.editorialOriginal = editorialOriginal(frame, active, spec, editorial);
+      if (originalGate) result.originalDisposition = { owner: originalGate.owner, decision: originalGate.decisions[editorial.id].decision };
+    }
+    const boundMaterial = material?.locator && part.assertion === MATERIAL_ATTRIBUTION && part.kind === "direct" && !part.objectCheck &&
+      start === material.start && cursor === block.text.length;
+    if (boundMaterial) result.evidence = boundMaterialEvidence(frame, active, spec, material, part);
     const boundedPart=bounded&&requireBoundedPart(block,result,binding,bounded);
     const scope=simulationMarker(block.text);
     if(scope&&start<scope.end-1&&cursor>scope.start+1&&!["direct","inference"].includes(part.kind))throw scopeFailure("[模拟] 是来源范围断言，不能作为无事实标签",block,scope);
@@ -1178,17 +1569,24 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
       }
       result.inference=bounded;
     } else if (part.status === "supported" || part.kind === "inference" && part.inference?.rule === "project-policy") {
-      if (part.kind === "direct") {
+      if (part.kind === "direct" && !boundMaterial) {
         if (!Array.isArray(part.evidence) || !part.evidence.length || part.evidence.length > 12) throw new Error("直接事实须给 evidence 原文及逐字 quote");
-        result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
-      } else {
+        result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref, part.assertion === MATERIAL_ATTRIBUTION));
+      } else if (!boundMaterial) {
         // A rejection for fields placed at the part root is a tool-shape
         // error. Tell the caller to move the actual fields instead of
         // repeatedly inventing replacement evidence or defaults.
         const misplaced = INFERENCE_INPUTS.filter(field => Object.hasOwn(part, field));
         if (misplaced.length) throw new Error("推导参数位置错误：把 parts[] 层的 " + misplaced.join(", ") +
           " 放到同一 part.inference 对象内；只调整参数层级，保留实际证据和判断。");
-        result.inference = inferenceProof(frame, active, spec, part.inference, lines,
+        // The host already knows the exact current clause. Existing callers
+        // may still send policy refs; validate them and pin the complete rule.
+        const suppliedPolicy = part.inference?.policy;
+        const inference = evaluatesDecision && (suppliedPolicy === undefined || Array.isArray(suppliedPolicy)) &&
+          !suppliedPolicy?.some(ref => ref?.file === editorial.rule.file && ref.start === editorial.rule.start &&
+            ref.end === editorial.rule.end && ref.quote === editorial.rule.quote)
+          ? { ...part.inference, policy: [editorial.rule, ...(suppliedPolicy ?? [])] } : part.inference;
+        result.inference = inferenceProof(frame, active, spec, inference, lines,
           { line: block.line, start: block.start + start, end: block.start + cursor, quote });
         if (part.status === "supported" && result.inference.counterexample.possible) {
           result.status = "uncertain";
@@ -1207,22 +1605,25 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
           || quote.indexOf(finding.quote,quote.indexOf(finding.quote)+1)!==-1) {
           throw new Error("事实退回须 finding.kind/quote/fix，quote 指该段实际的错误断言；排版、详细度和收尾表达建议只能走质量判断，不能冒充事实错误");
         }
+        if (evaluatesDecision && !finding.quote.includes(editorial.decision)) {
+          throw new Error("处置退回的 finding.quote 须含被判错的处置标签，而非只引用编号或标点。");
+        }
         result.finding = { kind: finding.kind, quote: finding.quote, fix: explanation(finding.fix, "事实最小修正") };
         result.repair = result.finding.fix;
         if (finding.kind === "contradiction" && !part.evidence?.length && !result.evidence?.length && !result.inference?.policy?.length && result.objectCheck?.result.matches!==false) throw new Error("矛盾退回须给实际原文反证、当前项目条款证明或已验证为 false 的 objectCheck");
       }
-      if (!measurement && part.evidence?.length) result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref));
+      if (!measurement && !boundMaterial && part.evidence?.length) result.evidence = part.evidence.map(ref => sourceQuote(frame, active, spec, ref, part.assertion === MATERIAL_ATTRIBUTION));
     }
     // These describe different objects. A manuscript measurement or a local
     // excerpt registry cannot establish a fact about the external world.
     if(["direct","inference"].includes(part.kind)) {
       const marker=objectMarker(block.lineText);
-      result.proofObject=result.inference?.rule==="project-policy"?"project-policy":result.objectCheck?.kind??
+      result.proofObject=part.assertion===MATERIAL_ATTRIBUTION?"working-material":result.inference?.rule==="project-policy"?"project-policy":result.objectCheck?.kind??
         (marker==="稿件自述"?"candidate":marker==="摘录范围"?"registered-excerpts":"external");
     }
     if(part.assertion!==undefined) {
       result.assertion=part.assertion;
-      assertionContract(result);
+      assertionContract(result, material);
       if(part.assertion==="manuscript-attribution"&&part.status==="supported"){
         result.manuscript=part.manuscript;
         result.manuscriptProof=manuscriptAttribution(frame,active,spec,result,block,readBytes(frame.root,spec.candidate));
@@ -1233,6 +1634,10 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
     return result;
   });
   if (block.text.slice(cursor).trim()) throw spanError(block,parts.length+1,cursor,undefined,"missing-tail");
+  if (material && !reviewed.some(part => part.assertion === MATERIAL_ATTRIBUTION &&
+      part.start <= material.start && part.end > material.start)) {
+    throw new Error("[assertion-proof] [材料转述] 对应范围须有独立的 material-attribution 判断。 materialAttribution=" + JSON.stringify(material));
+  }
   if (measurement?.kind !== "citation-lines") requireManuscriptProof(block,spec.phases[active.phase],spec.candidate,reviewed);
   const range=registeredLineRange(block.text,spec.phases[active.phase].evidence);
   if(range&&!reviewed.some(part=>part.objectCheck?.check==="line-range"&&keyOf(part.objectCheck.file)===keyOf(range.file))) {
@@ -1248,9 +1653,9 @@ function reviewBlock(frame, active, spec, block, parts, lines, visible, measurem
     }
   }
   validateAttribution(frame,active,spec,block,reviewed,visible);
-  const files=spec.phases[active.phase].evidence,syntaxSources=[];
+  const grant=spec.phases[active.phase],files=[...grant.evidence,...(grant.materials??[])],syntaxSources=[];
   const syntax=syntaxSpans(block.text,files,ref=>{
-    try{syntaxSources.push(evidenceReference(frame,active,spec,ref));return true;}catch{return false;}
+    try{syntaxSources.push(citationReference(frame,active,spec,ref));return true;}catch{return false;}
   });
   const possible=syntaxSpans(block.text,files);
   const substantiveOutside=spans=>block.text.split("").some((char,index)=>/[\p{L}\p{N}]/u.test(char)&&!spans.some(([a,b])=>a<=index&&index<b));
@@ -1333,10 +1738,14 @@ export function requireStoredHostResults(frame, active, spec, coverages, bytes) 
 
 /** Inventory and per-block decisions are incremental, bounded calls under the host lock. */
 export function coverageAction(frame, active, spec, args, options = {}) {
+  if (args.action === "originals" || args.action === "original-record") return originalAction(frame, active, spec, args);
+  const originalGate = originalReviewGate(frame, active, spec);
+  if (originalGate?.pending.length) throw new Error("先用 building_loop_coverage originals 完成原稿独立判断");
   const bytes = readBytes(frame.root, spec.candidate);
   if (!bytes) throw new Error("候选不存在");
   const manifest = documentCoverage(bytes);
   const measurements = measurementBlocks(frame, active, spec, bytes, manifest);
+  const editorials = workingClaimDecisions(frame, active, spec, bytes);
   if (args.action === "inventory") {
     const offset = args.offset ?? 0, requested = args.count ?? 8;
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(requested) || requested < 1) {
@@ -1347,7 +1756,16 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       active.coverage = { version: COVERAGE_VERSION, candidateSha256: manifest.candidateSha256, records: {} };
       frame.changed = true;
     }
-    const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest, measurements);
+    const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest, measurements, editorials);
+    if (originalGate) {
+      const lines = lineList(bytes), visible = bodyVisibility(lines);
+      for (const block of manifest.blocks) {
+        const editorial = editorialOnBlock(editorials, block);
+        if (!editorial || Object.hasOwn(active.coverage.records, block.id) || measurements.has(block.id) ||
+            /[\p{L}\p{N}]/u.test(block.text.slice(editorial.end - block.start))) continue;
+        active.coverage.records[block.id] = reviewBlock(frame, active, spec, block, [{}], lines, visible, undefined, editorial, originalGate);
+      }
+    }
     const pending = manifest.blocks.filter(b => !Object.hasOwn(active.coverage.records, b.id)).map(b => b.id);
     const result = { candidateSha256: manifest.candidateSha256, classificationVersion:CLASSIFICATION_VERSION,total: manifest.blocks.length,
       pending: options.maxBytes ? pending.slice(0,24) : pending, pendingCount: pending.length,
@@ -1355,6 +1773,7 @@ export function coverageAction(frame, active, spec, args, options = {}) {
         ...(row.reason.length>240?{reasonTruncated:true}:{})})):invalidated,
       invalidatedCount:invalidated.length,offset,blocks:[],
       ...(requested > count ? { pageLimit: { requested, applied: count } } : {}) };
+    const editorialRows = new Map();
     for (const row of manifest.blocks.slice(offset,offset+count)) {
       const {lineText,...block}=row;
       const grant=spec.phases[active.phase];
@@ -1366,15 +1785,35 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       };
       const hint=measurement ? null : profileHint(row,grant,spec.candidate)??countHint(row,grant,spec.candidate)??registeredLineRange(row.text,grant.evidence);
       if(hint)block.objectCheckHint=hint;
+      const material = materialReviewScope(frame, active, materialAttributionScope(row, grant));
+      if (material) block.materialAttribution = material;
+      const editorial = editorialOnBlock(editorials, row);
+      if (editorial) block.editorial = { id: editorial.id, decision: editorial.decision, original: editorial.original };
+      if (editorial && originalGate) {
+        const decision = originalGate.decisions[editorial.id];
+        const recorded = active.coverage.records[row.id]?.parts.find(part => part.originalDisposition);
+        block.editorial.independentOriginal = { decision: decision.decision, method: decision.method,
+          ...(recorded?.finding ? { finding: recorded.finding } : {}) };
+      }
+      const claim = editorials.get(row.line);
+      if (claim) block.editorialClaim = claim.id;
       const bounded=boundedCase(row,spec.phases[active.phase]);
       if(bounded)block.inferenceHint={rule:"bounded-non-entailment",kind:"inference",quote:row.text.slice(...bounded.tail),
         source:{file:bounded.file,start:bounded.start,end:bounded.end},
         note:"核验整段外层结论。原句‘不能说明’且原文确实推不出内层命题，填 status=supported、sourceRelation=supports；若原句却断言可推出该命题，填 unsupported、insufficient 和实际 finding。宿主复算有界反例，不需另填 inference。"};
       // prepare has a separate response budget. Never stamp blocks removed by
       // that budget as shown; the explicit next page remains unobserved.
-      if (options.maxBytes && Buffer.byteLength(JSON.stringify({...result,blocks:[...result.blocks,block]}))>options.maxBytes-400) break;
+      const comparison = claim && !editorialRows.has(claim.id) && editorialComparison(frame, active, spec, claim, row.lineText);
+      const pageRows = comparison ? [...editorialRows.values(), comparison] : [...editorialRows.values()];
+      if (options.maxBytes && Buffer.byteLength(JSON.stringify({...result,blocks:[...result.blocks,block],editorialRows:pageRows}))>options.maxBytes-400) {
+        // Context can fill a page, but must not make the first block impossible
+        // to obtain. Explicit inventory without prepare's small budget has it.
+        if (result.blocks.length || Buffer.byteLength(JSON.stringify({...result,blocks:[block]}))>options.maxBytes-400) break;
+      } else if (comparison) editorialRows.set(claim.id, comparison);
       result.blocks.push(block);
     }
+    if (editorialRows.size) result.editorialRows = [...editorialRows.values()];
+    if (result.blocks.some(block => block.editorialClaim)) result.editorialReview = "同一来稿下分别核处置和每个正文块，尤其改稿新增断言。声称原稿用过某措辞时核 incoming 原句。处置用 inference/project-policy、project-application 与实际 premises，宿主绑定条款。引用位置只提示去哪查，结论须判断原文支持范围。";
     if (offset+result.blocks.length<manifest.blocks.length) result.next = {
       tool:"building_loop_coverage",action:"inventory",offset:offset+result.blocks.length,
       count:result.blocks.length?Math.min(INVENTORY_LIMIT,manifest.blocks.length-offset-result.blocks.length):1,
@@ -1406,7 +1845,7 @@ export function coverageAction(frame, active, spec, args, options = {}) {
   // A source change can invalidate more blocks than fit in one record call.
   // Retire them before incremental repair, so an untouched stale block cannot
   // roll back eleven newly checked proofs. Completion still rechecks every ref.
-  const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest, measurements);
+  const invalidated = retireStaleProofs(frame, active, spec, bytes, manifest, measurements, editorials);
   const records = { ...active.coverage.records }, supplied = new Set(), invalid = [];
   const lines=lineList(bytes),visible=bodyVisibility(lines);
   for (const entry of args.entries) {
@@ -1417,7 +1856,8 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       const owner=active.coverage.presentationOwner;
       if (owner?.actor!==(frame.agent?.id??null)||owner.phase!==active.phase||owner.candidateSha256!==manifest.candidateSha256
         ||!active.coverage.presented?.includes(block.id)) throw new Error("该块尚未由本会话本阶段 inventory/prepare 实际返回；pending 编号不能代替块原文。请调用 inventory offset="+manifest.blocks.indexOf(block)+" count=1 后再判断，不要猜编号对应内容。");
-      records[block.id] = reviewBlock(frame, active, spec, block, entry.parts, lines, visible, measurements.get(block.id));
+      records[block.id] = reviewBlock(frame, active, spec, block, entry.parts, lines, visible, measurements.get(block.id),
+        editorialOnBlock(editorials, block), originalGate);
       requireDisputedProof(active,[records[block.id]]);
     }
     catch (error) {
@@ -1479,7 +1919,7 @@ export function requireStoredCalculations(frame, spec, coverages, bytes) {
 /** The same strict version/read/pin checks serve both progress and acceptance.
  * Retiring a stale proof means pending, never a verdict about the new source.
  */
-function validateRecordSources(frame, active, spec, record, lines, block, bytes, visible, measurement) {
+function validateRecordSources(frame, active, spec, record, lines, block, bytes, visible, measurement, editorial) {
   requireMatchingMeasurement(record, measurement);
   if (measurement) measurementEvidence(frame, active, spec, measurement);
   if (measurement?.kind !== "citation-lines") requireManuscriptProof(block,spec.phases[active.phase],spec.candidate,record.parts);
@@ -1487,16 +1927,36 @@ function validateRecordSources(frame, active, spec, record, lines, block, bytes,
   // Syntax is neutral only while its locator remains authorized, read and pinned.
   // Keep the same ordinary refs for host closure to check without exposing text.
   for(const ref of record.syntaxSources??[]) {
-    const current=evidenceReference(frame,active,spec,ref);
+    const current=citationReference(frame,active,spec,ref);
     if(current.sha256!==ref.sha256||JSON.stringify(current.origin)!==JSON.stringify(ref.origin))throw new Error("合法定位的来源或获取回执版本已变化，须重新核验");
   }
   for (const part of record.parts) {
-    if(part.assertion!==undefined) assertionContract(part);
+    if (editorialPart(part, editorial, block)) {
+      const original = editorialOriginal(frame, active, spec, editorial);
+      if (JSON.stringify(original) !== JSON.stringify(part.editorialOriginal)) {
+        throw new Error(editorial.id + " 的原来稿版本已变化或缺独立处置核验，须重新核验该块。");
+      }
+      if (spec.originalFirst) {
+        const gate = originalReviewGate(frame, active, spec);
+        const disposition = part.originalDisposition;
+        const own = disposition?.owner?.actor === gate.owner.actor && disposition.owner.phase === gate.owner.phase;
+        const first = frame.role === "auditor" && disposition?.owner && disposition.owner.actor === active.pendingReceipt?.reviewer &&
+          disposition.owner.phase === active.phase.replace(/-audit$/u, "-review");
+        if (!disposition || disposition.owner.binding !== gate.binding || !(own || first) ||
+            (own && gate.decisions[editorial.id]?.decision !== disposition.decision) ||
+            (disposition.decision === editorial.decision) !== (part.status === "supported")) {
+          throw new Error("稿件处置缺少绑定当前来稿与来源的本角色原稿先核结果");
+        }
+      }
+    } else if (part.editorialOriginal) {
+      throw new Error("处置已无法定位到原来的来稿行或当前规则，须重新核验 " + part.editorialOriginal.file);
+    }
+    if(part.assertion!==undefined) assertionContract(part, materialAttributionScope(block, spec.phases[active.phase]));
     if(part.manuscriptProof&&JSON.stringify(part.manuscriptProof)!==JSON.stringify(manuscriptAttribution(frame,active,spec,part,block,bytes))){
       throw new Error("[assertion-proof] 当前稿件归属范围的证明已失效");
     }
     for (const ref of proofReferences(part)) {
-      const current = sourceQuote(frame, active, spec, ref);
+      const current = sourceQuote(frame, active, spec, ref, part.assertion === MATERIAL_ATTRIBUTION);
       if (ref.sha256 !== current.sha256||ref.origin&&JSON.stringify(ref.origin)!==JSON.stringify(current.origin)
         ||ref.evidenceSpan&&ref.evidenceSpan!==current.evidenceSpan) throw new Error("覆盖证据或获取回执版本已经变化，须重新判断该块而非仅重读文件");
     }
@@ -1514,12 +1974,15 @@ function validateRecordSources(frame, active, spec, record, lines, block, bytes,
 }
 
 /** Keep independent unaffected blocks; explicitly expose every invalidation. */
-function retireStaleProofs(frame, active, spec, bytes, manifest, measurements) {
+function retireStaleProofs(frame, active, spec, bytes, manifest, measurements, editorials) {
   const invalidated = [];
   const lines = lineList(bytes),visible=bodyVisibility(lines);
   const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
   for (const [id, record] of Object.entries(active.coverage.records)) {
-    try { validateRecordSources(frame, active, spec, record, lines, blocks.get(id), bytes,visible,measurements.get(id)); }
+    try {
+      const block = blocks.get(id);
+      validateRecordSources(frame, active, spec, record, lines, block, bytes, visible, measurements.get(id), editorialOnBlock(editorials, block));
+    }
     catch (error) {
       delete active.coverage.records[id];
       invalidated.push({ block: id, reason: error.message });
@@ -1576,6 +2039,7 @@ export function restoreDirectCoverage(frame,active,spec,memo) {
   if(!bytes||!memo.items.length)return;
   const manifest=documentCoverage(bytes),lines=lineList(bytes),grant=spec.phases[active.phase];
   const visible=bodyVisibility(lines);
+  const editorials=workingClaimDecisions(frame,active,spec,bytes);
   const old=new Map(memo.items.map(row=>[row.anchor,row.record]));
   const records={};
   for(const block of manifest.blocks) {
@@ -1587,7 +2051,7 @@ export function restoreDirectCoverage(frame,active,spec,memo) {
     const seen=Object.assign(Object.create(null),active.seen);
     for(const ref of [...record.parts[0].evidence,...(record.syntaxSources??[])])seen[keyOf(ref.file)]=memo.seen[keyOf(ref.file)];
     try {
-      if(validateRecordSources(frame,{...active,seen},spec,record,lines,block,bytes,visible))continue;
+      if(validateRecordSources(frame,{...active,seen},spec,record,lines,block,bytes,visible,undefined,editorialOnBlock(editorials,block)))continue;
     } catch { continue; }
     records[block.id]=record;
     active.seen=seen;
@@ -1601,6 +2065,7 @@ export function coverageSummary(frame, active, spec, complete = true) {
   const lines=lineList(bytes),visible=bodyVisibility(lines);
   const manifest = documentCoverage(bytes);
   const measurements = measurementBlocks(frame, active, spec, bytes, manifest);
+  const editorials = workingClaimDecisions(frame, active, spec, bytes);
   const inventory = active.coverage;
   if (inventory?.version !== COVERAGE_VERSION || inventory.candidateSha256 !== manifest.candidateSha256) throw new Error("当前正文尚无有效全文覆盖记录，请 inventory 后逐块 record");
   const pending = manifest.blocks.filter(b => !Object.hasOwn(inventory.records, b.id)).map(b => b.id);
@@ -1614,7 +2079,8 @@ export function coverageSummary(frame, active, spec, complete = true) {
   }
   const blocks = new Map(manifest.blocks.map(block => [block.id, block]));
   const attributions=records.flatMap(record=>{
-    const block=blocks.get(record.block),problem=validateRecordSources(frame,active,spec,record,lines,block,bytes,visible,measurements.get(record.block));
+    const block=blocks.get(record.block),problem=validateRecordSources(frame,active,spec,record,lines,block,bytes,visible,
+      measurements.get(record.block),editorialOnBlock(editorials,block));
     return problem?[{block,problem}]:[];
   });
   const rejected = records.flatMap(record => record.parts.filter(part => ["direct", "inference"].includes(part.kind) && part.status !== "supported")
@@ -1763,7 +2229,7 @@ function quotationChecks(frame, active, spec, manifest, records) {
   const normalize = value => value.replace(/\s+/gu," ").trim();
   const lines = lineList(readBytes(frame.root,spec.candidate));
   const grant=spec.phases[active.phase], policyFiles=active.goal?.files?.map(row=>row.file)??[];
-  const files=[...new Set([...grant.evidence,...policyFiles])];
+  const files=[...new Set([...grant.evidence,...(grant.materials??[]),...policyFiles])];
   const footnotes=lines.some(line=>line.includes("[^"))?footnoteQuoteIndex(lines,files):null;
   for (const [index,line] of lines.entries()) {
     for (const match of verbatimQuotes(line)) {
@@ -1778,7 +2244,7 @@ function quotationChecks(frame, active, spec, manifest, records) {
       if (!locators.length && !bound?.excludedLocators.length) continue;
       const block=manifest.blocks.find(b=>b.line===index+1&&b.start<=match.index&&b.end>match.index);
       const part=records[block?.id]?.parts.find(row=>row.status==="supported"&&
-        row.start<=match.index-block.start&&row.end>=quoteEnd-1-block.start&&row.inference?.rule==="project-policy");
+        row.start<=match.index-block.start&&row.end>=quoteEnd-1-block.start);
       const refs = [];
       const policyRefs = [];
       const excludedLocators = [...(bound?.excludedLocators ?? [])];
@@ -1786,10 +2252,18 @@ function quotationChecks(frame, active, spec, manifest, records) {
         if (includes(policyFiles,locator.file)) {
           // A literal project quote needs its own typed proof in this role's
           // exact passage. It never joins the external quotation references.
-          const cited=part?.inference.policy.find(ref=>keyOf(ref.file)===keyOf(locator.file)&&
+          const policyProof=part?.inference?.rule==="project-policy"&&part.inference.policy;
+          const cited=policyProof&&policyProof.find(ref=>keyOf(ref.file)===keyOf(locator.file)&&
             ref.start>=locator.start&&ref.end<=locator.end&&ref.quote.includes(match[1]));
           if(cited)policyRefs.push(cited);
-          else excludedLocators.push({...locator,reason:part?"project-quote-mismatch":"unapproved-source"});
+          else excludedLocators.push({...locator,reason:policyProof?"project-quote-mismatch":"unapproved-source"});
+          continue;
+        }
+        if (includes(grant.materials ?? [],locator.file)) {
+          const cited=part?.assertion===MATERIAL_ATTRIBUTION&&part.evidence.some(ref=>keyOf(ref.file)===keyOf(locator.file)&&
+            ref.start>=locator.start&&ref.end<=locator.end&&ref.quote.includes(match[1]));
+          if(cited)refs.push(workingMaterialReference(frame,active,spec,locator));
+          else excludedLocators.push({...locator,reason:"working-material-quote-mismatch"});
           continue;
         }
         if(footnote&&includes(grant.read,locator.file)){
@@ -1826,7 +2300,8 @@ function quotationChecks(frame, active, spec, manifest, records) {
 export function requireStoredFootnoteBindings(spec,coverages,bytes,phase,goal) {
   const lines=lineList(bytes);
   if(!lines.some(line=>line.includes("[^")))return;
-  const footnotes=footnoteQuoteIndex(lines,[...new Set([...spec.phases[phase].evidence,...(goal?.files??[]).map(row=>row.file)])]);
+  const grant=spec.phases[phase];
+  const footnotes=footnoteQuoteIndex(lines,[...new Set([...grant.evidence,...(grant.materials??[]),...(goal?.files??[]).map(row=>row.file)])]);
   for(const [index,line] of lines.entries())for(const match of verbatimQuotes(line)){
     const bound=footnotes(index+1,match.index,match.index+match[0].length);
     if(!bound||bound.ignored)continue;
@@ -1941,6 +2416,7 @@ function assertionsAgree(a,b,first,second) {
   if(!positiveProof(a)||!positiveProof(b))return ak===bk;
   if(redundantLegacyPolicy(a,b,first,second)||redundantLegacyPolicy(b,a,second,first))return true;
   if(ak==="material-identity"&&bk==="material-identity")return sameMaterialSet(a,b);
+  if(ak===MATERIAL_ATTRIBUTION&&bk===MATERIAL_ATTRIBUTION)return sameRefSet(factEvidence(a),factEvidence(b));
   if(ak==="manuscript-attribution"&&bk==="manuscript-attribution")return sameMaterialSet(a,b)&&
     !!a.manuscriptProof&&JSON.stringify(a.manuscriptProof)===JSON.stringify(b.manuscriptProof);
   if(ak===bk&&(ak==="project-rule"||ak==="project-application")||
@@ -2087,7 +2563,7 @@ export function classificationDisagreements(first,second,equivalentOutcomeSummar
         }
         // The more specific application carries the rule and the record;
         // material identity and raw fact may describe adjacent subclauses.
-        const priority=["project-application","project-rule","manuscript-attribution","material-identity","original-fact"];
+        const priority=["project-application","project-rule","manuscript-attribution",MATERIAL_ATTRIBUTION,"material-identity","original-fact"];
         const kind=priority.find(type=>kinds.includes(type));
         if(kind){
           if(!obligations.has(kind))obligations.set(kind,new Uint8Array(a.length));
@@ -2140,7 +2616,9 @@ export function requireDisputedProof(active,records,complete=false) {
 /** Shared schema keeps formal premises, quoted evidence and the tool contract aligned. */
 export function coverageSchema() {
   const string = { type: "string" }, integer = { type: "integer" };
-  const ref = { type: "object", properties: { file: string, start: integer, end: integer, quote: string }, required: ["file", "start", "end", "quote"], additionalProperties: false };
+  const ref = { type: "object", properties: { file: string, start: integer, end: integer, quote: {
+    ...string, description: "单行逐字引句可只填 start 或 end；多行必须填两个端点。",
+  } }, required: ["file", "quote"], anyOf: [{ required: ["start"] }, { required: ["end"] }], additionalProperties: false };
   const proposition = { type: "object", properties: { relation: { type: "string", enum: ["implies", "asserts", "equals"] },
     left: { ...string, description: "具体命题/对象标识。implies 表示 left→right；asserts 仅断言 left；equals 表示 left=right。同一命题必须用相同字符串。" },
     right: { ...string, description: "仅 implies/equals 必填；asserts 必须省略，不填空串或复述左项。" } }, required: ["relation", "left"], additionalProperties: false };
@@ -2158,7 +2636,12 @@ export function coverageSchema() {
     file:string,source:string,line:integer,expected:{anyOf:[integer,{type:"string",enum:["registered","unregistered"]}]},quote:string,marker:string,
     start:integer,end:integer,mode:{type:"string",enum:["subset","exact"]}},required:["kind","check"],additionalProperties:false,
     description:"direct 专用，与 evidence 互斥。有 objectCheckHint 时按对应块原样提交，包括独立计数的 expected。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)、line-range(file,start,end,mode，按 inventory)，只核本地登记摘录，不证明网页全文，勿与其他事实或来源合用。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding。"};
-  return { offset: { ...integer, minimum: 0, description: "inventory 的起始位置，使用上页 next.offset。" },
+  return { originals: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,
+    description: "仅 original-record；保留／改正／待证判断只针对所读原稿。改正给实际原文争议短句，其他可省 quote；evidence 给独立已读原文。",
+    items: { type: "object", properties: { id: string, decision: { type: "string", enum: ["保留", "改正", "待证"] },
+      basis: string, quote: string, evidence: { type: "array", minItems: 1, maxItems: 12, items: ref } },
+    required: ["id", "decision", "basis", "evidence"], additionalProperties: false } },
+    offset: { ...integer, minimum: 0, description: "inventory 的起始位置，使用上页 next.offset。" },
     count: { ...integer, minimum: 1, maximum: INVENTORY_LIMIT, description: "inventory 每页 1–24 块，下一页按返回的 next 原样传入 offset/count。" },
     block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,
     description: "每次提交1至12块，按 inventory 分页分批提交；不能把全文超过12块塞进一次调用。", items: { type: "object", properties: {
@@ -2166,7 +2649,7 @@ export function coverageSchema() {
       quote: { ...string, description: "单一判断可省略，自动取该块完整原文；复合判断须逐段连续覆盖本块，不能把下一块文字并入。匹配失败按 coverage-span 的 part/cursor/expectedSuffix 修正核验参数，不得改写正文或省掉事实。" },
       kind: { type: "string", enum: KINDS }, status: { type: "string", enum: STATUSES,
         description: "direct/inference 给事实判定；nonfactual 用 supported；hypothesis 宿主固定 uncertain，不能成为已证前提。" }, basis: string, repair: string,
-      assertion: {type:"string",enum:ASSERTIONS,description:"混合证据段按独立断言拆开。material-identity 只核材料自身类别；original-fact 核原始记录；project-rule 核项目规则；project-application 为具体处置，需规则和真实记录；manuscript-attribution 核本稿某节明确编号行的来源归属。各段引所需实际证据。"},
+      assertion: {type:"string",enum:ASSERTIONS,description:"混合证据段按独立断言拆开。material-identity 只核材料自身类别；material-attribution 仅用于 [材料转述] 段、用本阶段已读的待核材料逐字引句；original-fact 核原始记录；project-rule 核项目规则；project-application 为具体处置，需规则和真实记录；manuscript-attribution 核本稿某节明确编号行的来源归属。"},
       manuscript: {type:"object",properties:{start:integer,end:integer},required:["start","end"],additionalProperties:false,description:"仅用于 manuscript-attribution，从本节首个至最后一个可见编号断言实际行号；需先完整读取当前稿和这些出处。"},
       sourceRelation: { type: "string", enum: ["supports", "contradicts", "insufficient"], description: "direct/inference 必填：原始证据对该断言字面含义的关系。error-example 核展示的错误推理，只能 contradicts/insufficient，并提供 evidence；明确错例的状态由宿主固定，不作为已证前提。" },
       finding: { type: "object", properties: { kind: { type: "string", enum: ["missing-evidence", "contradiction", "scope", "invalid-inference"] }, quote: string, fix: string }, required: ["kind", "quote", "fix"], additionalProperties: false },

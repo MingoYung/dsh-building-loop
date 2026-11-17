@@ -6,6 +6,7 @@ import { DiagnosticRecipeInputError, validateRecipeInputs } from "./diagnostic-r
 import { inputContractCases } from "./input-contracts.mjs";
 import { compareReviewProbe } from "./code-review-probes.mjs";
 import { digest, includes, isImplementationPath, keyOf, readBytes, relativeName } from "./policy.mjs";
+import { caseComparisonFingerprint } from "./stall-diagnostics.mjs";
 
 const LEGACY_SPEC = "building-loop/diagnostics/1";
 const SCOPED_SPEC = "building-loop/diagnostics/2";
@@ -208,9 +209,10 @@ export async function runInputContractBatch(batch, runner, signal) {
         json: JSON.parse(result.probe.stdout), executed: result.probe.executed });
       continue;
     }
-    const { id, shape, input, expected } = check;
+    const { id, shape, input, expected, requirement } = check;
     failures.push({ id, ...(shape ? { shape } : {}), ...compared,
       ...(compared.outcome === "mismatch" ? { ...(failures.length < 4 ? { stdin: input.stdin, expected } : {}),
+        ...(requirement ? { requirement } : {}),
         ...(result.probe?.stack ? { stack: result.probe.stack } : {}) }
         : { status: result.status, ...(result.reason ? { reason: result.reason } : {}) }) });
   }
@@ -401,9 +403,10 @@ function executionTrace(rows, job) {
 }
 
 function caseError(error, job) {
-  return hasOnly(error, ["caseId", "message", "path", "line", "stack"]) &&
+  return hasOnly(error, ["caseId", "message", "path", "line", "stack", "comparison"]) &&
     cleanText(error.message, 1200, MULTILINE_CONTROLS) && error.message.isWellFormed() &&
     (error.path === undefined ? error.line === undefined : sourceLocation(error.path, error.line, job)) &&
+    (error.comparison === undefined || Boolean(caseComparisonFingerprint(error.comparison))) &&
     sourceStack(error.stack, job);
 }
 

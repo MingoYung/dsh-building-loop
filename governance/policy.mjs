@@ -172,12 +172,38 @@ const unitDimensions = [
   { ns: 1n, "μs": 1_000n, ms: 1_000_000n, s: 1_000_000_000n, min: 60_000_000_000n, h: 3_600_000_000_000n },
   { mm: 1n, cm: 10n, m: 1_000n, km: 1_000_000n },
   { mg: 1n, g: 1_000n, kg: 1_000_000n },
+  { "mW/m²": 1n, "W/m²": 1_000n },
 ];
 
 export function numericUnitConversion(from, to) {
   if (typeof from !== "string" || typeof to !== "string") return null;
   const dimension = unitDimensions.find(units => Object.hasOwn(units, from) && Object.hasOwn(units, to));
   return dimension ? { from: dimension[from], to: dimension[to] } : null;
+}
+
+/** Authority declares the measured statement and both physical source rows.
+ * The value and the editorial verdict are derived from the current evidence. */
+function originalMeasurementPolicy(input, phases) {
+  const data = object(input, "原稿复算", ["source", "header", "valueColumn", "valueHeading", "keyColumn", "before", "after",
+    "sourceUnit", "targetUnit", "statement"]);
+  const { header, valueColumn, valueHeading, keyColumn, sourceUnit, targetUnit, statement } = data;
+  const source = relativeName(data.source);
+  const positive = value => Number.isSafeInteger(value) && value > 0;
+  const cell = value => typeof value === "string" && value.trim() === value && !!value && value.length <= 80 && !/[\x00-\x1f",]/u.test(value);
+  const endpoint = raw => {
+    const { line, key } = object(raw, "原稿复算记录", ["line", "key"]);
+    if (!positive(line) || line <= header || !cell(key)) throw new Error("原稿复算须指定表头之后的实际数据行和记录主键");
+    return { line, key };
+  };
+  if (![header, valueColumn, keyColumn].every(positive) || keyColumn === valueColumn || !cell(valueHeading) ||
+      !numericUnitConversion(sourceUnit, targetUnit) || typeof statement !== "string" || statement.length > 1200 ||
+      /[\r\n]/u.test(statement) || statement.split("{quantity}").length !== 2 || !statement.replace("{quantity}", "").trim() ||
+      ["first-review", "final-review"].some(phase => !includes(phases[phase].evidence, source))) {
+    throw new Error("原稿复算需要表头、物理列、两道审核均可核的原始文件、量纲及只含一个 {quantity} 的完整原句口径");
+  }
+  const before = endpoint(data.before), after = endpoint(data.after);
+  if (before.line === after.line || before.key === after.key) throw new Error("原稿复算的两条原始记录必须不同");
+  return { source, header, valueColumn, valueHeading, keyColumn, before, after, sourceUnit, targetUnit, statement };
 }
 
 function numericRule(input, phases) {
@@ -430,7 +456,7 @@ export function parseAuthority(bytes) {
   const receiptsSeen = new Set();
   for (const [id, value] of Object.entries(object(source.units, "工作单元"))) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(id) || Object.keys(units).length >= 80) throw new Error("工作单元编号或数量无效");
-    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "hostResults", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture"]);
+    object(value, "工作单元", ["candidate", "claims", "continuation", "phases", "calculations", "hostResults", "requireSourcePins", "covers", "plainLast", "cacheReadRotationThreshold", "codeTask", "architecture", "originalFirst", "originalMeasurements"]);
     if (value.architecture !== undefined) architectureEntries.set(id, value.architecture);
     if (value.plainLast !== undefined && typeof value.plainLast !== "boolean") throw new Error("plainLast 须为布尔值；非文字产物由项目维护者明确关闭");
     if (value.cacheReadRotationThreshold !== undefined && (!Number.isSafeInteger(value.cacheReadRotationThreshold) || value.cacheReadRotationThreshold < 1)) {
@@ -451,8 +477,11 @@ export function parseAuthority(bytes) {
     for (const phase of BASE_PHASES) {
       const review = phase.endsWith("review");
       const raw = value.phases[phase];
-      const access = grants(raw, phase, review ? ["receipt", "evidence"] : []);
+      const access = grants(raw, phase, review ? ["receipt", "evidence", "materials"] : ["materials"]);
       if (!includes(access.read, candidate)) throw new Error("当前阶段需要候选文件读权");
+      const materials = pathList(raw.materials);
+      if (materials.some(file => !includes(access.read, file))) throw new Error("待核材料须在当前阶段可读");
+      if (materials.length) access.materials = materials;
       if (review) {
         if (access.write.length) throw new Error("核验方只读，回执由机制写入");
         const receipt = relativeName(raw.receipt);
@@ -478,6 +507,17 @@ export function parseAuthority(bytes) {
       calculations[claim] = numericRule(formula, phases);
     }
     const codeTask = value.codeTask === undefined ? undefined : codeTaskPolicy(value.codeTask, phases);
+    const originalFirst = value.originalFirst === true;
+    if (value.originalFirst !== undefined && typeof value.originalFirst !== "boolean" || originalFirst &&
+        (codeTask || !/\.(?:md|markdown)$/iu.test(candidate) || !claims.length || claims.some(id => !/^C\d+$/u.test(id)) ||
+        ["first-review", "final-review"].some(phase => !phases[phase].materials?.length || !phases[phase].evidence.length))) {
+      throw new Error("先核原稿仅适用于有明确编号及两道独立证据授权的 Markdown 原稿核对单元");
+    }
+    const originalMeasurements = Object.create(null);
+    for (const [claim, input] of Object.entries(object(value.originalMeasurements ?? {}, "原稿复算"))) {
+      if (!originalFirst || !claims.includes(claim)) throw new Error("原稿复算须绑定先核原稿模式中的既有编号");
+      originalMeasurements[claim] = originalMeasurementPolicy(input, phases);
+    }
     const hostResults = value.hostResults === undefined ? undefined : hostResultPolicy(value.hostResults, candidate, phases, calculations, codeTask);
     for (const contract of codeTask?.diagnostics?.inputContracts ?? []) {
       for (const { requirement, diagnosticCases } of contract.examples ?? []) {
@@ -494,7 +534,7 @@ export function parseAuthority(bytes) {
     units[id] = { candidate, claims, continuation, phases, calculations, covers,
       requireSourcePins: value.requireSourcePins === true, plainLast: value.plainLast !== false,
       cacheReadRotationThreshold: value.cacheReadRotationThreshold, ...(codeTask ? { codeTask } : {}),
-      ...(hostResults ? { hostResults } : {}) };
+      ...(hostResults ? { hostResults } : {}), ...(originalFirst ? { originalFirst, originalMeasurements } : {}) };
   }
   const sourcePins = Object.create(null);
   for (const [path, entry] of Object.entries(object(source.sourcePins ?? {}, "来源凭据"))) {
@@ -520,11 +560,25 @@ export function parseAuthority(bytes) {
   for (const unit of Object.values(units)) {
     if (unit.requireSourcePins && ["first-review", "final-review"].some(phase =>
       unit.phases[phase].evidence.some(file => !sourcePins[keyOf(file)]))) throw new Error("本单元要求每份原始证据登记来源凭据");
+    if (Object.values(unit.originalMeasurements ?? {}).some(rule => !sourcePins[keyOf(rule.source)])) {
+      throw new Error("原稿复算须使用项目登记的原始来源凭据");
+    }
+  }
+  const phaseGrants = Object.values(units).flatMap(unit => Object.values(unit.phases));
+  const workingMaterials = phaseGrants.flatMap(grant => grant.materials ?? []);
+  const independentFiles = [...instructions, ...goalContext, ...ledgerContext,
+    ...Object.values(units).map(unit => unit.candidate),
+    ...phaseGrants.flatMap(grant => grant.evidence ?? [])];
+  // A desk copy or source register can describe its own contents. Do not let
+  // it assume the authority of a policy, another draft, or independent source.
+  if (workingMaterials.some(file => sourcePins[keyOf(file)] || receiptsSeen.has(keyOf(file)) || includes(independentFiles, file))) {
+    throw new Error("待核材料须与外部证据、目标、候选、指令及核验回执分开");
   }
   const protectedFiles = [...instructions, ...Object.values(sourcePins).flatMap(pin => pin.observation ? [pin.observation.file] : []), ...Object.values(units).flatMap(unit => [
     unit.phases["first-review"].receipt, unit.phases["final-review"].receipt,
     ...unit.phases["first-review"].evidence, ...unit.phases["final-review"].evidence,
-  ])];
+  ]), ...workingMaterials];
+  if (mutable.some(file => includes(workingMaterials, file))) throw new Error("待核材料不能授予模型写权");
   if (mutable.some(file => includes(protectedFiles, file))) throw new Error("指令、原始证据和核验回执不能授予模型写权");
   if(requiredLinesGoal&&includes(mutable,requiredLinesGoal))throw new Error("requiredLinesGoal 须对总控和执行、核验角色只读");
   if (Object.values(units).some(unit => includes(goalContext, unit.candidate)
@@ -662,8 +716,8 @@ export function historyPaths(file) {
   return { log, backup: MANAGED + "/latest_backup/" + file, logBackup: MANAGED + "/latest_backup/" + log };
 }
 
-/** Match every literal fragment against the same original UTF-8 file. */
-export function scopedEditContent(before, { beforeSha256, oldText, newText, edits }, recordSplice) {
+/** Resolve every replacement against the same original UTF-8 file. */
+export function scopedEditContent(before, { beforeSha256, oldText, newText, edits }, recordSplice, resolveDraft) {
   if (before === null) throw new Error("局部编辑只适用于已有文件，新建文件请用 write");
   const currentSha256 = digest(before);
   if (currentSha256 !== beforeSha256) {
@@ -683,8 +737,27 @@ export function scopedEditContent(before, { beforeSha256, oldText, newText, edit
   // read returns numbered lines. Match those lines in the file's CRLF form when it has uniform CRLF.
   const crlf = current.includes("\r\n") && !/(?<!\r)\n|\r(?!\n)/u.test(current);
   const fileNewlines = value => crlf ? value.replace(/\r?\n/gu, "\r\n") : value;
+  let lineStarts;
   const ranges = replacements.map((row, index) => {
     const old = row?.oldText, next = row?.newText;
+    if (row?.block !== undefined || row?.line !== undefined) {
+      if (!resolveDraft) throw new Error("仅当前补查执行者的授权候选文稿可以按 block 或 line 局部编辑");
+      const block = row.block !== undefined;
+      const selector = block ? typeof row.block === "string" && /^B\d+-[0-9a-f]{8}$/u.test(row.block) && row.line === undefined
+        : Number.isSafeInteger(row.line) && row.line > 0;
+      if (!selector || old !== undefined || typeof next !== "string" || !next.isWellFormed() || /[\r\n]/u.test(next)) {
+        throw new Error("按位置局部编辑须只给当前块编号或行号，以及单行 newText");
+      }
+      const target = resolveDraft(row);
+      // Coverage coordinates are line-local. Resolve them on the decoded
+      // preimage with its original line endings and without the separate BOM.
+      lineStarts ??= [0, ...Array.from(current.matchAll(/\r\n|\n|\r/gu), match => match.index + match[0].length)];
+      const start = lineStarts[target.line - 1] + target.start;
+      const end = lineStarts[target.line - 1] + target.end;
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end <= start ||
+          current.slice(start, end) !== target.text) throw new Error("当前文稿定位与实际原文不一致");
+      return { start, end, to: next };
+    }
     if (typeof old !== "string" || typeof next !== "string" || !old.isWellFormed() || !next.isWellFormed() ||
         (!old && (current || replacements.length !== 1))) {
       throw new Error("第 " + (index + 1) + " 项须提供 oldText 和 newText；仅空文件允许空 oldText");
@@ -695,8 +768,9 @@ export function scopedEditContent(before, { beforeSha256, oldText, newText, edit
     if (start < 0 || duplicate) {
       const recovery = start < 0 ? "anchor-not-found：逐字复制当前 read 返回的一个较短片段"
         : "anchor-ambiguous：在当前 read 返回的范围内加一行相邻原文，使片段唯一";
+      const draftRecovery = resolveDraft ? "。文稿补查可用 read 返回的当前行号，传 edits:[{line,newText}] 整行替换，或用当前 block 改一个片段" : "";
       throw new Error("第 " + (index + 1) + " 项 oldText 须在当前文件中恰好出现一次。"
-        + recovery + "。本次未落盘，未运行检查。");
+        + recovery + draftRecovery + "。本次未落盘，未运行检查。");
     }
     return { start, end: start + from.length, to: fileNewlines(next) };
   }).sort((a, b) => a.start - b.start);

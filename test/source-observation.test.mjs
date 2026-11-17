@@ -75,6 +75,46 @@ test("actual excerpt evidence passes, copied metadata and changed acquisition re
   assert.equal((await h.ledger("root", "review", { decisions })).phase, "closed");
 }));
 
+test("numbered review accepts separate cited data rows without using the earlier heading or another file", () => fixture(async (root, write) => {
+  const { p } = setup(write);
+  const second = "local-table.md", decoy = "archive/snapshot.md";
+  const otherQuote = "A single-station estimate is separate from a worldwide estimate.";
+  write(second, "# 单站表\n估计口径\n" + otherQuote + "\n");
+  fs.mkdirSync(path.join(root,"archive"));
+  write(decoy,snapshot);
+  for (const name of ["first-review", "final-review"]) {
+    const phase = p.units.K01.phases[name];
+    phase.read.push(second,decoy);
+    phase.evidence.push(second,decoy);
+  }
+  write("BUILDING-LOOP.json", JSON.stringify(p));
+  write("candidate.md", "- C1：相关不能证明因果，单站估计也要区别于全球估计" +
+    "（出处：snapshot.md 第 1 行标题、第 3 行；local-table.md 第 1 行、第 3 行）。\n");
+  const h = host(root, {automaticCoverage:false});
+  const executor = (await h.flow("root","advance")).childId;
+  await h.flow(executor,"prepare");
+  await h.flow(executor,"submit");
+  const reviewer = (await h.flow("root","advance")).childId;
+  const packet = await h.flow(reviewer,"prepare");
+  const evidence = [source,{file:second,start:3,end:3,quote:otherQuote}];
+  await h.coverage(reviewer,"record",{entries:packet.coverage.blocks.map((block,index) => ({block:block.id,parts:[index ? {
+    kind:"nonfactual",status:"supported",basis:"其余文字只是相邻的另一个实际原文定位。",
+  } : {kind:"direct",status:"supported",sourceRelation:"supports",evidence,basis:"两份原文分别说明相关的边界和单站口径。"}]}))});
+  await h.assess(reviewer,{...Object.fromEntries(Object.keys(QUALITY).map(key=>[key,"清楚核对全年口径与独立原文边界。"])),
+    goalFit:{pass:true,basis:"正文同时解释两种不同的比较口径。"},sourceRefs:evidence,unverifiedSources:[],unlisted:[],revise:[]});
+  const check = {id:"C1",status:"supported",file:source.file,start:3,end:3,basis:"该行明确列出原始的数据行。"};
+  const review = args => h.flow(reviewer,"review",{checks:[{...check,...args}]});
+  await assert.rejects(review({start:4,end:4}),/核验引用无效/u); // genuine excerpt, but the author did not cite it
+  await assert.rejects(review({start:1,end:3}),/核验引用无效/u); // cannot fill the gap between disjoint locators
+  await assert.rejects(review({start:1,end:1}),/未登记为外部原文/u); // precise heading locator still supplies no evidence
+  await assert.rejects(review({file:decoy}),/未出现在候选断言的同行出处/u); // an authorized look-alike path is not the cited source
+  assert.equal((await review({})).phase,"first-audit-ready");
+  const receipt = JSON.parse(fs.readFileSync(path.join(root,"first.json"),"utf8"));
+  assert.equal(receipt.checks[0].file,source.file);
+  assert.deepEqual([receipt.checks[0].start,receipt.checks[0].end],[3,3]);
+  assert.equal(receipt.checks[0].provenance,"maintainer-pinned-acquisition-receipt");
+}));
+
 test("observation files cannot be given to a model as writable or generated from its review", () => fixture(async (root, write) => {
   const { p } = setup(write);
   p.coordinator.write = ["acquisition.json"];

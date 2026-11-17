@@ -101,6 +101,16 @@ test("V2 feedback requires exact case inventory and bounded authorized frames an
     assert.deepEqual(result.old, old);
     assert.deepEqual(result.required, [rows[1], rows[0]]);
 
+    const comparison = { expected: [{ status: 200 }], actual: [{ status: 401 }] };
+    const withProof = value => [{ ...rows[0], error: { ...rows[0].error, comparison: value } }, rows[1]];
+    next = { status: "failed", old, required: withProof(comparison) };
+    assert.deepEqual((await runCodeDiagnostics(check, runner)).required[1].error.comparison, comparison);
+    for (const value of [{ expected: [200] }, { expected: { a: 1, b: 2 }, actual: { b: 2, a: 1 } },
+      { expected: [], actual: "x".repeat(4096) }]) {
+      next = { status: "failed", old, required: withProof(value) };
+      assert.deepEqual(await runCodeDiagnostics(check, runner), invalidReply);
+    }
+
     for (const invalid of [
       { required: [rows[1], rows[1]] },
       { required: [rows[0]] },

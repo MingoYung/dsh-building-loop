@@ -369,6 +369,68 @@ for (const cutoff of ["before-session", "before-inbox", "after-inbox"]) {
   }));
 }
 
+async function rejectUnprovenDraft(host) {
+  host.running(owner, true);
+  const executor = await deliverIntake(host);
+  const reviewer = (await host.flow(owner, "advance")).childId;
+  assert.equal((await inspectManuscript(host, reviewer, "review", { reject: true })).phase, "supplement-ready");
+  return { executor, reviewer };
+}
+
+regression("a rejected candidate is sent back once when the owner and native user question have settled", () => fixture(async (root, write) => {
+  configure(root, write, { manuscript: instructions + "\n" + unsupported + "\n" });
+  const host = nativeHost(root);
+  const { executor, reviewer } = await rejectUnprovenDraft(host);
+  host.remoteEvents.push({ agentId: owner, event: "user-questions/request" });
+  await Promise.all([host.finish(owner), host.finish(reviewer)]);
+  await host.running(owner, false);
+  await delay(70);
+  assert.equal(await host.status(), "supplement-ready");
+  assert.equal(durableAssignments(host.store, executor).length, 0);
+  host.remoteEvents.length = 0;
+  await Promise.all([host.idleEvent(owner), host.idleEvent(reviewer), host.finish(owner)]);
+  await waitForPhase(host, "supplement");
+  await waitFor(() => durableAssignments(host.store, executor).length, 1, () => host.warnings.join("\n"));
+  assert.equal(storedUnit(root).actor, executor);
+  assert.match(host.deliveries.at(-1).content[0].text, /supplement/u);
+  assert.equal(decision(root, firstReceipt).decision, "reject");
+  await host.reconnect();
+  await host.finish(owner);
+  await delay(70);
+  assert.equal(durableAssignments(host.store, executor).length, 1);
+  await host.flow(executor, "prepare");
+  await assert.rejects(host.flow(executor, "submit", { quality: approval }), /读回|退回|未改|无证/u);
+}));
+
+for (const cutoff of ["before-inbox", "after-inbox"]) {
+  regression("cold reconnect resumes a rejected draft once on the original executor after hard exit " + cutoff, () => fixture(async (root, write) => {
+    configure(root, write, { manuscript: instructions + "\n" + unsupported + "\n" });
+    const initial = nativeHost(root);
+    const { executor } = await rejectUnprovenDraft(initial);
+    initial.dispose();
+    saveSessions(root)(initial.store);
+    assert.equal(stopAt(root, cutoff), executor);
+    const interrupted = storedUnit(root);
+    assert.equal(interrupted.actor, executor);
+    assert.equal(interrupted.phase, "supplement");
+    assert.throws(() => process.kill(interrupted.activationHost.pid, 0), { code: "ESRCH" });
+    const store = savedSessions(root);
+    assert.equal(durableAssignments(store, executor).length, cutoff === "after-inbox" ? 1 : 0);
+
+    const restored = nativeHost(root, { store, acceptMessage: saveSessions(root) });
+    await restored.reconnect();
+    await waitFor(() => restored.deliveries.length, 1, () => restored.warnings.join("\n"));
+    assert.equal(storedUnit(root).actor, executor);
+    assert.equal(restored.deliveries[0].id, executor);
+    assert.equal(durableAssignments(savedSessions(root), executor).length, 1);
+    await restored.reconnect();
+    await restored.finish(owner);
+    await delay(70);
+    assert.equal(restored.deliveries.length, 1);
+    assert.equal(durableAssignments(savedSessions(root), executor).length, 1);
+  }));
+}
+
 regression("host dispatches the final independent audit and requires its own coverage before ledger review", () => fixture(async (root, write) => {
   configure(root, write, { manuscript: instructions + "\n" + unsupported + "\n" });
   const host = nativeHost(root);

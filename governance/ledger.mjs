@@ -427,10 +427,12 @@ export function ledgerAction(frame, args) {
       disposition: { outcome, basis, evidence, checkpoint: unitId, ...(coverage ? { coverage } : {}) }, note: basis });
     if (unit && item.unit !== unitId && FINISHED.has(outcome)) {
       unit.phase = "retired";
+      delete unit.codeReviewCheckpoint;
       unit.retirement = { outcome, basis, evidence };
     }
   }
   delete active.ledgerProgress;
+  delete active.codeReviewCheckpoint;
   active.phase = "closed";
   active.closedAt = new Date().toISOString();
   const retained = Object.fromEntries(planned.filter(row => !FINISHED.has(row.outcome)).map(row => [row.item.id, {
