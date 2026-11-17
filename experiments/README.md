@@ -6,6 +6,7 @@
 |---|---|
 | 看同题结果、稳定版能力和验证规模 | [实测亮点与复算口径](showcase-0.7.39.md) |
 | 复用历史冻稿、难题实测与资料真实性 | [2026-11-17 全局验收](results-2026-11-17-global-acceptance.md) |
+| 资料真实性 12 道独立题及两次中途改版 | [四模式原生盲测](results-2026-11-17-research-truth-benchmark.md) |
 | 0.7.39 四模式同模型旧题、新难题和资料核查 | [Building-loop、两种标准与 ClearAI](results-0.7.39-four-way.md) |
 | 查所有运行、完成状态、已记录用量与文件摘要 | [实验清单](data/index.json) |
 | 重算公开数据、检查摘要与缺失记录 | [只读核对脚本](verify.py) |
