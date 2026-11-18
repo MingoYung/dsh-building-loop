@@ -217,7 +217,7 @@ test("signed responsibility distinguishes a reached business guard from the same
     const sources = Object.fromEntries(request.artifacts.map(row => [row.path, Buffer.from(row.contentBase64, "base64").toString()]));
     const selected = traceMode === "wrong-owner" ? candidate : "limits.py";
     const responseLine = sources[selected].split("\n").findIndex(row => row.includes("return {")) + 1;
-    const executed = traceMode === "missing" ? undefined :
+    const executed = traceMode === "missing" ? undefined : traceMode === "inconclusive" ? [{ path: candidate, line: 1 }] :
       [{ path: selected, line: responseLine - 1 }, { path: selected, line: responseLine }];
     seen.push(request.snapshotSha256);
     res.end(JSON.stringify({ spec: request.spec, requestId: request.requestId, snapshotSha256: request.snapshotSha256,
@@ -255,10 +255,18 @@ test("signed responsibility distinguishes a reached business guard from the same
     const absent = await harness.flow(executor, "submit");
     assert.equal(absent.phase, "intake");
     assert.equal(absent.submission.inputContracts.failures[0].reason, "invalid-runner-reply");
+    traceMode = "inconclusive";
+    const unresolved = await harness.flow(executor, "submit");
+    assert.equal(unresolved.phase, "intake");
+    assert.equal(unresolved.submission.rows[0].status, "unresolved");
+    assert.equal(unresolved.submission.next.action, "block");
+    assert.match(unresolved.submission.next.note, /non-object：no-executed-typed-decision/u);
     traceMode = "wrong-owner";
     const wrong = await harness.flow(executor, "submit");
     assert.equal(wrong.phase, "intake");
     assert.equal(wrong.submission.rows[0].status, "mismatch");
+    assert.equal(wrong.submission.next.tool, "building_loop_file");
+    assert.equal(wrong.submission.next.action, "edit");
     assert.equal(wrong.submission.rows[0].actual.file, candidate);
     assert.deepEqual(wrong.submission.rows[0].response.json, bad);
     write(candidate, 'from limits import validate\n\ndef dispatch(request):\n    try:\n        return validate(request)\n    except Exception:\n        return {"error": "invalid-request"}\n');
@@ -282,7 +290,7 @@ test("signed responsibility distinguishes a reached business guard from the same
     assert.equal(codeReview.architectureResponsibilities[0].actual.file, "limits.py");
     assert.equal(codeReview.progress.responsibilityEvidenceMissing, undefined);
     assert.equal((await harness.invoke(reviewer, "building_loop_code_review", { action: "submit" })).status, "needs-review");
-    assert.equal(seen.length, 3);
+    assert.equal(seen.length, 4);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
@@ -314,9 +322,39 @@ test("an owner's explicit static import boundary rejects a signed behavioral pas
   const rejected = await submit("from limits import MAXIMUM\n\ndef budget(value):\n    return min(value, MAXIMUM)\n");
   assert.equal(rejected.phase, "intake");
   assert.deepEqual(rejected.submission, { status: "architecture-import-boundary",
-    violations: [{ file: candidate, line: 1, target: "limits.py" }], next: { tool: "building_loop", action: "submit" } });
+    violations: [{ file: candidate, line: 1, target: "limits.py" }], next: { tool: "building_loop_file", action: "edit", path: candidate } });
+  assert.deepEqual((await harness.flow(executor, "prepare")).submission, rejected.submission);
   await assert.rejects(harness.file("root", "read", candidate), /读白名单/u);
   assert.equal((await submit("import math\n\ndef budget(value):\n    return min(math.floor(value), 5)\n")).phase, "review-ready");
+}));
+
+test("prepare and submit agree on a signed owner clause before and after repair", () => fixture(async (root, write) => {
+  const goalClause = "预算错误由 limits 返回 `over-budget`。";
+  const { harness, save } = project(root, write, { importsHeading: "静态导入", goalClause });
+  await harness.file("root", "write", architecture, { content: plan + "\n## 静态导入\n\n待由宿主生成。\n",
+    note: "Register the current budget design" });
+  await harness.flow("root", "architecture");
+  const executor = (await harness.flow("root", "advance")).childId;
+  const checked = "def budget(value):\n    if value > 5:\n        return {'error': 'over-budget'}\n    return value\n";
+  write(candidate, checked);
+  const signCurrent = async () => {
+    const { codeTask } = await harness.flow(executor, "prepare");
+    const { file, previousCases, requiredCases, protectedCases, ...binding } = codeTask.regressionProof;
+    save(file, { ...binding, runId: "signed-owner", cases: [...previousCases, ...requiredCases].map(id => ({ id, status: "passed" })) });
+  };
+  await signCurrent();
+  const preview = await harness.flow(executor, "prepare");
+  assert.equal(preview.submission.status, "signed-source-check");
+  assert.equal(preview.submission.next.action, "edit");
+  assert.deepEqual(preview.submission.responsibilities.map(row => row.expected.file), ["limits.py"]);
+  const rejected = await harness.flow(executor, "submit");
+  assert.deepEqual(rejected.submission, preview.submission);
+  assert.equal(rejected.phase, "intake");
+  write("limits.py", checked);
+  write(candidate, "from limits import budget as check\n\ndef budget(value):\n    return check(value)\n");
+  await signCurrent();
+  assert.equal((await harness.flow(executor, "prepare")).submission.status, "ready");
+  assert.equal((await harness.flow(executor, "submit")).phase, "architecture-sync");
 }));
 
 test("the host preloads architecture sources and both reviewers decide only the compact section rows", () => fixture(async (root, write) => {
@@ -507,10 +545,13 @@ for (const entry of ["first-review", "first-audit", "owner-example", "blocked-cl
     const diagnostics = { checkSet: "service-smoke", protocol: 2, recipes: ["entry"], reviewRecipes: ["entry"],
       ...(!blocked ? { inputContracts: [{ id: "service", recipe: "entry", examples: [{ id: "get-ping", input: serviceInput,
         expectedJson: expected, requirement: { ...ref(goal, 3), quote: clause } }] }] } : {}) };
+    const checkBoundary = entry === "first-review";
     const { harness, save } = project(root, write, { goalClause: clause, diagnostics, continuation: "fresh",
+      ...(checkBoundary ? { importsHeading: "静态导入", allowedLocalImports: [{ file: candidate, imports: [] }] } : {}),
       examplesHeading, ...(examplesHeading ? { ownerExamples: [id] } : {}) });
     const arch = examplesHeading ? plan + "\n## " + examplesHeading + "\n\n~~~json\n" +
-      JSON.stringify([{ id, expectedExitCode: 0, expectedJson: expected }]) + "\n~~~\n" : plan;
+      JSON.stringify([{ id, expectedExitCode: 0, expectedJson: expected }]) + "\n~~~\n" : checkBoundary
+        ? plan + "\n## 静态导入\n\n待由宿主生成。\n" : plan;
     await harness.file("root", "write", architecture, { content: arch, note: "Register the service responsibility." });
     await harness.flow("root", "architecture");
     const executor = (await harness.flow("root", "advance")).childId;
@@ -582,8 +623,22 @@ for (const entry of ["first-review", "first-audit", "owner-example", "blocked-cl
     }
     await assert.rejects(harness.flow(executor, "submit"), /代码核验已退回/u);
     assert.equal(calls.filter(({ phase }) => phase === detectingPhase).length, 2);
+    if (checkBoundary) {
+      // A real review return sees the same static gate at preflight and submission.
+      write(candidate, "from limits import MAXIMUM\n" + code(expected));
+      await signCandidate("signed-outside-boundary");
+      const before = calls.length;
+      const preview = (await harness.flow(executor, "prepare")).submission;
+      assert.equal(preview.status, "architecture-import-boundary");
+      assert.deepEqual(await harness.flow(executor, "preflight"), { ok: false, submission: preview });
+      assert.deepEqual((await harness.flow(executor, "submit")).submission, preview);
+      assert.equal(calls.length, before);
+    }
     write(candidate, code(expected));
     const proofFile = await signCandidate("fixed-candidate");
+    const preflight = await harness.flow(executor, "preflight");
+    assert.equal(preflight.ok, true);
+    assert.equal(preflight.submission.status, "ready");
     assert.equal((await harness.flow(executor, "submit")).phase, "final-review-ready");
     const finalReviewer = (await harness.flow("root", "advance")).childId;
     assert.equal((await approve(harness, finalReviewer, false, examplesHeading)).phase, "final-audit-ready");

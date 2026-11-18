@@ -480,6 +480,38 @@ test("source-first recorded evidence turns an opposite draft label into a target
   assert.deepEqual(receipt.checks[0].findingOrigin,{kind:"same-reviewer-original-disposition",block:label.id});
   assert.equal(receipt.checks[0].counterEvidence.file,report);
   assert.match(receipt.checks[0].finding.fix,/改为「保留」/u);
+
+  assert.equal((await h.flow("root","advance")).childId,worker);
+  await h.flow(worker,"prepare");
+  await h.file(worker,"read","overview.md");
+  await h.file(worker,"read",report,{start:2,count:1});
+  const current = "+ C1：保留。" + externalStatement;
+  const other = "附记：其他事项需改正。";
+  async function revise(lines) {
+    await h.file(worker,"write","candidate.md",{content:lines.join("\n")+"\n",note:"核对被退回编号的处置及稿件原文。"});
+    await h.file(worker,"read","candidate.md");
+    return h.flow(worker,"preflight");
+  }
+  for (const rows of [
+    [current.replace("保留","改正"),other], [current.replace("保留","待证"),other],
+    [current,"- C1：另作说明。",other], [current.replace("保留","正在整理"),other],
+    ["```text",current,"```",other], ["> " + current,other], [other],
+  ]) {
+    const result = await revise(rows);
+    assert.equal(result.ok,false,rows.join("\n"));
+    assert.match(result.issues.join("\n"),/C1/u);
+  }
+  const accepted = await revise([other,"","```text","- C1：改正。示例行。","- C80：改正。示例行。","```","",current]);
+  assert.deepEqual(accepted.issues,[]);
+  assert.equal(accepted.repairs.find(item=>item.claim==="C1")?.resolution,"corrected-for-review");
+  const quality = Object.fromEntries(Object.keys(QUALITY).map(key=>[key,"已按原稿凭据校正本编号并保留可回查的出处。"]));
+  assert.equal((await h.flow(worker,"submit",{quality})).phase,"final-review-ready");
+  // A corrected disposition only releases the author. The final reviewer must
+  // still build an independent original-only judgement before seeing this draft.
+  const finalReviewer=(await h.flow("root","advance")).childId;
+  const pending = await h.flow(finalReviewer,"prepare");
+  assert.equal(pending.originalReview.pending,1);
+  await assert.rejects(h.file(finalReviewer,"read","candidate.md"),/改稿尚未开放/u);
 }));
 
 test("supplement retains the independently supported locator or submits newly read evidence for both reviews", () => fixture(async (root,write) => {

@@ -13,7 +13,9 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "build:markdown": "node scripts/build-markdown-parser.mjs",
-    "build:python": "node scripts/build-markdown-parser.mjs --python"
+    "build:python": "node scripts/build-markdown-parser.mjs --python",
+    "check:index": "node scripts/check-index-coverage.mjs && pwsh -NoProfile -File skills/project-index/check.ps1 -Index INDEX.json -ExpectedRoot .",
+    "prepublishOnly": "npm run check:index"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.1",

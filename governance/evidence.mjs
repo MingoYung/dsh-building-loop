@@ -1,5 +1,5 @@
 import { digest, includes, keyOf, readBytes, relativeName, text } from "./policy.mjs";
-import { citation, claimRow, lineList } from "./preflight.mjs";
+import { citation, claimRow, editorialLabel, lineList } from "./preflight.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
 
 // This failure belongs to a candidate locator only after the acquisition receipt
@@ -8,8 +8,12 @@ export class UnobservedExcerptError extends Error {}
 
 /** Enumerate explicit factual rows as well as the project's required minimum. */
 export function expectedClaims(spec, lines) {
-  const discovered = lines.flatMap(line => {
-    const match = /^\s*(?:[-*]\s+|\d+[.)]\s+)?(?:\*\*)?(C\d+)(?:\*\*)?\s*[:：]/.exec(line);
+  let visible;
+  const discovered = lines.flatMap((line,index) => {
+    // Newly accepted '+' items in a displayed example are not obligations.
+    const row = spec.originalFirst || /^\s*\+\s/u.test(line)
+      ? (visible ??= markdownStructure(lines).visible)[index] : line;
+    const match = /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*)?(C\d+)(?:\*\*)?\s*[:：]/.exec(row);
     return match ? [match[1]] : [];
   });
   return [...new Set([...spec.claims, ...discovered])];
@@ -67,10 +71,6 @@ export function originalReviewContract(frame, active, spec) {
   return { originals, sources, rule, binding };
 }
 
-function editorialLabel(line) {
-  return /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*)?(C\d+)(?:\*\*)?\s*[:：]\s*(保留|改正|待证)(?=[。！？；;!?.,，、\s]|$)/u.exec(line);
-}
-
 export function originalDraftIssues(spec, lines) {
   if (!spec.originalFirst) return [];
   const { visible } = markdownStructure(lines);
@@ -91,7 +91,7 @@ export function workingClaimDecisions(frame, active, spec, bytes) {
   for (const [index, line] of visible.entries()) {
     const match = editorialLabel(line);
     const original = originals.find(row => row.id === match?.[1]);
-    if (!original || claimRow(lines, original.id)?.line !== index + 1) continue;
+    if (!original || claimRow(lines, original.id, visible)?.line !== index + 1) continue;
     const decision = match[2], end = match[0].length;
     decisions.set(index + 1, { id: original.id, decision, start: end - decision.length, end, original, rule });
   }

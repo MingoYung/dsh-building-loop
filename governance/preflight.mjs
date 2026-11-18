@@ -14,14 +14,25 @@ export const lineList = bytes => text(bytes).split(/\r\n|\n|\r/);
 const escape = value => value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
 
 /** 以唯一编号定位事实行，重复编号交回修改。 */
-export function claimRow(lines, id) {
-  const pattern = new RegExp("^\\s*(?:[-*]\\s+|\\d+[.)]\\s+)?(?:\\*\\*)?" + escape(id) + "(?:\\*\\*)?\\s*[:：]\\s*(.*)$");
+export function claimRow(lines, id, visible) {
+  const pattern = new RegExp("^\\s*(?:[-*+]\\s+|\\d+[.)]\\s+)?(?:\\*\\*)?" + escape(id) + "(?:\\*\\*)?\\s*[:：]\\s*(.*)$");
   const found = [];
   for (let i = 0; i < lines.length; i++) {
     const match = pattern.exec(lines[i]);
-    if (match) found.push({ line: i + 1, body: match[1] });
+    if (match && (!visible || pattern.test(visible[i]))) found.push({ line: i + 1, body: match[1] });
+  }
+  // A displayed example can repeat a real row. Check collisions and the
+  // additional '+' list spelling in Markdown; existing single-row callers keep
+  // their raw-line contract. Editorial callers already pass their visible view.
+  if (!visible && (found.length > 1 || found.length && /^\s*\+\s/u.test(lines[found[0].line - 1]))) {
+    return claimRow(lines, id, markdownStructure(lines).visible);
   }
   return found.length === 1 ? found[0] : null;
+}
+
+/** The leading decision on a numbered row is a separate project-policy field. */
+export function editorialLabel(line) {
+  return /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*)?(C\d+)(?:\*\*)?\s*[:：]\s*(保留|改正|待证)(?=[。！？；;!?.,，、\s]|$)/u.exec(line);
 }
 
 /** Catch explicit required rows on the author side before review pays to
@@ -493,6 +504,24 @@ function checkRepairSpan(root,spec,lines,readable,active,finding,footnotes) {
     resolution:unresolved.length?"unchanged":evidence.length?"new-evidence-for-review":limited?"explicit-scope-for-review":withdrawn?"explicitly-withdrawn":"removed-or-rewritten",evidence};
 }
 
+/** An original-only reviewer compared one numbered decision with a specific
+ * project-policy field. Recover that field from the recorded draft and exact
+ * span, including for older signed findings. All other findings still follow
+ * their quotation through the full manuscript. */
+function originalDecisionTarget(active, finding) {
+  const baseline = finding.repairBaseline;
+  if (finding.proofObject !== "project-policy" || finding.finding?.kind !== "contradiction" ||
+      !baseline?.candidateSha256 || baseline.candidateSha256 !== active.rejectedCandidate ||
+      baseline.version !== 1 || baseline.attribution || baseline.inlineQuote || baseline.footnote || baseline.line !== finding.line) return;
+  const old = editorialLabel(finding.lineText ?? "");
+  if (!old || baseline.quote !== old[2] || finding.finding.quote !== old[2] ||
+      baseline.end !== old[0].length || baseline.start !== baseline.end - old[2].length) return;
+  const id = old[1], decision = active.originalReview?.decisions?.[id];
+  if (["original-only-review", "measured-original"].includes(decision?.method) &&
+      typeof decision.basis === "string" && decision.basis === finding.basis &&
+      ["保留", "改正", "待证"].includes(decision.decision) && decision.decision !== old[2]) return { id, expected: decision.decision };
+}
+
 /** A document-scoped numeric return may be repaired outside its valid numbered row. */
 function documentHash(spec, lines) {
   return digest(normalized(conclusion(lines.join("\n"), spec.phases["final-review"].evidence)));
@@ -931,11 +960,24 @@ export function plainLastIssues(spec, lines) {
 export function supplementChecks(root, spec, lines, readable, active) {
   const issues = plainLastIssues(spec, lines);
   const repairs=[],legacy=[];
+  let visibleDecisionLines;
   const footnotes=active.coverageRejections?.some(finding=>finding.repairBaseline?.footnote||finding.repairBaseline?.attribution?.footnote)
     ? footnoteQuoteIndex(lines,spec.phases["final-review"].evidence) : null;
   // New receipts bind the actual rejected substring, not surrounding correct
   // prose. Every retained assertion needs real revision or newly read evidence.
   for (const finding of active.coverageRejections ?? []) {
+    const target = spec.originalFirst && originalDecisionTarget(active, finding);
+    if (target) {
+      visibleDecisionLines ??= markdownStructure(lines).visible;
+      const row = claimRow(lines, target.id, visibleDecisionLines);
+      const current = row && editorialLabel(visibleDecisionLines[row.line - 1]);
+      const matches = current?.[1] === target.id && current[2] === target.expected;
+      repairs.push({ channel: "coverage", block: finding.block, claim: target.id, quote: finding.repairBaseline.quote,
+        baseline: "original-decision", resolution: matches ? "corrected-for-review" : "unresolved-disposition",
+        unresolved: !matches && row ? [row.line] : [], evidence: [] });
+      if (!matches) issues.push(target.id + " 的退回处置须在唯一可见的编号行改为「" + target.expected + "」");
+      continue;
+    }
     const repair=checkRepairSpan(root,spec,lines,readable,active,finding,footnotes);
     if(repair){repairs.push({...repair,channel:"coverage",block:finding.block});
       if(repair.unresolved.length)issues.push("全文退回 "+finding.block+" 的实际片段仍未修订或补入已读新证据，当前第 "+repair.unresolved.join("、")+" 行："+repair.quote

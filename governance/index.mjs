@@ -1126,6 +1126,24 @@ export function apply(ctx, config = {}) {
     return !plan.rollback || !!plan.rollback.proposal;
   }
 
+  /** A preview and a locked submission use the same ordered static gates.
+   * Read-back pages and external probes are served only by submission itself. */
+  function codeSubmissionState(frame, id, active, spec) {
+    const signed = signedSubmission(frame, id, active, spec);
+    const { goal, qualification, pending } = signed;
+    const submission = { status: pending.length ? "read-back" : "ready", receiptSha256: qualification.receiptSha256,
+      pending: submissionGaps(pending, active), next: { tool: WORKFLOW, action: "submit" } };
+    if (pending.length) return { signed, submission };
+    const boundary = signedLocalImportBoundary(frame, spec, qualification);
+    if (boundary) return { signed, submission: { ...boundary, next: { tool: FILE, action: "edit", path: boundary.violations[0].file } } };
+    const responsibilities = signedExplicitResponsibilityIssues(frame, spec, qualification, goal);
+    if (responsibilities.length) return { signed, submission: { status: "signed-source-check", responsibilities,
+      next: { tool: FILE, action: "edit", reason: "依据条款及判定位置修正实际职责，读回并重新签名。" } } };
+    if (rollbackProposalNeeded(frame, active, spec, qualification)) return { signed, submission: {
+      status: "rollback-proposal-required", next: { tool: WORKFLOW, action: "rollback-proposal" } } };
+    return { signed, submission };
+  }
+
   /** The executor receives only host-authorized repair instructions, not
    * access to the review receipt or to the reviewer's private evidence. */
   function codeRepairPacket(frame, active, spec) {
@@ -1411,12 +1429,7 @@ export function apply(ctx, config = {}) {
       let submission;
       if (frame.role === "executor" && isCodeReviewUnit(frame, current, spec)) {
         try {
-          const { qualification, pending } = signedSubmission(frame, assignment[0], current, spec);
-          submission = (!pending.length && (signedLocalImportBoundary(frame, spec, qualification) ||
-            (rollbackProposalNeeded(frame, current, spec, qualification) && { status: "rollback-proposal-required",
-              next: { tool: WORKFLOW, action: "rollback-proposal" } }))) ||
-            { status: pending.length ? "read-back" : "ready", receiptSha256: qualification.receiptSha256,
-            pending: submissionGaps(pending, current), next: { tool: WORKFLOW, action: "submit" } };
+          submission = codeSubmissionState(frame, assignment[0], current, spec).submission;
         } catch (error) {
           submission = { status: "blocked", reason: error.message,
             ...(recipeInputs ? { next: { tool: REPRODUCE, action: "check" } } : {}) };
@@ -1429,11 +1442,9 @@ export function apply(ctx, config = {}) {
         ?? repairRead ?? targetedNext ?? availableNext ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
         ?? architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
         : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
-        : submission?.status === "rollback-proposal-required" ? submission.next
-        : submission?.status === "ready" ? "当前签名回归和读回已齐，直接 submit"
+        : submission?.status === "ready" ? "当前签名稿的静态送审条件已齐，submit 会核验已登记的运行证据"
         : submission?.status === "read-back" ? "当前签名回归已通过，submit 会返回待读回的准确页"
-        : submission?.status === "architecture-import-boundary" ? "按 violations 修正实际越界导入，读回并获取新的签名后 submit"
-        : submission?.status === "blocked" && submission.next ? submission.next
+        : submission?.next ? submission.next
         : codeTask?.regressionProof ? "落实当前目标，读回改动和候选，取得当前版本的签名回归回执后 submit"
         : phase==="supplement" ? "按退回项修改，读回、preflight、submit"
         : frame.role==="executor"&&phase==="intake" ? (frame.managed ? "按当前目标写出首稿，完整读回后 submit" : "保留原稿 submit")
@@ -3006,12 +3017,9 @@ export function apply(ctx, config = {}) {
       if (!spec.codeTask?.diagnostics?.inputContracts || !active.codeIntake?.regression) return;
       if (engineeringArchitectureLinkIssues(frame, spec, undefined, active).length) return;
       if (isCodeReviewUnit(frame, active, spec)) {
-        const { pending, qualification, goal } = signedSubmission(frame, id, active, spec);
         // Save runner calls on a known static violation. Publication still
         // checks the boundary again against the current signed bytes.
-        if (pending.length || signedLocalImportBoundary(frame, spec, qualification) ||
-          signedExplicitResponsibilityIssues(frame, spec, qualification, goal).length ||
-          rollbackProposalNeeded(frame, active, spec, qualification)) return;
+        if (codeSubmissionState(frame, id, active, spec).submission.status !== "ready") return;
       } else {
         verifySignedCodeSubmission(frame, id, active, spec, goalSnapshot(frame));
       }
@@ -3088,18 +3096,12 @@ export function apply(ctx, config = {}) {
         }
         let signed;
         if (codeRoute) {
-          const { goal, qualification, pending } = signedSubmission(frame, id, active, spec);
-          if (pending.length) return { unit: id, phase: active.phase, submission: serveSubmissionReadback(frame, active, pending) };
-          const boundary = signedLocalImportBoundary(frame, spec, qualification);
-          if (boundary) return { unit: id, phase: active.phase, submission: boundary };
-          const responsibilities = signedExplicitResponsibilityIssues(frame, spec, qualification, goal);
-          if (responsibilities.length) return { unit: id, phase: active.phase,
-            submission: { status: "signed-source-check", responsibilities, next: { tool: WORKFLOW, action: "submit" } } };
-          if (rollbackProposalNeeded(frame, active, spec, qualification)) {
-            return { unit: id, phase: active.phase, submission: { status: "rollback-proposal-required",
-              next: { tool: WORKFLOW, action: "rollback-proposal" } } };
+          const state = codeSubmissionState(frame, id, active, spec);
+          if (state.submission.status === "read-back") {
+            return { unit: id, phase: active.phase, submission: serveSubmissionReadback(frame, active, state.signed.pending) };
           }
-          signed = { goal, qualification };
+          if (state.submission.status !== "ready") return { unit: id, phase: active.phase, submission: state.submission };
+          signed = state.signed;
         }
         let inputProof, responsibilityProof;
         if (spec.codeTask?.diagnostics?.inputContracts && active.codeIntake?.regression) {
@@ -3122,9 +3124,15 @@ export function apply(ctx, config = {}) {
             policySha256: frame.policy.hash, artifactsSha256: digest(JSON.stringify(artifacts)) };
           if (signed && spec.architecture?.responsibilities) {
             const rows = architectureResponsibilityResult(frame, spec, signed.qualification, observed.traced);
-            if (rows.some(row => row.status !== "passed")) {
+            const failures = rows.filter(row => row.status !== "passed");
+            if (failures.length) {
+              // A proven ownership mismatch is actionable on the signed source.
+              // Inconclusive witness data calls for diagnosis before changing it.
+              const next = failures.some(row => row.status === "mismatch") ? { tool: FILE, action: "edit",
+                reason: "按 mismatch 行所列条款及实际判定位置修正实现，读回并重新签名。" } : { tool: WORKFLOW, action: "block",
+                note: "职责证据不足（" + failures[0].id + "：" + failures[0].reason + "）。请总控核实条款、已登记用例和执行轨迹，再回派原执行方。" };
               return { unit: id, phase: active.phase, submission: { status: "architecture-responsibility",
-                rows: rows.filter(row => row.status !== "passed"), next: { tool: WORKFLOW, action: "submit" } } };
+                rows: failures, next } };
             }
             responsibilityProof = { version: 1, policySha256: frame.policy.hash, artifactsSha256: inputProof.artifactsSha256, rows };
           }
@@ -3467,10 +3475,8 @@ export function apply(ctx, config = {}) {
       if (args.unit !== undefined && args.unit !== assignment[0]) throw new Error("unit 与本会话授权不匹配，当前单元为 " + assignment[0]);
       const spec = unitOf(frame, assignment[0]);
       if (isCodeReviewUnit(frame, assignment[1], spec)) {
-        const { qualification, pending } = signedSubmission(frame, assignment[0], assignment[1], spec);
-        return { ok: pending.length === 0, submission: { status: pending.length ? "read-back" : "ready",
-          receiptSha256: qualification.receiptSha256, pending: submissionGaps(pending, assignment[1]),
-          next: { tool: WORKFLOW, action: "submit" } } };
+        const { submission } = codeSubmissionState(frame, assignment[0], assignment[1], spec);
+        return { ok: submission.status === "ready", submission };
       }
       const bytes = readBytes(frame.root, spec.candidate);
       if (!bytes) throw new Error("候选文件尚未交付");

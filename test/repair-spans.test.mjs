@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {fixture,host,policy} from "./helpers.mjs";
-import {QUALITY,supplementChecks,plainLastIssues} from "../governance/preflight.mjs";
+import {QUALITY,claimRow,supplementChecks,plainLastIssues} from "../governance/preflight.mjs";
+import {expectedClaims} from "../governance/evidence.mjs";
 
 const rejectedText="全部20项均通过";
 const firstLine="资料说明：本例通过19项，"+rejectedText;
@@ -150,6 +151,40 @@ test("legacy receipts disclose their limited line fallback and cannot invent new
   const quoted={unlisted:[{line:1,text:firstLine,quote:rejectedText,basis:"旧片段无原证据快照"}],unsupported:[]};
   const current=supplementChecks("",spec,["改了前缀，"+rejectedText],[],quoted);
   assert.equal(current.ok,false);assert.equal(current.repairs[0].baseline,"legacy-quote-no-evidence-snapshot");
+});
+
+test("only a pinned original disposition can narrow the full-text repair to one numbered field",()=>{
+  const quote="改正", lineText="- C7：改正。";
+  const hash="a".repeat(64), start=lineText.indexOf(quote), basis="依照该项独立原始资料，原句可以保留。";
+  const finding={block:"B-test",proofObject:"project-policy",line:1,lineText,basis,finding:{kind:"contradiction",quote},
+    repairBaseline:{version:1,quote,line:1,start,end:start+quote.length,candidateSha256:hash,refs:[]}};
+  const saved={decision:"保留",method:"measured-original",basis};
+  const spec={originalFirst:true,plainLast:false,calculations:{},phases:{"final-review":{evidence:[]}}};
+  const changed=["其他项目需要改正。","+ C7：保留。"];
+  function replay(entry=finding,decision=saved,rejectedCandidate=hash){
+    return supplementChecks("",spec,changed,[],{coverageRejections:[entry],originalReview:{decisions:{C7:decision}},rejectedCandidate});
+  }
+  assert.equal(replay().repairs[0].resolution,"corrected-for-review");
+  for(const result of [
+    replay(finding,null), replay(finding,{...saved,basis:"另一项原稿的判断。"}), replay(finding,{...saved,method:"unknown"}),
+    replay(finding,saved,"b".repeat(64)), replay({...finding,proofObject:"external-source"}),
+    replay({...finding,repairBaseline:{...finding.repairBaseline,start:start+1}}),
+    replay({...finding,finding:{kind:"scope",quote}}),
+  ]){
+    assert.equal(result.ok,false);
+    assert.deepEqual(result.repairs[0].unresolved,[1]);
+    assert.equal(result.repairs[0].baseline,"precise-v1");
+  }
+});
+
+test("disambiguating a numbered claim preserves its original inline code and source bytes",()=>{
+  const body="使用 `keep(\"x\")` 并引用 `source.md` 第 2 行。";
+  const lines=["```text","- C7：隐藏示例","```","","> C7：引用的例子。","","+ C7："+body];
+  assert.deepEqual(claimRow(lines,"C7"),{line:7,body});
+  assert.equal(claimRow(["```text","+ C7：只有围栏内有处置。","```"],"C7"),null);
+  assert.deepEqual(expectedClaims({claims:[]},["```text","+ C1：演示。","```","+ C7："+body]),["C7"]);
+  assert.equal(claimRow([...lines,"C7：第二份有效处置。"],"C7"),null);
+  assert.equal(claimRow(lines,"C8"),null);
 });
 
 test("the real closing immediately after a Markdown list is valid without an extra blank line",()=>{
