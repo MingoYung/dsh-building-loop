@@ -44,11 +44,11 @@ export function requiredClaimRowIssues(lines, ids) {
 
 function citationPath(file) {
   return new RegExp("(^|[\\s:：\\x60\"'“‘(（\\[【〔<《,，、；;])" + escape(file)
-    + "(?=$|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "gi" : "g");
+    + "(?=$|第\\s*[-+−]?\\s*\\d|[\\s#:,：，、。；;\\x60\"'”’）)\\]】〕>》]|\\.(?:\\s|$))", process.platform === "win32" ? "gi" : "g");
 }
 
 function citationRange(after) {
-  const match = /^\s*(?:\x60\s*)?(?:#L(\d+)(?:-L?(\d+))?|[:：](\d+)(?:[-–—](\d+))?|第\s*(\d+)(?:\s*[-–—、至到]\s*(\d+))?\s*行)/i.exec(after);
+  const match = /^\s*(?:\x60\s*)?(?:#L(\d+)(?:-L?(\d+))?|[:：](\d+)(?:[-–—](\d+))?|第\s*(\d+)(?:\s*[-–—至到]\s*(\d+))?\s*行)/i.exec(after);
   if (!match) return;
   const start = Number(match[1] ?? match[3] ?? match[5]);
   const end = Number(match[2] ?? match[4] ?? match[6] ?? start);
@@ -58,22 +58,11 @@ function citationRange(after) {
 
 /** 识别准确路径及首个原文行范围，排除同名前缀和备份别名。 */
 export function citation(body, file) {
-  const row = body.replaceAll("\\", "/");
-  let mentioned = false;
-  // A filename may first appear as a topic and only later carry its locator.
-  // Prefer the first explicit range, but never hide an invalid explicit range
-  // behind a later good one. Bare mentions retain their existing no-range shape.
-  for (const match of row.matchAll(citationPath(file))) {
-    mentioned = true;
-    const after = row.slice(match.index + match[0].length);
-    const range = citationRange(after);
-    if (range) return range.range;
-  }
-  return mentioned ? { start: null, end: null } : null;
+  return numberedCitationRanges(body, file)[0] ?? null;
 }
 
-function numberedCitationEntry(after, grouped) {
-  const list = grouped && /^\s*(?:\x60\s*)?第\s*([-+−]?\s*\d+(?:\s*、\s*[-+−]?\s*\d+)+)\s*行/u.exec(after);
+function numberedCitationEntry(after) {
+  const list = /^\s*(?:\x60\s*)?第\s*([-+−]?\s*\d+(?:\s*、\s*[-+−]?\s*\d+)+)\s*行/u.exec(after);
   if (list) {
     // An enumerated line does not cite anything between its members, even
     // when they appear in reverse order. Dash/至 ranges retain their meaning.
@@ -92,15 +81,18 @@ const labelledSeparator = new RegExp(String.raw`^([^、，,；;\r\n]*?)(?:[、�
 
 /** Inline labels may describe the cited row. The label cannot supply a new
  * locator or source, and compound units must be recognized by the host. */
-function labelledCitationSeparator(remainder) {
-  const separator = labelledSeparator.exec(remainder);
-  const label = separator?.[1].trim();
-  if (!separator || label.length > 24) return;
-  if (/^[\p{L}\p{M} \t]*$/u.test(label)) return separator;
+function citationLabel(label) {
+  if (label.length > 24) return false;
+  if (/^[\p{L}\p{M} \t]*$/u.test(label)) return true;
   const quantity = /^(?:[\p{L}\p{M}]+[ \t]*)?[-+−±]?\d+(?:\.\d+)?(?:[eE][-+−]?\d+)?[ \t]*(.*)$/u.exec(label);
-  if (!quantity) return;
+  if (!quantity) return false;
   const unit = quantity[1];
-  if (!unit || /^(?:[%％‰]|[\p{L}\p{M}°]+[²³]?)$/u.test(unit) || numericUnitConversion(unit, unit)) return separator;
+  return !unit || /^(?:[%％‰]|[\p{L}\p{M}°]+[²³]?)$/u.test(unit) || !!numericUnitConversion(unit, unit);
+}
+
+function labelledCitationSeparator(remainder) {
+  const separator=labelledSeparator.exec(remainder);
+  return separator && citationLabel(separator[1].trim()) ? separator : undefined;
 }
 
 /** A marked citation can start a sentence without surrounding brackets.
@@ -118,57 +110,71 @@ function numberedCitationGroups(row) {
   return [...bracketed, ...standalone];
 }
 
+/** Parse one path's successive ranges and expose the unconsumed suffix. An
+ * exact quote-owned annotation must consume its whole group; prose scanning
+ * may stop before the next source or assertion. */
+function readNumberedGroup(tail, marked) {
+  const ranges=[];
+  while(tail) {
+    const entry=numberedCitationEntry(tail);
+    if(!entry)return {ranges,tail,invalid:marked&&locatorLead.test(tail.trimStart())};
+    if(!entry.ranges.length)return {ranges:[],tail,invalid:true};
+    ranges.push(...entry.ranges);
+    tail=tail.slice(entry.length);
+    const separator=marked ? labelledCitationSeparator(tail)
+      : /^\s*(?:标题|表头|说明)?\s*[、，,]\s*(?=(?:第\s*\d|#L\d))/iu.exec(tail);
+    if(!separator)break;
+    tail=tail.slice(separator[0].length);
+  }
+  return {ranges,tail,invalid:false};
+}
+
 /** For numbered review, preserve disjoint locations on the same authored row.
  * An adjacent list can repeat line locations without repeating the path. A new
  * path, sentence or source-group separator cannot inherit the prior path. */
 export function numberedCitationRanges(body, file) {
   const row = body.replaceAll("\\", "/"), ranges = [];
-  const groups = numberedCitationGroups(row);
+  let groups;
   let mentioned = false;
   for (const match of row.matchAll(citationPath(file))) {
     mentioned = true;
     const afterPath = match.index + match[0].length;
-    const group = groups.find(({ start, end }) => match.index >= start && afterPath <= end);
+    const group = (groups ??= numberedCitationGroups(row)).find(({ start, end }) => match.index >= start && afterPath <= end);
     // Group and source boundaries cannot be crossed by a locator list or by
     // a descriptive label. The information in a label never proves a fact.
-    let tail = group ? row.slice(afterPath, group.end).split(/[；;]/u, 1)[0] : row.slice(afterPath);
-    while (tail) {
-      const entry = numberedCitationEntry(tail, group);
-      if (!entry) {
-        if (group && locatorLead.test(tail.trimStart())) return [];
-        break;
-      }
-      if (!entry.ranges.length) return [];
-      ranges.push(...entry.ranges);
-      const remainder = tail.slice(entry.length);
-      const separator = group
-        ? labelledCitationSeparator(remainder)
-        : /^\s*(?:标题|表头|说明)?\s*[、，,]\s*(?=(?:第\s*\d|#L\d))/iu.exec(remainder);
-      if (!separator || group && !locatorLead.test(remainder.slice(separator[0].length))) break;
-      tail = remainder.slice(separator[0].length);
-    }
+    const tail = group ? row.slice(afterPath, group.end).split(/[；;]/u, 1)[0] : row.slice(afterPath);
+    const parsed=readNumberedGroup(tail,!!group);
+    if(parsed.invalid)return [];
+    ranges.push(...parsed.ranges);
   }
   return ranges.length ? ranges : mentioned ? [{ start: null, end: null }] : [];
 }
 
-const exactLineRange = "(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)";
+export const exactLineRange = String.raw`(?:#L\d+(?:-L?\d+)?|[:：]\d+(?:[-–—]\d+)?|第\s*\d+(?:(?:\s*、\s*\d+)+|\s*[-–—至到]\s*\d+)?\s*行)`;
+const unknownLocatorPath = /^(?:`([^`\r\n]+)`|([^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+?\.[A-Za-z0-9_-]+))\s*(?=第\s*[-+−]?\s*\d|#L|[:：])/iu;
 
 /** Parse a single locator with no surrounding prose or second source. Unknown
  * paths return only diagnostics and are never opened by this parser. */
-export function exactCitationLocator(value, files) {
+export function exactCitationLocator(value, files, labelledTail=false) {
   let body=value.trim().replace(/^(?:出处|来源|证据|source|evidence)\s*[:：]\s*/iu, "").replaceAll("\\", "/");
   if (/^`[^`]+`$/u.test(body)) body=body.slice(1,-1);
   for (const file of files) {
     const name=escape(file);
-    if (!new RegExp("^(?:`"+name+"`|"+name+")\\s*"+exactLineRange+"$",process.platform==="win32"?"iu":"u").test(body)) continue;
-    const cited=citation(body,file);
-    return cited?.start ? {locators:[{file,...cited}],excludedLocators:[]}
-      : {locators:[],excludedLocators:[{file,locator:body,reason:"invalid-range"}]};
+    const path=new RegExp("^(?:`"+name+"`|"+name+")(?=\\s|第\\s*[-+−]?\\s*\\d|[:：#]|$)",process.platform==="win32"?"iu":"u").exec(body);
+    if(!path)continue;
+    const cited=readNumberedGroup(body.slice(path[0].length),true);
+    if(cited.invalid)return {locators:[],excludedLocators:[{file,locator:body,reason:"invalid-range"}]};
+    if(cited.ranges.length&&(!cited.tail.trim()||labelledTail&&citationLabel(cited.tail.trim())))
+      return {locators:cited.ranges.map(range=>({file,...range})),excludedLocators:[]};
   }
-  const unknown=/^(?:`([^`\r\n]+)`|([^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+))\s*(?:#L\d+(?:-L?\d+)?|[:：]\d+(?:[-–—]\d+)?|第\s*\d+(?:\s*[-–—、至到]\s*\d+)?\s*行)$/iu.exec(body);
+  const unknown=unknownLocatorPath.exec(body);
   const file=unknown?.[1]??unknown?.[2];
-  return file&&/^[^\s`"'“”‘’()（）\[\]【】<>:：#;,，、；]+\.[A-Za-z0-9_-]+$/u.test(file)
-    ? {locators:[],excludedLocators:[{file,locator:body,reason:"unapproved-source"}]} : null;
+  if(file&&/\.[A-Za-z0-9_-]+$/u.test(file)) {
+    const cited=readNumberedGroup(body.slice(unknown[0].length),true);
+    if(cited.invalid||cited.ranges.length&&(!cited.tail.trim()||labelledTail&&citationLabel(cited.tail.trim())))
+      return {locators:[],excludedLocators:[{file,locator:body,reason:"unapproved-source"}]};
+  }
+  return null;
 }
 
 /** Bind the literal adjacent annotation and its physical end to this quote.
@@ -176,8 +182,18 @@ export function exactCitationLocator(value, files) {
 export function adjacentCitationLocator(line, quoteEnd, files) {
   const annotation=/^\s*(?:（([^（）\r\n]*)）|\(([^()\r\n]*)\)|\[([^\[\]\r\n]*)\]|【([^【】\r\n]*)】)/u.exec(line.slice(quoteEnd));
   if(!annotation)return null;
-  const bound=exactCitationLocator(annotation.slice(1).find(value=>value!==undefined),files);
-  return bound?{...bound,end:quoteEnd+annotation[0].length}:null;
+  const body=annotation.slice(1).find(value=>value!==undefined), end=quoteEnd+annotation[0].length;
+  const marked=/^\s*(?:出处|来源|证据|source|evidence)\s*[:：]/iu.test(body);
+  const bound=exactCitationLocator(body,files,marked);
+  if(bound)return {...bound,end};
+  if(!marked)return null;
+  // A marked note owns only its contents. Unsupported syntax or one bad
+  // member cannot fall back to some other quotation elsewhere on this line.
+  const members=body.split(/[；;]|[、，,]\s*(?=(?:`[^`]+`|[^\s,，、；;]+?\.[A-Za-z0-9_-]+)\s*(?:第\s*[-+−]?\s*\d|#L|[:：]))/iu)
+    .map(entry=>exactCitationLocator(entry,files,true));
+  if(members.length>1&&members.every(Boolean))return {end,compound:true,
+    locators:members.flatMap(entry=>entry.locators),excludedLocators:members.flatMap(entry=>entry.excludedLocators)};
+  return {end,locators:[],excludedLocators:[{reason:"unresolved-quotation-source"}]};
 }
 
 /** Escape parity matters only outside a literal code span. */
@@ -300,8 +316,7 @@ export function footnoteQuoteIndex(lines, files) {
 function conclusion(body, files = [], normalize = value => value.normalize("NFKC")) {
   let result = normalize(body).replaceAll("−", "-").replaceAll("\\", "/");
   for (const file of files) {
-    const locator = new RegExp(escape(normalize(file))
-      + "\\s*(?:#L\\d+(?:-L?\\d+)?|[:：]\\d+(?:[-–—]\\d+)?|第\\s*\\d+(?:\\s*[-–—、至到]\\s*\\d+)?\\s*行)", "gi");
+    const locator = new RegExp(escape(normalize(file)) + "\\s*" + exactLineRange, "gi");
     result = result.replace(locator, "");
   }
   return result.replace(/(?:出处|来源|证据|source|evidence)\s*[:：]/gi, "");
@@ -340,7 +355,7 @@ export function errorExample(value) {
  */
 function repairReferences(root,spec,body,readable,seen,extra=[]) {
   const files=spec.phases?.["final-review"]?.evidence??[];
-  const candidates=[...extra,...files.flatMap(file=>{const range=citation(body,file);return range?.start?[{file,...range}]:[];})];
+  const candidates=[...extra,...files.flatMap(file=>numberedCitationRanges(body,file).map(range=>({file,...range})))];
   const refs=[];
   for(const ref of candidates){
     const {file,start,end}=ref;
@@ -374,7 +389,8 @@ export function repairBaseline(root,spec,lines,finding,readable,seen,extra=[]) {
   const contextStart=finding.contextStart??line.indexOf(context),start=contextStart+context.indexOf(quote);
   if(contextStart<0||context.indexOf(quote,context.indexOf(quote)+1)!==-1)throw new Error("退回 finding.quote 在本段必须唯一定位，请缩小或补足实际错误片段；不要把正确前缀列入退回");
   if(line.slice(contextStart,contextStart+context.length)!==context)throw new Error("退回片段位置与当前正文不一致");
-  return {version:1,quote,line:finding.line,start,end:start+quote.length,candidateSha256:digest(readBytes(root,spec.candidate)),
+  const siblings = !finding.footnote && !finding.inlineQuote && siblingParagraphs(lines, quote, finding.line);
+  return {version:1,quote,line:finding.line,start,end:start+quote.length,...(siblings?.length ? {siblings} : {}),candidateSha256:digest(readBytes(root,spec.candidate)),
     kind:finding.finding?.kind,scopeMarkers:scopeMarkers(context),...(finding.footnote?{footnote:finding.footnote}:{}),
     ...(finding.inlineQuote?{inlineQuote:true}:{}),
     refs:repairReferences(root,spec,finding.footnote||finding.inlineQuote?"":line,readable,seen,extra)};
@@ -404,6 +420,72 @@ function repairParagraphs(lines) {
     rows.push(row);
   }
   flush();return groups;
+}
+
+/** Only a unique, visible Markdown section can identify a sibling. Bind its
+ * unchanged preceding prose too: moving a subjectless sentence under a new
+ * introduction changes the assertion even when the sentence is verbatim. */
+function siblingParagraphs(lines, quote, targetLine) {
+  if (!lines.some((line, index) => index + 1 !== targetLine && line.includes(quote))) return [];
+  const groups = repairParagraphs(lines);
+  const target = groups.find(rows => rows.some(row => row.line === targetLine));
+  if (!target) return [];
+  const original = target.map(row => row.text).join("\n");
+  const scoped = scopedSiblingRows(lines, groups, body => body === original || body.includes(quote));
+  const rejected = scoped.find(entry => entry.rows === target);
+  if (!rejected) return [];
+  // A different section owns the previously correct assertion. Two
+  // occurrences under one heading may share an implicit subject.
+  const siblings = scoped.filter(entry => entry.section !== rejected.section && entry.body !== original);
+  return siblings.length <= 32 ? siblings.map(({identity}) => identity) : [];
+}
+
+/** An old text-only fingerprint lacks the owning section and preceding
+ * context. Let it use the full repair check just like an unsigned baseline. */
+function unchangedSiblingLines(lines, siblings) {
+  const wanted = new Set(siblings.filter(key => typeof key === "string"));
+  if (!wanted.size) return new Set();
+  return new Set(scopedSiblingRows(lines,repairParagraphs(lines),() => true)
+    .filter(({identity}) => wanted.has(identity)).flatMap(({rows}) => rows.map(row => row.line)));
+}
+
+function scopedSiblingRows(lines,groups,includeBody) {
+  if (!lines.some(line => /^ {0,3}#{1,6}\s/u.test(line))) return [];
+  const {visible,closingRows} = markdownStructure(lines);
+  // Setext headings are intentionally unsupported. They may change the
+  // section of subsequent text; treating them as plain prose would be unsafe.
+  if (visible.some(line => /^ {0,3}(?:=+|-+)\s*$/u.test(line))) return [];
+  const headings = new Map(), counts = new Map();
+  for (const [i,line] of visible.entries()) {
+    const m = closingRows[i] && /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/u.exec(line);
+    if (!m) continue;
+    const title = (m[2] ?? "").replace(/[ \t]+#+[ \t]*$/u,"").trim().normalize("NFKC").toLowerCase();
+    // A second decorated title can render as the same heading. Without a
+    // simple literal name there is no unique text identity to sign.
+    if (line!==lines[i] || !/^[\p{L}\p{N}][\p{L}\p{N}\p{Zs}、，。！？：·/（）().—–-]*$/u.test(title)) return [];
+    headings.set(i+1,{depth:m[1].length,title});
+    counts.set(title,(counts.get(title) ?? 0)+1);
+  }
+  const stack = [], result = [], bodies = new Map();
+  let preamble = "";
+  for (const rows of groups) {
+    const first = rows[0].line, body = rows.map(row => row.text).join("\n"), heading = headings.get(first);
+    if (heading) {
+      while (stack.length && stack.at(-1).depth >= heading.depth) stack.pop();
+      const parent = stack.at(-1);
+      stack.push({depth:heading.depth,safe:counts.get(heading.title)===1 && (parent?.safe ?? true),
+        scope:digest(JSON.stringify([parent?.scope,parent?.prefix ?? preamble,heading.depth,body])),prefix:""});
+      continue;
+    }
+    const section = stack.at(-1);
+    if (!section) { preamble=digest(preamble+"\n"+body); continue; }
+    if (section.safe && rows.every(row => closingRows[row.line-1] && visible[row.line-1]===row.text) && includeBody(body)) {
+      bodies.set(body,(bodies.get(body) ?? 0)+1);
+      result.push({body,rows,section:section.scope,identity:digest(JSON.stringify([section.scope,section.prefix,body]))});
+    }
+    section.prefix=digest(section.prefix+"\n"+body);
+  }
+  return result.filter(({body}) => bodies.get(body)===1);
 }
 
 /** Locate every retained occurrence while ignoring cosmetic Unicode/spacing edits.
@@ -484,8 +566,11 @@ function checkRepairSpan(root,spec,lines,readable,active,finding,footnotes) {
   const quote=baseline?.version===1?baseline.quote:finding.finding?.quote??finding.quote;
   if(typeof quote!=="string"||!quote.trim())return null; // Explicit legacy full-line fallback below.
   const occurrences=repairOccurrences(lines,quote,baseline?.footnote);
+  const unrelated = baseline?.candidateSha256 === active.rejectedCandidate && baseline?.siblings?.length
+    ? unchangedSiblingLines(lines, baseline.siblings) : null;
   const unresolved=[],evidence=[];let withdrawn=0,limited=0;
   for(const item of occurrences){
+    if (unrelated?.has(item.line)) continue;
     if(withdrawnOccurrence(item)){withdrawn++;continue;}
     if(baseline?.kind==="scope"&&scopeMarkers(item.sentence).some(marker=>!baseline.scopeMarkers?.includes(marker))){limited++;continue;}
     const refs=baseline?.version!==1?[]:baseline.footnote
@@ -531,14 +616,15 @@ function documentHash(spec, lines) {
 function shape(root, spec, row, readable, seen) {
   const refs = [];
   for (const file of spec.phases["final-review"].evidence) {
-    const locate = citation(row.body, file);
-    if (!locate?.start || !includes(readable, file)) continue;
+    if (!includes(readable, file)) continue;
+    const ranges = numberedCitationRanges(row.body, file);
+    if (!ranges[0]?.start) continue;
     const bytes = readBytes(root, file);
-    if (!bytes || locate.end > lineList(bytes).length) continue;
-    const hash = digest(bytes);
-    const observed = seen?.[keyOf(file)];
-    if (seen && (observed?.hash !== hash || !observed.ranges.some(([a, b]) => a <= locate.start && b >= locate.end))) continue;
-    refs.push({ hash, start: locate.start, end: locate.end });
+    if (!bytes) continue;
+    const length = lineList(bytes).length, hash = digest(bytes), observed = seen?.[keyOf(file)];
+    for (const { start, end } of ranges) {
+      if (end <= length && (!seen || observed?.hash === hash && observed.ranges.some(([a,b]) => a <= start && b >= end))) refs.push({ hash, start, end });
+    }
   }
   return { version: 2, body: row.body, conclusion: digest(normalized(conclusion(row.body, spec.phases["final-review"].evidence))), refs };
 }
@@ -553,6 +639,12 @@ export function rejectedClaims(root, spec, lines, rejected, readable) {
     if (spec.calculations?.[check.id]?.scope === "document") baseline.documentHash = documentHash(spec, lines);
     return [check.id, baseline];
   }));
+}
+
+/** Preserve a grouped source value and validate every separator before exact arithmetic. */
+export function canonicalDecimal(raw) {
+  if (!/^[+−-]?(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,3}(?:\u202f\d{3})+|\d{1,3}(?:\u00a0\d{3})+)(?:\.\d+)?$/u.test(raw)) throw new Error("原始十进制数值格式或分组不明确，须先确认口径");
+  return raw.replaceAll("−", "-").replace(/[,\u202f\u00a0]/gu, "");
 }
 
 /** 把普通十进制拆成整数比，复算不依赖浮点近似。 */
@@ -578,10 +670,23 @@ function formatDecimal(n, places) {
   return (prefix + digits.slice(0, -places) + "." + digits.slice(-places)).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+/** Parse a single physical CSV record. Refuse a quoted newline so that each
+ * operand remains bound to exactly the physical line that the reviewer read. */
+export function physicalCsvCells(line) {
+  if (!line.includes('"')) return line.split(",").map(cell => cell.trim());
+  const cells = [];
+  const field = /[ \t]*(?:"((?:[^"\r\n]|"")*)"|([^",\r\n]*))[ \t]*(,|$)/gy;
+  for (;;) {
+    const match = field.exec(line);
+    if (!match) throw new Error("CSV 引号格式有误或字段跨行，无法绑定物理行");
+    cells.push((match[1] === undefined ? match[2] : match[1].replaceAll('""', '"')).trim());
+    if (!match[3]) return cells;
+  }
+}
+
 /** Read the original physical lines once, preserving exact source locators. */
 function numericCsv(lines) {
-  if (lines.some(line => line.includes('"'))) throw new Error("复算支持无引号和无跨行字段的 UTF-8 CSV");
-  const header = lines[0].split(",").map(x => x.trim());
+  const header = physicalCsvCells(lines[0]);
   if (new Set(header).size !== header.length) throw new Error("复算 CSV 表头不匹配或有重复列");
   const column = name => {
     const index = header.indexOf(name);
@@ -590,7 +695,7 @@ function numericCsv(lines) {
   };
   const rows = lines.slice(1).flatMap((quote, i) => {
     if (!quote.trim()) return [];
-    const cells = quote.split(",").map(value => value.trim());
+    const cells = physicalCsvCells(quote);
     if (cells.length !== header.length) throw new Error("复算 CSV 行列数量不一致");
     return [{ cells, line: i + 2, quote }];
   });
@@ -617,8 +722,8 @@ function decrease(lines, rule) {
   const before = rows.get(rule.before);
   const after = rows.get(rule.after);
   if (!before || !after) throw new Error("缺少配置的基准行或对照行");
-  const a = decimal(before.raw);
-  const b = decimal(after.raw);
+  const a = decimal(canonicalDecimal(before.raw));
+  const b = decimal(canonicalDecimal(after.raw));
   if (a.n <= 0n || b.n < 0n) throw new Error("降幅复算需要正基准和非负对照值");
   const valueText = roundedDecimal((a.n * b.scale - b.n * a.scale) * 100n, a.n * b.scale, rule.decimals);
   return { value: valueText, before, after, sourceRows: [before.line, after.line].sort((a, b) => a - b),
@@ -639,7 +744,7 @@ function aggregate(lines, rule) {
   const sum = (name, nonnegative = false) => {
     const at = column(name);
     return selected.reduce((total, row) => {
-      const value = decimal(row.cells[at]);
+      const value = decimal(canonicalDecimal(row.cells[at]));
       if (nonnegative && value.n < 0n) throw new Error("百分比的分子和分母列须为非负数");
       return total + value.n * (scale / value.scale);
     }, 0n);
@@ -794,7 +899,7 @@ const unsupportedQuantitySuffix = /^(?:[,;:]?\s*(?:[<>≤≥≦≧⩽⩾≈≃�
 
 /** A recognized adjacent spelling supplies a typed qualifier; null means the
  * nearby arithmetic or competing qualifiers do not describe one scalar. */
-function quantityRelation(body, { start, end }) {
+export function quantityRelation(body, { start, end }) {
   const tail = body.slice(end);
   const previous = body.slice(0, start);
   const before = previous.replace(/(\*{1,3}|_{1,3}|`{1,3})$/u, mark => tail.startsWith(mark) ? "" : mark).trimEnd();
@@ -848,7 +953,7 @@ export function generatedQuantityMatches(line, owned, measurement) {
 function checkComputedNumber(rule, lines, measured) {
   const { id, expected, unit, sourceRows, sourceLineCount } = measured;
   const row = claimRow(lines, id);
-  const cited = row && citation(row.body, rule.source);
+  const cited = row ? numberedCitationRanges(row.body, rule.source) : [];
   const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
   const units = rule.units ?? [unit];
   // A literal ×100% is a formula multiplier in a percent calculation, not a result.
@@ -861,8 +966,8 @@ function checkComputedNumber(rule, lines, measured) {
   const unexpectedNumber = rule.kind !== "percent-decrease" && scanned.some(quantity => !quantity.unit);
   const correct = !unexpectedNumber && quantities.length > 0 &&
     quantities.every(quantity => quantityMatches(body, quantity, measured, rule.kind === "unit-conversion"));
-  const coversRows = cited?.start && cited.end <= sourceLineCount &&
-    sourceRows.every(line => cited.start <= line && line <= cited.end);
+  const coversRows = cited.length > 0 && cited.every(ref => ref.start && ref.end <= sourceLineCount) &&
+    sourceRows.every(line => cited.some(ref => ref.start <= line && line <= ref.end));
   const issue = !correct ? (rule.kind === "percent-decrease" ? "结论中的降幅应为 " : "结论中的复算结果应为 ") + expected
     : !coversRows ? "出处须引用 " + rule.source +
       (rule.kind === "percent-decrease" ? " 中两条原始数据行" : " 中实际参与复算的全部原始行") : null;
@@ -877,9 +982,9 @@ function checkSourceNumber(rule, lines, measured, evidence) {
   const body = row ? conclusion(row.body, [rule.source], quantityText) : "";
   const quantities = quantityScanner(rule.units)(body);
   const values = quantities.map(quantity => quantity.value);
-  const cited = row && citation(row.body,rule.source);
+  const cited = row ? numberedCitationRanges(row.body, rule.source) : [];
   const rowOk = quantities.length > 0 && quantities.every(quantity => quantityMatches(body, quantity, measured))
-    && cited?.start <= rule.line && cited?.end >= rule.line && cited.end <= sourceLineCount;
+    && cited.every(ref => ref.start && ref.end <= sourceLineCount) && cited.some(ref => ref.start <= rule.line && rule.line <= ref.end);
   // This opt-in contract is for one scalar per declared unit across the document.
   // It deliberately does not infer quantities or support arbitrary conversions.
   const documentIssues = rule.scope === "document" ? directQuantityIssues(lines, rule, measured, evidence) : [];
@@ -957,7 +1062,7 @@ export function plainLastIssues(spec, lines) {
 }
 
 /** 补查提交前逐项检查退回、遗漏事实及可复算数字。 */
-export function supplementChecks(root, spec, lines, readable, active) {
+export function supplementChecks(root, spec, lines, readable, active, locateQuote) {
   const issues = plainLastIssues(spec, lines);
   const repairs=[],legacy=[];
   let visibleDecisionLines;
@@ -980,7 +1085,10 @@ export function supplementChecks(root, spec, lines, readable, active) {
     }
     const repair=checkRepairSpan(root,spec,lines,readable,active,finding,footnotes);
     if(repair){repairs.push({...repair,channel:"coverage",block:finding.block});
-      if(repair.unresolved.length)issues.push("全文退回 "+finding.block+" 的实际片段仍未修订或补入已读新证据，当前第 "+repair.unresolved.join("、")+" 行："+repair.quote
+      const location = repair.unresolved.length && locateQuote?.(finding);
+      if (location) issues.push(finding.block + " 当前第 " + repair.unresolved.join("、") + " 行可保留该逐字引文，将其出处明确写成「"
+        + location.file + " 第 " + location.line + " 行」后再提交，由审核独立核对。");
+      else if(repair.unresolved.length)issues.push("全文退回 "+finding.block+" 的实际片段仍未修订或补入已读新证据，当前第 "+repair.unresolved.join("、")+" 行："+repair.quote
         +"。修改正确前缀或文件其他行不算落实；可删除/实质修订、在该句明确否定或标为错例，或同行引用本轮已读的新证据后重核。"+(repair.baseline.startsWith("legacy")?"旧回执无证据快照，不能据文件变化宣称补证成功。":""));
     }else{
       legacy.push({channel:"coverage",block:finding.block,guarantee:"legacy-whole-line-only"});

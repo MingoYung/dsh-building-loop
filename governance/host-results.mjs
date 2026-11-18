@@ -1,6 +1,6 @@
 import { markdownStructure } from "./markdown-structure.mjs";
 import { digest, includes, keyOf, readBytes, relativeName } from "./policy.mjs";
-import { citation, claimRow, configuredNumericMeasurements, errorExample, generatedQuantityMatches, lineList } from "./preflight.mjs";
+import { numberedCitationRanges, claimRow, configuredNumericMeasurements, errorExample, generatedQuantityMatches, lineList } from "./preflight.mjs";
 import { registeredSourceRows } from "./evidence.mjs";
 
 const marker = "{{building-loop:";
@@ -62,7 +62,13 @@ function slotAt(text, rows, line) {
 }
 
 function showLineRange(lines) {
-  return lines[0] === lines.at(-1) ? String(lines[0]) : lines[0] + "-" + lines.at(-1);
+  const spans=[];
+  for (const line of lines) {
+    const last=spans.at(-1);
+    if (last && line === last.end+1) last.end=line;
+    else if (!last || line !== last.end) spans.push({start:line,end:line});
+  }
+  return spans.map(({start,end}) => start === end ? String(start) : start+"-"+end).join(" 行、第 ");
 }
 
 /** Keep collision detection linear for long manuscripts. A repeated rendered
@@ -112,7 +118,7 @@ function renderRows(frame, spec, draft, slots, readable) {
     if (blockBreak.test(measurement.expected)) throw new Error(id + " 的格式化结果包含正文分隔符");
     const { observation: sourceObservation, registered } = checkSourcePin(frame, spec, slot.source, measurement.sourceHash);
     const usedLines = measurement.sourceRows.map(row => row.line);
-    if (!registeredRange(registered, { start: usedLines[0], end: usedLines.at(-1) })) {
+    if (!usedLines.every(line => registeredRange(registered, {start:line,end:line}))) {
       throw new Error("宿主指标的引用跨度包含未登记的外部原文：" + slot.source);
     }
     const locator = "（出处：" + slot.source + " 第 " + showLineRange(usedLines) + " 行）";
@@ -141,8 +147,8 @@ function renderRows(frame, spec, draft, slots, readable) {
     // to actually resolve to this version of the authorized original material.
     const sourceLength = lineList(sourceBytes).filter((_, index, rows) => index < rows.length - 1 || rows[index] !== "").length;
     const citedLines = visible.flatMap((text, index) => {
-      const range = !errorExample(text) && citation(text, source);
-      return range?.start && range.end <= sourceLength && registeredRange(registered, range) ? [index + 1] : [];
+      const ranges = errorExample(text) ? [] : numberedCitationRanges(text, source);
+      return ranges.length && ranges.every(ref => ref.start && ref.end <= sourceLength && registeredRange(registered, ref)) ? [index + 1] : [];
     });
     const result = citedLines.length ? "[稿件自述] 本稿对 " + source + " 有" + citedLines.length +
       "行可识别同行引用（第" + citedLines.join("、") + "行）。" : "[稿件自述] 本稿带 " + source + " 行号定位的共0行。";

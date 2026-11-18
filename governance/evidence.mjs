@@ -1,5 +1,5 @@
 import { digest, includes, keyOf, readBytes, relativeName, text } from "./policy.mjs";
-import { citation, claimRow, editorialLabel, lineList } from "./preflight.mjs";
+import { citation, claimRow, editorialLabel, lineList, verbatimQuotes } from "./preflight.mjs";
 import { markdownStructure } from "./markdown-structure.mjs";
 
 // This failure belongs to a candidate locator only after the acquisition receipt
@@ -145,6 +145,42 @@ export function registeredSourceRows(root, file, bytes, pin) {
   if (!pin.observation) return null;
   const { registered } = observationRegistry(root, file, bytes, pin);
   return new Set(registered.map(row => row.line));
+}
+
+/** Suggest a location only for a signed verbatim finding. Restrict the search
+ * to its source, registered original rows and this executor's read stamps.
+ * An edit hint never supplies evidence or a verdict to either reviewer. */
+export function quoteRepairLocation(frame, active, spec, finding) {
+  const saved = finding.repairBaseline;
+  if (finding.finding?.kind !== "verbatim-quote" || saved?.version !== 1 ||
+      saved.candidateSha256 !== active.rejectedCandidate || saved.quote !== finding.finding.quote ||
+      finding.lineText?.slice(saved.start, saved.end) !== saved.quote) return;
+  const quotes = [...verbatimQuotes(saved.quote)];
+  if (quotes.length !== 1 || (!saved.inlineQuote && !saved.footnote && quotes[0][0] !== saved.quote)) return;
+  const quote = quotes[0][1];
+  const refs = saved.attribution?.refs ?? saved.refs ?? [];
+  const sources = [...new Set(refs.map(ref => keyOf(ref.file)))];
+  if (sources.length !== 1) return;
+  const key = sources[0], file = refs[0].file;
+  const pin = frame.policy.sourcePins[key], seen = active.seen?.[key];
+  if (!pin?.observation || !includes(frame.reads, file) || !includes(spec.phases["final-review"].evidence, file) ||
+      seen?.hash !== pin.sha256 || refs.some(ref => ref.sha256 !== pin.sha256)) return;
+  try {
+    const bytes = readBytes(frame.root, file), rows = registeredSourceRows(frame.root, file, bytes, pin);
+    const lines = lineList(bytes);
+    let location;
+    for (const row of rows) {
+      const body = lines[row - 1], start = body.indexOf(quote);
+      if (start < 0) continue;
+      if (location || body.indexOf(quote, start + 1) >= 0 ||
+          !seen.ranges?.some(([a,b]) => a <= row && row <= b)) return;
+      location = { file, line: row };
+    }
+    return location;
+  } catch {
+    // A stale acquisition receipt leaves the underlying rejection in force.
+    return;
+  }
 }
 
 /** Recheck both source and optional acquisition receipt before using a saved proof. */

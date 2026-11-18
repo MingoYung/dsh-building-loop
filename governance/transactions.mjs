@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { AUTHORITY, digest, hierarchyBodyPath, historyPaths, keyOf, readBytes, replaceBytes, text } from "./policy.mjs";
 import { isLedgerVolume } from "./ledger-projection.mjs";
+import { encodeWorkspaceEvidence, retireBackupEvidence } from "./closed-evidence.mjs";
 
 export const STATE_LIMIT = 8 * 1024 * 1024;
 export const LEDGER_TURN_ENDS = Object.freeze(["error", "max-tokens", "blocked", "completed", "aborted", "interrupted"]);
@@ -18,6 +19,7 @@ const EVENT_NAME = /^[a-f0-9]{64}\.[a-f0-9-]{36}\.json$/u;
 const OWNER = /^owner-([1-9]\d{0,9})-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 const WINDOWS_CLAIM_DELAYS = [10, 25, 50, 100];
 const CLAIM_WAIT = new Int32Array(new SharedArrayBuffer(4));
+const ownedWorkspaceLocks = new Set();
 const WINDOWS_LOCK_ERRORS = new Set(["EPERM", "EBUSY", "EACCES", "EBADF"]);
 const unknownLock = () => new Error("工作台账锁来源未知，需维护者确认旧进程已退出后核对宿主状态");
 const stateDigest = bytes => bytes === null ? null : digest(bytes);
@@ -128,8 +130,10 @@ export function withWorkspaceLock(home, file, operation, warnCleanup) {
       }
     }
     acquired = true;
+    ownedWorkspaceLocks.add(lock);
     return operation();
   } finally {
+    if(acquired)ownedWorkspaceLocks.delete(lock);
     // Cleanup is separate from the operation result. In particular, a failed
     // rmdir after commit must not cause the host to replay the mutation.
     try { dropOwner(acquired ? lock : staged, owner); }
@@ -139,6 +143,13 @@ export function withWorkspaceLock(home, file, operation, warnCleanup) {
 
 export function hasLedgerJournal(home, file) {
   return !!fs.lstatSync(path.join(home, journalName(file)), { throwIfNoEntry: false });
+}
+
+/** Only the writer that actually owns this workspace's live lock may reclaim
+ * cold evidence. Direct encoding/import tools cannot collect in-flight blobs. */
+export function encodeLockedWorkspaceState(home,file,state,warnCleanup) {
+  const held=ownedWorkspaceLocks.has(path.join(home,file+".lock"));
+  return encodeWorkspaceEvidence(home,file,state,STATE_LIMIT,held?{warnCleanup}:undefined);
 }
 
 const eventDirectory = file => "automatic/" + file;
@@ -298,9 +309,17 @@ export function commitWorkspaceState(home, frame, next, warnCleanup) {
   if (!writes?.length && old?.equals(next)) return;
   const backup = file + ".bak";
   const backupBefore = old ? readBytes(home, backup, STATE_LIMIT) : null;
+  // Collection is maintenance, never the commit point. A failed unlink must
+  // not cause replay of a ledger decision which is already durable.
+  const retire=()=>{
+    if(!ownedWorkspaceLocks.has(path.join(home,file+".lock")))return;
+    try { retireBackupEvidence(home,file,backupBefore,old,next,STATE_LIMIT); }
+    catch(error) { warnCleanup?.(error); }
+  };
   if (!writes?.length) {
     if (old) replaceBytes(home, backup, old, backupBefore, STATE_LIMIT);
     replaceBytes(home, file, next, old, STATE_LIMIT);
+    retire();
     return;
   }
   const name = journalName(file);
@@ -343,4 +362,5 @@ export function commitWorkspaceState(home, frame, next, warnCleanup) {
   // The state rename above already committed this receipt. If unlink fails,
   // leave the journal for normal committed recovery and report cleanup alone.
   catch (error) { warnCleanup?.(error); }
+  retire();
 }

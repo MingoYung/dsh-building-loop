@@ -38,22 +38,23 @@ test("signed list cost review surfaces exact source and excludes explicit linear
 }));
 
 function prepareProject(root, write, { evidence = false, proseEdit = false, partialReview = false,
-  receiptReads = true, diagnostics, text = goalText, nativeOpening = false } = {}) {
+  receiptReads = true, diagnostics, text = goalText, nativeOpening = false, sample } = {}) {
   const keys = generateKeyPairSync("ed25519");
-  const sources = [entry, worker];
+  const entryPath = sample?.entry ?? entry, workerPath = sample?.worker ?? worker;
+  const sources = [entryPath, workerPath];
   const grant = { read: [...sources, ...(receiptReads ? ["first.json", "final.json"] : []), ...(proseEdit ? ["notes.md"] : [])],
     write: [...sources, ...(proseEdit ? ["notes.md"] : [])] };
-  const review = receipt => ({ read: [...(partialReview ? [entry] : sources), ...(evidence ? ["functional.csv"] : [])],
+  const review = receipt => ({ read: [...(partialReview ? [entryPath] : sources), ...(evidence ? ["functional.csv"] : [])],
     evidence: evidence ? ["functional.csv"] : [], receipt });
   const tests = { file: "candidate-proof.json", publicKey: keys.publicKey.export({ type: "spki", format: "der" }).toString("base64"),
     previousSuiteSha256: digest("previous suite"), suiteSha256: digest("candidate suite"),
     requiredCases: ["batch-bound"], regression: { baselineFile: "baseline-proof.json", previousCases: ["old-negative"] } };
-  write(entry, "from queue import bounded\n\nprint(bounded(9))\n");
-  write(worker, source);
+  write(entryPath, sample?.main ?? "from queue import bounded\n\nprint(bounded(9))\n");
+  write(workerPath, sample?.initial ?? source);
   write(goal, text);
   if (proseEdit) write("notes.md", "# Existing release notes\n");
   write("BUILDING-LOOP.json", JSON.stringify({ spec: "building-loop/1", coordinator: { read: [goal, "first.json", "final.json"] },
-    goalContext: [goal], units: { K01: { candidate: entry, plainLast: false, codeTask: { sources, tests, diagnostics },
+    goalContext: [goal], units: { K01: { candidate: entryPath, plainLast: false, codeTask: { sources, tests, diagnostics },
       phases: { intake: grant, supplement: grant, "first-review": review("first.json"), "final-review": review("final.json") } } } }));
   const policy = authority(root);
   const saveProof = (file, body) => write(file, JSON.stringify({ ...body,
@@ -677,4 +678,33 @@ test("an unmarked signed qualification from before the upgrade retains prose rep
   const legacy = { ...active, phase: "supplement", coverageRejections: [{ block: "B1" }], qualityRejected: ["sources"],
     codeIntake: { ...active.codeIntake, qualification: { artifacts, submittedPhase: "intake" } } };
   assert.equal(isCodeReviewUnit(frame, legacy, spec), false);
+}));
+
+// The harness authenticates both snapshots; these cases exercise the review
+// interface with real JS and C++ source rather than claiming a compiler run.
+for (const sample of [
+  {entry:"app.mjs",worker:"queue.mjs",main:"import { bounded } from \"./queue.mjs\"; console.log(bounded(9));",
+    initial:"export function bounded(n) { return Math.max(0, n); }",
+    updated:"export function bounded(n) {\n  // Clamp here to protect queue storage before enqueue.\n  return Math.min(5, Math.max(0,n));\n}\n"},
+  {entry:"main.cpp",worker:"queue.hpp",main:'#include "queue.hpp"\nint main(){return bounded(9)==5 ? 0 : 1;}\n',
+    initial:"inline int bounded(int n) { return n < 0 ? 0 : n; }",
+    updated:"inline int bounded(int n) {\n  // Clamp here to protect queue storage before enqueue.\n  return n < 0 ? 0 : n > 5 ? 5 : n;\n}\n"},
+  {entry:"BatchQueue.h",worker:"BatchQueue.cpp",main:'#pragma once\n#include "CoreMinimal.h"\n#include "UObject/Object.h"\n#include "BatchQueue.generated.h"\nUCLASS()\nclass UBatchQueue : public UObject { GENERATED_BODY() public: UFUNCTION(BlueprintCallable) int32 Bounded(int32 N) const; };\n',
+    initial:'#include "BatchQueue.h"\nint32 UBatchQueue::Bounded(int32 N) const { return FMath::Max(0,N); }\n',
+    updated:'#include "BatchQueue.h"\n// Clamp here to protect queue storage before enqueue.\nint32 UBatchQueue::Bounded(int32 N) const { return FMath::Clamp(N,0,5); }\n'},
+]) test("signed annotation review uses actual source across modules: " + sample.entry, () => fixture(async(root,write)=>{
+  const {harness,qualify}=prepareProject(root,write,{sample});
+  const workerId=(await harness.flow("root","advance")).childId;
+  write(sample.worker,sample.updated);
+  assert.equal((await qualify(workerId)).phase,"review-ready");
+  const reviewer=(await harness.flow("root","advance")).childId;
+  const packet=await codeReview(harness,reviewer,"prepare");
+  assert.ok(packet.codeReview);
+  await harness.file(reviewer,"read",sample.worker);
+  const comment={status:"verified",basis:"The bound protects queue memory at the interface",start:2,end:2};
+  const evidence=quote=>({files:[{file:sample.worker,basis:"The queue owns the input bound",comment:{...comment,quote}}]});
+  const forged=await codeReview(harness,reviewer,"record",evidence("// Invented historical comment"));
+  assert.equal(forged.errors[0].id,sample.worker);
+  const correct=await codeReview(harness,reviewer,"record",evidence(sample.updated.split("\n")[1].trim()));
+  assert.ok(!correct.errors?.length, JSON.stringify(correct.errors));
 }));

@@ -414,7 +414,7 @@ export function prepareCodeReview(frame, id, active, spec, offset = 0) {
       observations: "通过的核对、可选优化或无需修改的备注 [{id,kind,file,start,end,observation,suggestion?,evidence:[{file,start,end,relation}]}]；removeObservations 删除",
     } },
     next: (architectureProbe ? "先调用 building_loop_code_review {action:'probe',assertion:'architecture'} 一次，宿主运行当前角色未完成的已登记示例。不要把示例逐个复制到 runtime。" : "") +
-      "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。" + CODE_REVIEW_REJECTION_RULE + CODE_REVIEW_PROBE_RULE +
+      "优先完成 pending 中的全部缺项。用 record decisions 只记编号、判断、短依据及必要证据，已通过的行不用重报。先对照签名和已返回的实际行。行为退回按 record.findings 的实证要求。" + CODE_REVIEW_PROBE_RULE +
       (architecture ? "完整读架构稿，对照实际目标和源码判断各节。静态导入仅能证明静态依赖。" : "") +
       (proseReview ? "逐段检查 proseReview.pendingBlocks 后再核 pendingFacts，单独处理同节的每个项目。用实际条款、触发和源码区分计划、业务判定、兜底和透传。"
         : signed.architectureResponsibilities ? "按编号逐条对照生成的关键职责与全稿。若实施、回退或验证章节把该触发归给其他模块，用该章节原位置和实际源码登记架构退回。计划、兜底和透传分别判断。" : "") +

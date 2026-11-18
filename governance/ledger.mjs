@@ -7,13 +7,26 @@ export const TERMINAL = new Set(["closed", "retired"]);
 const FINISHED = new Set(["completed", "covered", "obsolete", "superseded"]);
 const PAGE_SIZE = 32;
 const itemHash = item => digest(JSON.stringify(item));
+// An inherited request needs a new commission before it can claim completion
+// by this unit. The old unit's verified result is recorded as coverage.
+function inheritedUnassigned(frame, item, active) {
+  if (!item.handedOffFrom || item.unit) return false;
+  const assignment = active?.ledgerAssignment;
+  return !assignment || assignment.policySha256 !== frame.policy.hash ||
+    assignment.goalSha256 !== active.goal?.sha256 || assignment.versions?.[item.id] !== itemHash(item);
+}
 const independentRecord = () => ({ tool: "building_loop_ledger", action: "record", required: ["id", "kind", "title", "note"],
   note: "同一条消息内的不同事项分别使用用户给定或各自稳定的 id，省略 originId。" });
 
 /** Keep the book in the same locked, atomic state file as workflow transitions. */
 function book(frame) {
   frame.state.ledger ??= { revision: 0, items: {} };
-  frame.state.ledger.items = Object.assign(Object.create(null), frame.state.ledger.items);
+  const ledger = frame.state.ledger;
+  // JSON restores a plain object. Normalize it once per loaded transaction;
+  // closing a page can call put for every item in the same long ledger.
+  if (!ledger.items || Object.getPrototypeOf(ledger.items) !== null) {
+    ledger.items = Object.assign(Object.create(null), ledger.items);
+  }
   return frame.state.ledger;
 }
 
@@ -68,6 +81,30 @@ export function captureRequest(frame, event) {
   }
 }
 
+/** Bind only the confirmed opening or explicitly commissioned IDs. Store
+ * these on the dispatch record so failed native activation rolls them back. */
+export function bindLedgerAssignment(frame, id, active, ids) {
+  const { source, binding } = frame.started ?? {};
+  const items = book(frame).items;
+  if (ids === undefined) {
+    if (!source || !(binding?.checkpoint?.unit === id || frame.managed)) return;
+    const original = "request-" + digest(active.owner + "/" + source.seq).slice(0, 20);
+    if (items[original]?.origin?.sha256 !== source.sha256) return;
+    ids = [original];
+  }
+  if (!Array.isArray(ids) || !ids.length || ids.length > 32 || new Set(ids).size !== ids.length)
+    throw new Error("ledgerItems 须为 1 至 32 个互不重复的当前账项 ID");
+  const versions = Object.create(null);
+  for (const key of ids) {
+    const item = typeof key === "string" && items[key];
+    if (!item || item.owner !== active.owner || item.unit || FINISHED.has(item.status))
+      throw new Error("ledgerItems 只能选择本总控尚未处置完成的请求或独立事项");
+    versions[key] = itemHash(item);
+  }
+  active.ledgerAssignment = { unit: id, owner: active.owner, policySha256: frame.policy.hash,
+    goalSha256: active.goal.sha256, versions };
+}
+
 /** Track dispatched and interrupted units even if the model omits a book call. */
 export function trackUnit(frame, id, active, interrupted = false) {
   const prior = book(frame).items["unit-" + id];
@@ -98,6 +135,27 @@ export function ledgerSummary(frame, includeClosed = false) {
 function currentProjection(frame) {
   const projection = frame.state.ledgerProjection;
   return projection?.owner === frame.agent.id && projection.path === frame.policy.ledgerDocument ? projection : null;
+}
+
+/** A historical acceptance proves the scope delivered then. Read the pinned
+ * receipt under today's grant and require both the exact item binding and
+ * formal succession; never qualify changed code against an old goal. */
+function historicalCoverage(frame, item, id, cache) {
+  const unit = frame.state.units[id], dispatch = item.dispatch, archive = unit?.ledgerDecision?.acceptedWork;
+  if (!archive || dispatch?.unit !== id || unit.phase !== "closed" || unit.owner === frame.agent.id ||
+      item.owner !== frame.agent.id || dispatch.owner !== unit.owner || !historyOwners(frame).has(unit.owner) ||
+      !Array.isArray(archive.ids) || !archive.ids.includes(item.id) || archive.policySha256 !== dispatch.policySha256 ||
+      archive.goalSha256 !== dispatch.goalSha256 || archive.receiptHash !== unit.receiptHash ||
+      archive.evidence?.file !== unit.receipt || archive.evidence.sha256 !== archive.receiptHash ||
+      !includes(frame.reads, unit.receipt)) return null;
+  if (!cache.has(id)) {
+    const bytes = readBytes(frame.root, unit.receipt);
+    const receipt = bytes && digest(bytes) === archive.receiptHash && JSON.parse(bytes.toString("utf8"));
+    cache.set(id, receipt?.decision === "accept" && receipt.goal?.sha256 === archive.goalSha256 &&
+      receipt.candidateSha256 === archive.candidateSha256 ? { unit: id, receipt: unit.receipt, receiptHash: archive.receiptHash,
+        candidateSha256: archive.candidateSha256, goal: receipt.goal, evidence: archive.evidence } : null);
+  }
+  return cache.get(id);
 }
 
 /** The authorized document and volumes are derived views of the same ledger. */
@@ -180,11 +238,16 @@ function validProgress(frame, active, items, context = checkpointDigest(frame, a
   if (active.ledgerProgress?.context !== context) return new Map();
   const rows = active.ledgerProgress.rows;
   const covered = new Map();
+  const historical = new Map();
   return new Map(items.flatMap(item => {
     const row = rows[item.id];
     if (row?.itemSha256 !== itemHash(item)) return [];
     if (row.decision.outcome === "covered") {
       const id = row.decision.coveredBy;
+      if (frame.state.units[id]?.owner !== frame.agent.id) {
+        const proof = historicalCoverage(frame, item, id, historical);
+        return proof && proof.receiptHash === row.coveringVersion ? [[item.id, row]] : [];
+      }
       if (!covered.has(id)) {
         const unit = frame.state.units[id];
         let version = null;
@@ -248,18 +311,27 @@ function ledgerRead(frame, args, unitId, active) {
     frame.changed = true;
   } else page = browseRows(frame, args, view, limit);
   const covered = new Set(active ? frame.policy.units[unitId].covers : []);
+  const historical = new Map();
+  const projection = currentProjection(frame);
+  const evidenceRules = { evidenceRequiredFor: ["completed", "covered", "obsolete"], coveredByRequiredFor: "covered" };
   return { revision: view.revision, ...page, itemCount: view.items.length,
     items: page.items.map(item => ({ ...item, itemSha256: itemHash(item) })),
     context: [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])],
-    document: frame.policy.ledgerDocument ? { path: frame.policy.ledgerDocument, managedBy: "host", projection: currentProjection(frame) }
+    document: frame.policy.ledgerDocument ? { path: frame.policy.ledgerDocument, managedBy: "host",
+      projection: reviewing && projection ? { format: projection.format, revision: projection.revision, sha256: projection.sha256 } : projection }
       : { configured: false, authority: "host-state", next: "维护者可配置 ledgerDocument；不会按文件名自动覆盖现有叙事文档。" },
-    coverage: [...covered].map(id => ({ id, coveredBy: unitId })),
+    coverage: (reviewing ? page.items.filter(item => covered.has(item.id)).map(item => item.id) : [...covered]).map(id => ({ id, coveredBy: unitId })),
     current: active ? { unit: unitId, phase: active.phase, receipt: active.receipt } : null,
-    constraints: page.items.filter(item => !FINISHED.has(item.status)).map(item => ({ id: item.id,
+    ...(reviewing ? { decisionEvidence: evidenceRules } : {}),
+    constraints: page.items.filter(item => !FINISHED.has(item.status)).map(item => {
+      const previous = reviewing && item.dispatch && historicalCoverage(frame, item, item.dispatch.unit, historical);
+      return { id: item.id,
       outcomes: item.id === "unit-" + unitId ? ["completed"] : covered.has(item.id) ? ["covered", "obsolete"]
-        : item.origin && !item.unit ? ["keep", "resume", "defer", "completed", "covered", "obsolete"] : ["keep", "resume", "defer", "covered", "obsolete"],
+        : item.origin && !item.unit && !inheritedUnassigned(frame, item, active) ? ["keep", "resume", "defer", "completed", "covered", "obsolete"] : ["keep", "resume", "defer", "covered", "obsolete"],
       ...(item.id === "unit-" + unitId ? { requiredEvidenceFile: active.receipt } : {}),
-      evidenceRequiredFor: ["completed", "covered", "obsolete"], coveredByRequiredFor: "covered" })) };
+      ...(!reviewing ? evidenceRules : {}),
+      ...(previous ? { historicalCoverage: { coveredBy: previous.unit, evidence: previous.evidence } } : {}) };
+    }) };
 }
 
 /** Apply explicit dispositions to every open item, guarding stale and partial reads. */
@@ -324,6 +396,7 @@ export function ledgerAction(frame, args) {
     if (duplicate) throw new Error("同名事项已登记 " + duplicate.id + "，请沿用原编号或 originId");
     // Reclassification never reopens completed/covered/obsolete items.
     return put(frame, id, { kind: args.kind, title, note, status: previous?.status ?? "pending", owner: frame.agent.id,
+      ...(previous?.dispatch ? { dispatch: undefined } : {}),
       ...(linked ? { originClassified: true } : {}) });
   }
   // A single owned checkpoint is unambiguous when the caller reads the global book.
@@ -342,7 +415,7 @@ export function ledgerAction(frame, args) {
   if (read?.revision !== ledger.revision || read?.serial !== active.serial || read.cursor !== args.cursor) {
     throw new Error("请先调用账本 read（unit=" + unitId + "）读取最新账本，分批处置须提供最新 cursor，变更后须重新读取");
   }
-  acceptedVersion(frame, unitId, active);
+  const acceptance = acceptedVersion(frame, unitId, active);
   for (const file of [...new Set([...frame.policy.ledgerContext, ...frame.policy.goalContext])]) {
     const bytes = readBytes(frame.root, file);
     if (!bytes || active.ledgerSeen?.[keyOf(file)]?.hash !== digest(bytes)) throw new Error("请先读取最新项目现状 " + file);
@@ -359,6 +432,7 @@ export function ledgerAction(frame, args) {
     throw new Error(read.cursor ? "请逐项处置本页的全部未复盘账目，保留或续做也需给原因" : "请逐项处置全部未结账目，保留或续做也需给原因");
   }
   const decisions = new Map(args.decisions.map(row => [row.id, row]));
+  const historical = new Map();
   function validate(item) {
     const decision = decisions.get(item.id);
     if (!decision || !["keep", "resume", "defer", "completed", "covered", "obsolete"].includes(decision.outcome)) throw new Error("账本处置项缺失或状态无效 " + item.id);
@@ -367,13 +441,18 @@ export function ledgerAction(frame, args) {
     // A blocked sibling may be retained, cancelled, or replaced by an accepted
     // delivery; another unit's receipt must never claim it actually completed.
     // Finished historical items are absent from this open-item plan and unchanged.
+    if (decision.outcome === "completed" && inheritedUnassigned(frame, item, active))
+      throw new Error(item.id + " 是交接旧事项。选择原承办单元 coveredBy 并核其实绩；没有绑定时不能借本轮验收标 completed");
     if(decision.outcome==="completed"&&item.unit&&item.unit!==unitId) {
       throw new Error(item.id+" 须由本单元自身验收后登记 completed，不能借 "+unitId+" 的验收完成其他阻塞工作；保留/续做用 keep、resume 或 defer，确被已验收成果替代用 covered 并提供 coveredBy，取消用 obsolete");
     }
     // Continuing work may cite its current context too. Omission stays legacy-
     // compatible, but an explicitly supplied locator is never silently dropped:
     // it must pass the same authority, exact read range and current-version gate.
-    const evidence = FINISHED.has(decision.outcome)||decision.evidence!==undefined
+    const archived = decision.outcome === "covered" && historicalCoverage(frame, item, decision.coveredBy, historical);
+    const priorRef = archived?.evidence, supplied = decision.evidence;
+    const evidence = priorRef && supplied?.file === priorRef.file && supplied.start === priorRef.start && supplied.end === priorRef.end
+      ? priorRef : FINISHED.has(decision.outcome)||decision.evidence!==undefined
       ? contextReference(frame, active, decision, item.id === "unit-" + unitId) : null;
     if (frame.policy.units[unitId].covers.includes(item.id) && !["covered","obsolete"].includes(decision.outcome)) {
       throw new Error(item.id + " 已声明由本轮当前目标下的验收产物替代，请 covered 并填 coveredBy；关系确已失效时引用当前目标标 obsolete");
@@ -386,7 +465,10 @@ export function ledgerAction(frame, args) {
       throw new Error(item.id + " 是独立计划，不能用本轮其他工作的验收标为 completed；任务已取消用 obsolete 并引用当前目标；确被已验收成果满足才用 covered、coveredBy 和具体覆盖依据。实际执行的工作单元由其自身验收登记完成");
     }
     let coverage;
-    if (decision.outcome === "covered") {
+    if (archived) {
+      const { evidence: _, ...proof } = archived;
+      coverage = proof;
+    } else if (decision.outcome === "covered") {
       const covering = frame.state.units[decision.coveredBy];
       if (!covering || covering.owner !== frame.agent.id || !["closed","ledger-review"].includes(covering.phase)) throw new Error("coveredBy 须指向本总控已验收单元");
       const proof = acceptedVersion(frame, decision.coveredBy, covering);
@@ -422,8 +504,13 @@ export function ledgerAction(frame, args) {
       counts[row.outcome] = (counts[row.outcome] ?? 0) + 1; return counts;
     }, {}))
     : reason(args.note);
+  const assignment = active.ledgerAssignment;
+  const verifiedIds = assignment?.policySha256 === frame.policy.hash && assignment.goalSha256 === acceptance.goal.sha256
+    ? planned.filter(row => assignment.versions[row.item.id] === itemHash(row.item)).map(row => row.item.id) : [];
+  const verified = new Set(verifiedIds);
   for (const { item, outcome, basis, evidence, unit, coverage } of planned) {
     put(frame, item.id, { status: outcome === "keep" ? item.status : outcome === "resume" ? "pending" : outcome === "defer" ? "deferred" : outcome,
+      ...(verified.has(item.id) ? { dispatch: { unit: unitId, owner: active.owner, policySha256: frame.policy.hash, goalSha256: acceptance.goal.sha256 } } : {}),
       disposition: { outcome, basis, evidence, checkpoint: unitId, ...(coverage ? { coverage } : {}) }, note: basis });
     if (unit && item.unit !== unitId && FINISHED.has(outcome)) {
       unit.phase = "retired";
@@ -438,7 +525,14 @@ export function ledgerAction(frame, args) {
   const retained = Object.fromEntries(planned.filter(row => !FINISHED.has(row.outcome)).map(row => [row.item.id, {
     itemSha256: itemHash(ledger.items[row.item.id]), decision: decisions.get(row.item.id),
   }]));
+  // Reopening for a late event must not erase prior verified assignments.
+  const previous = active.ledgerDecision?.acceptedWork;
+  const ids = new Set(previous?.receiptHash === active.receiptHash ? previous.ids : []);
+  for (const id of verified) ids.add(id);
+  const receiptEvidence = planned.find(({item}) => item.id === "unit-" + unitId)?.evidence;
   active.ledgerDecision = { revision: ledger.revision, context,
+    ...(ids.size ? { acceptedWork: { ids: [...ids], goalSha256: acceptance.goal.sha256, policySha256: frame.policy.hash,
+      candidateSha256: acceptance.candidateSha256, receiptHash: active.receiptHash, evidence: receiptEvidence } } : {}),
     contextOrigin: args.note === undefined ? "host-from-validated-decisions" : "provided",
     reviewed: planned.map(row => row.item.id), requestHash, contextDigest: checkpointDigest(frame, active), retained };
   frame.changed = true;

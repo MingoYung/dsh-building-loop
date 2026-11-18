@@ -3,8 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {fixture,host,policy} from "./helpers.mjs";
-import {QUALITY,claimRow,supplementChecks,plainLastIssues} from "../governance/preflight.mjs";
+import {QUALITY,claimRow,supplementChecks,plainLastIssues,repairBaseline} from "../governance/preflight.mjs";
 import {expectedClaims} from "../governance/evidence.mjs";
+import {digest} from "../governance/policy.mjs";
 
 const rejectedText="全部20项均通过";
 const firstLine="资料说明：本例通过19项，"+rejectedText;
@@ -208,3 +209,42 @@ test("strict closing fences cannot expose a plain-language label that remains in
     assert.deepEqual(plainLastIssues({},[fence+"text","代码内容",fence+"   ","大白话：这是围栏之后的独立解释。"]),[]);
   }
 });
+
+test("an unnumbered repair exempts only a uniquely scoped, verbatim sibling with the same context", async () => fixture(async (root,write) => {
+  const quote = "结果为零";
+  const target = "一号设备：结果为零。";
+  const sibling = "二号设备：结果为零。";
+  const corrected = "一号设备：结果为七。";
+  const group = (heading,body) => [heading,"",body];
+  const one = group("## 一号设备",target), two = group("## 二号设备",sibling);
+  const fixed = group("## 一号设备",corrected), old = [...one,"",...two];
+  const spec = {candidate:"candidate.md",plainLast:false,calculations:{},phases:{"final-review":{evidence:[]}}};
+  function returned(lines, error=target) {
+    write("candidate.md",lines.join("\n"));
+    const finding={line:lines.indexOf(error)+1,text:error,quote};
+    const baseline=repairBaseline(root,spec,lines,finding,[],{});
+    return {unlisted:[{...finding,repairBaseline:baseline}],rejectedCandidate:baseline.candidateSha256};
+  }
+  const active = returned(old);
+  const check = (lines, state=active) => supplementChecks(root,spec,lines,[],state);
+  assert.equal(check([...two,"",...fixed]).ok,true,"the entire independently named section can move");
+  assert.equal(check(old).ok,false,"the rejected assertion still exists");
+  assert.equal(check([...two,"",...group("## 一号设备",sibling)]).ok,false,"duplicating a sibling cannot erase a debt");
+  assert.equal(check([...fixed,"",...group("## 三号设备","三号设备："+quote+"。")]).ok,false);
+  assert.equal(check([...two,"",...fixed],{...active,rejectedCandidate:"outdated"}).ok,false);
+  assert.equal(check([...group("## 一号设备",sibling),"",...group("## 二号设备",corrected)]).ok,false,"wrong subject after a cross-heading move");
+  assert.equal(check([...fixed,"","## 二号设备","","现在切换到一号。","",sibling]).ok,false,"new contextual lead even under the same heading");
+  for (const headers of [["一号的数据如下：","二号的数据如下："],["## 同名","## 同名"],["> # 一号","> # 二号"],
+    ["~~~md\n## 一号\n~~~","~~~md\n## 二号\n~~~"],["## 一号","# **一号**"]]) {
+    const [first,second]=headers.map(header=>header.split("\n"));
+    const before=[...first,"",target,"",...second,"",sibling];
+    assert.equal(check([...first,"",corrected,"",...second,"",sibling],returned(before)).ok,false,
+      "ambiguous or hidden headings grant no exemption: "+headers);
+  }
+  const lead=["资料适用于本批次。",""],nested=["# 发布范围","",...lead,...old];
+  assert.equal(check(["# 发布范围","",...lead,...two,"",...fixed],returned(nested)).ok,true);
+  assert.equal(check(["# 发布范围","","资料仅适用于另一批次。","",...two,"",...fixed],returned(nested)).ok,false);
+  const legacy=structuredClone(active);
+  legacy.unlisted[0].repairBaseline.siblings=[[digest(sibling),1]];
+  assert.equal(check([...fixed,"",...two],legacy).ok,false,"historical text-only sibling anchors cannot exempt a claim");
+}));

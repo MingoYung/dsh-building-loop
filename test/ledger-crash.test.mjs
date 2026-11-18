@@ -5,7 +5,9 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fixture, host, policy } from "./helpers.mjs";
-import { digest, readBytes } from "../governance/policy.mjs";
+import { authority, digest, readBytes } from "../governance/policy.mjs";
+import { goalSnapshot } from "../governance/goals.mjs";
+import { claimEngineeringCoordinator } from "../governance/engineering-handoff.mjs";
 import { QUALITY } from "../governance/preflight.mjs";
 
 const ref = { file: "functional.csv", start: 2, end: 2, quote: "19,20" };
@@ -13,7 +15,7 @@ const files = ["ledger.md", ".building-loop/changes/ledger.md.md", ".building-lo
   ".building-loop/latest_backup/.building-loop/changes/ledger.md.md"];
 
 /** Build an actual ledger-review checkpoint and a prior generated snapshot. */
-async function scenario(root, write, setup, configure) {
+async function scenario(root, write, setup, configure, ledgerItems) {
   const config = structuredClone(policy);
   config.units.K01.claims = ["C1"];
   config.units.K01.calculations = {};
@@ -26,7 +28,7 @@ async function scenario(root, write, setup, configure) {
   write("ledger.md", "# 项目既有快照\n");
   const h = host(root);
   await setup?.(h);
-  const executor = (await h.flow("root", "advance")).childId;
+  const executor = (await h.flow("root", "advance", { unit: "K01", ...(ledgerItems ? { ledgerItems } : {}) })).childId;
   await h.flow(executor, "prepare");
   await h.flow(executor, "submit");
   const reviewer = (await h.flow("root", "advance")).childId;
@@ -76,6 +78,98 @@ function pageDecisions(book, keep = new Set()) {
       : { id: item.id, outcome: "obsolete", basis: "当前项目放弃这条已失去业务前提的历史方案。" + "原因需要按原始证据留档。".repeat(12),
         evidence: { file: "overview.md", start: 2, end: 2 } });
 }
+
+test("a formally succeeding owner can resolve exactly the commissioned item against its historical acceptance", async () => fixture(async (root, write) => {
+  const configure = p => {
+    p.goalContext = ["overview.md"];
+    const second = structuredClone(p.units.K01);
+    second.phases["first-review"].receipt = "second-first.json";
+    second.phases["final-review"].receipt = "second-final.json";
+    p.coordinator.read.push("second-first.json", "second-final.json");
+    p.units.K02 = second;
+  };
+  const f = await scenario(root, write, async h => {
+    await h.user("root", 12, "本轮整理原始记录，另列培训和扩展两个独立事项。");
+    for (const id of ["training", "extension"]) await h.ledger("root", "record",
+      { id, kind: "planned", title: id, note: "同一消息登记，独立安排。" });
+  }, configure, ["training"]);
+  const {h} = f;
+  const first = await h.ledger("root", "read", {unit:"K01"});
+  await h.ledger("root", "review", { unit:"K01", decisions:first.items.map(item => item.unit ?
+    { id:item.id, outcome:"completed", basis:"原单元实测通过。", evidence:{file:"first.json",start:1,end:5} } :
+    { id:item.id, outcome:"keep", basis:"移交后结合新目标确认。" }) });
+  const state = JSON.parse(fs.readFileSync(f.statePath));
+  assert.deepEqual(state.units.K01.ledgerDecision.acceptedWork.ids, ["training"]);
+  const originalReceipt = fs.readFileSync(path.join(root,"first.json"));
+  write("overview.md","# 新目标\n新增工作，并复盘旧请求。\n");
+  const manifest = authority(root);
+  const frame = {root, state, policy:manifest, role:"coordinator", agent:{id:"successor"}};
+  frame.started = {source:{seq:21,sha256:digest("接手")}, proposal:{id:digest("新开工")},
+    binding:{checkpoint:{unit:"K02", goalSha256:goalSnapshot(frame).sha256, policySha256:manifest.hash,predecessor:null}}};
+  claimEngineeringCoordinator(frame);
+  assert.deepEqual(state.engineeringCoordinator.historyOwners,["root"]);
+  assert.equal(state.ledger.items.training.owner,"successor");
+  fs.writeFileSync(f.statePath,JSON.stringify(state));
+  h.coordinator("successor");
+  const flow = (id, action, args = {}) => h.invoke(id, "building_loop", { action, unit:"K02", ...args });
+  const actor=(await flow("successor","advance")).childId;
+  await flow(actor,"prepare");
+  await flow(actor,"submit");
+  const check = async id => {
+    const packet = await flow(id,"prepare");
+    const entries = packet.coverage.blocks.map(row=>({block:row.id,parts:[{kind:"direct",status:"supported",
+      sourceRelation:"supports",basis:"原始 CSV 数据实际为 19/20。",evidence:[ref]}]}));
+    await h.coverage(id,"record",{entries});
+  };
+  const reviewer=(await flow("successor","advance")).childId;
+  await check(reviewer);
+  await h.assess(reviewer,{unit:"K02", ...Object.fromEntries(Object.keys(QUALITY).map(key=>[key,"核对新目标和原始依据。"])),
+    sourceRefs:[ref],unverifiedSources:[],unlisted:[],revise:[],goalFit:{pass:true,basis:"新目标已核对。"}});
+  assert.match((await flow(reviewer,"review",{checks:[{...ref,id:"C1",status:"supported",basis:"CSV 为 19/20。"}]})).phase,/audit-ready$/);
+  const auditor = (await flow("successor","advance")).childId;
+  await check(auditor);
+  assert.equal((await flow(auditor,"audit")).phase,"ledger-review");
+  await flow("successor","prepare");
+  const read=()=>h.ledger("successor","read",{unit:"K02"});
+  const page=await read();
+  const archive=page.constraints.find(row=>row.id==="training").historicalCoverage;
+  assert.equal(archive.coveredBy,"K01");
+  assert.equal(archive.evidence.sha256,digest(originalReceipt));
+  assert.equal(page.constraints.filter(row=>row.historicalCoverage).length,1);
+  assert.ok(!page.constraints.find(row=>row.id.startsWith("request-")).outcomes.includes("completed"));
+  const decisions=page.items.map(item=>item.id==="training" ? {id:item.id,outcome:"covered",basis:"新目标保留培训交付，按旧回执结清。",...archive}
+    : item.id==="unit-K02" ? {id:item.id,outcome:"completed",basis:"本轮交付单独验收。",evidence:{file:"second-first.json",start:1,end:5}}
+    : {id:item.id,outcome:"keep",basis:"仍需另行安排。"});
+  const review=rows=>h.ledger("successor","review",{unit:"K02",decisions:rows});
+  await assert.rejects(review(decisions.map(row=>row.id==="extension"?{...row,outcome:"covered",...archive}:row)));
+  await assert.rejects(review(decisions.map(row=>row.id.startsWith("request-")?{...row,outcome:"completed",evidence:{file:"second-first.json",start:1,end:5}}:row)),/交接旧事项/);
+  const liveBytes = fs.readFileSync(f.statePath);
+  for (const alter of [
+    s => { delete s.units.K01.ledgerDecision.acceptedWork; }, // Legacy receipt with no verified assignment.
+    s => { s.engineeringCoordinator.historyOwners=[]; },    // An unrelated owner cannot cite the old proof.
+    s => { s.ledger.items.training.dispatch.goalSha256=digest("another goal"); },
+  ]) {
+    const modified=JSON.parse(liveBytes); alter(modified);
+    fs.writeFileSync(f.statePath,JSON.stringify(modified));
+    assert.equal((await read()).constraints.some(row=>row.historicalCoverage),false);
+    await assert.rejects(review(decisions));
+  }
+  fs.writeFileSync(f.statePath,liveBytes);
+  write("first.json",'{"altered":true}');
+  assert.equal((await read()).constraints.some(row=>row.historicalCoverage),false);
+  await assert.rejects(review(decisions));
+  write("first.json",originalReceipt);
+  let submitted;
+  do {
+    const one=await h.ledger("successor","read",{unit:"K02",limit:1});
+    submitted=await h.ledger("successor","review",{unit:"K02",cursor:one.reviewPage.cursor,
+      decisions:one.items.map(item=>decisions.find(row=>row.id===item.id))});
+  } while (submitted.phase==="ledger-review");
+  assert.equal(submitted.phase,"closed");
+  const record=(await h.ledger("successor","lookup",{id:"training"})).item;
+  assert.equal(record.disposition.coverage.receiptHash,digest(originalReceipt));
+  assert.equal((await h.ledger("successor","lookup",{id:"extension"})).item.status,"pending");
+}));
 
 test("bounded ledger volumes survive real interruption, reopen incrementally and retain exact old decisions", async () => fixture(async (root, write) => {
   const count = 330;

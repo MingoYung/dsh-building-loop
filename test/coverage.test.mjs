@@ -239,6 +239,9 @@ test("enumeration positive cases are scoped to authorized actual reads and exact
   assert.deepEqual(checked(body,{...e.frame,role:"coordinator"}),[]);
   assert.deepEqual(checked(enumerationRow("5","第 5-8 行")),[]); // unregistered metadata
   assert.deepEqual(checked(enumerationRow("6","第 7-8 行")),[]); // incompatible locator
+  assert.equal(checked(enumerationRow("7-8","第 6、7、8 行"))[0].matches,true);
+  assert.equal(checked(enumerationRow("6","第 8、6 行"))[0].matches,false);
+  assert.deepEqual(checked(enumerationRow("7-8","第 6、8 行")),[]); // line 7 is not cited
   const literalSubstring=enumerationEnvironment(root,write,body,["failure-mode","success"]);
   const [noSubstring]=sourceLineEnumerationChecks(literalSubstring.frame,literalSubstring.active,literalSubstring.spec,Buffer.from(body));
   assert.equal(noSubstring.matches,false);assert.deepEqual(noSubstring.missing,["failure"]);
@@ -1788,6 +1791,7 @@ test("sixth paid mixed-locator simulation row returns to the author instead of r
     .replace("（出处：sources/synthetic.md 第 2 行；sources/github-checks.md","（出处：sources/github-checks.md");
   const fallback=line.replace("；sources/github-checks.md 第 6-8 行","");
   assert.deepEqual(author(local),[]);assert.deepEqual(author(fallback),[]);
+  assert.deepEqual(author(local.replace("第 2 行）；","第 2、900 行）；")).map(row=>row.code),["missing"]);
   assert.deepEqual(author(local,e.spec.phases.supplement.read.filter(item=>item!==file&&item!==enumerationSource)).map(row=>row.code),["missing"]);
   write("candidate.md",local+"\n");e=environment(root);[block]=e.invoke("inventory").blocks;
   assert.deepEqual(put([marker,{...sentence,quote:block.text.slice(5)}]).recorded,[block.id]);

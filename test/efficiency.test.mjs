@@ -589,3 +589,39 @@ test("cache threshold configuration is explicit and fresh policy remains fresh",
   const reviewer=(await h.flow("root","advance")).childId;await rejectNumeric(h,reviewer);
   const next=await h.flow("root","advance");assert.notEqual(next.childId,executor);assert.equal(next.rotation,undefined);
 }));
+
+// A resume filter only removes work the current actor has both seen and proved.
+// Explicit inventory remains an absolute, inspectable view of the signed draft.
+test("review preparation resumes at the first outstanding block and reopens invalid evidence", () => fixture(async (root,write) => {
+  single(write,{body:"# 介绍\n- C1：通过19/20（出处：functional.csv 第 2 行）。\n尚待核验的下一段。\n"});
+  const h=host(root,{automaticCoverage:false}),{reviewer}=await reviewStage(h);
+  const initial=await h.flow(reviewer,"prepare");
+  const [title,claim,last]=initial.coverage.blocks;
+  assert.equal(initial.coverage.offset,0);
+  await h.coverage(reviewer,"record",{entries:[{block:title.id,parts:[nonfact]},{block:claim.id,parts:[fact]}]});
+  const resumed=await h.flow(reviewer,"prepare");
+  assert.equal(resumed.coverage.total,3);
+  assert.equal(resumed.coverage.offset,2);
+  assert.deepEqual(resumed.coverage.blocks.map(b=>b.id),[last.id]);
+  assert.deepEqual((await h.coverage(reviewer,"inventory",{offset:0,count:2})).blocks.map(b=>b.id),[title.id,claim.id]);
+  write("functional.csv","passed,total\n17,20\n");
+  const invalid=await h.flow(reviewer,"prepare");
+  assert.ok(invalid.coverage.pending.includes(claim.id));
+  assert.ok(invalid.coverage.blocks.some(b=>b.id===claim.id));
+  await assert.rejects(h.flow(reviewer,"review",{checks}),/未核块|缺少/u);
+}));
+
+test("specialized guidance follows displayed material on explicit and prepare pages", () => fixture(async (root,write) => {
+  single(write,{claims:[],body:"普通正文。\n[错例] 由此可知所有对象都是一样的。\n脚注指向原话[^1]。\n[^1]: functional.csv 第 2 行。"});
+  const h=host(root,{automaticCoverage:false}),{reviewer}=await reviewStage(h);
+  const prompt=h.prompt(reviewer);
+  assert.match(prompt,/完整读当前目标、候选和原始证据/u);
+  assert.match(prompt,/逐项覆盖/u);
+  assert.doesNotMatch(prompt,/同名定义/u);
+  const prepared=await h.flow(reviewer,"prepare");
+  assert.match(prepared.coverage.guidance.join(" "),/显式错例/u);
+  assert.match(prepared.coverage.guidance.join(" "),/同名定义/u);
+  assert.equal((await h.coverage(reviewer,"inventory",{offset:0,count:1})).guidance,undefined);
+  const withFootnote=prepared.coverage.blocks.findIndex(b=>b.text.includes("[^1]"));
+  assert.match((await h.coverage(reviewer,"inventory",{offset:withFootnote,count:1})).guidance.join(" "),/同名定义/u);
+}));

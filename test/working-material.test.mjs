@@ -455,6 +455,85 @@ test("source-first review withholds the candidate until each reviewer saves a cu
   assert.equal(JSON.parse(fs.readFileSync(path.join(root,"first.json"),"utf8")).independentAudit.auditor,auditor);
 }));
 
+for (const scenario of ["agreement","evidence","project-rule","mixed"]) {
+  test("opposite original receipts reconcile independently before executor repair: "+scenario, () => fixture(async (root,write) => {
+    setOriginalFirstFixtures(write,"保留");
+    const h=host(root,{automaticCoverage:false});
+    const worker=(await h.flow("root","advance")).childId;
+    await h.flow(worker,"prepare");
+    await h.flow(worker,"submit");
+    const reviewer=(await h.flow("root","advance")).childId;
+    const row = decision => ({id:"C1",decision,basis:"本轮实际核对登记的独立项目状态。",
+      evidence:asExternal.evidence});
+    const recheck = (decision,scope) => ({...row(decision),disputeScope:scope,
+      gap:scope==="project-rule"?"项目处置是否需要两份独立报告尚待规定。":"报告的时间范围能否覆盖本次发布尚有分歧。"});
+    await h.flow(reviewer,"prepare");
+    await h.coverage(reviewer,"original-record",{originals:[row("保留")]});
+    const p=await h.flow(reviewer,"prepare");
+    await h.coverage(reviewer,"record",{entries:[{block:p.coverage.blocks[1].id,parts:[asExternal]}]});
+    await h.assess(reviewer,{...Object.fromEntries(Object.keys(QUALITY).map(key=>[key,"已核对授权原文与这次项目状态。"])),
+      sourceRefs:[{file:report,start:2,end:2}],goalFit:{pass:true,basis:"稿件交付了原始报告的判断。"},unverifiedSources:[],unlisted:[],revise:[]});
+    await h.flow(reviewer,"review",{checks:[{id:"C1",status:"supported",useCoverage:true,basis:"当前原稿的项目状态有直接来源。"}]});
+    const auditor=(await h.flow("root","advance")).childId;
+    assert.notEqual(auditor,reviewer);
+    assert.equal((await h.flow(auditor,"prepare")).originalReview.items[0].reviewer,undefined);
+    const dispute=await h.coverage(auditor,"original-record",{originals:[row("待证")]});
+    assert.equal(dispute.stage,"original-dispute");
+    assert.deepEqual([dispute.items[0].reviewer.decision,dispute.items[0].auditor.decision],["保留","待证"]);
+    await assert.rejects(h.file(auditor,"read","candidate.md"),/改稿尚未开放/u);
+    await assert.rejects(h.coverage(auditor,"original-recheck",{originals:[{...recheck("保留","evidence"),
+      evidence:[{...asExternal.evidence[0],quote:"出处没有这句话"}]}]}),/逐字/u);
+    const a=recheck(scenario==="agreement"?"保留":"待证",scenario==="project-rule"?"project-rule":"evidence");
+    const first=await h.coverage(auditor,"original-recheck",{originals:[a]});
+    assert.equal(first.phase,"review-ready");
+    assert.equal((await h.flow("root","advance")).childId,reviewer);
+    const blind=(await h.flow(reviewer,"prepare")).originalReview;
+    assert.deepEqual(blind.items,dispute.items);
+    const second=await h.coverage(reviewer,"original-recheck",{originals:[
+      recheck("保留",["project-rule","mixed"].includes(scenario)?"project-rule":"evidence")]});
+    if(scenario==="agreement") {
+      assert.equal(second.phase,"review-ready");
+      const resumed=await h.flow("root","advance");
+      assert.equal(resumed.childId,reviewer);
+      const next=await h.flow(reviewer,"prepare");
+      assert.equal(next.coverage.blocks[0].editorial.independentOriginal.decision,"保留");
+      // Modify the evidence at the same path and refresh the pin. Both old
+      // reconciled opinions are now stale, including the actor's proven label.
+      const data="# 发布记录\n"+externalQuote+"\n补记：同一来源更新。\n";
+      write(report,data);
+      const changed=(await h.flow(reviewer,"prepare")).originalReview;
+      assert.equal(changed.pending,1);assert.equal(changed.stage,"originals");
+      await assert.rejects(h.coverage(reviewer,"original-record",{originals:[row("保留")]}),/摘要|版本/u);
+      const policy=originalFirstPolicy(), url="https://example.org/official-report";
+      const acquisition=JSON.stringify({sources:[{snapshot:report,snapshotSha256:digest(data),status:200,finalUrl:url,
+        fetchedAt:"2026-11-18T00:00:00Z",responseSha256:digest(data),exactQuotes:[externalQuote]}]});
+      write("acquisition.json",acquisition);
+      Object.assign(policy.sourcePins[report],{sha256:digest(data),locator:url,observation:{file:"acquisition.json",sha256:digest(acquisition)}});
+      write("BUILDING-LOOP.json",JSON.stringify(policy));
+      const newWork=await h.flow("root","advance");
+      assert.equal(newWork.childId,worker);
+      await h.flow(worker,"prepare");await h.flow(worker,"submit",{quality:
+        Object.fromEntries(Object.keys(QUALITY).map(key=>[key,"原执行方已按新来源核对材料、处置和读者说明。"]))});
+      const newReview=await h.flow("root","advance");
+      assert.equal(newReview.childId,reviewer);
+      assert.equal((await h.flow(reviewer,"prepare")).originalReview.pending,1);
+      return;
+    }
+    assert.equal(second.phase,"blocked");
+    assert.equal(second.gaps[0].reason,scenario==="project-rule"?"project-rule":"evidence");
+    assert.equal(second.gaps[0].auditor.evidence[0].file,report);
+    assert.equal((await h.flow("root","status")).units[0].next,null);
+    await assert.rejects(h.flow("root","advance"),/原稿定点对账/u);
+    write("candidate.md","- C1：改正。"+externalStatement+"\n");
+    await assert.rejects(h.flow("root","advance"),/原稿定点对账/u);
+    write("overview.md","逐项提交保留／改正／待证。保留表示一份报告足够，改正表示原话有错，待证表示证据不足。\n");
+    const restarted=await h.flow("root","advance");
+    assert.equal(restarted.childId,reviewer);
+    const changed=(await h.flow(reviewer,"prepare")).originalReview;
+    assert.equal(changed.pending,1);assert.equal(changed.stage,"originals");
+  }));
+}
+
 test("source-first recorded evidence turns an opposite draft label into a targeted rejection", () => fixture(async (root,write) => {
   setOriginalFirstFixtures(write, "改正");
   const h=host(root,{automaticCoverage:false});

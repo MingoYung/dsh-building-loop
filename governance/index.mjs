@@ -11,21 +11,23 @@ import {
   QUALITY, citation, claimRow, deliveryQuality, lineList, numberedCitationRanges, numericChecks, plainLastIssues,
   rejectedClaims, reviewedQuality, supplementChecks, repairBaseline, requiredClaimRowIssues,
 } from "./preflight.mjs";
-import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, originalDraftIssues, readInventory, registeredSourceRows, sourceVersionCurrent, workingClaimLocations } from "./evidence.mjs";
+import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, originalDraftIssues, originalReviewContract, readInventory, quoteRepairLocation, registeredSourceRows, sourceVersionCurrent, workingClaimLocations } from "./evidence.mjs";
+import { authorityVersions, restartSourceReview, sourceAuthorityChanges } from "./source-authority.mjs";
 import { currentHostResults, hostResultSlots, renderHostResults } from "./host-results.mjs";
 import { arithmeticSources, calculateFromSources, sourceArithmeticSchema } from "./source-arithmetic.mjs";
-import { TERMINAL, beginLedgerReview, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
+import { TERMINAL, beginLedgerReview, bindLedgerAssignment, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
 import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage, originalReviewGate, projectPolicyContract, captureNumberedEvidence, numberedEvidenceRegressions } from "./coverage.mjs";
-import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
+import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, encodeLockedWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
   pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
+import { openWorkspaceEvidence } from "./closed-evidence.mjs";
 import { sessionProjectMode, workspaceStateFile } from "./session-mode.mjs";
 import { conversationDiscussion, decideConversationStart, groundConversationMaterials, latestConversationUser, proposeConversationTask, startedConversationProject } from "./conversation-start.mjs";
 import { existingConversationProject, initializeConversationProject, privateProjectRoot, privateProjectUsesOwnerTable, requirePrivateDraft } from "./conversation-project.mjs";
 import { claimEngineeringCoordinator, EngineeringHandoffDenied, engineeringAccess, engineeringStatus, resolveBoundUnit } from "./engineering-handoff.mjs";
 import { captureCodeIntake, codeRegressionArtifacts, prepareCodeIntake, requireCodeRegressionCurrent, verifyCodeIntake, verifySignedCodeSubmission } from "./code-intake.mjs";
 import { codeSubmissionReadback, editedCodeReadback, unreadCodeRanges } from "./code-submission.mjs";
-import { CODE_COMMENT_RULE, CODE_REVIEW_PROBE_RULE, CODE_REVIEW_REJECTION_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
+import { CODE_COMMENT_RULE, CodeReviewIncomplete, captureCodeReviewBaseline, codeReviewBinding,
   codeReviewProbeRequirement, codeReviewReadPaths, codeReviewRequirement, codeReviewSchema,
   currentCodeReview, isCodeReviewUnit, inspectArchitectureImports, prepareCodeReview, recordCodeReview,
   rememberCodeReview, resumeCodeReview, signedAnnotationCandidates, signedLocalImportBoundary, unreadAnnotationCandidates, verifyCodeReview } from "./code-review.mjs";
@@ -142,23 +144,14 @@ const RULES = {
   "final-audit": "修订稿独立反证复核。重新核全文与逐项推导，正确内容保留，证据不足写明确最小修正。核完用 building_loop audit 提交。",
   diagnosis: "只读诊断。先 prepare 获取现行目标和源码。语法、参数、运行器用 building_loop_reproduce。行为用 building_loop_diagnosis_probe 比较一个可见字段，附已读条款。得到 proofId 后按 next 提交原因和定点修法。若实测落在另一层，用 reroute 交总控重新分层。",
 };
-const COVERAGE_RULE = '必须先完整读正文和当前目标，再 building_loop_coverage inventory 取得宿主全文清单（分页读取全部），用 record 为每块提交 parts；一块只有一段可省 quote，多段须连续逐字覆盖。标题、表格、脚注、括号和引用后补充句同样要核。复合句的独立判断拆开。直接转述用 direct + evidence 的原文逐字 quote；推导用 inference，列 premises、scope（对象/概念/条件）、assumptions（无则 []）、counterexample。自然语言推导 rule=source-warrant 须给原文 warrant 桥接关系；形式规则或配置计算按工具契约。检查概念是否一致、条件有无倒置、相关能否推出因果、样本能否推广；能构造前提成立结论却不成立的反例，就不得 supported。证据不足可直接 unsupported/uncertain + repair，不必伪造证明。正确直接转述不要求新增事实；明确 [推测]/[假设]/[未证实] 才能分类 hypothesis，纯标题等才是 nonfactual。每条写具体 basis。coverage status 的 pending 必须清零才能交回执。结构齐全不等于语义正确，需要自己对原文核对。';
-const REVIEW_FORMAT = '先完整读当前目标、候选和引用原文。有据事实给 supported。事实退回提供 finding，定位实际错句和最小修正；contradiction 的编号核验还须 file/start/end 指向已读反证。用 building_loop_quality assess 记录六项依据、sourceRefs、unverifiedSources、unlisted、revise；goalFit={pass,basis} 独立填写。质量退回用 revisions 引已读目标或项目规则，选做建议放 suggestions。最后按 prepare 的实际 claims 提交 review checks。支持项可给同行 file/start/end；本角色已核完整编号行及其同行出处时填 useCoverage:true，由宿主沿用原文定位。';
-const QUALITY_RULE = "质量说明按任务规模写，小任务每项一两句具体内容。资料标实际来源及未证事项，结论和方法交代边界与取舍，给一个可行备选，先摘要后证据并留一句大白话。必要时引用文件和行号，细节留在正文，回执不用重复全文或哈希。稿件的错例和推测行号由宿主的 candidatePositions 分别给出，质量理由不要重报这些列表。质量理由是模型判断；涉及已执行的搜索时，以工具返回的 searchObservation 和回执 searchObservations 为准，区分实际搜索路径与查询词，不把未命中或截断搜索写成全文不存在，也不复述未经记录的调用经历。";
-const CODE_SUBMIT_RULE = "落实已确认目标后，用 prepare 查看当前候选的签名和送审条件。submission.status 为 ready 就提交当前版本。返回 read-back 时核对当前行并按 submission.next 完成读回，再提交同一版。有实际需求缺口时修订并重新测试当前版本。";
-const EVIDENCE_RULE = "sourceRefs 只填下列 evidence 白名单内的原始证据。没有授权原始资料时填 []，仍须逐块判断，缺源事实应退回。候选、外部未核来稿和项目规则不能混充。unlisted 只填尚未编号、仍需查证的实际事实；空行、没有事实主张的标题、已核或已编号内容不要填，没有遗漏时填 []。需要判断的标题事实仍须列出。";
-// Semantic alignment is an explicit review duty, not a host claim that quote
-// hashes or two model approvals establish entailment in arbitrary prose.
-const SOURCE_ALIGNMENT_RULE = "逐项对齐原文与结论的对象、关系、数值口径、统计层次、量词和适用条件。原文未说明的口径或层次须写未知，不能用领域常识补成来源事实。每个可独立证伪的修饰、量词或对象关系须单独拆成 parts 判断；主干有据不能替未证的括注、标签、原因说明或其他附加断言背书。direct 只作忠实转述，加入新概念或关系就须显式推导；找不到桥接原文时记录证据不足，不猜补。对本稿或产物自身完整性、计数、标注情况的主张，必须回到当前完整产物核查所指范围；外部来源只能证明外部事实，不能证明本稿怎样写。相应范围未核或无法支持时须 uncertain/unsupported 并要求删改，不能拿外部来源身份代替产物核查。";
-const ASSERTION_PROOF_RULE = "同一块混有材料身份、记录字段和项目处置，分别提交 exact quote 与 assertion：material-identity 用该材料的真实凭据；original-fact 用实际记录；project-rule 只引当前总纲；project-application 同时引总纲和具体记录。额外读过的总纲不挂到仅描述材料身份的断言上。文稿所用来源归属用 manuscript-attribution 核本节可见编号行，不能用一份来源的身份代证整稿。定向重核优先处理 requiredAssertions，不改正确正文。";
-const OUTCOME_RULE = "prepare 有 outcomeContract 时，正文每项写「事项编号：明确结果」，分别标出原始记录事实和处置。若要求大白话，在末尾按同一编号和结果复述。两道审核分别在 coverage 用 original-fact 核同项实际记录、用 project-application 核该项处置及其总结。提交 outcomes 前从 coverage status 看本角色 outcomeProofGaps；status=decided 要分别填 decision、body 和要求的 summary。真实证据歧义用 clarify 和具体问题，未写结果用 missing，正文与总结冲突用 inconsistent。";
-const OBJECT_RULE="外部事实用实际原文 evidence；项目规则与处置用 inference 的 project-policy，把总纲凭证放 policy、事实原文放 premises。已登记摘录范围与稿件自身计数用各自的 direct.objectCheck，按块原样传 objectCheckHint（包括计数的 expected）。局部登记范围只代表该登记范围。错例后说明及大白话含事实时仍逐项核。";
-const NON_ENTAILMENT_RULE="‘这些前提不足以推出 P’与‘这些前提证实非 P’分别判。inventory 有 inferenceHint 时，按提示的连续原句给 inference 的 status、sourceRelation 和依据，宿主从同一已读原文核两个反例，无须手填 inference。";
-const FOOTNOTE_RULE="逐字引句紧接脚注标记时，读当前稿的同名定义和所指原文。旁边其他出处不能替该脚注证明引句。脚注定义后的事实照常核验。";
-const EXAMPLE_RULE = '原句明确以“误读：”“错例：”“错误推理：”或 [误读]/[错例] 开头时，按 error-example 单列：sourceRelation 核其中展示的推理是 contradicts 或 insufficient，evidence 给实际反证或不足依据。宿主保留它作为已标注的错例，不作为已证前提；不要求作者为了核验换一个同义标签。没有显式标签绝不能用此分类。';
-const LITERAL_RULE = '每个事实段还须 sourceRelation=supports|contradicts|insufficient，单独判断原文对这句话字面含义的关系。不得猜测作者有意举反例、在做测试或暗含否定；正文没有明确标注错误，就当成作者提出的断言。识别到原文与断言相反必须退回，不能一边说矛盾一边 supported。inventory 标 requiresInference 的块中有明确推导关系，推导片段用 inference 并交证明；不能把两个前提的组合叫直接转述来省证明。原文引句须逐字，但候选可以忠实翻译或同义转述，不要求字字相同。';
-const NEUTRAL_SPAN_RULE = "清单的 neutralSpans 是宿主从当前原文识别的纯标签或有限读者提示。仍须逐字覆盖这些范围，用 nonfactual + supported + 具体 basis；不为格式或阅读动作找外部引句。只按给出的字符范围处理，标签后未覆盖的数量、条件、事实和推导照常核验。 行首 [模拟] 是来源范围声明。把该标签本身用 direct 核对同一引用来源的模拟声明或已核对的合成来源凭据，余下断言按 direct/inference 各自举证。";
-const COVERAGE_REJECTION_RULE = '覆盖中的事实退回必须 finding={kind:missing-evidence|contradiction|scope|invalid-inference,quote:该段实际错误断言,fix:最小修正}；contradiction 还须 evidence 原文反证。只说“可以更详细”“结尾未复述全部要点”不是事实错误：不作外部事实主张的阅读建议或收尾可 nonfactual，必要写法走 quality，选做改进放 suggestions。不能把正确但简短的句子判 uncertain 来要求扩写。记录时的分类或参数错误由核验方修正，禁止因此让作者返工。';
+// The invariant stays in every reviewer's phase prompt. Kind-specific input
+// shapes travel with their inventory page, outcome contract or tool error.
+const COVERAGE_RULE = "完整读当前目标、候选和原始证据；prepare 已带清单首页，按 next 续页，coverage record 逐块逐项覆盖到 pending 清零。多段用连续逐字 quote 拆开，标题、括注、脚注和大白话中的事实也要核。按字面判断 sourceRelation，逐项对齐对象、数量、单位、条件、范围和因果。原文未说明就写未知。";
+const PROOF_RULE = "direct 须引真实原文，允许忠实转述；新增关系用 inference，交 premises、scope、assumptions、counterexample 和所需 warrant。前提可真而结论可假则不足。区分材料身份、外部事实、当前总纲规则、规则应用和稿件自述，各用对应证据。稿件自身计数须核当前产物。仅明确标记的假设或错例可按其类别判断。";
+const RETURN_RULE = "证据缺失、矛盾、越界或无效推导，给 unsupported/uncertain、实际错句和最小修正；矛盾须引已读反证。保留正确内容。参数错误由本人纠正，选做改进列 suggestions。";
+const REVIEW_FORMAT = "building_loop_quality assess 独立判断六项质量和 goalFit；sourceRefs 仅列已读授权原始证据，unlisted 仅列未编号的遗漏事实，无则 []。必改项引用目标或规则。按 prepare.claims 交 review checks；本角色已核整行及同行出处可用 useCoverage:true。";
+const QUALITY_RULE = "六项质量写具体依据：来源和未证项、结论边界、方法局限、可行备选、层次细节、结尾大白话。稿件行号用 candidatePositions；搜索只据 searchObservation 描述命中与截断。";
+const CODE_SUBMIT_RULE = "按 prepare.submission.next 完成当前版本读回与送审；改实现后须重新签名。";
 // Different inspection method, same admissibility standard. This is a mitigation
 // for shared prompt bias, not proof that two calls to one model are independent.
 const AUDIT_METHOD = '反证路线：逐块先固定原句提出的对象、量词、条件、因果方向和概念含义，再回原文寻找能使结论不成立的具体情形。检查“完成/成功”等相近词是否偷换、充分条件是否倒置、群体相关是否升级个体因果。不能猜作者意图，也不靠多数票；对正确内容须说明为何现有范围内反例不成立。仍用同一全文覆盖和证据门槛，不能只抽查危险句。';
@@ -248,19 +241,6 @@ function checkpointBinding(frame,spec) {
       .map(file=>{const bytes=readBytes(frame.root,file);return {file,sha256:bytes?digest(bytes):null};})};
 }
 
-/** A maintainer may refresh registered bytes in place. Hash the entire grant
- * except the source/receipt digests so no permissions or source identity move. */
-function authorityVersions(policy) {
-  const { hash, sourcePins, ...grants } = policy;
-  const identity = Object.fromEntries(Object.entries(sourcePins).map(([file, { kind, locator, observation }]) =>
-    [file, { kind, locator, ...(observation ? { observation: observation.file } : {}) }]));
-  return {
-    shape: digest(buffer({ ...grants, sourcePins: identity })),
-    pins: Object.fromEntries(Object.entries(sourcePins).map(([file, pin]) =>
-      [file, digest(buffer([pin.sha256, pin.observation?.sha256 ?? null]))])),
-  };
-}
-
 /** Host-only version check. It projects IDs/status to the coordinator, never
  * source contents or the verifier's read stamps. */
 function hostSourceUpdate(frame, active, spec) {
@@ -310,11 +290,38 @@ function proofMaterials(binding) {
   return digest(buffer(materials));
 }
 
+/** An original-only recheck can precede any draft acceptance. Compare the
+ * original grant and its evidence, never substitute a missing draft receipt. */
+function originalDisputeCurrent(frame,id,unit) {
+  const dispute = unit?.originalDispute;
+  if (!dispute || !id) return false;
+  const spec = unitOf(frame,id), phase = dispute.reviewPhase, grant = spec.phases[phase];
+  if (!grant) return false;
+  try {
+    return originalReviewContract({...frame,role:"reviewer",reads:[...grant.read,...(frame.policy.goalContext??[])]},
+      {...unit,phase,goal:goalSnapshot(frame)},spec)?.binding === dispute.binding;
+  } catch { return false; } // The ordinary review path will explain invalid new inputs.
+}
+
 /** Report an actual reconciliation transition without exposing either proof.
  * The notice is derived from current disputes, so successful resolution or a
  * version invalidation cannot leave behind a misleading historical fault label.
  */
 function reconciliationNotice(frame,unit) {
+  if (unit?.originalDispute?.status === "blocked") {
+    const id = Object.keys(frame.state.units).find(key => frame.state.units[key] === unit);
+    if (originalDisputeCurrent(frame,id,unit)) {
+      const position = row => ({decision:row.decision,gap:row.gap,
+        evidence:row.evidence.map(({file,start,end,sha256}) => ({file,start,end,sha256}))});
+      const gaps = unit.originalDispute.unresolved.map(({id,reason}) => ({id,reason,
+        reviewer:position(unit.originalDispute.rechecks.reviewer[id]),auditor:position(unit.originalDispute.rechecks.auditor[id])}));
+      return {reason:"original-disagreement-unresolved",gaps,nextRole:null,nextPhase:null,
+        reasonNote:["原稿定点对账仍有分歧，稿件未验收。",
+          gaps.some(row=>row.reason==="evidence") ? "evidence 项据双方列出的缺口补授权原始材料和取证回执。" : "",
+          gaps.some(row=>row.reason==="project-rule") ? "project-rule 项请用户明确项目规则并更新总纲。" : "",
+          "更新后用 advance 重新独立核验。"].join("")};
+    }
+  }
   if(!unit?.reconciliation?.length)return {};
   const nextPhase=unit.phase==="blocked"?unit.resumePhase:BEGIN[unit.phase]??unit.phase;
   if(!["first-review","final-review","first-audit","final-audit"].includes(nextPhase))return {};
@@ -412,7 +419,8 @@ function viewUnits(frame) {
     const { phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions } = unit;
     const notice=reconciliationNotice(frame,unit);
     const sourceUpdate = unit.owner === frame.agent.id && hostSourceUpdate(frame, unit, frame.policy.units[id]);
-    const stale=needsRevalidation(frame,id,unit)||!!unit.reconciliationExhausted&&!notice.reason;
+    const checkingOriginal=unit.originalDispute?.status==="checking" && originalDisputeCurrent(frame,id,unit);
+    const stale=!checkingOriginal&&needsRevalidation(frame,id,unit)||(!!unit.reconciliationExhausted||unit.originalDispute?.status==="blocked")&&!notice.reason;
     const waiting=(unit.metricClarification ?? unit.outcomeClarification)?.goalSha256===goalSnapshot(frame).sha256;
     return {
       unit: id, phase, executor, reviewer, auditor, receipt, unsupported, qualityRejected, blocked, interruptions,
@@ -428,7 +436,7 @@ function viewUnits(frame) {
       next: diagnosisNext(unit) ?? (phase === "architecture-sync" && unit.rollbackFailure ? "advance"
         : ["architecture-repair", "architecture-sync"].includes(phase) ? "architecture" :
           waiting ? null : sourceUpdate ? sourceUpdate.status === "ready" ? "supplement" : null
-            : notice.reason==="classification-reconciliation-unresolved"?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
+            : ["classification-reconciliation-unresolved","original-disagreement-unresolved"].includes(notice.reason)?null:stale?"final-review":phase==="blocked"?unit.resumePhase:BEGIN[phase]),
       goalStale: stale,
       owned: unit.owner === frame.agent.id,
       ...(architecture ? { architecture } : {}),
@@ -710,7 +718,8 @@ export function apply(ctx, config = {}) {
     const checkpoint = engineeringStatus(frame);
     if (checkpoint?.blocked || checkpoint && checkpoint.unit !== id) return;
     const spec = unitOf(frame, id);
-    if (hostSourceUpdate(frame, active, spec) || needsRevalidation(frame, id, active)) return;
+    const checkingOriginal = active.originalDispute?.status === "checking" && originalDisputeCurrent(frame,id,active);
+    if (hostSourceUpdate(frame, active, spec) || !checkingOriginal && needsRevalidation(frame, id, active)) return;
     if (REVIEW_HANDOFFS.has(active.phase)) return "dispatch";
     const host = previousActivationHost(active.activationHost);
     if (active.reviewHandoff && REVIEW_HANDOFF_STAGES.has(active.phase) &&
@@ -833,25 +842,34 @@ export function apply(ctx, config = {}) {
       else withWorkspaceLock(stateHome,file,settle,warnCleanup);
       old = readBytes(stateHome, file, STATE_LIMIT);
     }
-    let state = old ? JSON.parse(text(old)) : { spec: "building-loop-state/1", policy: policy.hash, units: {}, markers: {} };
+    let state = old ? openWorkspaceEvidence(stateHome, file, JSON.parse(text(old)), STATE_LIMIT) : { spec: "building-loop-state/1", policy: policy.hash, units: {}, markers: {} };
     if (state.spec !== "building-loop-state/1") throw new Error("工作台账版本无效");
-    const versions = authorityVersions(policy);
+    const versions = state.policy === policy.hash && state.authorityVersions?.research ? state.authorityVersions : authorityVersions(policy);
+    let adoptedSources = false;
     if (state.policy !== policy.hash) {
       const activeUnits = Object.entries(state.units).filter(([, unit]) => !TERMINAL.has(unit.phase));
       if (activeUnits.length) {
         const previous = state.authorityVersions;
         const refreshed = Object.keys(versions.pins).filter(file => previous?.pins?.[file] !== versions.pins[file]);
         const metricSources = new Set(activeUnits.flatMap(([id]) => hostResultSlots(unitOf({ policy }, id)).map(({ source }) => keyOf(source))));
-        if (previous?.shape !== versions.shape || !refreshed.length || refreshed.some(file => !metricSources.has(file))) {
-          throw new Error("运行期间授权清单发生变化，需项目维护者核对");
+        if (previous?.shape === versions.shape && refreshed.length && refreshed.every(file => metricSources.has(file))) {
+          for (const file of refreshed) registeredSourceRows(root, file, readBytes(root, file), policy.sourcePins[file]);
+        } else {
+          const changes = sourceAuthorityChanges(root, policy, previous, versions, state.policy);
+          for (const [id, unit] of activeUnits) if (changes.has(id)) {
+            const spec = policy.units[id];
+            if (!unit.executor || spec.codeTask || spec.architecture || spec.hostResults) throw new Error("工程签名或宿主结果契约的变更需项目维护者核对");
+            state.units[id] = restartSourceReview(unit, state.policy, policy.hash, changes.get(id), goalSnapshot({root,policy}));
+          }
+          adoptedSources = true;
         }
-        for (const file of refreshed) registeredSourceRows(root, file, readBytes(root, file), policy.sourcePins[file]);
       }
       // Terminal units and their receipts remain historical evidence even after
       // the maintainer changes the grant. A new unit needs a distinct ID.
       state = { ...state, policy: policy.hash };
     }
     state.authorityVersions = versions;
+    if (adoptedSources && !inspection && !lockedFile) return change(agent, frame => frame, { claim: false });
     state.units = Object.assign(Object.create(null), state.units);
     state.markers = Object.assign(Object.create(null), state.markers);
     const parent = agent.session.header.parentSession;
@@ -874,7 +892,7 @@ export function apply(ctx, config = {}) {
     // model file writes cannot replace a complete state-derived snapshot.
     const writes = assignment?.[1].rollbackRepairActive ? [] :
       grant.write.filter(file=>!policy.ledgerDocument||keyOf(file)!==keyOf(policy.ledgerDocument));
-    return { agent, root, policy, file, old, state, role, assignment, reads, writes, managed: binding.managed,
+    return { agent, root, policy, file, old, state, role, assignment, reads, writes, adoptedSources, managed: binding.managed,
       started: binding.started, startedProject: owner => startedConversationProject(hostHome, owner) };
   }
 
@@ -883,6 +901,11 @@ export function apply(ctx, config = {}) {
     const {file}=coordinates(agent);
     return withWorkspaceLock(stateHome,file,()=>{
       let frame = scope(agent,{lockedFile:file});
+      if (frame.adoptedSources) {
+        // Revocation must survive even if the caller is a now-idle child whose action fails.
+        commitWorkspaceState(stateHome,frame,encodeLockedWorkspaceState(stateHome,file,frame.state,warnCleanup),warnCleanup);
+        frame = scope(agent,{lockedFile:file});
+      }
       const pending = pendingLedgerEvents(stateHome,file);
       if (pending.length) {
         for (const { event } of pending) {
@@ -892,7 +915,7 @@ export function apply(ctx, config = {}) {
         // Commit independently of the tool action. An invalid tool argument
         // cannot roll back an observed user request or interruption.
         if (frame.changed) {
-          commitWorkspaceState(stateHome,frame,buffer(frame.state),warnCleanup);
+          commitWorkspaceState(stateHome,frame,encodeLockedWorkspaceState(stateHome,file,frame.state,warnCleanup),warnCleanup);
           frame = scope(agent,{lockedFile:file});
         }
         clearLedgerEvents(stateHome,pending,warnCleanup);
@@ -919,7 +942,7 @@ export function apply(ctx, config = {}) {
         // Give each actual publication a distinct authoritative commit point.
         if (frame.ledgerWrites?.length) frame.state.ledgerCommit = randomUUID();
         if (frame.hierarchyWrites) frame.state.hierarchyCommit = randomUUID();
-        commitWorkspaceState(stateHome,frame,buffer(frame.state),warnCleanup);
+        commitWorkspaceState(stateHome,frame,encodeLockedWorkspaceState(stateHome,file,frame.state,warnCleanup),warnCleanup);
       }
       if (invalidation) throw invalidation;
       return result;
@@ -1379,7 +1402,7 @@ export function apply(ctx, config = {}) {
           requireGoalRead(frame,current);
           const bytes=reviewCandidate(frame,current,spec);
           if(frame.role==="reviewer")actualClaims=expectedClaims(spec,lineList(bytes));
-          coverage=coverageAction(frame,current,spec,{action:"inventory",count:24},{maxBytes:16*1024});
+          coverage=coverageAction(frame,current,spec,{action:"inventory",count:24},{maxBytes:16*1024, resume:true});
           manuscriptCounts=candidateMeasurements(frame,current,spec,bytes);
           candidatePositions=candidatePositionSummary(spec.candidate,bytes);
         } catch(error) { coverage={pendingRead:true,reason:error.message}; }
@@ -1440,8 +1463,8 @@ export function apply(ctx, config = {}) {
       const next = codeReview ? codeReview.next : current?.rollbackRepairActive && frame.role === "executor"
         ? { tool: WORKFLOW, action: "rollback-proposal" } : diagnosisNext(current)
         ?? repairRead ?? targetedNext ?? availableNext ?? (diagnostic ? { tool: REPRODUCE, action: "check" } : undefined)
-        ?? architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? "逐块 coverage record，全部完成后 audit"
-        : frame.role==="reviewer" ? "逐块 coverage record，再 quality assess 和 review"
+        ?? architecture?.next ?? checkpointAdvance ?? (frame.role==="auditor" ? (coverage?.pendingCount === 0 ? "本角色已核完全文，按契约提交 audit" : "逐块 coverage record，全部完成后 audit")
+        : frame.role==="reviewer" ? (coverage?.pendingCount === 0 ? "本角色已核完全文，完成质量判断后 review" : "逐块 coverage record，再 quality assess 和 review")
         : submission?.status === "ready" ? "当前签名稿的静态送审条件已齐，submit 会核验已登记的运行证据"
         : submission?.status === "read-back" ? "当前签名回归已通过，submit 会返回待读回的准确页"
         : submission?.next ? submission.next
@@ -1500,6 +1523,11 @@ export function apply(ctx, config = {}) {
         } } : {}),
         ...(numericSources.length ? { sourceArithmetic: { tool: CALCULATE, action: "evaluate", sources: numericSources,
           use: "原文摘句不足时检查获授权的原始数据。口径明确的差值、当前占比和基准以来增量占比分别按原始行列复算；结论仍需核对象、分母、单位和范围。" } } : {}),
+        ...(current?.authorityUpdate && frame.role === "executor" ? { sourceRevision: {
+          added: current.authorityUpdate.added.filter(file => includes(frame.reads, file)),
+          refreshed: current.authorityUpdate.refreshed.filter(file => includes(frame.reads, file)),
+          withdrawnCount: current.authorityUpdate.removed.length,
+        } } : {}),
         ...(clarification ? { outcomeClarification: clarification } : {}),
         ...(reviewRestart ? { reviewRestart } : {}),
         ...(frame.role==="executor" && current?.outcomeIssues?.length ? {outcomeIssues: current.outcomeIssues} : {}),
@@ -1525,7 +1553,6 @@ export function apply(ctx, config = {}) {
           ...(frame.policy.goalContext.length ? { projectPolicy: projectPolicyContract(frame.policy.goalContext) } : {}),
           rejected:{kind:"inference",status:"unsupported",sourceRelation:"insufficient",basis:"具体缺口",
             finding:{kind:"invalid-inference",quote:"候选真实原句",fix:"最小修正"}},
-          ...(coverage?.blocks?.some(block=>block.neutralSpans?.length)?{neutralSpanRule:NEUTRAL_SPAN_RULE}:{}),
           ...(coverage?.blocks?.some(block=>/\[(?:摘录范围|稿件自述)\]/u.test(block.text))?{objectCheckExamples:{
             excerptCount:{kind:"registered-excerpts",check:"count",file:"原句明确写出的来源路径",expected:1},
             citingLineCount:{kind:"candidate",check:"citation-count",source:"原句所说的被引用来源，不是候选文件",expected:6},
@@ -2182,7 +2209,10 @@ export function apply(ctx, config = {}) {
         reusable: repair ? stall.executor : stall.investigator ?? (interrupted ? prior.actor : undefined),
         serial: prior.serial + 1, stallId: stall.id, repair };
     }
-    const revalidating = needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted;
+    if (prior?.originalDispute?.status === "blocked" && reconciliationNotice(frame,prior).reason === "original-disagreement-unresolved")
+      throw new Error("原稿定点对账仍有分歧，请按 status 的逐项缺口更新授权证据或项目口径后恢复");
+    const checkingOriginal = prior?.originalDispute?.status === "checking" && originalDisputeCurrent(frame,id,prior);
+    const revalidating = !checkingOriginal && needsRevalidation(frame, id, prior)||prior?.reconciliationExhausted||prior?.originalDispute?.status==="blocked";
     const waiting = prior?.outcomeClarification;
     const metricWaiting = prior?.metricClarification;
     if (metricWaiting?.goalSha256 === goalSnapshot(frame).sha256) {
@@ -2199,7 +2229,7 @@ export function apply(ctx, config = {}) {
     }
     const pausedCodeRepair = prior?.codeReviewRejection?.pausedReviewReceiptSha256 &&
       currentPausedCodeRepair(frame, id, spec, prior, goalSnapshot(frame));
-    const planned = metricWaiting ? (prior?.resumePhase === "intake" ? "intake" : "supplement")
+    const planned = prior?.authorityUpdate && prior.phase === "supplement-ready" ? "supplement" : metricWaiting ? (prior?.resumePhase === "intake" ? "intake" : "supplement")
       : (revalidating || waiting) ? "final-review"
       : prior?.phase === "blocked" ? pausedCodeRepair ? "supplement" : prior.resumePhase : BEGIN[prior?.phase ?? "dispatch"];
     const priorPhase = prior?.phase === "blocked" ? prior.resumePhase : prior?.phase;
@@ -2218,7 +2248,7 @@ export function apply(ctx, config = {}) {
     const role = isAudit(phase) ? "auditor" : isReview(phase) ? "reviewer" : "executor";
     const threshold=spec.cacheReadRotationThreshold;
     const used=prior?.executorUsage?.[prior.executor]?.cacheReadTokens??0;
-    const mandatoryRepair = phase === "supplement" && (pausedCodeRepair || currentCodeRejection(prior, spec, goalSnapshot(frame).sha256)?.publicBehavior);
+    const mandatoryRepair = phase === "supplement" && (prior?.authorityUpdate && prior.phase === "supplement-ready" || pausedCodeRepair || currentCodeRejection(prior, spec, goalSnapshot(frame).sha256)?.publicBehavior);
     // Rotation occurs only between completed executor stages. An interrupted
     // checkpoint or an exact public-behavior repair keeps its bound actor.
     const rotate=phase==="supplement" && !mandatoryRepair && prior?.phase!=="blocked" && spec.continuation==="reuse"
@@ -2258,7 +2288,8 @@ export function apply(ctx, config = {}) {
       const plan = prepare(frame, id);
       if (plan.phase !== prepared.phase || plan.serial !== prepared.serial || plan.reusable !== prepared.reusable ||
         plan.regressionRetry !== prepared.regressionRetry || plan.stallId !== prepared.stallId ||
-        plan.rollbackFailureId !== prepared.rollbackFailureId || plan.sourceUpdate?.binding !== prepared.sourceUpdate?.binding) {
+        plan.rollbackFailureId !== prepared.rollbackFailureId || plan.prior?.authorityUpdate?.to !== prepared.prior?.authorityUpdate?.to ||
+        plan.sourceUpdate?.binding !== prepared.sourceUpdate?.binding) {
         throw new Error("工作单元已经由其他调用推进");
       }
       const spec = unitOf(frame, id),binding=checkpointBinding(frame,spec);
@@ -2291,13 +2322,14 @@ export function apply(ctx, config = {}) {
         record.engineeringArchitecture = requireEngineeringArchitecture(frame, id, spec, plan.prior, needsRepairedSource);
       }
       if (plan.phase === "intake" && !plan.prior) {
+        bindLedgerAssignment(frame, id, record, args.ledgerItems);
         const codeIntake = captureCodeIntake(frame, spec, id);
         if (codeIntake) {
           record.codeIntake = codeIntake;
           const baseline = captureCodeReviewBaseline(frame, record, spec);
           if (baseline) record.codeReviewBaseline = baseline;
         }
-      }
+      } else if (args.ledgerItems !== undefined) throw new Error("ledgerItems 只能在工作单元首次派给执行方时绑定");
       if (["reviewer", "auditor"].includes(plan.role)) requireCodeRegressionCurrent(frame, id, record, spec, record.goal);
       if (plan.stallId) {
         // A later stall may be on different bytes or a different failure.
@@ -2383,6 +2415,7 @@ export function apply(ctx, config = {}) {
       frame.changed = true;
       const ownerTableIntake = plan.phase === "intake" && frame.managed && privateProjectUsesOwnerTable(frame.root);
       const brief = "工作单元 " + id + " 进入 " + plan.phase + "。候选文件 " + spec.candidate
+        + (record.authorityUpdate && plan.role === "executor" ? "。资料授权已更新。按 prepare 的 sourceRevision 核对改动，读新目标和本阶段可读原文再修订。旧审核须重做。" : "")
         + (plan.sourceUpdate ? "。原始资料新版本已经宿主核对。原执行方先用 prepare 打开新材料，按提示用同一候选正文重新保存宿主结果，再读回、预检和提交。旧审核回执已失效。" : "")
         + (plan.rollbackRepair ? "。原执行方只读补正回退方案。先用 prepare 领取失败实证，再用 rollback-proposal 登记新的最小方案。" : "")
         + (plan.repair ? "。原执行会话继续定点修复。prepare 会返回总控核实的诊断、修法和可重跑输入。" : "")
@@ -2401,7 +2434,7 @@ export function apply(ctx, config = {}) {
           : plan.repair || plan.rollbackRepair ? ""
           : ownerTableIntake ? "先用 prepare 完整读取用户开工原文，逐项依据原文和当前授权材料独立完成交付。"
           : args.note===undefined?"":"\n本次任务要求 "+requireText(args.note,"任务说明"))
-        + (plan.role === "executor" && record.codeIntake ? "\n" + CODE_COMMENT_RULE : "")
+        + (plan.role === "executor" && record.codeIntake ? " 必要注释属于本次交付，按阶段规则处理。" : "")
         + (plan.role === "executor" && spec.architecture ? "\n架构由总控维护。当前架构是 " + spec.architecture.file + "，按授权只读，不要尝试改写。" : "");
       if (automatic) record.reviewHandoff = { id: handoffId, brief, reused: Boolean(prepared.reusable) };
       return { workspace: frame.root, phase: plan.phase, serial: plan.serial, brief };
@@ -2727,15 +2760,30 @@ export function apply(ctx, config = {}) {
   }
 
   /** Candidate inventory is readable only by the assigned reviewer or blind auditor. */
-  function cover(args, exec) {
-    return change(exec.agent, frame => {
+  async function cover(args, exec) {
+    const result = change(exec.agent, frame => {
       if (!["reviewer", "auditor"].includes(frame.role)) throw new Error("全文覆盖仅本阶段核验或独立反证角色可访问，总控无正文读权");
       const [id, active] = frame.assignment;
       const goal = requireGoalRead(frame, active);
       const spec = unitOf(frame, id);
       if (isCodeReviewUnit(frame, active, spec)) throw new Error("当前代码任务用 building_loop_code_review prepare 获取变更范围");
       const binding=refreshCheckpoints(frame,active,spec);
-      if (args.action === "originals" || args.action === "original-record") return coverageAction(frame,active,spec,args);
+      if (["originals","original-record","original-recheck"].includes(args.action)) {
+        const packet = coverageAction(frame,active,spec,args);
+        if (!packet.handoff) return packet;
+        const first = active.phase.startsWith("first");
+        delete active.coverage;
+        delete active.assessment;
+        active.seen = {};
+        if (packet.handoff === "blocked") {
+          pause(active,"原稿定点对账未收敛");
+          trackUnit(frame,id,active,true);
+        } else {
+          active.phase = packet.handoff === "reviewer" ? first?"review-ready":"final-review-ready" : first?"first-audit-ready":"final-audit-ready";
+          if (active.originalDispute.status === "settled") delete active.pendingReceipt;
+        }
+        return {...packet,unit:id,phase:active.phase,parent:active.owner,...reconciliationNotice(frame,active)};
+      }
       const bytes = reviewCandidate(frame, active, spec);
       const contract = args.action === "status" && args.block === undefined ? deliveryOutcomeContract(frame, spec, goal) : null;
       const result=coverageAction(frame, active, spec, args, contract ? {
@@ -2751,6 +2799,7 @@ export function apply(ctx, config = {}) {
       }
       return result;
     });
+    return result.parent ? notifyPhase(exec,result) : result;
   }
 
   /** Finalize a blind second opinion. Pending acceptance is never ledger evidence. */
@@ -2958,7 +3007,7 @@ export function apply(ctx, config = {}) {
     const observed=candidateReadComplete(active,spec.candidate,bytes,lines.length);
     const preservation=requiredLineCheck(frame,id,observed?bytes:null,goal,goal?undefined:active);
     if(preservation.pendingGoalRead)return {ok:false,...preservation};
-    let result=supplementChecks(frame.root,spec,lines,frame.reads,active);
+    let result=supplementChecks(frame.root,spec,lines,frame.reads,active, finding => quoteRepairLocation(frame,active,spec,finding));
     if(!observed) {
       // Repair diagnostics can already be useful, but current-draft statistics
       // and submit both require an observed full read of these exact bytes.
@@ -3194,6 +3243,7 @@ export function apply(ctx, config = {}) {
           active.quality = deliveryQuality(args.quality, active.quality, active.qualityRejected);
           active.phase = "final-review-ready";
           delete active.hostResultRefresh;
+          delete active.authorityUpdate;
         } else {
           if(frame.policy.requiredLinesGoal){
             const goal=requireGoalRead(frame,active,true);
@@ -3843,7 +3893,7 @@ export function apply(ctx, config = {}) {
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
   const proseReview = frame => !isCodeReviewUnit(frame, frame.assignment[1], unitOf(frame, frame.assignment[0]));
-  register(tool(COVERAGE, "按宿主全文清单逐块核验。已启用原稿先核时，改稿开放前用 originals 查看来稿、original-record 保存独立判断。inventory 分页取全文；record 每次 1–12 块，部分错误只重交 invalid 块；status 默认只给进度，可用 block 取单块证明。", ["originals", "original-record", "inventory", "record", "status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"], proseReview)});
+  register(tool(COVERAGE, "按宿主全文清单逐块核验。原稿先核用 originals、original-record；遇双方分歧按返回的 original-recheck 定点对账。inventory 分页取全文；record 每次 1–12 块，部分错误只重交 invalid 块；status 默认只给进度，可用 block 取单块证明。", ["originals","original-record","original-recheck","inventory","record","status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"], proseReview)});
   const qualityNames = Object.keys(QUALITY);
   const referenceSchema = { type: "object", properties: { file: string, start: number, end: number }, required: ["file", "start", "end"], additionalProperties: false };
   register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
@@ -3891,6 +3941,8 @@ export function apply(ctx, config = {}) {
   }, (args, exec) => change(exec.agent, frame => ledgerAction(frame, args))), {when:visible(["coordinator"])});
   register(tool(WORKFLOW, "每阶段先 prepare 获取授权读包。architecture 和 advance 仅总控。原执行方按 prepare 提示用 refresh-results 重算新版资料，再读回提交。preflight/submit/rollback-proposal 仅执行，review 仅文稿核验，audit 仅文稿独立反证。", ["prepare", "status", "architecture", "advance", "refresh-results", "preflight", "submit", "rollback-proposal", "review", "audit", "block"], {
     unit: { ...string, description: "工程总控和子会话省略时沿用宿主唯一授权单元；无绑定的总控 advance 需填授权单元。" }, note: string,
+    ledgerItems: { type: "array", minItems: 1, maxItems: 32, uniqueItems: true, items: string,
+      description: "仅首次 advance。拆分任务时指定本单承办的账项 ID；省略则沿用已确认的开工请求。" },
     metricClarification: { type: "object", description: "仅 block 使用。已授权指标口径不明确时，填写该指标 id 和具体问题，等待用户确认。",
       properties: { id: string, question: string }, required: ["id", "question"], additionalProperties: false },
     rollbackEdits: { type: "array", maxItems: 8, items: { type: "object", properties: {
@@ -3941,7 +3993,7 @@ export function apply(ctx, config = {}) {
           : frame.managed && phase === "intake"
             ? "接单。按已确认总纲和索引撰写第一版交付稿，只写 DELIVERY.md。会话原文是用户提供的材料，不能证明外部事实。材料不足时注明待核事项。完整读回目标和新正文后 submit。"
             : codeReview
-              ? "先用 building_loop_code_review prepare 读取宿主预填的文件、测试、架构和依据。用 record.decisions 只补未判断的编号及理由，选择宿主提供的证据引用。" + CODE_REVIEW_REJECTION_RULE + CODE_REVIEW_PROBE_RULE + "提交返回 needs-review 时按 next 补缺项。"
+              ? "核签名源码、架构、必要注释和测试。按 prepare 的证据与条款独立判断；行为退回须本角色可复现实测差异。按 pending 补缺项。"
             : frame.role === "executor" && assignment?.[1].codeIntake?.regression
               ? "按当前目标修改授权代码。先用 prepare 读目标和当前文件。签名运行者须证明改前通过的旧用例和新增必测用例都通过；回退时按失败用例修复后重跑。" + CODE_SUBMIT_RULE +
                 (unitOf(frame, assignment[0]).architecture?.rollback ? "签名与读回齐备后，按 prepare 的 rollback 提议契约登记准确步骤，再 submit。" : "")
@@ -3978,12 +4030,10 @@ export function apply(ctx, config = {}) {
           ...(reviewRestart ? [reviewRestart.note] : []),
           ...(assignment && confirmed?.instruction ? ["prepare 的 instruction 是所有者开工时的完整任务指令，补足当时的摘要；后续已确认变更以当前目标为准。它不是证据文件，权限仍由现有授权决定。"] : []),
           ...architectureRule,
-          ...(!codeReview && frame.role === "reviewer" ? [REVIEW_FORMAT, EVIDENCE_RULE] : []),
-          ...(!codeReview && frame.role === "auditor" ? [AUDIT_METHOD,'逐块 record 后提交 building_loop audit；prepare 有 outcomeContract 时附本角色 outcomes。不要重复发送 checks、quality 或全文。'] : []),
-          ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, SOURCE_ALIGNMENT_RULE, ASSERTION_PROOF_RULE, OUTCOME_RULE, OBJECT_RULE, NON_ENTAILMENT_RULE, FOOTNOTE_RULE, NEUTRAL_SPAN_RULE, COVERAGE_REJECTION_RULE, LITERAL_RULE, EXAMPLE_RULE] : []),
-          ...(!codeReview && frame.role === "executor" ? [OUTCOME_RULE] : []),
+          ...(!codeReview && ["reviewer", "auditor"].includes(frame.role) ? [COVERAGE_RULE, PROOF_RULE, RETURN_RULE,
+            frame.role === "reviewer" ? REVIEW_FORMAT : AUDIT_METHOD + " 提交 audit，不要重复发送 checks、quality 或全文。"] : []),
           ...(!codeReview && (phase === "supplement" || frame.role === "reviewer") ? [QUALITY_RULE] : []),
-          ...(codeReview || frame.role === "executor" && assignment?.[1].codeIntake ? [CODE_COMMENT_RULE] : []),
+          ...(frame.role === "executor" && assignment?.[1].codeIntake ? [CODE_COMMENT_RULE] : []),
           ...(frame.managed && frame.role === "coordinator" ? [
             "此任务已由用户确认。初次进入 dispatch 必须先 prepare，再 advance 派给 K01 执行方起稿。收到后续消息先按当前阶段判断，已有阶段用同一单元续做，用户明确变更目标时只更新总纲的对应部分。",
             "会话项目目录 " + frame.root + "。直接开工指令与摘要有差异时按实际用户指令厘清。对用户汇报时给出实际产物位置。",
@@ -4052,7 +4102,7 @@ function reviewCandidate(frame, active, spec) {
 
 function pendingOriginalReads(frame, active, spec) {
   const gate = originalReviewGate(frame,active,spec);
-  if (!gate?.pending.length) return;
+  if (!gate || !gate.pending.length && !gate.conflicts?.length && gate.dispute?.status !== "checking") return;
   const grant = spec.phases[active.phase];
   const allowed = [...frame.policy.goalContext,...frame.policy.instructions,...(grant.materials ?? []),...gate.sources];
   return frame.reads.filter(file => includes(allowed,file) && keyOf(file) !== keyOf(spec.candidate));
@@ -4155,8 +4205,7 @@ function carryNumberedFinding(frame,active,grant,row,material,fullCoverage) {
   // Missing evidence can be a real finding even when the cited line is an
   // editorial note. The actor must have observed the cited bytes regardless.
   const citations=grant.evidence.flatMap(file=>{
-    const cited=citation(row.body,file);
-    return cited?[{file,...cited}]:[];
+    return numberedCitationRanges(row.body,file).map(range => ({file,...range}));
   });
   if(!citations.length||citations.some(({file,start,end})=>{
     const seen=active.seen?.[keyOf(file)];

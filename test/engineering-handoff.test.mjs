@@ -124,6 +124,10 @@ test("goal and unit are pinned, and a fresh coordinator claims the same workspac
   baseline("K01");
   const assigned = await native.flow("root", "advance");
   assert.equal(assigned.unit, "K01");
+  const opened = state();
+  const request = Object.values(opened.ledger.items).find(item => item.origin);
+  assert.deepEqual(Object.keys(opened.units.K01.ledgerAssignment.versions), [request.id]);
+  assert.equal(opened.units.K01.ledgerAssignment.goalSha256, opened.units.K01.goal.sha256);
   start("contender", opening("K03"));
   assert.match((await native.flow("contender", "status")).checkpoint.blocked, /仍有写入权或未关单/);
   await assert.rejects(native.file("contender", "write", "DESIGN.md", { content: "stolen", note: "wrong" }), /仍有写入权或未关单/);

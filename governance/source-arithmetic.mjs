@@ -1,5 +1,5 @@
 import { evidenceReference, registeredSourceRows, workingMaterialReference } from "./evidence.mjs";
-import { decimal, lineList, roundedDecimal } from "./preflight.mjs";
+import { canonicalDecimal, decimal, lineList, physicalCsvCells, quantityRelation, roundedDecimal } from "./preflight.mjs";
 import { digest, includes, keyOf, numericUnitConversion, readBytes, relativeName } from "./policy.mjs";
 
 const operations = {
@@ -7,7 +7,11 @@ const operations = {
   share: { count: 2, formula: "a / b × 100", unit: "%" },
   "change-share": { count: 4, formula: "(a − b) / (c − d) × 100", unit: "%" },
 };
-const decimalToken = /(?<![\d.])[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\d.])/gu;
+// Consume the full numeric token, including unsupported numeric forms; a
+// substring of a grouped number or scientific notation is never an operand.
+const decimalToken = /[+−-]?\d+(?:[,\u202f\u00a0]\d+)*(?:\.\d+)?(?:[eE][+−-]?\d+)?/gu;
+const durationUnits = ["h", "min", "s"];
+const durationPart = /^\s*(?:(hours?|h|minutes?|min|seconds?|s)(?![a-z])|(小时|分钟|秒钟?))/iu;
 
 export const sourceArithmeticSchema = {
   operation: { enum: Object.keys(operations) },
@@ -15,11 +19,12 @@ export const sourceArithmeticSchema = {
     type: "object", properties: {
       file: { type: "string" },
       line: { type: "integer", minimum: 1 },
-      column: { type: "integer", minimum: 1, description: "无引号 CSV 中的物理列号，1 起计。与 value 二选一。" },
-      value: { type: "string", maxLength: 30, description: "非 CSV 原文行中唯一出现的十进制数，须逐字相同。" },
+      column: { type: "integer", minimum: 1, description: "同一物理行 CSV 中的列号，1 起计。与 value 二选一。" },
+      value: { type: "string", maxLength: 30, description: "非 CSV 原文行中唯一的完整原数值，分组符保留。" },
     }, required: ["file", "line"], additionalProperties: false,
   } },
   decimals: { type: "integer", minimum: 0, maximum: 6 },
+  durationUnit: { enum: durationUnits, description: "复合时长换算。每个操作数只传 file 和 line，宿主取整段明确的时、分、秒。差值按所选单位输出，占比仍为百分比。" },
 };
 
 /** Only the active author and the two independent review roles can recompute
@@ -32,7 +37,35 @@ export function arithmeticSources(frame, active, spec) {
   return authorized.filter(file => includes(frame.reads, file) && frame.policy.sourcePins[keyOf(file)]);
 }
 
-function sourceOperand(frame, active, files, ref) {
+/** Consume every numeral as one descending sequence of time components. This
+ * prevents selecting only the minutes when the hour boundary also changed. */
+function compoundDuration(quote) {
+  const tokens = [...quote.matchAll(decimalToken)];
+  const invalid = () => new Error("该原文行须含唯一、连续、没有限定词的完整复合时长");
+  if (tokens.length < 1 || tokens.length > 3) throw invalid();
+  let end = 0, previousFactor, ns = 0n;
+  for (const { index, 0: raw } of tokens) {
+    if (!/^\d+(?:\.\d+)?$/u.test(raw)) throw invalid();
+    const connector = quote.slice(end, index);
+    if (previousFactor === undefined ? /[\w.\-–—]$/u.test(connector)
+      : !/^\s*(?:and|和|又|[,，、])?\s*$/iu.test(connector)) throw invalid();
+    const unitMatch = durationPart.exec(quote.slice(index + raw.length));
+    if (!unitMatch) throw invalid();
+    const unit = (unitMatch[1] ?? unitMatch[2]).toLowerCase();
+    const symbol = /^(?:h|小时)/u.test(unit) ? "h" : /^(?:m|分钟)/u.test(unit) ? "min" : "s";
+    const factor = numericUnitConversion(symbol, "ns").from;
+    const number = decimal(raw);
+    if (previousFactor !== undefined && previousFactor <= factor) throw invalid();
+    ns += number.n * factor / number.scale;
+    previousFactor = factor;
+    end = index + raw.length + unitMatch[0].length;
+  }
+  const start = tokens[0].index, relation = quantityRelation(quote, {start, end});
+  if ((relation !== undefined && relation !== "exact") || /^\s*(?:\/|每|per\b)/iu.test(quote.slice(end))) throw invalid();
+  return { number: { n: ns, scale: 1n }, raw: quote.slice(start, end), value: ns.toString(), unit: "ns" };
+}
+
+function sourceOperand(frame, active, files, ref, durationUnit) {
   const file = relativeName(ref?.file);
   if (!includes(files, file)) throw new Error("只可从本角色已获授权的登记原始证据复算 " + file);
   const bytes = readBytes(frame.root, file);
@@ -49,35 +82,58 @@ function sourceOperand(frame, active, files, ref) {
 
   const quote = lineList(bytes)[line - 1];
   if (quote === undefined) throw new Error("原始数据行超出文件实际范围 " + file);
-  let value;
-  if (Number.isSafeInteger(ref.column) && ref.column > 0 && ref.value === undefined && !quote.includes('"') && quote.includes(",")) {
-    value = quote.split(",")[ref.column - 1]?.trim();
-  } else if (ref.column === undefined && typeof ref.value === "string" &&
-      [...quote.matchAll(decimalToken)].filter(match => match[0] === ref.value).length === 1) {
-    value = ref.value;
+  if (durationUnit !== undefined) {
+    if (ref.value !== undefined || ref.column !== undefined) throw new Error("复合时长使用完整登记原文行，只需 file 和 line");
+    const { number, ...quantity } = compoundDuration(quote);
+    return { number, evidence: { file, line, ...quantity, sha256 } };
   }
-  if (!value) throw new Error("每个操作数需提供有效的 CSV 物理列号或本行唯一的原始数值");
-  const number = decimal(value);
-  return { number, evidence: { file, line, ...(ref.column ? { column: ref.column } : {}), value, sha256 } };
+  let raw, unit;
+  if (Number.isSafeInteger(ref.column) && ref.column > 0 && ref.value === undefined && quote.includes(",")) {
+    raw = physicalCsvCells(quote)[ref.column - 1];
+  } else if (ref.column === undefined && typeof ref.value === "string") {
+    const hits = [...quote.matchAll(decimalToken)].filter(match => match[0] === ref.value);
+    if (hits.length === 1) {
+      const { index: start, 0: token } = hits[0], end = start + token.length;
+      const tail = quote.slice(end);
+      unit = /^\s*(%|％|‰|[a-zA-Zμ°]+(?:\/[a-zA-Z]+[²³]?)?|毫秒|秒|分钟|小时|千克|公斤|美元|人民币|人|次)(?![a-zA-Z])/u.exec(tail)?.[1];
+      const unitEnd = unit ? end + tail.indexOf(unit) + unit.length : end;
+      // In "12 or more", an apparent unit can be the start of a bound.
+      // A bound after an actual unit and one after a bare number both apply.
+      const boundaries = unitEnd === end ? [end] : [end, unitEnd];
+      if (/^(?:and|or|to|but|nor|through|versus)$/iu.test(unit ?? "") || boundaries.some(boundary => {
+        const relation = quantityRelation(quote, { start, end: boundary });
+        return relation !== undefined && relation !== "exact";
+      })) throw new Error("原文含限定词、区间或运算，须先确认计算口径："+quote.slice(Math.max(0,start-16),unitEnd+12));
+      if (!/[\d._A-Za-z]$/u.test(quote.slice(0,start)) && !/^\.\d/u.test(tail)) raw = token;
+    }
+  }
+  if (!raw) throw new Error("每个操作数需提供有效的 CSV 物理列号或本行唯一的原始数值");
+  const value = canonicalDecimal(raw), number = decimal(value);
+  return { number, evidence: { file, line, ...(ref.column ? { column: ref.column } : {}), value,
+    ...(raw !== value ? { raw } : {}), ...(unit ? {unit} : {}), sha256 } };
 }
 
 /** Bind operands to current data and round once on the exact rational result.
  * The caller still establishes the comparability of the populations and units. */
-export function calculateFromSources(frame, active, spec, { operation, operands, decimals = 2 }) {
+export function calculateFromSources(frame, active, spec, { operation, operands, decimals = 2, durationUnit }) {
   const rule = Object.hasOwn(operations, operation) && operations[operation];
   if (!rule || !Array.isArray(operands) || operands.length !== rule.count ||
       !Number.isSafeInteger(decimals) || decimals < 0 || decimals > 6) {
     throw new Error("按已选公式提供 2 或 4 个操作数，精度为 0–6 位小数");
   }
   const files = arithmeticSources(frame, active, spec);
-  const sourced = operands.map(ref => sourceOperand(frame, active, files, ref));
+  if (durationUnit !== undefined && !durationUnits.includes(durationUnit)) throw new Error("复合时长输出单位须为 h、min 或 s");
+  const sourced = operands.map(ref => sourceOperand(frame, active, files, ref, durationUnit));
+  const units = sourced.map(row => row.evidence.unit);
+  if (units.some(Boolean) && !units.every(unit => unit === units[0])) throw new Error("操作数单位不一致或不完整，请先统一单位并确认口径");
   // A common exact scale cancels in both ratio operations.
   const scale = 1_000_000_000n;
   const [a, b, c, d] = sourced.map(({ number }) => number.n * (scale / number.scale));
   const numerator = operation === "difference" ? a - b : operation === "share" ? a * 100n : (a - b) * 100n;
-  const denominator = operation === "difference" ? scale : operation === "share" ? b : c - d;
+  const differenceScale = durationUnit ? scale * numericUnitConversion(durationUnit, "ns").from : scale;
+  const denominator = operation === "difference" ? differenceScale : operation === "share" ? b : c - d;
   if (denominator <= 0n) throw new Error("当前口径的分母必须大于零");
-  return { operation, formula: rule.formula, value: roundedDecimal(numerator, denominator, decimals), unit: rule.unit,
+  return { operation, formula: rule.formula, value: roundedDecimal(numerator, denominator, decimals), unit: operation === "difference" ? (durationUnit ?? units[0] ?? rule.unit) : rule.unit,
     operands: sourced.map(row => row.evidence) };
 }
 
@@ -110,8 +166,8 @@ export function measuredOriginalDisposition(frame, active, spec, id, location) {
   const lines = lineList(bytes);
   const cells = position => {
     const row = lines[position - 1];
-    if (!row || row.includes('"')) throw new Error("原稿复算需要可唯一定位的无引号 CSV 行");
-    return row.split(",").map(cell => cell.trim());
+    if (!row) throw new Error("原稿复算需要可唯一定位的 CSV 物理行");
+    return physicalCsvCells(row);
   };
   const headings = cells(rule.header);
   if (headings[rule.valueColumn - 1] !== rule.valueHeading || [rule.before, rule.after].some(endpoint => {

@@ -10,7 +10,42 @@ const cell = (line, column) => ({ file: source, line, column });
 const evaluate = (h, id, operation, operands) =>
   h.invoke(id, "building_loop_calculate", { action: "evaluate", operation, operands });
 
-function registerSource(write) {
+test("whole compound durations bind to registered rows and are normalized before rounding", () => fixture(async (root, write) => {
+  const rows = ["# Source", "It took 11 hours and 55 minutes to orbit its parent.", "11 hours and 23 minutes",
+    "历时2小时5分钟", "1 hour 55 minutes", "2 小时 5 分钟 0.5 秒", "5 min 0 seconds",
+    "2 hours and 4 kg", "1 h 5 min or 2 h 0 min", "About 2 h 5 min", "2 h and at least 5 min",
+    "2 h 5 min or more", "2 h 5 min/km", "5 min 1 hour", "Version 3 took 2 h 5 min",
+    "12", "2026-11-18", "2 to 3 hours", "2 hours", "1 hour 30 minutes"];
+  const original = rows.join("\n") + "\n";
+  registerSource(write, original);
+  const h = host(root, { automaticCoverage: false }), worker = (await h.flow("root", "advance")).childId;
+  const ref = line => ({file: source, line});
+  const compute = (a, b, durationUnit = "min", operation = "difference", decimals = 2, role = worker) =>
+    h.invoke(role, "building_loop_calculate", {action: "evaluate", operation, operands: [a,b], durationUnit, decimals});
+  await h.file(worker, "read", "overview.md");
+  await assert.rejects(compute(ref(2), ref(3)), /先实际读取/u);
+  await h.file(worker, "read", source);
+  const result = await compute(ref(2), ref(3));
+  assert.deepEqual([result.value,result.unit], ["32","min"]);
+  assert.deepEqual(result.operands.map(({raw,sha256,line}) => [raw,sha256,line]), [
+    ["11 hours and 55 minutes",digest(original),2], ["11 hours and 23 minutes",digest(original),3]]);
+  assert.equal((await compute(ref(4),ref(5))).value, "10");
+  assert.equal((await compute(ref(6),ref(5),"s")).value, "600.5");
+  assert.equal((await compute(ref(4),ref(5),"h","difference",6)).value, "0.166667");
+  assert.equal((await compute(ref(7),ref(4),"s","share")).value, "4");
+  assert.equal((await compute(ref(rows.length-1),ref(rows.length))).value, "30");
+  for (let line = 8; line <= rows.length-2; line++) {
+    await assert.rejects(compute(ref(line),ref(3)), /完整复合时长/u, rows[line-1]);
+  }
+  for (const selector of [{value: "55"},{column: 2}]) {
+    await assert.rejects(compute({...ref(2),...selector},ref(3)), /只需 file 和 line/u);
+  }
+  await assert.rejects(compute(ref(1),ref(3)), /登记为原文/u);
+  await assert.rejects(compute(ref(2),ref(3),"min","difference",2,"root"), /没有原文复算授权/u);
+  assert.equal((await evaluate(h,worker,"difference",[{...ref(2),value:"55"},{...ref(3),value:"23"}])).unit, "minutes");
+}));
+
+function registerSource(write, tableText = table) {
   const config = structuredClone(policy);
   const spec = config.units.K01;
   delete spec.calculations;
@@ -21,13 +56,13 @@ function registerSource(write) {
   }
   const locator = "https://example.org/frozen-sales.csv";
   const observation = {
-    sources: [{ snapshot: source, snapshotSha256: digest(table), finalUrl: locator, status: 200,
-      responseSha256: digest("response"), fetchedAt: "2025-01-01T00:00:00.000Z", exactQuotes: table.trimEnd().split("\n").slice(1) }],
+    sources: [{ snapshot: source, snapshotSha256: digest(tableText), finalUrl: locator, status: 200,
+      responseSha256: digest("response"), fetchedAt: "2025-01-01T00:00:00.000Z", exactQuotes: tableText.trimEnd().split("\n").slice(1) }],
   };
   const receipt = JSON.stringify(observation);
-  config.sourcePins = { [source]: { sha256: digest(table), kind: "primary", locator,
+  config.sourcePins = { [source]: { sha256: digest(tableText), kind: "primary", locator,
     observation: { file: "sources.json", sha256: digest(receipt) } } };
-  write(source, table);
+  write(source, tableText);
   write("sources.json", receipt);
   write("BUILDING-LOOP.json", JSON.stringify(config));
   return config;
@@ -111,4 +146,29 @@ test("authorized roles can evaluate two distinct ratios from the same pinned dat
   write(source, table.replace("32,140", "33,140"));
   await h.file(reviewer, "read", source);
   await assert.rejects(evaluate(h, reviewer, "share", pairs), /原始版本不符/u);
+}));
+
+test("source calculation binds whole numbers, units and qualified claims to raw physical rows", () => fixture(async (root, write) => {
+  const rows = ["# Frozen measurement", "Dataset", "Duration = 1,234 ms.", "Duration = 34 ms.",
+    "At least 34 ms.", "Duration = 34 kg.", '"base, first","1,234",24', '"unfinished,12',
+    "Duration = 12,34 ms.", "Duration = 34 ms or more.", "Duration = 34 ms and 34 ms.",
+    "12 or more", "10 or more", "12 or so", "12 to 15", "12 and then", "12 ms", "10 ms", "12 ms or less"];
+  registerSource(write, rows.join("\n")+"\n");
+  const h=host(root,{automaticCoverage:false}), worker=(await h.flow("root","advance")).childId;
+  await h.file(worker,"read","overview.md");
+  await h.file(worker,"read",source);
+  const at=(line,value)=>({file:source,line,value});
+  const diff=(a,b)=>evaluate(h,worker,"difference",[a,b]);
+  const result=await diff(at(3,"1,234"),at(4,"34"));
+  assert.equal(result.value,"1200");assert.equal(result.unit,"ms");assert.equal(result.operands[0].raw,"1,234");
+  assert.equal((await diff(cell(7,2),cell(7,3))).value,"1210");
+  for(const value of ["1","234"]) await assert.rejects(diff(at(3,value),at(4,"34")),/唯一的原始数值/u);
+  for(const line of [5,10]) await assert.rejects(diff(at(line,"34"),at(4,"34")),/限定词/u);
+  await assert.rejects(diff(at(6,"34"),at(4,"34")),/单位/u);
+  await assert.rejects(diff(cell(8,2),cell(7,3)),/CSV/u);
+  await assert.rejects(diff(at(9,"12,34"),at(4,"34")),/格式/u);
+  await assert.rejects(diff(at(11,"34"),at(4,"34")),/唯一/u);
+  await assert.rejects(diff(at(12,"12"),at(13,"10")), /限定词/u);
+  for (const line of [14,15,16,19]) await assert.rejects(diff(at(line,"12"),at(18,"10")), /限定词/u);
+  assert.equal((await diff(at(17,"12"),at(18,"10"))).value, "2");
 }));

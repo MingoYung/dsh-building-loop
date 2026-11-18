@@ -4,8 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import { fixture, host, policy } from "./helpers.mjs";
 import { authority, digest } from "../governance/policy.mjs";
+import { workspaceStateFile } from "../governance/session-mode.mjs";
+import { quoteRepairLocation } from "../governance/evidence.mjs";
 import { QUALITY } from "../governance/preflight.mjs";
-import { classificationDisagreements } from "../governance/coverage.mjs";
+import { classificationDisagreements, requireStoredFootnoteBindings } from "../governance/coverage.mjs";
 
 const locator = "https://www.itl.nist.gov/div898/handbook/eda/section3/scatterp.htm";
 const excerpt = "association does NOT imply causality.";
@@ -239,6 +241,62 @@ test("a unique touching footnote binds its own source and cannot borrow nearby e
   assert.deepEqual(rejected.repairBaseline.refs.map(({file,start})=>[file,start]),[["snapshot.md",3]]);
 }));
 
+test("disjoint source lines survive both independent footnote checks and ledger closure", () => fixture(async(root,write)=>{
+  const body=`相关边界（出处：snapshot.md 第3行）。\n原文为“${secondExcerpt}”[^both]\n\n[^both]: snapshot.md 第3、4行。`;
+  const {h,result}=await quoteReview(root,write,body);
+  assert.equal(result.phase,"first-audit-ready");
+  const auditor=(await h.flow("root","advance")).childId;
+  const packet=await h.flow(auditor,"prepare");
+  await h.coverage(auditor,"record",{entries:packet.coverage.blocks.map(block=>({block:block.id,parts:[{
+    kind:"direct",status:"supported",sourceRelation:"supports",evidence:[source,{...source,start:4,end:4,quote:secondExcerpt}],
+    basis:"分别读取两个登记行，逐字引文出现在第二个定位。"
+  }]}))});
+  assert.equal((await h.flow(auditor,"audit")).phase,"ledger-review");
+  const stateFile=path.join(process.env.DSH_HOME,"building-loop-state",workspaceStateFile(root));
+  const proof=JSON.parse(fs.readFileSync(stateFile,"utf8")).units.K01.proof;
+  const both=[proof.reviewerCoverage,proof.auditorCoverage];
+  for(const role of both)assert.deepEqual(role.quotations[0].refs.map(ref=>ref.start),[3,4]);
+  const bytes=fs.readFileSync(path.join(root,"candidate.md")),spec=authority(root).units.K01;
+  for(const damage of [row=>row.refs.pop(),row=>row.refs[0].end=4,row=>row.refs[1].file="other.md"]){
+    const tampered=structuredClone(both);damage(tampered[1].quotations[0]);
+    assert.throws(()=>requireStoredFootnoteBindings(spec,tampered,bytes,"final-review"),/唯一脚注定位/);
+  }
+  await h.ledger("root","read");
+  await h.file("root","read","overview.md");await h.file("root","read","first.json");
+  assert.equal((await h.ledger("root","review",{decisions:[{id:"unit-K01",outcome:"completed",basis:"两道审核保留所有登记行并核对逐字引句。",evidence:{file:"first.json",start:1,end:1}}]})).phase,"closed");
+}));
+
+test("same-line quotations cannot borrow a sibling's source, including compound and unapproved locator lists", async()=>{
+  for(const annotation of ["（出处：denied.md 第2、4、6行）","（出处：denied.md 第-1行）","", "（出处：snapshot.md 第3行；denied.md 第1行）"]) {
+    await fixture(async(root,write)=>{
+      const local=`原文为“${secondExcerpt}”${annotation}，原文为“${secondExcerpt}”（出处：snapshot.md 第4行）。`;
+      const {receipt,result}=await quoteReview(root,write,`相关边界（出处：snapshot.md 第3行）。\n${local}`);
+      assert.equal(result.phase,"supplement-ready",annotation);
+      const [first,second]=receipt.coverage.quotations;
+      assert.deepEqual([first.matches,second.matches],[false,true],annotation);
+      assert.ok(!first.refs.some(ref=>ref.start===4),annotation);
+      assert.deepEqual(second.refs.map(ref=>ref.start),[4]);
+      // An open receipt created by the previous whole-line fallback cannot
+      // be carried through the audit or ledger after a restart.
+      const old=structuredClone(receipt.coverage);
+      Object.assign(old.quotations[0],{matches:true,refs:structuredClone(second.refs)});
+      delete old.quotations[0].excludedLocators;
+      assert.throws(()=>requireStoredFootnoteBindings(authority(root).units.K01,[old],
+        fs.readFileSync(path.join(root,"candidate.md")),"first-review"),/自身的出处/);
+    });
+  }
+});
+
+test("a marked list of lines or sources can establish its own literal without borrowing a sibling",async()=>{
+  for(const note of ["snapshot.md第3行说明、第4行", "snapshot.md 第3行表头、第4行摘录", "snapshot.md 第3行、other.md 第1行"]) {
+    await fixture(async(root,write)=>{
+      const {receipt}=await quoteReview(root,write,`相关边界（出处：snapshot.md 第3行）。\n原文为“${secondExcerpt}”（出处：${note}），原文为“${excerpt}”（出处：snapshot.md 第3行）。`);
+      assert.deepEqual(receipt.coverage.quotations.map(row=>row.matches),[true,true],note);
+      assert.equal(receipt.coverage.quotations[0].refs.length,2,note);
+    });
+  }
+});
+
 test("authorized hyphenated paths are literal in touching and inline locators", () => fixture(async (root, write) => {
   const file="sources/other-checks.md";
   fs.mkdirSync(path.join(root,"sources"));
@@ -469,3 +527,156 @@ test("an invalid adjacent authorized range creates author evidence debt without 
     });
   }
 });
+
+
+test("an authenticated source replacement revokes the old stage, resumes its executor and requires both independent reviews", () => fixture(async (root, write) => {
+  const {p, row} = setup(write);
+  const unit = p.units.K01;
+  for (const phase of ["intake","supplement"]) unit.phases[phase].read.push(source.file);
+  write("BUILDING-LOOP.json", JSON.stringify(p));
+  const h = host(root,{automaticCoverage:false});
+  const exec = (await h.flow("root","advance")).childId;
+  await h.flow(exec,"prepare");
+  await h.flow(exec,"submit");
+  const reviewer = (await h.flow("root","advance")).childId;
+  const quality = Object.fromEntries(Object.keys(QUALITY).map(key=>[key,"核对当前来源、更新的项目目标和适用范围。"]));
+  async function assessRevision(actor, ref, basis) {
+    const packet=await h.flow(actor,"prepare");
+    assert.equal(packet.coverage.pending.length,packet.coverage.total);
+    await h.coverage(actor,"record",{entries:packet.coverage.blocks.map(block=>({ block:block.id,parts:[{
+      kind:"direct",status:"supported",sourceRelation:"supports",evidence:[ref],basis,
+    }]}))});
+    if (actor === reviewer) {
+      await h.assess(actor,{...quality,goalFit:{pass:true,basis},sourceRefs:[{file:ref.file,start:ref.start,end:ref.end}],
+        unverifiedSources:[],unlisted:[],revise:[]});
+      return h.flow(actor,"review",{checks:[{id:"C1",file:ref.file,start:ref.start,end:ref.end,status:"supported",basis}]});
+    }
+    return h.flow(actor,"audit");
+  }
+  assert.equal((await assessRevision(reviewer,source,"首审逐字检查了初始原文。")).phase,"first-audit-ready");
+  const auditor = (await h.flow("root","advance")).childId;
+  assert.notEqual(reviewer,auditor);
+  assert.equal((await assessRevision(auditor,source,"独立复核亲自对照初始原文。")).phase,"ledger-review");
+  const first=fs.readFileSync(path.join(root,"first.json"));
+  const file="replacement.md", quote="Replacement observations cover this interval.", revised=quote+"\n";
+  const newRow={...row,snapshot:file,snapshotSha256:digest(revised),finalUrl:locator+"?revision=2",exactQuotes:[quote]};
+  const receipt=JSON.stringify({sources:[newRow]});
+  const grant=structuredClone(p);
+  grant.sourcePins={[file]:{kind:"primary",locator:newRow.finalUrl,sha256:digest(revised),
+    observation:{file:"acquisition.json",sha256:digest(receipt)}}};
+  for(const phase of Object.values(grant.units.K01.phases)) {
+    phase.read=phase.read.map(name=>name===source.file?file:name);
+    if(phase.evidence)phase.evidence=phase.evidence.map(name=>name===source.file?file:name);
+  }
+  write(file,revised);write("BUILDING-LOOP.json",JSON.stringify(grant));
+  await assert.rejects(h.flow("root","advance"),/获取回执/u);
+  write("acquisition.json",receipt);
+  for (const modify of [
+    cfg=>cfg.coordinator.read.push(file),
+    cfg=>cfg.units.K01.phases.intake.write=["candidate.md"],
+    cfg=>cfg.units.K01.phases.supplement.read.push("unregistered.txt"),
+  ]) {
+    const unsafe=structuredClone(grant);modify(unsafe);
+    write("BUILDING-LOOP.json",JSON.stringify(unsafe));
+    await assert.rejects(h.flow("root","advance"),/授权清单发生变化/u);
+  }
+  write("BUILDING-LOOP.json",JSON.stringify(grant));write("overview.md","项目现在要求使用替换后的实际观测。");
+  await assert.rejects(h.flow(auditor,"audit"),/未获得|未处于|阶段|归属|工作单元|分配/u);
+  let resumed=await h.flow("root","advance");
+  assert.deepEqual([resumed.childId,resumed.phase],[exec,"supplement"]);
+  const packet=await h.flow(exec,"prepare");
+  assert.deepEqual(packet.sourceRevision,{added:[file],refreshed:[],withdrawnCount:1});
+  await assert.rejects(h.file(exec,"read",source.file),/读白名单/u);
+  await assert.rejects(h.file("root","read",file),/读白名单/u);
+  assert.match(h.guard("root","pwsh"),/禁止直接调用/u);
+  assert.deepEqual(fs.readFileSync(path.join(root,"first.json")),first);
+  const draft="- C1：替换后的观测涵盖当前区间（出处："+file+" 第 1 行）。\n";
+  await h.file(exec,"write","candidate.md",{content:draft,note:"改用经过核实的替换材料"});
+  await h.file(exec,"read","candidate.md");
+  assert.equal((await h.flow(exec,"submit",{quality})).phase,"final-review-ready");
+  const ref={file,start:1,end:1,quote};
+  assert.equal((await h.flow("root","advance")).childId,reviewer);
+  assert.equal((await assessRevision(reviewer,ref,"首审逐字检查替换后的原文。")).phase,"final-audit-ready");
+  assert.equal((await h.flow("root","advance")).childId,auditor);
+  assert.equal((await assessRevision(auditor,ref,"独立复核重新核对变更后的观测范围。")).phase,"ledger-review");
+  await h.ledger("root","read");await h.file("root","read","overview.md");await h.file("root","read","final.json");
+  const decisions=[{id:"unit-K01",outcome:"completed",basis:"两道验收都已重新核对替换材料。",evidence:{file:"final.json",start:1,end:1}}];
+  assert.equal((await h.ledger("root","review",{decisions})).phase,"closed");
+}));
+
+
+
+test("legacy source withdrawal needs the exact old grant and keeps an unresolved outcome paused", () => fixture(async (root, write) => {
+  const { p, row } = setup(write);
+  const second = "older.md", receipt = JSON.stringify({sources:[row, {...row,snapshot:second}]});
+  write(second,snapshot);write("acquisition.json",receipt);
+  p.sourcePins[source.file].observation.sha256=digest(receipt);
+  p.sourcePins[second]=structuredClone(p.sourcePins[source.file]);
+  for(const phase of Object.values(p.units.K01.phases)) {
+    phase.read.push(second);
+    if(phase.evidence)phase.evidence.push(second);
+  }
+  const baseline=JSON.stringify(p);
+  write("BUILDING-LOOP.json",baseline);
+  const h=host(root,{automaticCoverage:false}),executor=(await h.flow("root","advance")).childId;
+  const statePath=path.join(process.env.DSH_HOME,"building-loop-state",workspaceStateFile(root));
+  const state=JSON.parse(fs.readFileSync(statePath));
+  // Versions before this migration stored only two fingerprints. Simulate their
+  // persisted shape and a real outstanding clarification bound to this goal.
+  delete state.authorityVersions.research;
+  const unit=state.units.K01;
+  unit.phase="blocked";unit.resumePhase="intake";unit.outcomeClarification={goalSha256:unit.goal.sha256,
+    question:"记录里写的是两种不同的口径，请维护者选择一种。"};
+  fs.writeFileSync(statePath,JSON.stringify(state));
+  const revised=structuredClone(p);
+  delete revised.sourcePins[second];
+  for(const phase of Object.values(revised.units.K01.phases)) {
+    phase.read=phase.read.filter(file=>file!==second);
+    if(phase.evidence)phase.evidence=phase.evidence.filter(file=>file!==second);
+  }
+  write("BUILDING-LOOP.json",JSON.stringify(revised));
+  await assert.rejects(h.flow("root","advance"),/授权清单发生变化/u);
+  write("BUILDING-LOOP.json.bak",JSON.stringify(revised));
+  await assert.rejects(h.flow("root","advance"),/授权清单发生变化/u);
+  write("BUILDING-LOOP.json.bak",baseline);
+  await assert.rejects(h.flow("root","advance"),/等待用户澄清/u);
+  assert.equal(h.activations.length,1);
+  write("overview.md","项目维护者选择了记录的原始口径。");
+  const next=await h.flow("root","advance");
+  assert.deepEqual([next.childId,next.phase],[executor,"supplement"]);
+  assert.equal((await h.flow(executor,"prepare")).sourceRevision.withdrawnCount,1);
+}));
+
+test("a verbatim repair hints only one exact acquired location in the rejected source already read under this grant", () => fixture((root,write) => {
+  const { p, row } = setup(write);
+  const sample = "原文为“" + secondExcerpt + "”";
+  const finding = { lineText:sample, finding:{kind:"verbatim-quote",quote:sample},
+    repairBaseline:{version:1,candidateSha256:"old-draft",start:0,end:sample.length,quote:sample,
+      refs:[{file:source.file,start:3,end:3,sha256:digest(snapshot)}]} };
+  const active = {rejectedCandidate:"old-draft",seen:{[source.file]:{hash:digest(snapshot),ranges:[[1,4]]}}};
+  const frame={root,policy:authority(root),reads:[source.file]},spec=frame.policy.units.K01;
+  const hint=(scope=frame,current=active,rejection=finding)=>quoteRepairLocation(scope,current,spec,rejection);
+  assert.deepEqual(hint(),{file:source.file,line:4});
+  assert.equal(hint({...frame,reads:[]}),undefined);
+  assert.equal(hint(frame,{...active,seen:{}}),undefined);
+  assert.equal(hint(frame,{...active,seen:{[source.file]:{hash:digest(snapshot),ranges:[[1,3]]}}}),undefined);
+  assert.equal(hint(frame,{...active,rejectedCandidate:"another-draft"}),undefined);
+  assert.equal(hint(frame,active,{...finding,finding:{...finding.finding,kind:"contradiction"}}),undefined);
+  const ambiguity="Normalized control: "+secondExcerpt,expanded=snapshot+ambiguity+"\n";
+  const registered=JSON.stringify({sources:[{...row,snapshotSha256:digest(expanded),exactQuotes:[...row.exactQuotes,ambiguity]}]});
+  write(source.file,expanded);write("acquisition.json",registered);
+  // A stale pin cannot turn a changed document into a recommended repair.
+  assert.equal(hint(),undefined);
+  p.sourcePins[source.file].sha256=digest(expanded);p.sourcePins[source.file].observation.sha256=digest(registered);
+  write("BUILDING-LOOP.json",JSON.stringify(p));
+  const newFrame={...frame,policy:authority(root)};
+  const freshFinding={...finding,repairBaseline:{...finding.repairBaseline,refs:[{...finding.repairBaseline.refs[0],sha256:digest(expanded)}]}};
+  const current={...active,seen:{[source.file]:{hash:digest(expanded),ranges:[[1,5]]}}};
+  assert.equal(hint(newFrame,current,freshFinding),undefined);
+  // Exclude the duplicate from the acquisition record, while keeping the
+  // bytes in the source. Only the authenticated original rows can be offered.
+  const unique=JSON.stringify({sources:[{...row,snapshotSha256:digest(expanded)}]});
+  write("acquisition.json",unique);
+  p.sourcePins[source.file].observation.sha256=digest(unique);write("BUILDING-LOOP.json",JSON.stringify(p));
+  assert.deepEqual(hint({...frame,policy:authority(root)},current,freshFinding),{file:source.file,line:4});
+}));

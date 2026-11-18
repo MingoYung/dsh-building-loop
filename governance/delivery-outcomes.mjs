@@ -51,7 +51,7 @@ export function deliveryOutcomeInstructions(contract) {
     ...contract,
     bodyFormat: "正文每项先写 `事项编号：短结果`，同一行再写原始记录和规则。正文同一编号只能有一个结果字段。",
     ...(contract.summary ? { summaryFormat: "大白话先逐项写 `事项编号：短结果`，使用正文相同结果，各项用句号或分号隔开。" } : {}),
-    reviewFormat: "先逐项核原始记录 original-fact、正文与大白话 project-application。用 review 或 audit 提交本角色 outcomes。decided 包含 id、status、decision、basis、body、需要时的 summary；body 和 summary 各只放 {line,quote}。",
+    reviewFormat: "先逐项核原始记录 original-fact、正文与大白话 project-application。从 coverage status 核本角色 outcomeProofGaps。真有歧义填 clarify 和具体问题，缺结果填 missing，前后冲突填 inconsistent。用 review 或 audit 提交本角色 outcomes。decided 包含 id、status、decision、basis、body、需要时的 summary；body 和 summary 各只放 {line,quote}。",
   };
 }
 

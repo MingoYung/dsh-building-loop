@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { apply } from "../governance/index.mjs";
-import { QUALITY, citation, lineList, numberedCitationRanges, numericChecks, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
+import { QUALITY, citation, exactCitationLocator, lineList, numberedCitationRanges, numericChecks, rejectedClaims, supplementChecks } from "../governance/preflight.mjs";
 import { authority, digest } from "../governance/policy.mjs";
 import { evidenceReference, expectedClaims, checkSourceNarrative } from "../governance/evidence.mjs";
 import { citationLineCounts } from "../governance/coverage.mjs";
@@ -341,8 +341,8 @@ test("compact lists preserve singleton order and conventional ranges remain incl
   for (const separator of ["-","至","到"]) {
     assert.deepEqual(numberedCitationRanges(`（出处：${table} 第4${separator}7行）`,table),[{start:4,end:7}]);
   }
-  assert.deepEqual(citation(c4,table),{start:4,end:7});
-  assert.deepEqual(numberedCitationRanges(`${table} 第4、7行`,table),[{start:4,end:7}]);
+  assert.deepEqual(citation(c4,table),{start:4,end:4});
+  assert.deepEqual(numberedCitationRanges(`${table} 第4、7行`,table),singleton(4,7));
 });
 
 test("short quantities in an explicit source annotation do not hide the following locator",()=>{
@@ -380,7 +380,7 @@ test("standalone source sentences preserve explicit disjoint locations without b
   assert.deepEqual(numberedCitationRanges(`此稿核对了对象与周期。出处：${source} 第 3、4、6 行。`,source),locations);
   assert.deepEqual(numberedCitationRanges(`出处：${source} 第 3 行说明、第 4、6 行；第 8 行`,source),locations);
   assert.deepEqual(numberedCitationRanges(`Claim. Source: ${source} #L4. 第6行`,source),[{start:4,end:4}]);
-  assert.deepEqual(numberedCitationRanges(`此处写到 ${source} 第 3、4、6 行`,source),[{start:null,end:null}]);
+  assert.deepEqual(numberedCitationRanges(`此处写到 ${source} 第 3、4、6 行`,source),locations);
   assert.deepEqual(numberedCitationRanges(`出处：${source} 第 3 行，sources/other.md 第 6 行`,source),[{start:3,end:3}]);
   assert.deepEqual(numberedCitationRanges(`出处：${source} 第 3、0、6 行`,source),[]);
 });
@@ -421,4 +421,17 @@ test("numeric and source-narrative consumers retain authorization while finding 
   active.seen["timing.csv"]={hash:digest(fs.readFileSync(path.join(root,"timing.csv"))),ranges:[[2,3]]};
   assert.doesNotThrow(()=>checkSourceNarrative(frame,active,"已读 timing.csv，原始值见 timing.csv #L2-L3。"));
   assert.doesNotThrow(()=>checkSourceNarrative(frame,active,"只讨论 timing.csv 文件。"));
+}));
+
+test("disjoint row citations prove only the stated operands, including quoted numeric CSV fields", () => fixture((root,write)=>{
+  write("timing.csv",'phase,mean_ms\nbefore,"1,200"\ncontrol,1100\nafter,"900"\n');
+  const spec=authority(root).units.K01;
+  const check=locator=>numericChecks(root,spec,["C2：耗时下降25%（出处：timing.csv "+locator+"）。"],["timing.csv"])[0];
+  assert.equal(check("第2、4行").ok,true,check("第2、4行").issue);
+  assert.equal(check("第2、3行").ok,false);
+  assert.deepEqual(exactCitationLocator("timing.csv 第2、4行",["timing.csv"]).locators,
+    [{file:"timing.csv",start:2,end:2},{file:"timing.csv",start:4,end:4}]);
+  write("timing.csv","phase,mean_ms\nbefore,1200\nafter,900\ncontrol,1200\n");
+  assert.equal(check("第2、4行").ok,false,"the omitted middle observation cannot prove a result");
+  assert.equal(check("第2至4行").ok,true);
 }));
