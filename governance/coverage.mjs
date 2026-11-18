@@ -12,6 +12,8 @@ export const CLASSIFICATION_VERSION = 13;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
+const ORIGINAL_RELATIONS = Object.freeze({supports:"保留",contradicts:"改正",insufficient:"待证"});
+const ORIGINAL_RECHECK_VIEW = "original-evidence/1";
 const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example"];
 const STATUSES = ["supported", "unsupported", "uncertain"];
 const MATERIAL_ATTRIBUTION = "material-attribution";
@@ -418,7 +420,7 @@ function discoverOriginalDispute(frame, active, gate, decisions) {
   const select = rows => Object.fromEntries(ids.map(id => [id,rows[id]]));
   const settled = gate.dispute && Object.fromEntries(["reviewer","auditor"].map(role =>
     [role,{...gate.dispute.settled?.[role],...gate.dispute.rechecks[role]}]));
-  active.originalDispute = { binding:gate.binding, reviewPhase:active.phase, status:"checking", ids, ...(settled ? {settled} : {}), actors:{reviewer:active.reviewer,auditor:active.auditor},
+  active.originalDispute = { view:ORIGINAL_RECHECK_VIEW, binding:gate.binding, reviewPhase:active.phase, status:"checking", ids, ...(settled ? {settled} : {}), actors:{reviewer:active.reviewer,auditor:active.auditor},
     initial:{[frame.role]:select(decisions),[gate.opposite]:select(other)}, rechecks:{reviewer:{},auditor:{}} };
   frame.changed = true;
   return active.originalDispute;
@@ -431,20 +433,35 @@ function rememberOriginal(frame, active, owner, decisions) {
   frame.changed = true;
 }
 
-function originalDisputePacket(frame, gate, dispute) {
+// Peer decisions remain available to the host for conflict detection and the
+// final unresolved receipt. During a blind second reading, disclose only the
+// current original and the union of evidence within this role's own grant.
+function originalDisputePacket(frame, active, spec, gate, dispute) {
   const ids = dispute.ids.filter(id => !dispute.rechecks[frame.role][id]);
-  // Return the initial independent receipts to both readers. The first fresh
-  // recheck stays private until the second one is committed.
-  const side = row => ({ decision:row.decision, basis:row.basis,
-    ...(row.quote ? { originalSpan:row.quote } : {}),
-    evidence:row.evidence.map(({file,start,end,sha256,quote}) => ({file,start,end,sha256,quote})) });
-  return { stage:"original-dispute", binding:gate.binding, rule:gate.rule, pending:ids.length,
-    items:ids.slice(0,1).map(id => {
-      const {original}=dispute.initial.reviewer[id];
-      return {id,original:{file:original.file,line:original.start,sha256:original.sha256,quote:originalQuote(frame,original)},
-        reviewer:side(dispute.initial.reviewer[id]), auditor:side(dispute.initial.auditor[id])};
-    }), next:{tool:"building_loop_coverage",action:"original-recheck"},
-    note:"逐项比较原句限定、双方争点与证据能证明的范围。可复算的部分可调用 building_loop_calculate；另外核查数字以外的事实。独立给处置、依据和已读引句。disputeScope 仅在争议取决于项目规则时用 project-rule，其他用 evidence；gap 写具体分歧。改稿与执行方等待对账。" };
+  const items = ids.slice(0,1).map(id => {
+    const {original} = dispute.initial.reviewer[id], locations = new Map();
+    for (const side of Object.values(dispute.initial)) {
+      for (const ref of side[id].evidence) {
+        // Use the granted spelling so that two Windows aliases yield one evidence location.
+        const file = gate.sources.find(path => keyOf(path) === keyOf(ref.file));
+        if (!file) continue;
+        const {start,end,sha256} = ref, locator = {file,start,end,sha256};
+        const seen = active.seen?.[keyOf(file)];
+        if (typeof ref.quote === "string" && seen?.hash === sha256 && seen.ranges.some(([a,b]) => a <= start && b >= end)) {
+          const checked = sourceQuote(frame,active,spec,ref);
+          if (checked.sha256 !== sha256) throw new Error("来源已换版，请用当前原文重核。");
+          locator.quote = checked.quote;
+        }
+        locations.set(JSON.stringify(locator),locator);
+      }
+    }
+    const evidence = [...locations.values()].sort((a,b) => a.file.localeCompare(b.file) || a.start-b.start ||
+      a.end-b.end || (a.quote ?? "").localeCompare(b.quote ?? ""));
+    return {id,original:{file:original.file,line:original.start,sha256:original.sha256,quote:originalQuote(frame,original)}, evidence};
+  });
+  return {stage:"original-dispute",binding:gate.binding,rule:gate.rule,pending:ids.length,items,
+    next:{tool:"building_loop_coverage",action:"original-recheck"},
+    note:"按当前总纲独立核原句。sourceRelation 只选 supports、contradicts、insufficient，宿主据此登记处置。basis 与 evidence 给出所据原文，contradicts 还需逐字定位反驳的短句。gap 记录证明范围或缺口；仅项目规则存在歧义时 disputeScope 选 project-rule。"};
 }
 
 function originalQuote(frame, ref) {
@@ -461,8 +478,17 @@ function originalAction(frame, active, spec, args) {
     frame.changed = true;
   }
   const dispute = discoverOriginalDispute(frame,active,gate,gate.decisions);
+  // A partially answered legacy round exposed both verdicts. Preserve its answers
+  // as history, but never combine one of them with a new independent reading.
+  let migrated = false;
+  if (dispute?.status === "checking" && dispute.view !== ORIGINAL_RECHECK_VIEW) {
+    if (Object.values(dispute.rechecks).some(rows => Object.keys(rows).length)) dispute.previousRechecks = dispute.rechecks;
+    dispute.rechecks = {reviewer:{},auditor:{}};
+    dispute.view = ORIGINAL_RECHECK_VIEW;
+    migrated = frame.changed = true;
+  }
   const rechecking = dispute?.status === "checking";
-  if (rechecking && args.action !== "original-recheck") return originalDisputePacket(frame,gate,dispute);
+  if (rechecking && (migrated || args.action !== "original-recheck")) return originalDisputePacket(frame,active,spec,gate,dispute);
   if (args.action === "original-recheck" && !rechecking) throw new Error("当前材料没有待对账的原稿分歧");
   const decisions = rechecking ? { ...dispute.rechecks[frame.role] } : { ...gate.decisions };
   const deferred = new Map();
@@ -488,7 +514,11 @@ function originalAction(frame, active, spec, args) {
       if (rechecking && !dispute.ids.includes(input.id)) throw new Error("只对账当前有分歧的编号");
       if (deferred.has(input.id)) throw new Error("本编号先读齐已登记的复算证据：" + deferred.get(input.id));
       if (Object.hasOwn(decisions, input.id)) throw new Error("本编号已保存来稿判断，读过改稿后不能改写这份原稿凭据");
-      const { decision, basis, evidence } = entry;
+      const {basis,evidence,sourceRelation} = entry;
+      const decision = rechecking && Object.hasOwn(ORIGINAL_RELATIONS,sourceRelation) ? ORIGINAL_RELATIONS[sourceRelation] : entry.decision;
+      if (rechecking && (!Object.hasOwn(ORIGINAL_RELATIONS,sourceRelation) || (entry.decision !== undefined && entry.decision !== decision))) {
+        throw new Error("original-recheck 只按原句与证据的 sourceRelation 登记处置，无需另填 decision。");
+      }
       const original = editorialOriginal(frame, active, spec, { original: input });
       const line = originalQuote(frame, original);
       const quote = entry.quote ?? line;
@@ -506,7 +536,7 @@ function originalAction(frame, active, spec, args) {
         evidence: evidence.map(ref => sourceQuote(frame, active, spec, ref)), method: "original-only-review" };
       if (rechecking) {
         if (!["evidence","project-rule"].includes(entry.disputeScope)) throw new Error("原稿对账须区分外部证据与项目规则");
-        Object.assign(decisions[input.id],{scope:entry.disputeScope,gap:explanation(entry.gap,"双方原始依据的具体分歧",400)});
+        Object.assign(decisions[input.id],{sourceRelation,scope:entry.disputeScope,gap:explanation(entry.gap,"双方原始依据的具体分歧",400)});
       }
       submitted.add(input.id);
     }
@@ -514,7 +544,7 @@ function originalAction(frame, active, spec, args) {
   if (rechecking) {
     dispute.rechecks[frame.role] = decisions;
     frame.changed = true;
-    if (dispute.ids.some(id => !decisions[id])) return originalDisputePacket(frame,gate,dispute);
+    if (dispute.ids.some(id => !decisions[id])) return originalDisputePacket(frame,active,spec,gate,dispute);
     if (dispute.ids.some(id => !dispute.rechecks[gate.opposite][id])) return { stage:"original-dispute",handoff:gate.opposite };
     const unresolved = dispute.ids.filter(id => dispute.rechecks.reviewer[id].decision !== dispute.rechecks.auditor[id].decision);
     dispute.status = unresolved.length ? "blocked" : "settled";
@@ -531,7 +561,7 @@ function originalAction(frame, active, spec, args) {
     rememberOriginal(frame,active,gate.owner,decisions);
   }
   const conflict = discoverOriginalDispute(frame,active,gate,decisions);
-  if (conflict?.status === "checking") return originalDisputePacket(frame,gate,conflict);
+  if (conflict?.status === "checking") return originalDisputePacket(frame,active,spec,gate,conflict);
   const pending = gate.originals.filter(({ id }) => !Object.hasOwn(decisions, id));
   const items = pending.slice(0, RECORD_LIMIT).map(input => {
     try {
@@ -2812,11 +2842,12 @@ export function coverageSchema() {
     start:integer,end:integer,mode:{type:"string",enum:["subset","exact"]}},required:["kind","check"],additionalProperties:false,
     description:"direct 专用，与 evidence 互斥。有 objectCheckHint 时按对应块原样提交，包括独立计数的 expected。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)、line-range(file,start,end,mode，按 inventory)，只核本地登记摘录，不证明网页全文，勿与其他事实或来源合用。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding。"};
   return { originals: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,
-    description: "仅 original-record；保留／改正／待证判断只针对所读原稿。改正给实际原文争议短句，其他可省 quote；evidence 给独立已读原文。",
+    description: "original-record 填 decision；original-recheck 只填 sourceRelation 并记录 disputeScope、gap。判断只针对原句。改正或 contradicts 给被反驳的原稿短句，evidence 引本角色已读原文。",
     items: { type: "object", properties: { id: string, decision: { type: "string", enum: ["保留", "改正", "待证"] },
       basis: string, quote: string, evidence: { type: "array", minItems: 1, maxItems: 12, items: ref },
+      sourceRelation:{type:"string",enum:Object.keys(ORIGINAL_RELATIONS),description:"仅 original-recheck 使用，表示依据对本条原句的关系"},
       disputeScope:{type:"string",enum:["evidence","project-rule"],description:"仅 original-recheck 使用"},gap:string },
-    required: ["id", "decision", "basis", "evidence"], additionalProperties: false } },
+    required: ["id", "basis", "evidence"], additionalProperties: false } },
     offset: { ...integer, minimum: 0, description: "inventory 的起始位置，使用上页 next.offset。" },
     count: { ...integer, minimum: 1, maximum: INVENTORY_LIMIT, description: "inventory 每页 1–24 块，下一页按返回的 next 原样传入 offset/count。" },
     block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,

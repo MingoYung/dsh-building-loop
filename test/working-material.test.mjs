@@ -7,6 +7,7 @@ import { evidenceReference, workingClaimLocations } from "../governance/evidence
 import { goalSnapshot } from "../governance/goals.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { lineList, QUALITY } from "../governance/preflight.mjs";
+import { workspaceStateFile } from "../governance/session-mode.mjs";
 import { fixture, host, policy } from "./helpers.mjs";
 
 const material = "forward.md";
@@ -455,7 +456,7 @@ test("source-first review withholds the candidate until each reviewer saves a cu
   assert.equal(JSON.parse(fs.readFileSync(path.join(root,"first.json"),"utf8")).independentAudit.auditor,auditor);
 }));
 
-for (const scenario of ["agreement","evidence","project-rule","mixed"]) {
+for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-handoff"]) {
   test("opposite original receipts reconcile independently before executor repair: "+scenario, () => fixture(async (root,write) => {
     setOriginalFirstFixtures(write,"保留");
     const h=host(root,{automaticCoverage:false});
@@ -465,7 +466,7 @@ for (const scenario of ["agreement","evidence","project-rule","mixed"]) {
     const reviewer=(await h.flow("root","advance")).childId;
     const row = decision => ({id:"C1",decision,basis:"本轮实际核对登记的独立项目状态。",
       evidence:asExternal.evidence});
-    const recheck = (decision,scope) => ({...row(decision),disputeScope:scope,
+    const recheck = (decision,scope) => ({...row(decision),decision:undefined,sourceRelation:decision==="保留"?"supports":"insufficient",disputeScope:scope,
       gap:scope==="project-rule"?"项目处置是否需要两份独立报告尚待规定。":"报告的时间范围能否覆盖本次发布尚有分歧。"});
     await h.flow(reviewer,"prepare");
     await h.coverage(reviewer,"original-record",{originals:[row("保留")]});
@@ -479,8 +480,12 @@ for (const scenario of ["agreement","evidence","project-rule","mixed"]) {
     assert.equal((await h.flow(auditor,"prepare")).originalReview.items[0].reviewer,undefined);
     const dispute=await h.coverage(auditor,"original-record",{originals:[row("待证")]});
     assert.equal(dispute.stage,"original-dispute");
-    assert.deepEqual([dispute.items[0].reviewer.decision,dispute.items[0].auditor.decision],["保留","待证"]);
+    assert.deepEqual(Object.keys(dispute.items[0]),["id","original","evidence"]);
+    assert.deepEqual(dispute.items[0].evidence.map(ref => [ref.file,ref.start,ref.end,ref.quote]),[[report,2,2,externalQuote]]);
+    assert.ok(!JSON.stringify(dispute.items).includes(row("保留").basis),"historical judgments stay with the host");
     await assert.rejects(h.file(auditor,"read","candidate.md"),/改稿尚未开放/u);
+    await assert.rejects(h.coverage(auditor,"original-recheck",{originals:[{...recheck("保留","evidence"),decision:"改正"}]}),/sourceRelation/u);
+    await assert.rejects(h.coverage(auditor,"original-recheck",{originals:[row("保留")]}),/sourceRelation/u);
     await assert.rejects(h.coverage(auditor,"original-recheck",{originals:[{...recheck("保留","evidence"),
       evidence:[{...asExternal.evidence[0],quote:"出处没有这句话"}]}]}),/逐字/u);
     const a=recheck(scenario==="agreement"?"保留":"待证",scenario==="project-rule"?"project-rule":"evidence");
@@ -489,6 +494,55 @@ for (const scenario of ["agreement","evidence","project-rule","mixed"]) {
     assert.equal((await h.flow("root","advance")).childId,reviewer);
     const blind=(await h.flow(reviewer,"prepare")).originalReview;
     assert.deepEqual(blind.items,dispute.items);
+    if (scenario === "legacy-handoff") {
+      // Simulate an upgrade after a named auditor voted and the reviewer had prepared the old packet.
+      const statePath = path.join(process.env.DSH_HOME,"building-loop-state",workspaceStateFile(root));
+      const readState = () => JSON.parse(fs.readFileSync(statePath,"utf8"));
+      const currentDispute = () => readState().units.K01.originalDispute;
+      const state = readState(), legacy = state.units.K01.originalDispute;
+      delete legacy.view;
+      const oldVote = legacy.rechecks.auditor.C1;
+      delete oldVote.sourceRelation;
+      oldVote.basis = "旧格式的具名依据不应随证据包重放。";
+      assert.equal(oldVote.decision,"待证");
+      const source = legacy.initial.auditor.C1.evidence[0];
+      // A duplicate and a working-material-only receipt test the recipient's evidence grants.
+      legacy.initial.auditor.C1.evidence.push({...source},{...source,file:material,quote:materialQuote});
+      if (process.platform === "win32") {
+        legacy.initial.auditor.C1.evidence.push({...source,file:source.file.toUpperCase()});
+      }
+      fs.writeFileSync(statePath,JSON.stringify(state));
+
+      const fresh = await h.coverage(reviewer,"original-recheck",{originals:[row("改正")]});
+      assert.equal(fresh.stage,"original-dispute");
+      assert.equal(fresh.pending,1);
+      assert.deepEqual(fresh.items,blind.items);
+      const archived = currentDispute();
+      assert.deepEqual(archived.previousRechecks,{reviewer:{},auditor:{C1:oldVote}});
+      assert.deepEqual(archived.rechecks,{reviewer:{},auditor:{}});
+      assert.equal(archived.status,"checking");
+
+      const newVote = (basis) => ({...recheck("保留","evidence"),basis});
+      const reviewerVote = newVote("首审按新版原始证据确认公布状态。");
+      const auditorVote = newVote("复核独立读取正式报告并核对状态。");
+      const firstFresh = await h.coverage(reviewer,"original-recheck",{originals:[reviewerVote]});
+      assert.equal(firstFresh.phase,"first-audit-ready");
+      assert.equal(currentDispute().status,"checking");
+      assert.deepEqual(currentDispute().rechecks.auditor,{});
+      assert.equal((await h.flow("root","advance")).childId,auditor);
+      assert.deepEqual((await h.flow(auditor,"prepare")).originalReview.items,blind.items);
+      const secondFresh = await h.coverage(auditor,"original-recheck",{originals:[auditorVote]});
+      assert.equal(secondFresh.phase,"review-ready");
+      const settled = currentDispute();
+      assert.equal(settled.status,"settled");
+      assert.deepEqual(settled.actors,{reviewer,auditor});
+      assert.deepEqual(settled.previousRechecks.auditor.C1,oldVote);
+      assert.equal(settled.rechecks.reviewer.C1.sourceRelation,"supports");
+      assert.equal(settled.rechecks.reviewer.C1.basis,reviewerVote.basis);
+      assert.equal(settled.rechecks.auditor.C1.sourceRelation,"supports");
+      assert.equal(settled.rechecks.auditor.C1.basis,auditorVote.basis);
+      return;
+    }
     const second=await h.coverage(reviewer,"original-recheck",{originals:[
       recheck("保留",["project-rule","mixed"].includes(scenario)?"project-rule":"evidence")]});
     if(scenario==="agreement") {
