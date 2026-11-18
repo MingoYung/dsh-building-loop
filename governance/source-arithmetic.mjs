@@ -2,6 +2,8 @@ import { evidenceReference, registeredSourceRows, workingMaterialReference } fro
 import { canonicalDecimal, decimal, lineList, physicalCsvCells, quantityRelation, roundedDecimal } from "./preflight.mjs";
 import { digest, includes, keyOf, numericUnitConversion, readBytes, relativeName } from "./policy.mjs";
 
+export const SOURCE_ARITHMETIC_TOOL = "building_loop_calculate";
+
 const operations = {
   difference: { count: 2, formula: "a − b", unit: "原单位" },
   share: { count: 2, formula: "a / b × 100", unit: "%" },
@@ -12,6 +14,33 @@ const operations = {
 const decimalToken = /[+−-]?\d+(?:[,\u202f\u00a0]\d+)*(?:\.\d+)?(?:[eE][+−-]?\d+)?/gu;
 const durationUnits = ["h", "min", "s"];
 const durationPart = /^\s*(?:(hours?|h|minutes?|min|seconds?|s)(?![a-z])|(小时|分钟|秒钟?))/iu;
+// A number alone can also be a record key or a year. Automatic selection
+// requires a complete, recognized quantity at the end of a simple source row.
+const scalarUnits = new Set(("% ％ ‰ °C °F ℃ 秒 毫秒 分钟 小时 千克 公斤 克 毫克 米 毫米 厘米 千米 美元 人民币 " +
+  "件 个 人 人次 次 箱 盒 台 项 份 条 hours hour minutes minute seconds second items item boxes box people persons count").split(" "));
+// Chinese count units can lead directly into the sentence. Prefer the entire
+// longest registered unit (e.g. 人次); an English symbol must match as a whole.
+const chineseScalarUnits = [...scalarUnits].filter(unit => /^\p{Script=Han}+$/u.test(unit)).sort((a,b) => b.length - a.length);
+const leadingScalarUnit = new RegExp("^\\s*(" + chineseScalarUnits.join("|") + "|[%％‰°℃a-zA-Zμ]+(?:/[a-zA-Zμ]+)?[²³]?)", "u");
+const locatorLabel = /(?:号|编码|标识|版本|邮编|日期|年份|时刻|时间戳|第\s*$|\b(?:id|code|sku|identifier|serial|version|model|date|timestamp|epoch|clock|year)\b)/iu;
+const qualifiedLabel = /(?:每|人均|上限|下限|范围|区间|预计|估计|估算|大约|可能|不足|至少|至多|不超过|并非|否认|未达|\b(?:per|each|range|limit|bounded|estimated?|probably|possibly|not|approximately|about|maximum|minimum)\b)/iu;
+
+function scalarRowUnit(quote, hit, wholeRow) {
+  const prefix = quote.slice(0, hit.index);
+  const before = wholeRow ? prefix : prefix.split(/[。；;，,]/u).at(-1);
+  const tail = quote.slice(hit.index + hit[0].length);
+  const match = leadingScalarUnit.exec(tail);
+  const unit = match?.[1];
+  if (!unit || !scalarUnits.has(unit) && !numericUnitConversion(unit, unit) ||
+      locatorLabel.test(before) || qualifiedLabel.test(before)) return;
+  const after = tail.slice(match[0].length);
+  // An explicitly located token may be followed by prose. Never truncate a
+  // rate, power, compound unit or qualified amount to its leading unit.
+  if (/^\s*(?:[/／⁄·×÷*^²³]|每|力|平方|立方|per\b)/iu.test(after)) return;
+  if (wholeRow && (!/^\s*[.。]?\s*$/u.test(after) ||
+      /[,，;；。!?！？#/|*×÷+<>≤≥~≈±]|(?:^|\s)[−-]\s*$/u.test(before))) return;
+  return unit;
+}
 
 export const sourceArithmeticSchema = {
   operation: { enum: Object.keys(operations) },
@@ -20,7 +49,7 @@ export const sourceArithmeticSchema = {
       file: { type: "string" },
       line: { type: "integer", minimum: 1 },
       column: { type: "integer", minimum: 1, description: "同一物理行 CSV 中的列号，1 起计。与 value 二选一。" },
-      value: { type: "string", maxLength: 30, description: "非 CSV 原文行中唯一的完整原数值，分组符保留。" },
+      value: { type: "string", maxLength: 30, description: "已读原文行只含一个明确带单位的简单量时可省略。显式选数须逐字保留完整十进制数及分组符；CSV 用 column。" },
     }, required: ["file", "line"], additionalProperties: false,
   } },
   decimals: { type: "integer", minimum: 0, maximum: 6 },
@@ -65,7 +94,7 @@ function compoundDuration(quote) {
   return { number: { n: ns, scale: 1n }, raw: quote.slice(start, end), value: ns.toString(), unit: "ns" };
 }
 
-function sourceOperand(frame, active, files, ref, durationUnit) {
+function sourceOperand(frame, active, files, ref, durationUnit, usesImplicitScalar) {
   const file = relativeName(ref?.file);
   if (!includes(files, file)) throw new Error("只可从本角色已获授权的登记原始证据复算 " + file);
   const bytes = readBytes(frame.root, file);
@@ -90,12 +119,20 @@ function sourceOperand(frame, active, files, ref, durationUnit) {
   let raw, unit;
   if (Number.isSafeInteger(ref.column) && ref.column > 0 && ref.value === undefined && quote.includes(",")) {
     raw = physicalCsvCells(quote)[ref.column - 1];
-  } else if (ref.column === undefined && typeof ref.value === "string") {
-    const hits = [...quote.matchAll(decimalToken)].filter(match => match[0] === ref.value);
+  } else if (ref.column === undefined && (ref.value === undefined || typeof ref.value === "string")) {
+    const tokens = [...quote.matchAll(decimalToken)];
+    const hits = ref.value === undefined ? tokens : tokens.filter(match => match[0] === ref.value);
     if (hits.length === 1) {
       const { index: start, 0: token } = hits[0], end = start + token.length;
       const tail = quote.slice(end);
       unit = /^\s*(%|％|‰|[a-zA-Zμ°]+(?:\/[a-zA-Z]+[²³]?)?|毫秒|秒|分钟|小时|千克|公斤|美元|人民币|人|次)(?![a-zA-Z])/u.exec(tail)?.[1];
+      if (usesImplicitScalar) {
+        // Keep all-explicit historical receipts byte compatible. For a new
+        // line-only selection all units must agree, but only an omitted selector
+        // requires the single quantity to occupy the whole physical line.
+        unit = scalarRowUnit(quote, hits[0], ref.value === undefined);
+        if (!unit) throw new Error("操作数须有明确单位，省略数值仅适用于单一实测量；请确认口径并选择原数值或 CSV 列号");
+      }
       const unitEnd = unit ? end + tail.indexOf(unit) + unit.length : end;
       // In "12 or more", an apparent unit can be the start of a bound.
       // A bound after an actual unit and one after a bare number both apply.
@@ -123,7 +160,8 @@ export function calculateFromSources(frame, active, spec, { operation, operands,
   }
   const files = arithmeticSources(frame, active, spec);
   if (durationUnit !== undefined && !durationUnits.includes(durationUnit)) throw new Error("复合时长输出单位须为 h、min 或 s");
-  const sourced = operands.map(ref => sourceOperand(frame, active, files, ref, durationUnit));
+  const usesImplicitScalar = durationUnit === undefined && operands.some(ref => ref?.column === undefined && ref?.value === undefined);
+  const sourced = operands.map(ref => sourceOperand(frame, active, files, ref, durationUnit, usesImplicitScalar));
   const units = sourced.map(row => row.evidence.unit);
   if (units.some(Boolean) && !units.every(unit => unit === units[0])) throw new Error("操作数单位不一致或不完整，请先统一单位并确认口径");
   // A common exact scale cancels in both ratio operations.

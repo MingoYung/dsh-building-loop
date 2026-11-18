@@ -3,7 +3,9 @@ import { citation, claimRow, lineList, numberedCitationRanges, numericChecks, er
 import { evidenceReference, evidenceSpan, originalReviewContract, projectPolicyReference, registeredObservation, sourceVersionCurrent, UnobservedExcerptError, webSourceLocator, workingClaimDecisions, workingMaterialReference } from "./evidence.mjs";
 import { sectionSourceAttribution } from "./assertion-attribution.mjs";
 import { currentHostResults } from "./host-results.mjs";
-import { measuredOriginalDisposition } from "./source-arithmetic.mjs";
+import { measuredOriginalDisposition, SOURCE_ARITHMETIC_TOOL } from "./source-arithmetic.mjs";
+import { groundedOriginalReceipt, ORIGINAL_RECHECK_TOOL, ORIGINAL_RECHECK_VIEW, ORIGINAL_RELATIONS } from "./original-review-proof.mjs";
+export { rememberOriginalCalculation, originalRecheckSchema } from "./original-review-proof.mjs";
 
 export const COVERAGE_VERSION = 1;
 // Checkpoint bindings include this separate classification contract revision;
@@ -12,8 +14,6 @@ export const CLASSIFICATION_VERSION = 13;
 // Only this error authorizes persisting a failed call's proof invalidation. Other
 // failures retain the ordinary all-or-nothing state transaction behavior.
 export class CoverageRecordError extends Error {}
-const ORIGINAL_RELATIONS = Object.freeze({supports:"保留",contradicts:"改正",insufficient:"待证"});
-const ORIGINAL_RECHECK_VIEW = "original-evidence/1";
 const KINDS = ["direct", "inference", "nonfactual", "hypothesis", "error-example"];
 const STATUSES = ["supported", "unsupported", "uncertain"];
 const MATERIAL_ATTRIBUTION = "material-attribution";
@@ -459,9 +459,14 @@ function originalDisputePacket(frame, active, spec, gate, dispute) {
       a.end-b.end || (a.quote ?? "").localeCompare(b.quote ?? ""));
     return {id,original:{file:original.file,line:original.start,sha256:original.sha256,quote:originalQuote(frame,original)}, evidence};
   });
+  // A receipt belongs to this reader and this original. Completed peer arithmetic cannot satisfy this step.
+  const own = dispute.calculations?.[frame.role];
+  const hasCalculation = !!own && own.id === ids[0] && dispute.actors[frame.role] === frame.agent.id;
   return {stage:"original-dispute",binding:gate.binding,rule:gate.rule,pending:ids.length,items,
-    next:{tool:"building_loop_coverage",action:"original-recheck"},
-    note:"按当前总纲独立核原句。sourceRelation 只选 supports、contradicts、insufficient，宿主据此登记处置。basis 与 evidence 给出所据原文，contradicts 还需逐字定位反驳的短句。gap 记录证明范围或缺口；仅项目规则存在歧义时 disputeScope 选 project-rule。"};
+    next:{tool:ORIGINAL_RECHECK_TOOL,action:"original-recheck",calculation:{
+      status:hasCalculation ? "available" : "required-if-selected",tool:SOURCE_ARITHMETIC_TOOL,action:"evaluate"
+    }},
+    note:"独立判断这条原句与授权证据的关系。原文明示、可复算、缺少必要前提、项目规则分别选对应 grounds。缺少所需依据用 insufficient，原文有相反记录才用 contradicts。引用实际原文。选择 calculation 且尚无本角色凭据时，先执行 next.calculation，再提交判断。"};
 }
 
 function originalQuote(frame, ref) {
@@ -484,6 +489,7 @@ function originalAction(frame, active, spec, args) {
   if (dispute?.status === "checking" && dispute.view !== ORIGINAL_RECHECK_VIEW) {
     if (Object.values(dispute.rechecks).some(rows => Object.keys(rows).length)) dispute.previousRechecks = dispute.rechecks;
     dispute.rechecks = {reviewer:{},auditor:{}};
+    delete dispute.calculations;
     dispute.view = ORIGINAL_RECHECK_VIEW;
     migrated = frame.changed = true;
   }
@@ -507,6 +513,8 @@ function originalAction(frame, active, spec, args) {
     if (!Array.isArray(args.originals) || !args.originals.length || args.originals.length > RECORD_LIMIT) {
       throw new Error("original-record 每次提交 1–12 项来稿判断");
     }
+    const nextId = rechecking && dispute.ids.find(id => !decisions[id]);
+    if (rechecking && (args.originals.length !== 1 || args.originals[0]?.id !== nextId)) throw new Error("只提交本角色当前待核的一个争议编号。");
     const submitted = new Set();
     for (const entry of args.originals) {
       const input = gate.originals.find(({ id }) => id === entry?.id);
@@ -532,12 +540,10 @@ function originalAction(frame, active, spec, args) {
       if (!Array.isArray(evidence) || !evidence.length || evidence.length > 12) {
         throw new Error("原稿判断须给本角色实际读过的外部证据；待证仅说明这些依据能核到哪里");
       }
-      decisions[input.id] = { decision, original, quote, basis: explanation(basis, "原稿判断依据", 640),
-        evidence: evidence.map(ref => sourceQuote(frame, active, spec, ref)), method: "original-only-review" };
-      if (rechecking) {
-        if (!["evidence","project-rule"].includes(entry.disputeScope)) throw new Error("原稿对账须区分外部证据与项目规则");
-        Object.assign(decisions[input.id],{sourceRelation,scope:entry.disputeScope,gap:explanation(entry.gap,"双方原始依据的具体分歧",400)});
-      }
+      const signed = evidence.map(ref => sourceQuote(frame,active,spec,ref));
+      const proof = rechecking ? groundedOriginalReceipt(frame,active,dispute,entry,signed,line,quote)
+        : {basis:explanation(basis,"原稿判断依据",640)};
+      decisions[input.id] = {decision,original,quote,evidence:signed,method:"original-only-review",...proof};
       submitted.add(input.id);
     }
   }
@@ -1966,7 +1972,10 @@ export function coverageAction(frame, active, spec, args, options = {}) {
       if (editorial && originalGate) {
         const decision = originalGate.decisions[editorial.id];
         const recorded = active.coverage.records[row.id]?.parts.find(part => part.originalDisposition);
+        // Only the label block and only this actor get the reconciled, current-version proof.
         block.editorial.independentOriginal = { decision: decision.decision, method: decision.method,
+          ...(decision.grounds ? {grounds:decision.grounds,basis:decision.basis,
+            evidence:decision.evidence.map(({file,start,end})=>({file,start,end}))} : {}),
           ...(recorded?.finding ? { finding: recorded.finding } : {}) };
       }
       const claim = editorials.get(row.line);
@@ -2842,12 +2851,11 @@ export function coverageSchema() {
     start:integer,end:integer,mode:{type:"string",enum:["subset","exact"]}},required:["kind","check"],additionalProperties:false,
     description:"direct 专用，与 evidence 互斥。有 objectCheckHint 时按对应块原样提交，包括独立计数的 expected。registered-excerpts: count(file,expected条/句/项)、contains/excludes(file,quote单行确切文本)、line-status(file,line,expected登记状态)、line-range(file,start,end,mode，按 inventory)，只核本地登记摘录，不证明网页全文，勿与其他事实或来源合用。candidate: citation-count(source,expected可识别同行引用行数)、citations-marked(source,marker确切字面)、citations-leading-marked(source,marker确切行首)、citation-profile(source)，须先读当前全稿。参数/读取/谓词冲突留在核验侧；真实对象不符须核验者显式 unsupported+finding。"};
   return { originals: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,
-    description: "original-record 填 decision；original-recheck 只填 sourceRelation 并记录 disputeScope、gap。判断只针对原句。改正或 contradicts 给被反驳的原稿短句，evidence 引本角色已读原文。",
+    description: "original-record 用于初次独立判断原稿。改正给被反驳的原稿短句，evidence 引本角色已读原文。争议阶段用 prepare 指定的专用工具。",
     items: { type: "object", properties: { id: string, decision: { type: "string", enum: ["保留", "改正", "待证"] },
       basis: string, quote: string, evidence: { type: "array", minItems: 1, maxItems: 12, items: ref },
-      sourceRelation:{type:"string",enum:Object.keys(ORIGINAL_RELATIONS),description:"仅 original-recheck 使用，表示依据对本条原句的关系"},
-      disputeScope:{type:"string",enum:["evidence","project-rule"],description:"仅 original-recheck 使用"},gap:string },
-    required: ["id", "basis", "evidence"], additionalProperties: false } },
+    },
+    required: ["id", "decision", "basis", "evidence"], additionalProperties: false } },
     offset: { ...integer, minimum: 0, description: "inventory 的起始位置，使用上页 next.offset。" },
     count: { ...integer, minimum: 1, maximum: INVENTORY_LIMIT, description: "inventory 每页 1–24 块，下一页按返回的 next 原样传入 offset/count。" },
     block: { ...string, description: "status 可选：只取这一块已有的详细证明；省略时只返回进度摘要。" }, entries: { type: "array", minItems: 1, maxItems: RECORD_LIMIT,

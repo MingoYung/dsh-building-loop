@@ -14,9 +14,10 @@ import {
 import { checkSourceNarrative, coverageFindings, evidenceReference, expectedClaims, originalDraftIssues, originalReviewContract, readInventory, quoteRepairLocation, registeredSourceRows, sourceVersionCurrent, workingClaimLocations } from "./evidence.mjs";
 import { authorityVersions, restartSourceReview, sourceAuthorityChanges } from "./source-authority.mjs";
 import { currentHostResults, hostResultSlots, renderHostResults } from "./host-results.mjs";
-import { arithmeticSources, calculateFromSources, sourceArithmeticSchema } from "./source-arithmetic.mjs";
+import { arithmeticSources, calculateFromSources, sourceArithmeticSchema, SOURCE_ARITHMETIC_TOOL as CALCULATE } from "./source-arithmetic.mjs";
 import { TERMINAL, beginLedgerReview, bindLedgerAssignment, captureRequest, ledgerAction, ledgerSummary, noteContextRead, requestIntent, trackUnit } from "./ledger.mjs";
 import { goalSnapshot, needsRevalidation, requiredLineCheck, requireGoalRead } from "./goals.mjs";
+import { ORIGINAL_RECHECK_TOOL, originalRecheckSchema, rememberOriginalCalculation } from "./original-review-proof.mjs";
 import { CLASSIFICATION_VERSION, CoverageRecordError, classificationDisagreements, coverageAction, coverageSchema, coverageSummary, requireDisputedProof, recordMeetsDispute, documentCoverage, citationLineCounts, citationMarkedLines, candidateCitationProfiles, sourceLineEnumerationChecks, simulationScopeLocatorIssues, directCoverageMemo, restoreDirectCoverage, originalReviewGate, projectPolicyContract, captureNumberedEvidence, numberedEvidenceRegressions } from "./coverage.mjs";
 import { LEDGER_TURN_ENDS, STATE_LIMIT, WorkspaceLockBusy, clearLedgerEvents, commitWorkspaceState, encodeLockedWorkspaceState, hasLedgerJournal, hasPendingLedgerEvents,
   pendingLedgerEvents, persistLedgerEvent, recoverLedgerJournal, withWorkspaceLock } from "./transactions.mjs";
@@ -61,10 +62,9 @@ const ASSESS = "building_loop_quality";
 const CODE_REVIEW = "building_loop_code_review";
 const LEDGER = "building_loop_ledger";
 const COVERAGE = "building_loop_coverage";
-const CALCULATE = "building_loop_calculate";
 const START = "building_loop_propose";
 const dedicatedCodeReview = Symbol("dedicated-code-review");
-const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, CODE_REVIEW, LEDGER, COVERAGE, START, REPRODUCE, DIAGNOSE, DIAGNOSTIC_PROBE, CALCULATE];
+const PROJECT_TOOLS = [WORKFLOW, FILE, ASSESS, CODE_REVIEW, LEDGER, COVERAGE, ORIGINAL_RECHECK_TOOL, START, REPRODUCE, DIAGNOSE, DIAGNOSTIC_PROBE, CALCULATE];
 const SEARCH_OBSERVATION_LIMIT = 16;
 const MANUSCRIPT_LINE_PREVIEW_LIMIT = 24;
 const MANUSCRIPT_MARKER_PREVIEW_LIMIT = 4;
@@ -2764,6 +2764,7 @@ export function apply(ctx, config = {}) {
     const result = change(exec.agent, frame => {
       if (!["reviewer", "auditor"].includes(frame.role)) throw new Error("全文覆盖仅本阶段核验或独立反证角色可访问，总控无正文读权");
       const [id, active] = frame.assignment;
+      if (args.unit !== undefined && args.unit !== id) throw new Error("核验请求与本角色获准的单元不符。");
       const goal = requireGoalRead(frame, active);
       const spec = unitOf(frame, id);
       if (isCodeReviewUnit(frame, active, spec)) throw new Error("当前代码任务用 building_loop_code_review prepare 获取变更范围");
@@ -3857,7 +3858,12 @@ export function apply(ctx, config = {}) {
       if (!assignment || !["executor", "reviewer", "auditor"].includes(frame.role)) throw new Error("当前角色没有原文复算授权");
       const [id, active] = assignment;
       requireGoalRead(frame, active);
-      return calculateFromSources(frame, active, unitOf(frame, id), args);
+      const spec = unitOf(frame, id);
+      const result = calculateFromSources(frame, active, spec, args);
+      // Only the active disputed original can receive a reusable calculation.
+      // All other roles and phases retain the ordinary read-only response.
+      const proof = rememberOriginalCalculation(frame, active, spec, result);
+      return proof ? { ...result, ...proof } : result;
     }, { claim: false }), ["operation", "operands"]), { when: visible(["executor", "reviewer", "auditor"], frame =>
       Boolean(frame.assignment && arithmeticSources(frame, frame.assignment[1], unitOf(frame, frame.assignment[0])).length)) });
 
@@ -3893,7 +3899,17 @@ export function apply(ctx, config = {}) {
 
   const qualityFields = Object.fromEntries(Object.entries(QUALITY).map(([key, description]) => [key, { ...string, description }]));
   const proseReview = frame => !isCodeReviewUnit(frame, frame.assignment[1], unitOf(frame, frame.assignment[0]));
-  register(tool(COVERAGE, "按宿主全文清单逐块核验。原稿先核用 originals、original-record；遇双方分歧按返回的 original-recheck 定点对账。inventory 分页取全文；record 每次 1–12 块，部分错误只重交 invalid 块；status 默认只给进度，可用 block 取单块证明。", ["originals","original-record","original-recheck","inventory","record","status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"], proseReview)});
+  const disputeOpen = frame => frame.assignment[1].originalDispute?.status === "checking" &&
+    unitOf(frame, frame.assignment[0]).originalFirst;
+  register(tool(COVERAGE, "按宿主全文清单逐块核验。原稿先核用 originals、original-record。inventory 分页取全文；record 每次 1–12 块，部分错误只重交 invalid 块；status 默认只给进度，可用 block 取单块证明。", ["originals","original-record","inventory","record","status"], coverageSchema(), cover), {when:visible(["reviewer","auditor"], frame => proseReview(frame) && !disputeOpen(frame))});
+  // DSH registers static schemas. During a dispute offer only the current ballot;
+  // persisted calls still reach the same role, source and transaction checks.
+  register(tool(ORIGINAL_RECHECK_TOOL, "独立核一条有分歧的原稿。按 prepare 中的原句及本角色已读的出处提交，宿主登记依据与处置。", ["original-recheck"], {
+    originals: originalRecheckSchema(),
+  }, (args, exec) => {
+    if (args.action !== "original-recheck") throw new Error("当前工具只接受 original-recheck。");
+    return cover(args, exec);
+  }, ["originals"]), {when:visible(["reviewer","auditor"], frame => proseReview(frame) && disputeOpen(frame))});
   const qualityNames = Object.keys(QUALITY);
   const referenceSchema = { type: "object", properties: { file: string, start: number, end: number }, required: ["file", "start", "end"], additionalProperties: false };
   register(tool(ASSESS, "独立核验方在 review 前记录六项质量依据。每项一句具体判断，revise 列出要退回的项，均通过时填 []。此工具不关单。", ["assess"], {
@@ -4012,7 +4028,7 @@ export function apply(ctx, config = {}) {
         });
         const originalReads = assignment && pendingOriginalReads(frame,assignment[1],unitOf(frame,assignment[0]));
         if (originalReads) return [descriptor,
-          "当前只核原稿。先用 building_loop prepare 读授权来稿及来源，按 originalReview.next 保存判断。改正须逐字定位原稿争议；待证只说明证据范围。已登记的复算由宿主处理。改稿将在来稿判断保存后开放。",
+          "当前只核原稿。先用 building_loop prepare 读授权来稿及来源，按 originalReview.next 完成本角色选定的取证方式，再保存判断。改正须逐字定位原稿争议；待证只说明证据范围。已登记的复算由宿主处理。改稿将在来稿判断保存后开放。",
           JSON.stringify({read:originalReads,write:[]}),...shared,...goals].join("\n");
         const detail = assignment ? {
           unit: assignment[0], candidate: unitOf(frame, assignment[0]).candidate,

@@ -68,6 +68,71 @@ function registerSource(write, tableText = table) {
   return config;
 }
 
+test("line-only scalar operands require an unambiguous measured quantity and the caller's own signed read", () => fixture(async (root, write) => {
+  const rows = ["# Measurements", "上午盘点 72 箱。", "下午结余 15 箱。", "Box count: 15 items.", "Duration = 1,234 ms.",
+    "Elapsed: 34 ms.", "约 72 箱。", "盘点 72 箱或以上。", "批号：72 箱。", "第72箱。",
+    "2025-06-01", "08:15", "A72 ms", "盘点 72 箱及 15 箱", "34–37 ms", "Weight = 1e2 kg.",
+    "lower,72 boxes", "72", "Estimated load was 72 kg.", "每次耗时至少还有 34 ms。",
+    "每箱装有 72 件。", "Per truck: 72 boxes.", "并非库存合计 72 箱。"];
+  const original = rows.join("\n")+"\n";
+  registerSource(write,original);
+  const h = host(root,{automaticCoverage:false}), worker = (await h.flow("root","advance")).childId;
+  const ref = line => ({file:source,line}), difference = (a,b,role=worker) => evaluate(h,role,"difference",[a,b]);
+  await h.file(worker,"read","overview.md");
+  await assert.rejects(difference(ref(2),ref(3)),/先实际读取/u);
+  await h.file(worker,"read",source);
+  const count = await difference(ref(2),ref(3));
+  assert.deepEqual([count.value,count.unit],["57","箱"]);
+  assert.deepEqual(count.operands.map(x=>[x.file,x.line,x.value,x.unit,x.sha256]),[
+    [source,2,"72","箱",digest(original)],[source,3,"15","箱",digest(original)]]);
+  const measured = await difference(ref(5),ref(6));
+  assert.deepEqual([measured.value,measured.unit,measured.operands[0].raw],["1200","ms","1,234"]);
+  assert.deepEqual(await difference({...ref(2),value:"72"},ref(3)),count);
+  await assert.rejects(difference(ref(2),ref(4)),/单位/u);
+  await assert.rejects(difference({...ref(2),value:"73"},ref(3)),/唯一/u);
+  await assert.rejects(difference({...ref(2),value:72},ref(3)),/有效|唯一|字符串|参数/u);
+  for(let line=7;line<=rows.length;line++) {
+    await assert.rejects(difference(ref(line),ref(3)),/唯一|单一|限定词|格式/u,rows[line-1]);
+  }
+  await assert.rejects(difference(ref(1),ref(3)),/登记为原文/u);
+  await assert.rejects(difference({file:"candidate.md",line:2},ref(3)),/登记原始证据/u);
+  await assert.rejects(difference(ref(2),ref(3),"root"),/没有原文复算授权/u);
+  await h.file(worker,"read","candidate.md");
+  await h.flow(worker,"submit");
+  const reviewer = (await h.flow("root","advance")).childId;
+  await h.file(reviewer,"read","overview.md");
+  await assert.rejects(difference(ref(2),ref(3),reviewer),/先实际读取/u);
+  await h.file(reviewer,"read",source);
+  assert.deepEqual(await difference(ref(2),ref(3),reviewer),count);
+  write(source,original.replace("72 箱","73 箱"));
+  await assert.rejects(difference(ref(2),ref(3),reviewer),/实际读取|原始版本/u);
+}));
+
+test("mixed source references validate each locator separately and still compare whole units", () => fixture(async (root,write) => {
+  const rows = ["# 库存", "本批总共 72 箱。", "登记留存 55 箱，另有 17 箱列入退库单。",
+    "登记留存 55 箱，另有 17 盒列入退库单。", "退库单至少 17 箱，其余 55 箱。",
+    "登记每车 17 箱，其余 55 箱。", "退库单 17 箱/车，其余 55 箱。", "退库单 17 箱以下，其余 55 箱。"];
+  const original = rows.join("\n")+"\n";
+  registerSource(write,original);
+  const h=host(root,{automaticCoverage:false}), worker=(await h.flow("root","advance")).childId;
+  await h.file(worker,"read","overview.md");
+  await h.file(worker,"read",source);
+  const at = (line,value) => value === undefined ? {file:source,line} : {file:source,line,value};
+  const diff = (a,b) => evaluate(h,worker,"difference",[a,b]);
+  for (const [a,b,answer] of [[at(2),at(3,"17"),"55"],[at(2),at(3,"55"),"17"],[at(3,"17"),at(2),"-55"]]) {
+    const result=await diff(a,b);
+    assert.deepEqual([result.value,result.unit],[answer,"箱"]);
+    assert.ok(result.operands.every(row => row.sha256===digest(original)&&row.unit==="箱"));
+  }
+  await assert.rejects(diff(at(2),at(3)),/唯一/u);
+  await assert.rejects(diff(at(2),at(3,"7")),/唯一/u);
+  for (const line of [4,5,6,7,8]) await assert.rejects(diff(at(2),at(line,"17")),/单位|限定词/u,rows[line-1]);
+  const explicit=await diff(at(2,"72"),at(3,"17"));
+  assert.deepEqual(explicit.operands,[{file:source,line:2,value:"72",sha256:digest(original)},
+    {file:source,line:3,value:"17",sha256:digest(original)}]);
+  assert.equal(explicit.unit,"原单位");
+}));
+
 test("original disposition recomputes a scoped difference from pinned physical rows for each role", () => fixture((root, write) => {
   const config = registerSource(write), unit = config.units.K01;
   const incoming = "desk.md";

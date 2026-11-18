@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { coverageAction, coverageSummary } from "../governance/coverage.mjs";
 import { evidenceReference, workingClaimLocations } from "../governance/evidence.mjs";
+import { groundedOriginalReceipt, originalRecheckSchema, ORIGINAL_RECHECK_TOOL } from "../governance/original-review-proof.mjs";
 import { goalSnapshot } from "../governance/goals.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { lineList, QUALITY } from "../governance/preflight.mjs";
@@ -466,8 +467,9 @@ for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-ha
     const reviewer=(await h.flow("root","advance")).childId;
     const row = decision => ({id:"C1",decision,basis:"本轮实际核对登记的独立项目状态。",
       evidence:asExternal.evidence});
-    const recheck = (decision,scope) => ({...row(decision),decision:undefined,sourceRelation:decision==="保留"?"supports":"insufficient",disputeScope:scope,
-      gap:scope==="project-rule"?"项目处置是否需要两份独立报告尚待规定。":"报告的时间范围能否覆盖本次发布尚有分歧。"});
+    const recheck = (decision,scope) => ({id:"C1",evidence:asExternal.evidence,sourceRelation:decision==="保留"?"supports":"insufficient",
+      grounds:scope==="project-rule"?"project-rule":decision==="保留"?"source-statement":"missing-premise",
+      ...(scope==="project-rule"?{policy:{file:"overview.md",start:1,end:1,quote:"待证表示证据不足"}}:{})});
     await h.flow(reviewer,"prepare");
     await h.coverage(reviewer,"original-record",{originals:[row("保留")]});
     const p=await h.flow(reviewer,"prepare");
@@ -480,6 +482,16 @@ for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-ha
     assert.equal((await h.flow(auditor,"prepare")).originalReview.items[0].reviewer,undefined);
     const dispute=await h.coverage(auditor,"original-record",{originals:[row("待证")]});
     assert.equal(dispute.stage,"original-dispute");
+    assert.equal(dispute.next.tool,ORIGINAL_RECHECK_TOOL);
+    assert.deepEqual(dispute.next.calculation,{status:"required-if-selected",tool:"building_loop_calculate",action:"evaluate"});
+    assert.ok(h.visible(auditor).includes(ORIGINAL_RECHECK_TOOL));
+    assert.ok(!h.visible(auditor).includes("building_loop_coverage"));
+    for (const outsider of ["root",worker]) {
+      assert.ok(!h.visible(outsider).includes(ORIGINAL_RECHECK_TOOL));
+      await assert.rejects(h.invoke(outsider,ORIGINAL_RECHECK_TOOL,{action:"original-recheck",originals:[recheck("保留","evidence")]}));
+    }
+    await assert.rejects(h.invoke(auditor,ORIGINAL_RECHECK_TOOL,{action:"original-record",originals:[row("保留")]}));
+    await assert.rejects(h.invoke(auditor,ORIGINAL_RECHECK_TOOL,{action:"original-recheck",unit:"elsewhere",originals:[recheck("保留","evidence")]}));
     assert.deepEqual(Object.keys(dispute.items[0]),["id","original","evidence"]);
     assert.deepEqual(dispute.items[0].evidence.map(ref => [ref.file,ref.start,ref.end,ref.quote]),[[report,2,2,externalQuote]]);
     assert.ok(!JSON.stringify(dispute.items).includes(row("保留").basis),"historical judgments stay with the host");
@@ -489,7 +501,7 @@ for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-ha
     await assert.rejects(h.coverage(auditor,"original-recheck",{originals:[{...recheck("保留","evidence"),
       evidence:[{...asExternal.evidence[0],quote:"出处没有这句话"}]}]}),/逐字/u);
     const a=recheck(scenario==="agreement"?"保留":"待证",scenario==="project-rule"?"project-rule":"evidence");
-    const first=await h.coverage(auditor,"original-recheck",{originals:[a]});
+    const first=await h.invoke(auditor,ORIGINAL_RECHECK_TOOL,{action:"original-recheck",originals:[a]});
     assert.equal(first.phase,"review-ready");
     assert.equal((await h.flow("root","advance")).childId,reviewer);
     const blind=(await h.flow(reviewer,"prepare")).originalReview;
@@ -522,9 +534,8 @@ for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-ha
       assert.deepEqual(archived.rechecks,{reviewer:{},auditor:{}});
       assert.equal(archived.status,"checking");
 
-      const newVote = (basis) => ({...recheck("保留","evidence"),basis});
-      const reviewerVote = newVote("首审按新版原始证据确认公布状态。");
-      const auditorVote = newVote("复核独立读取正式报告并核对状态。");
+      const reviewerVote=recheck("保留","evidence"),auditorVote=recheck("保留","evidence");
+      await assert.rejects(h.coverage(reviewer,"original-recheck",{originals:[{...reviewerVote,basis:"来源给出了另一项没有写在引文中的事实。"}]}),/basis/u);
       const firstFresh = await h.coverage(reviewer,"original-recheck",{originals:[reviewerVote]});
       assert.equal(firstFresh.phase,"first-audit-ready");
       assert.equal(currentDispute().status,"checking");
@@ -538,9 +549,9 @@ for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-ha
       assert.deepEqual(settled.actors,{reviewer,auditor});
       assert.deepEqual(settled.previousRechecks.auditor.C1,oldVote);
       assert.equal(settled.rechecks.reviewer.C1.sourceRelation,"supports");
-      assert.equal(settled.rechecks.reviewer.C1.basis,reviewerVote.basis);
+      assert.ok(settled.rechecks.reviewer.C1.basis.includes(externalQuote));
       assert.equal(settled.rechecks.auditor.C1.sourceRelation,"supports");
-      assert.equal(settled.rechecks.auditor.C1.basis,auditorVote.basis);
+      assert.ok(settled.rechecks.auditor.C1.basis.includes(externalQuote));
       return;
     }
     const second=await h.coverage(reviewer,"original-recheck",{originals:[
@@ -551,6 +562,9 @@ for (const scenario of ["agreement","evidence","project-rule","mixed","legacy-ha
       assert.equal(resumed.childId,reviewer);
       const next=await h.flow(reviewer,"prepare");
       assert.equal(next.coverage.blocks[0].editorial.independentOriginal.decision,"保留");
+      assert.ok(next.coverage.blocks[0].editorial.independentOriginal.basis.includes(externalQuote));
+      assert.ok(h.visible(reviewer).includes("building_loop_coverage"));
+      assert.ok(!h.visible(reviewer).includes(ORIGINAL_RECHECK_TOOL));
       // Modify the evidence at the same path and refresh the pin. Both old
       // reconciled opinions are now stale, including the actor's proven label.
       const data="# 发布记录\n"+externalQuote+"\n补记：同一来源更新。\n";
@@ -774,4 +788,184 @@ test("source-first preparation itself records a registered numeric result and un
   const refreshed=await h.flow(reviewer,"prepare");
   assert.deepEqual(refreshed.originalReview.recorded,[{id:"C1",decision:"改正",method:"measured-original"}]);
   assert.ok(refreshed.files.every(({path})=>path!=="candidate.md"));
+}));
+
+test("disputed numerical receipts bind the quantity, scope, actor, evidence and actual source unit", () => fixture((root,write) => {
+  const file="weights.txt",rows=["秤 A 起读 8.5 kg。","秤 A 终读 5.0 kg。","秤 A 公报净变动 3.5 kg。","入口备查表另有 18.5 kg。"];
+  const sourceText=rows.join("\n")+"\n",sha256=digest(sourceText);
+  write(file,sourceText);
+  const evidence=rows.slice(0,3).map((quote,i)=>({file,start:i+1,end:i+1,quote,sha256}));
+  const result={operation:"difference",formula:"a − b",value:"3.5",unit:"kg",operands:[
+    {file,line:1,value:"8.5",unit:"kg",sha256},{file,line:2,value:"5.0",unit:"kg",sha256}]};
+  const calc={id:"C1",proofId:"local-signed",result},dispute={calculations:{reviewer:calc}};
+  const frame={role:"reviewer",root},base={id:"C1",grounds:"calculation",sourceRelation:"supports",calculation:calc.proofId};
+  const vote=(body,changes={},sources=evidence,role=frame)=>groundedOriginalReceipt(role,{},dispute,{...base,...changes},
+    sources,"- C1："+body,changes.quote??("- C1："+body));
+  const check="读者可以核对秤 A 的 3.5 kg。";
+  const properties=originalRecheckSchema().items.properties;
+  assert.equal(properties.calculation,undefined);assert.equal(properties.claimValue,undefined);
+  const proof=vote(check,{calculation:undefined});
+  assert.ok(proof.basis.includes("(8.5) − (5.0) = 3.5 kg"));
+  assert.deepEqual(proof.calculation.operands,result.operands);
+  const noNumericTarget="秤 A 的两条读数可供独立核验。";
+  const fromReport=vote(noNumericTarget,{claimValue:"3.5"});
+  assert.ok(fromReport.basis.includes("来自所引登记记录"));
+  assert.ok(!fromReport.basis.includes("原稿所称值为"));
+  assert.throws(()=>vote(noNumericTarget,{claimValue:"8.5"}),/删除 claimValue/u);
+  assert.throws(()=>vote(noNumericTarget,{claimValue:"两个数"}),/删除 claimValue/u);
+  const ambiguous={calculations:{reviewer:{...calc,alternatives:[{proofId:"other-computation",result:{...result,operation:"share"}}]}}};
+  assert.throws(()=>groundedOriginalReceipt(frame,{},ambiguous,{...base,calculation:undefined},evidence,check,check),/无法唯一/u);
+  assert.deepEqual(vote(check,{},[{file,sha256,start:1,end:2,quote:rows.slice(0,2).join("\n")},evidence[2]]).calculation.operands,result.operands);
+  assert.throws(()=>vote(check,{},[{file,sha256,start:1,end:4,quote:rows[3]},evidence[1],evidence[2]]),/操作数/u);
+  assert.throws(()=>vote(check,{},[{...evidence[0],quote:"8"},evidence[1],evidence[2]]),/操作数/u);
+  assert.throws(()=>vote(check,{basis:"主管已签署放行。"}),/自由/u);
+  assert.throws(()=>vote(check,{gap:"新的、无来源的时序。"}),/自由/u);
+  assert.throws(()=>vote(check,{},evidence,{role:"auditor"}),/building_loop_calculate/u);
+  assert.throws(()=>vote(check,{},evidence.slice(1)),/操作数/u);
+  assert.throws(()=>vote("读者可以核对秤 A 的 3.5%。"),/量纲/u);
+  assert.throws(()=>vote("读者可以核对秤 A 的至少 3.5 kg。"),/限定/u);
+  assert.throws(()=>vote("读者可以核对秤 B 的 3.5 kg。"),/对象/u);
+  assert.throws(()=>vote("读者可以核对 3.5 kg，甲已签字。"),/单一数量/u);
+  assert.throws(()=>vote("读者可以核对 3.5 kg，且甲先于乙签字。"),/单一数量/u);
+  assert.throws(()=>vote("秤 A 编制人实际采用了减法计算该数。"),/单一数量/u);
+  assert.throws(()=>vote("乙登记先于甲登记。",{grounds:"source-statement",calculation:undefined}),/时序/u);
+  const negative=vote("按交接单计算，净变动为 9 kg。",
+    {sourceRelation:"contradicts",quote:"9 kg",claimValue:"9"});
+  assert.ok(negative.basis.includes("原稿所称值为 9"));
+  const counter=vote("按交接单计算，净变动为 9 kg。",{sourceRelation:"contradicts",calculation:undefined,quote:"9 kg",counterQuote:evidence[2].quote});
+  assert.equal(counter.calculation.observation.quote,evidence[2].quote);
+  assert.throws(()=>vote("按交接单计算，净变动为 9 kg。",{sourceRelation:"contradicts",quote:"9 kg",counterQuote:"不存在的对照值"}),/counterQuote/u);
+  assert.throws(()=>vote("按交接单计算，净变动为 3.5 kg。",
+    {sourceRelation:"contradicts",quote:"3.5 kg",claimValue:"3.5"}),/不相等/u);
+}));
+
+test("a calculation's independently reported value stays bound to the physical subject and metric", () => fixture((root,write) => {
+  const file="energy-ledger.txt";
+  const rows=["晨星厂本期登记表。","晨星厂（A 厂）主要计量起读 36 kWh。","晨星厂（A 厂）主要计量终读 16 kWh。",
+    "本期登记表中净耗电量为 20 kWh。","海湾厂登记表中净耗电量为 20 kWh。",
+    "晨星厂登记表中照明耗电量为 20 kWh。","海湾厂：净耗电量为 20 kWh。","晨星厂登记表中累计净耗电量为 20 kWh。",
+    "# 海湾厂","本期登记表中净耗电量为 20 kWh。","# 晨星厂","本期登记表中净耗电量为 20 kWh。",
+    "A 厂：净耗电量为 20 kWh。","B 厂：净耗电量为 20 kWh。"];
+  const raw=rows.join("\n")+"\n", sha256=digest(raw);
+  write(file,raw);
+  const ref=line=>({file,sha256,start:line,end:line,quote:rows[line-1]});
+  const result={operation:"difference",formula:"a − b",value:"20",unit:"kWh",operands:[{file,line:2,value:"36",unit:"kWh",sha256},{file,line:3,value:"16",unit:"kWh",sha256}]};
+  const dispute={calculations:{reviewer:{id:"C1",proofId:"signed-test",result}}};
+  const active={seen:{[file]:{hash:sha256,ranges:[[1,rows.length]]}}};
+  const body="按晨星厂交接单计算，净耗电量为 25 kWh。";
+  function vote(line,quote=rows[line-1],current=active,original=body) {
+    const entry={id:"C1",grounds:"calculation",sourceRelation:"contradicts",quote:"25 kWh",counterQuote:quote};
+    return groundedOriginalReceipt({role:"reviewer",root},current,dispute,entry,[ref(2),ref(3),{...ref(line),quote}],original,entry.quote);
+  }
+  assert.equal(vote(4).calculation.observation.start,4);
+  assert.equal(vote(4,"20 kWh").calculation.observation.start,4);
+  assert.throws(()=>vote(4,"20 kWh",{seen:{[file]:{hash:sha256,ranges:[[2,8]]}}}),/主体/u);
+  for (const n of [5,7]) assert.throws(()=>vote(n,"20 kWh"),/主体/u);
+  for (const n of [6,8]) assert.throws(()=>vote(n,"20 kWh"),/指标/u);
+  assert.throws(()=>vote(10,"20 kWh"),/主体/u);
+  assert.equal(vote(12,"20 kWh").calculation.observation.start,12);
+  const named="按 A 厂交接单计算，净耗电量为 25 kWh。";
+  assert.equal(vote(13,"20 kWh",active,named).calculation.observation.start,13);
+  assert.throws(()=>vote(14,"20 kWh",active,named),/主体/u);
+}));
+
+test("source witnesses stay with the named party and an unrecorded premise is not a contrary observation", () => {
+  const sha256=digest("case"),file="handover.md";
+  const read=(text)=>[{file,sha256,start:2,end:2,quote:text}];
+  const vote=(body,rows,entry={})=>groundedOriginalReceipt({role:"reviewer"},{},{},
+    {id:"C1",grounds:"source-statement",sourceRelation:"supports",...entry},read(rows),body,body);
+  assert.throws(()=>vote("甲登记先于乙登记。","当前总数为 12 件。"),/时序/u);
+  assert.ok(vote("甲登记先于乙登记。","甲的登记先于乙的登记。").basis.includes("先于"));
+  const contrary=(original,actual,counterQuote)=>vote(original,actual,{sourceRelation:"contradicts",counterQuote});
+  for(const c of ["实收 18 份","黄组实收 18 份。"])
+    assert.throws(()=>contrary("黄组实收 18 份。","黄组实收 18 份。",c),/直接相反/u);
+  assert.ok(contrary("黄组实收 19 份。","黄组实收 18 份。","实收 18 份").basis.includes("18 份"));
+  assert.ok(contrary("上午","下午签收。","下午").basis.includes("下午"));
+  assert.ok(contrary("实收18份","原称实收18份，后来改为19份。","原称实收18份，后来改为19份。").basis.includes("19份"));
+  assert.ok(contrary("该事项已批准","该事项已批准不成立。","该事项已批准不成立").basis.includes("不成立"));
+  const claim="甲方公司规定以扫描清点为准。";
+  assert.throws(()=>vote(claim,"乙方公司规定以扫描清点为准。"),/同一条原文/u);
+  assert.ok(vote(claim,"甲方公司规定以扫描清点为准。").basis.includes("甲方公司"));
+  const capability="用登记的台数便可从本材料算出总质量。";
+  assert.throws(()=>vote(capability,"单台质量没有记录。",{sourceRelation:"contradicts",counterQuote:"没有记录"}),/缺少输入|相反/u);
+  assert.throws(()=>vote(capability,"总质量登记为 40 kg。",{sourceRelation:"contradicts",counterQuote:"40 kg"}),/缺少输入|相反/u);
+  assert.ok(vote(capability,"本规程明确写明：不能用台数换算总质量。",{sourceRelation:"contradicts",counterQuote:"不能用台数换算总质量"}).basis.includes("相反记录"));
+  assert.equal(vote(capability,"单台质量没有记录。",{grounds:"missing-premise",sourceRelation:"insufficient"}).scope,"evidence");
+  assert.throws(()=>vote(capability,"单台质量没有记录。",{grounds:"missing-premise",sourceRelation:"contradicts"}),/不足/u);
+});
+
+test("a missing premise separates observed quantities, the actual limitation and the reviewer's unresolved relationship", () => {
+  const file="shift.log", sha256=digest("signed synthetic handover");
+  const lines=["本批 5 筐；每筐质量没有记录。","交接单另行登记退回 16 kg。"];
+  const refs=lines.map((quote,i)=>({file,start:i+1,end:i+1,quote,sha256}));
+  const body="用 5 筐可算出此次退回的质量。", decision={id:"C1",sourceRelation:"insufficient",grounds:"missing-premise",
+    missing:"用 5 筐可算出此次退回的质量"};
+  const vote=(line=body,proof=decision,evidence=refs)=>groundedOriginalReceipt({role:"reviewer"},{},{},proof,evidence,line,line);
+  const r=vote();
+  assert.match(r.basis,/5 筐/u);assert.match(r.basis,/16 kg/u);assert.match(r.gap,/每筐质量没有记录/u);
+  assert.throws(()=>vote(body,{...decision,missing:"此次退回的质量"}),/没有指明待证关系/u);
+  assert.equal(originalRecheckSchema().items.properties.missing,undefined);
+  assert.throws(()=>vote(body,{...decision,limitation:"称重设备已失灵"}),/limitation/u);
+  const rule="乙中心规定逐袋电子登记。", entries=["甲中心未提供登记方法。","乙中心成稿规范：逐袋电子登记。"]
+    .map((quote,i)=>({file,start:i+1,end:i+1,quote,sha256}));
+  assert.throws(()=>vote(rule,{...decision,missing:"乙中心规定逐袋电子登记"},entries),/已引原文/u);
+  assert.throws(()=>vote(rule,{...decision,missing:"乙中心规定逐袋电子登记",limitation:"甲中心未提供登记方法"},entries),/主体/u);
+  const absent=vote("丙中心使用虹膜仪。",{...decision,missing:"虹膜仪"},entries);
+  assert.equal(absent.sourceRelation,"insufficient");assert.ok(absent.basis.includes("虹膜仪"));
+});
+
+test("a missing judgment defaults to its proposition and can select one complete claim in a compound original",()=>{
+  const lines=["表中已登记总能耗 48 kWh。","运行时间已登记，功率没有记录。"];
+  const refs=lines.map((quote,i)=>({file:"energy.txt",start:i+1,end:i+1,quote,sha256:digest(lines.join("\n"))}));
+  const prefix="电表已登记总能耗 48 kWh",part="由运行时间可以推算出实际消耗的电量";
+  const line=prefix+"；"+part+"。";
+  const vote=(fields={})=>groundedOriginalReceipt({role:"reviewer"},{},{},
+    {id:"C4",grounds:"missing-premise",sourceRelation:"insufficient",...fields},refs,line,fields.quote??line);
+  assert.match(vote().basis,/48 kWh/u);
+  assert.match(vote({quote:part}).gap,/中的「由运行时间可以推算出实际消耗的电量」/u);
+  assert.throws(()=>vote({quote:"实际消耗的电量"}),/完整分句/u);
+  assert.throws(()=>vote({missing:"实际消耗的电量"}),/没有指明待证关系/u);
+  assert.throws(()=>vote({quote:part,missing:prefix}),/不一致/u);
+  assert.match(vote({missing:part}).gap,/中的「由运行时间可以推算出实际消耗的电量」/u);
+});
+
+test("a missing time cannot be used to mark a separately witnessed measurement as missing",()=>fixture((root,write)=>{
+  const file="cooling.txt",rows=["各站的降温时间没有记录。","P 站流量读数为 72 kg。","Z 站流量读数为 53 kg。",
+    "交接单登记 P、Z 两个流量读数的差额为 19 kg。"];
+  const raw=rows.join("\n")+"\n",sha256=digest(raw);write(file,raw);
+  const refs=rows.map((quote,i)=>({file,start:i+1,end:i+1,quote,sha256}));
+  const result={operation:"difference",formula:"a − b",value:"19",unit:"kg",operands:[
+    {file,line:2,value:"72",unit:"kg",sha256},{file,line:3,value:"53",unit:"kg",sha256}]};
+  const dispute={calculations:{reviewer:{id:"C3",proofId:"local",result}}};
+  const time="P 先于 Z 降温", measured="两者流量读数差是 19 kg", unknown="第三站的进货量是 19 kg";
+  const vote=(part,focus)=>groundedOriginalReceipt({role:"reviewer",root},{},dispute,
+    {id:"C3",grounds:"missing-premise",sourceRelation:"insufficient",quote:focus,limitation:rows[0]},refs,time+"；"+part+"。",focus);
+  assert.throws(()=>vote(measured,measured),/独立登记的量重合/u);
+  assert.match(vote(measured,time).gap,/中的「P 先于 Z 降温」/u);
+  const independent=vote(unknown,unknown);
+  assert.match(independent.gap,/第三站的进货量/u);assert.equal(independent.calculation,undefined);
+}));
+
+test("a corroborating calculator independently agrees with the signed numeric counterstatement", () => fixture((root,write) => {
+  const file="manifest.txt",rows=["起始 22 盒。","库存退回 8 盒。","登记的余量为 14 盒。","留档说明：余量来自复点。","蓝区的余量为 14 盒。"];
+  const raw=rows.join("\n")+"\n",sha256=digest(raw);write(file,raw);
+  const refs=rows.map((quote,i)=>({file,quote,start:i+1,end:i+1,sha256}));
+  const result={operation:"difference",formula:"a − b",value:"14",unit:"原单位",operands:[{file,line:1,value:"22",sha256},{file,line:2,value:"8",sha256}]};
+  const proof={id:"C1",proofId:"calculation1",result};
+  const body="复点得到的余量结果为 17 盒。", counter=rows[2];
+  const base={id:"C1",grounds:"source-statement",sourceRelation:"contradicts",quote:"余量结果为 17 盒",counterQuote:counter,claimValue:"17",calculation:"calculation1"};
+  const run=(edit={},line=body,evidence=refs.slice(0,4),who="reviewer")=>groundedOriginalReceipt({role:who,root},{},{calculations:{reviewer:proof}},
+    {...base,...edit},evidence,line,edit.quote??base.quote);
+  const positive=run();
+  const direct=run({calculation:undefined});
+  assert.equal(direct.calculation,undefined);assert.ok(direct.basis.includes("14 盒"));
+  assert.throws(()=>run({calculation:undefined,claimValue:"22"}),/删除 claimValue/u);
+  assert.equal(positive.calculation.observation.file,file);assert.match(positive.basis,/22.*8.*14/u);
+  assert.match(positive.basis,/相反记录/u);
+  assert.throws(()=>run({calculation:"earlier"}),/proofId/u);
+  assert.throws(()=>run({},body,refs.slice(0,4),"auditor"),/building_loop_calculate/u);
+  assert.throws(()=>run({counterQuote:"库存退回 8 盒。"}),/独立观测/u);
+  assert.throws(()=>run({quote:"余量结果为 17 %"},body.replace("17 盒","17 %")),/量纲/u);
+  assert.throws(()=>run({quote:"余量结果为 17 盒",counterQuote:rows[4]},"黄区的余量结果为 17 盒。",refs),/独立观测/u);
+  assert.throws(()=>run({sourceRelation:"supports",claimValue:undefined,counterQuote:undefined,quote:undefined}, "复点员实际采用了本流程。"),/明示|同一条原文|实际数量/u);
 }));
