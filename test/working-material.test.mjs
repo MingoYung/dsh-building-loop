@@ -834,6 +834,7 @@ test("disputed numerical receipts bind the quantity, scope, actor, evidence and 
   assert.ok(negative.basis.includes("原稿所称值为 9"));
   const counter=vote("按交接单计算，净变动为 9 kg。",{sourceRelation:"contradicts",calculation:undefined,quote:"9 kg",counterQuote:evidence[2].quote});
   assert.equal(counter.calculation.observation.quote,evidence[2].quote);
+  assert.throws(()=>vote("按交接单计算，净变动为 9 kg。",{sourceRelation:"contradicts",quote:"9 kg",counterQuote:evidence[0].quote}),/仅以本角色签名算式作反证时省略此字段/u);
   assert.throws(()=>vote("按交接单计算，净变动为 9 kg。",{sourceRelation:"contradicts",quote:"9 kg",counterQuote:"不存在的对照值"}),/counterQuote/u);
   assert.throws(()=>vote("按交接单计算，净变动为 3.5 kg。",
     {sourceRelation:"contradicts",quote:"3.5 kg",claimValue:"3.5"}),/不相等/u);
@@ -867,6 +868,40 @@ test("a calculation's independently reported value stays bound to the physical s
   const named="按 A 厂交接单计算，净耗电量为 25 kWh。";
   assert.equal(vote(13,"20 kWh",active,named).calculation.observation.start,13);
   assert.throws(()=>vote(14,"20 kWh",active,named),/主体/u);
+}));
+
+test("an original's arithmetic uses its own signed operands, including intentionally compared parties",()=>fixture((root,write)=>{
+  const file="grain-ledger.txt",rows=["# 晨星厂","期初 50 kg。","期末 30 kg。",
+    "# 海湾厂","期初 70 kg。","期末 50 kg。","期末 21 kg。","晨星厂登记表：净变动为 20 kg。",
+    "A 站：起读 16 kg。","B 站：起读 12 kg。","C 站：起读 16 kg。",
+    "晨星厂本次交接单。","海湾厂盘点前有 50 kg。","海湾厂盘点后有 30 kg。",
+    "晨星厂本次交接单。","盘点前有 50 kg。","盘点后有 30 kg。",
+    "晨星厂本次交接单。","晨星厂盘点前有 50 kg。","晨星厂盘点后有 30 kg。"];
+  const raw=rows.join("\n")+"\n",sha256=digest(raw);write(file,raw);
+  const byLine=n=>({file,start:n,end:n,quote:rows[n-1],sha256}),frame={root,role:"reviewer"};
+  const active={seen:{[file]:{hash:sha256,ranges:[[1,rows.length]]}}};
+  const subject="按晨星厂登记表计算，净变动为 20 kg。";
+  function vote(body,indices,rel,extra=[],packet=active){
+    const inputs=indices.map(line=>({file,line,sha256,value:rows[line-1].match(/\d+/u)[0],unit:"kg"}));
+    const result={operation:"difference",formula:"a − b",operands:inputs,unit:"kg",value:String(+inputs[0].value-inputs[1].value)};
+    const quote=body.match(/-?\d+ kg/u)[0];
+    const entry={id:"C1",grounds:"calculation",sourceRelation:rel,quote:rel==="contradicts"?quote:undefined};
+    return groundedOriginalReceipt(frame,packet,{calculations:{reviewer:{id:"C1",proofId:"checked",result}}},entry,
+      [...indices,...extra].map(byLine),body,rel==="contradicts"?quote:body);
+  }
+  assert.equal(vote(subject,[2,3],"supports").calculation.value,"20");
+  // Adding the real party's output row cannot launder either matching or
+  // differing operands from a different facility.
+  assert.throws(()=>vote(subject,[5,6],"supports",[8]),/主体/u);
+  assert.throws(()=>vote(subject,[5,7],"contradicts",[8]),/主体/u);
+  assert.throws(()=>vote(subject,[2,3],"supports",[],{seen:{[file]:{hash:sha256,ranges:[[2,3]]}}}),/主体/u);
+  const cross="按 A 减 B 计算，两站差值为 4 kg。";
+  assert.equal(vote(cross,[9,10],"supports").calculation.value,"4");
+  assert.throws(()=>vote(cross,[10,9],"contradicts"),/主体/u);
+  assert.throws(()=>vote(cross,[11,10],"supports",[9]),/主体/u);
+  assert.throws(()=>vote(subject,[13,14],"supports"),/主体/u);
+  assert.equal(vote(subject,[16,17],"supports").calculation.value,"20");
+  assert.equal(vote(subject,[19,20],"supports").calculation.value,"20");
 }));
 
 test("source witnesses stay with the named party and an unrecorded premise is not a contrary observation", () => {

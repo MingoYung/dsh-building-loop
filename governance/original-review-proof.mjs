@@ -1,5 +1,5 @@
 import { digest, keyOf, readBytes } from "./policy.mjs";
-import { decimal, canonicalDecimal, lineList, quantityRelation } from "./preflight.mjs";
+import { decimal, canonicalDecimal, lineList, physicalCsvCells, quantityRelation } from "./preflight.mjs";
 import { originalReviewContract, projectPolicyReference } from "./evidence.mjs";
 import { SOURCE_ARITHMETIC_TOOL } from "./source-arithmetic.mjs";
 
@@ -151,7 +151,7 @@ function operandCitations(frame,result,evidence) {
       return hits.length===1 ? hits[0].index>=lo && hits[0].index+raw.length<=hi : hits.length>1 && lo===0 && hi===row.length;
     });
     if (!ref) throw Error("计算的每个原始操作数均须落在实际引句的物理行和完整数值范围内。");
-    return ref;
+    return {...ref,sourceLines:cache.get(keyOf(op.file))};
   });
 }
 
@@ -242,6 +242,76 @@ function reportedKey(prefix) {
   return {owner:trimOwner(possession.length>1?possession.at(-2):parts.length>1?parts[0]:""),
     metric:metricName(possession.at(-1))};
 }
+// A row containing a signed input must belong to the population named in the
+// original. Citing that name on a different row cannot establish ownership.
+function originalNamedRecord(body) {
+  return beforeRecord(body.split(/[，,；;]/u)[0]) ||
+    body.match(/(?:与|同)([^，,。；;与同]{1,25}?)(?:初报|原报|快报|台账)(?:对照|比较)/u)?.[1];
+}
+
+function localHeading(active,ref,line,canSkip) {
+  const seen=active?.seen?.[keyOf(ref.file)];
+  for (let i=line-1;i>=1;i--) {
+    if (seen?.hash!==ref.sha256 || !seen.ranges.some(([lo,hi])=>lo<=i && i<=hi)) break;
+    const row=ref.sourceLines[i-1];
+    if (!row.trim()) break;
+    const heading=sectionHeading(row);
+    if (heading!==undefined) return {owner:heading,line:i};
+    const names=row.split(/[。；;，,]/u).map(beforeRecord).filter(Boolean);
+    if (names.length) return {owner:names.at(-1),line:i};
+    if (canSkip && !canSkip(i)) break;
+  }
+}
+
+function operandOwners(body,result,citations,active) {
+  const symbols=[...new Set(recordSymbols(body).filter(s=>s!==result.unit))];
+  const named=originalNamedRecord(body);
+  const subjects=symbols.length ? symbols : named?.split(/(?:与|和|及|、|\s+and\s+)/iu).map(trimOwner).filter(Boolean);
+  if (!subjects?.length) return;
+  const mismatch=()=>new Error("已签操作数的主体与原稿对象不一致或缺少本角色读过的所属依据；请逐项核对物理行。");
+
+  const operands=result.operands;
+  const fields=operands.map((op,i)=>{
+    const ref=citations[i],row=ref.sourceLines[op.line-1],raw=op.raw??op.value;
+    // In tabular data a literal may repeat elsewhere on the row. Use the
+    // verified physical column; prose has to identify the actual numeric token.
+    if (op.column) return {label:"",lead:physicalCsvCells(row).slice(0,op.column-1).join(" ").trim()};
+    const hits=op.raw && /\p{L}/u.test(op.raw) ? [row.indexOf(raw)] : numbers(row).filter(m=>m[0]===raw).map(m=>m.index);
+    if (hits.length!==1 || hits[0]<0) throw mismatch();
+    const clause=row.slice(0,hits[0]).split(/[。；;!?！？]/u).at(-1).trim();
+    const local=clause.split(/[,，]/u).at(-1).split(/[:：]/u);
+    return {label:local.at(-1).trim(),lead:local.at(-2)?.trim()??""};
+  });
+  const [before,after]=fields.map(f=>f.label.match(/^(.+?)(前|后)/u));
+  const paired=operands.length===2 && keyOf(operands[0].file)===keyOf(operands[1].file) &&
+    operands[1].line===operands[0].line+1 &&
+    before?.[2]==="前" && after?.[2]==="后" && before[1]===after[1];
+  const owners=fields.map(({label,lead},i)=>{
+    const op=operands[i],ref=citations[i];
+    const ids=recordSymbols(lead+" "+label);
+    const explicit=symbols.length ? subjects.filter(id=>ids.includes(id))
+      : subjects.filter(id=>[label,lead].some(x=>x.startsWith(id)));
+    if (explicit.length===1 && (!symbols.length || ids.every(id=>subjects.includes(id)))) return explicit[0];
+    const other=beforeRecord(label) || (label.includes("的")?reportedKey(label).owner:"");
+    if (explicit.length || ids.length || lead || other || ref.origin?.observation) throw mismatch();
+    const inherited=localHeading(active,ref,op.line,n=>operands.some(o=>keyOf(o.file)===keyOf(op.file)&&o.line===n));
+    const owner=subjects.find(id=>inherited && (symbols.length?recordSymbols(inherited.owner).includes(id):inherited.owner===id));
+    if (!owner) throw mismatch();
+    // A heading can govern bare local fields. Adjacent rows with the same
+    // compound label can also name another party twice. An expanded operation
+    // must be identified in the original, never inferred from the pair alone.
+    const neutral=!label || /^(?:起始|期初|期末|初值|末值|起读|终读|开始|结束|before\b|after\b|initial\b|final\b)/iu.test(label);
+    const stem=before?.[1]??"";
+    const compact=/^\p{Script=Han}{1,2}$/u.test(stem) && !stem.includes(owner.at(-1));
+    const boundPair=paired && operands[0].line===inherited.line+1 && (compact || body.includes(stem));
+    if (!neutral && !boundPair) throw mismatch();
+    return owner;
+  });
+  if (subjects.some(id=>!owners.includes(id))) throw mismatch();
+  if (subjects.length===2 && result.operation==="difference" &&
+      /(?:减(?:去)?|[−-]|\bminus\b)/iu.test(body) && owners[0]!==subjects[0]) throw mismatch();
+}
+
 function observationPrefix(frame,ref,result,needle) {
   const bytes=readBytes(frame.root,ref.file);
   if (!bytes || digest(bytes)!==ref.sha256) return;
@@ -260,11 +330,11 @@ function observationPrefix(frame,ref,result,needle) {
 function checkReportedIdentity(frame,active,body,ref,result,entry,target,operandRefs,unit) {
   const found=observationPrefix(frame,ref,result,entry.counterQuote??ref.quote);
   if (!found) throw Error("独立登记的值无法唯一定位到已引原文行，请给出该条登记的具体引句。");
-  const clauses=body.split(/[，,；;]/u),claimed=target!==undefined&&numbers(body).find(m=>sameValue(m[0],target));
+  const claimed=target!==undefined&&numbers(body).find(m=>sameValue(m[0],target));
   const subjectOfCheck=body.match(/^(.+?)(?:可用|可由|可供)/u)?.[1]??"";
   const prefix=claimed?body.slice(0,claimed.index).split(/[，,；;]/u).at(-1):subjectOfCheck;
   const expected=reportedKey(prefix), recorded=reportedKey(found.prefix);
-  const named=beforeRecord(clauses[0])||body.match(/(?:与|同)([^，,。；;与同]{1,25}?)(?:初报|原报|快报|台账)(?:对照|比较)/u)?.[1];
+  const named=originalNamedRecord(body);
   const ids=recordSymbols(body);
   // Plain arithmetic checking may mention an instrument but not a metric.
   // Bind its identity independently of the number. A declared metric, when
@@ -287,16 +357,8 @@ function checkReportedIdentity(frame,active,body,ref,result,entry,target,operand
     // Omitted owners can inherit a signed and actually read local heading.
     // Never cross an unread boundary or an independently acquired excerpt.
     if (!other && !ref.origin?.observation) {
-      const seen=active?.seen?.[keyOf(ref.file)];
-      for (let i=found.line-1;i>=1;i--) {
-        if (seen?.hash!==ref.sha256 || !seen.ranges.some(([lo,hi])=>lo<=i&&i<=hi)) break;
-        const row=found.lines[i-1];
-        if (!row.trim()) break;
-        const heading=sectionHeading(row);
-        if (heading!==undefined) { other=heading;scopeFrom=i;break; }
-        const names=row.split(/[。；;，,]/u).map(beforeRecord).filter(Boolean);
-        if (names.length) { other=names.at(-1);scopeFrom=i;break; }
-      }
+      const at=localHeading(active,{...ref,sourceLines:found.lines},found.line);
+      if (at) {other=at.owner;scopeFrom=at.line;}
     }
     if (!other || !sameOwner(desiredOwner,other)) throw Error("独立登记的主体与原稿不同或缺少可定位的所属上下文，请核对来源主体。");
   }
@@ -450,6 +512,7 @@ function calculationBasis(frame,entry,role,dispute,evidence,line,quote,auxiliary
   const rawValues=result.operands.map(x=>x.raw??x.value);
   const citedOperands=operandCitations(frame,result,evidence);
   const body=claimBody(line);
+  operandOwners(body,result,citedOperands,active);
   if (!auxiliary && (!arithmeticClaim(body) || entry.sourceRelation==="insufficient")) {
     throw Error("计算凭据仅可判定原稿的单一数量验算。含行为归因、时序或其他独立事实时，给出能证明整句的原文或记录尚缺前提。");
   }
@@ -495,14 +558,12 @@ function calculationBasis(frame,entry,role,dispute,evidence,line,quote,auxiliary
   });
   const observedOutput=outputRows.length>0;
   if (reportOnly && (outputRows.length!==1 || !sameValue(compare,result.value))) throw legacyValueError();
-  if (entry.counterQuote && (!observedOutput || outputRows.length!==1)) throw Error("counterQuote 未唯一对应本次所引独立登记的相反值及单位；请修正引文。");
+  if (entry.counterQuote && (!observedOutput || outputRows.length!==1)) throw Error("counterQuote 未唯一对应本次所引独立登记的相反值及单位；请修正引文。 counterQuote 是独立登记的结果引文；仅以本角色签名算式作反证时省略此字段。若使用该引文，须能定位到同一对象的独立登记值。");
   if (entry.sourceRelation==="supports" && !originalValues.length && outputRows.length!==1) throw Error("原稿没有给出对照数。请引用唯一对应的独立登记值，不能按重复数字选取。");
   if (entry.sourceRelation==="supports" && !observedOutput && compare===undefined &&
       !originalValues.some(v=>sameValue(v,result.value))) throw Error("给出可核对的原稿数量或独立登记的对照结果原文。");
   // An unrelated input (e.g. a container count) is not a checked operand merely
   // because an independently computed value occurs elsewhere in the same file.
-  const ids=text=>text.match(/\b(?:[A-Z]{1,}|[A-Z]+\d+)\b/gu)??[];
-  if (ids(body).some(id=>!evidence.some(ref=>ids(ref.quote).includes(id)))) throw Error("原稿所指的编号对象没有进入计算凭据的证据范围。");
   if (entry.sourceRelation==="supports" && originalValues.length &&
       originalValues.some(v=>!sameValue(v,result.value) && !rawValues.some(s=>present(s,v)))) {
     throw Error("原句另有未由本算式绑定的数量，须独立核该项所需输入。");
@@ -573,7 +634,7 @@ export function groundedOriginalReceipt(frame,active,dispute,entry,evidence,line
   }
   if (grounds==="source-statement" && entry.calculation!==undefined) {
     if (sourceRelation!=="contradicts") throw Error("辅助计算用于实际数量反证，须有原稿目标数及直接相反记录。");
-    calculation=calculationBasis(frame,entry,frame.role,dispute,evidence,line,quote,true);
+    calculation=calculationBasis(frame,entry,frame.role,dispute,evidence,line,quote,true,evidence,active);
   }
   if (grounds==="missing-premise") {
     const saved=dispute.calculations?.[frame.role];
@@ -593,7 +654,7 @@ export function groundedOriginalReceipt(frame,active,dispute,entry,evidence,line
         const first=numbers(inputs[0].quote).find(m=>m[0]===(result.operands[0].raw??result.operands[0].value));
         const measuredUnit=result.unit==="原单位" ? first && followingUnit(inputs[0].quote,first) : result.unit;
         if (explicit || independentObservation(supplemental,body,evidence,result,measuredUnit)) {
-          calculation=calculationBasis(frame,supplemental,frame.role,dispute,inputs,line,quote,true,evidence);
+          calculation=calculationBasis(frame,supplemental,frame.role,dispute,inputs,line,quote,true,evidence,active);
           calculationEvidence=inputs;
         }
       }
