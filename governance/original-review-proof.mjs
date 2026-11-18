@@ -1,7 +1,7 @@
 import { digest, keyOf, readBytes } from "./policy.mjs";
 import { decimal, canonicalDecimal, lineList, physicalCsvCells, quantityRelation } from "./preflight.mjs";
 import { originalReviewContract, projectPolicyReference } from "./evidence.mjs";
-import { SOURCE_ARITHMETIC_TOOL } from "./source-arithmetic.mjs";
+import { compoundDuration, SOURCE_ARITHMETIC_TOOL } from "./source-arithmetic.mjs";
 
 export const ORIGINAL_RECHECK_VIEW = "original-evidence/5";
 export const ORIGINAL_RECHECK_TOOL = "building_loop_original_recheck";
@@ -92,6 +92,91 @@ function arithmeticClaim(body) {
   return (clauses.length===2 || /(?:差值|总和|计算|相加|相减|[+−×÷=＝]|\b(?:sum|difference|calculat\w*)\b)/iu.test(last)) && quantity.test(last) && endsWithAmount.test(last);
 }
 
+// Bind a written operation only when BOTH sides are complete numeric quantities.
+// A declared method, edition, or time is never established by equal numbers.
+function writtenQuantity(text) {
+  const token=text.trim(), matches=numbers(token);
+  if (!matches.length || matches[0].index!==0) return;
+  if (matches.length>1) {
+    const normalized=token.replace(/分(?!钟)/gu,"分钟");
+    try {
+      const value=compoundDuration(normalized);
+      if(value.raw===normalized) return {value:value.value,unit:"ns",compound:true};
+    } catch { /* Other compounds have no supported comparison contract. */ }
+    return;
+  }
+  const m=matches[0], suffix=token.slice(m[0].length).trim();
+  if (!suffix || rawUnit(token,m)!==suffix) return;
+  return {value:m[0],unit:followingUnit(token,m),compound:false};
+}
+
+function writtenExpression(body) {
+  const clauses=body.split(/，|,(?!\d)|[；;]/u);
+  const first=clauses[0].replace(/^(?:用|把|将|using\b)\s*/iu,"");
+  const equation=first.split(/[=＝]/u);
+  const inputs=equation[0].match(/^(.+?)\s*(减去|减|加上|加|乘以|乘|除以|除|\b(?:minus|plus|times)\b|[+−×÷-])\s*(.+)$/iu);
+  if (!inputs) return;
+  const sides=[writtenQuantity(inputs[1]),writtenQuantity(inputs[3])];
+  if (!sides.every(Boolean)) return;
+  const rest=equation[1]??clauses[1]??"", amount=numbers(rest);
+  let qualifier;
+  if (amount.length===1) {
+    const m=amount[0], prefix=rest.slice(0,m.index);
+    const checkAt=check.exec(prefix);
+    if (checkAt) qualifier=prefix.slice(checkAt.index+checkAt[0].length).trim().replace(/的$/u,"");
+    else if (procedure.test(prefix) || chronology.test(prefix)) qualifier=prefix.trim();
+    else if (!prefix.trim() || /^(?:结果|差值)?\s*(?:为|是|等于|=)$/u.test(prefix.trim())) qualifier="";
+    if (qualifier && /^(?:结果|数值|差值|值)$/u.test(qualifier)) qualifier="";
+    const output=writtenQuantity(rest.slice(m.index).trim());
+    const restScope=[qualifier,...clauses.slice(2)].filter(Boolean).join("，");
+    return {sides,minus:/^(?:减去|减|minus|[−-])$/iu.test(inputs[2]),output,qualifier,restScope};
+  }
+  return {sides,minus:/^(?:减去|减|minus|[−-])$/iu.test(inputs[2])};
+}
+
+function expressionProof(expression,result,refs,strict,requestFull=true) {
+  if (!expression) return;
+  const mismatch=(message)=>{if(strict)throw Error(message)};
+  if (!expression.minus || result.operation!=="difference" || result.operands.length!==2)
+    return mismatch("签名算符与原稿明写的运算不同；请核对动作和有序操作数。");
+  let partialDuration=false;
+  for (const [i,side] of expression.sides.entries()) {
+    const op=result.operands[i], ref=refs[i], unit=directUnits[op.unit]??op.unit;
+    if (side.compound && !(op.raw && op.unit==="ns")) {
+      // Older sessions may have signed just the minute field in an hour+minute
+      // record. Only ask for a complete duration when that exact source row can
+      // supply the complete original operand. Component-only questions remain valid.
+      let full;
+      try { full=compoundDuration(ref.sourceLines[op.line-1]); } catch { /* no unique complete quantity */ }
+      if (full && sameValue(full.value,side.value)) {partialDuration=true;continue;}
+    }
+    if (side.unit!==unit || !sameValue(side.value,op.value))
+      return mismatch("原稿操作数的顺序、完整数值或量纲与所签原始行不符。");
+  }
+  if (partialDuration && !requestFull) return;
+  if (partialDuration) throw Error("原稿明示完整复合时长，现有签名仅含分量。请按已引原始行重新 evaluate，传 durationUnit（h、min 或 s），每个操作数只传 file 和 line。其他版本、方法或时序仍可待证。");
+  const output=expression.output;
+  const unit=directUnits[result.unit]??result.unit;
+  return {sameOutput:!!output && output.unit===unit && sameValue(output.value,result.value),unit};
+}
+
+// A separate cited physical row may corroborate a numeric match. This reports
+// only its literal amount. It establishes no identity, edition, or author method.
+function citedAmountRow(evidence,result,unit) {
+  const [first]=result.operands;
+  const rows=evidence.filter(ref=>ref.start===ref.end && keyOf(ref.file)===keyOf(first.file) && ref.sha256===first.sha256 &&
+    !result.operands.some(o=>keyOf(o.file)!==keyOf(ref.file) || o.line===ref.start) &&
+    numbers(ref.quote).some(m=>{
+      if (!sameValue(m[0],result.value) || followingUnit(ref.quote,m)!==unit) return false;
+      const raw=rawUnit(ref.quote,m);
+      const end=m.index+m[0].length+ref.quote.slice(m.index+m[0].length).indexOf(raw)+raw.length;
+      const relation=quantityRelation(ref.quote,{start:m.index,end});
+      return relation===undefined || relation==="exact";
+    }));
+  return rows.length===1 ? rows[0] : undefined;
+}
+
+
 function scopeSubject(text,marker) {
   const idx=text.search(marker);
   return idx<0?"":text.slice(0,idx).replace(/(?:规定|档案|原文|材料|本次|这次|公布的|报告的|编制人|快报的)/gu," ").trim();
@@ -124,8 +209,7 @@ function requireSourceScope(body,listed) {
 
 // A broad authorized range is not the quoted text. Resolve the quote within that
 // range and require the entire computed token on the covered physical row.
-function operandCitations(frame,result,evidence) {
-  const cache=new Map();
+function operandCitations(frame,result,evidence,cache=new Map()) {
   return result.operands.map(op=>{
     const ref=evidence.find(ref=>{
       if (keyOf(ref.file)!==keyOf(op.file) || ref.sha256!==op.sha256 || op.line<ref.start || op.line>ref.end) return false;
@@ -481,7 +565,7 @@ function overlapsObservedMeasure(clause,calculation,inputs) {
 
 // The reviewers choose the disputed proposition and its evidence. The host owns
 // identifiers and values derived from them. An old explicit copy is checked.
-function boundCalculation(frame,entry,dispute,evidence) {
+function boundCalculation(frame,entry,dispute,evidence,expression,optional=false) {
   const saved=dispute.calculations?.[frame.role];
   if (!saved || saved.id!==entry.id) throw Error("尚无本角色当前原句的计算凭据。先调用 "+SOURCE_ARITHMETIC_TOOL+"（action=evaluate），按原文选择 operation 和 operands，再提交本条回执。");
   const candidates=[saved,...(saved.alternatives??[])];
@@ -491,12 +575,21 @@ function boundCalculation(frame,entry,dispute,evidence) {
     return chosen;
   }
   if (candidates.length===1) return saved;
-  const fitting=candidates.filter(c=>{
-    try { operandCitations(frame,c.result,evidence); return true; }
-    catch (error) { if (!String(error.message).includes("计算的每个原始操作数")) throw error;return false; }
+  const cache=new Map();
+  const fitting=candidates.flatMap(candidate=>{
+    try {return [{candidate,refs:operandCitations(frame,candidate.result,evidence,cache)}];}
+    catch (error) {if (!String(error.message).includes("计算的每个原始操作数")) throw error;return [];}
   });
-  if (fitting.length!==1) throw Error("本角色当前原句存在多个复算。请只引此断言所用的原始操作数，无法唯一绑定时保留待核。");
-  return fitting[0];
+  if (fitting.length===1) return fitting[0].candidate;
+  // A component and a full duration can cite exactly the same rows. A
+  // complete, ordered expression can distinguish them; do not use recency.
+  const matches=expression ? fitting.filter(({candidate,refs})=>{
+    const typed=expressionProof(expression,candidate.result,refs,false,false);
+    return typed && (!expression.output || typed.unit===expression.output.unit);
+  }) : fitting;
+  if (matches.length===1) return matches[0].candidate;
+  if (optional && !matches.length) return;
+  throw Error("本角色当前原句存在多个复算。请只引此断言所用的原始操作数，无法唯一绑定时保留待核。");
 }
 const legacyValueError=()=>Error("旧 claimValue 与争议原句或独立登记值不符。删除 claimValue；数量反证请只在 quote 定位唯一目标数，宿主取数。");
 function counterTarget(quote,copied) {
@@ -507,12 +600,15 @@ function counterTarget(quote,copied) {
 }
 
 function calculationBasis(frame,entry,role,dispute,evidence,line,quote,auxiliary=false,authorCitations=evidence,active) {
-  const proof=boundCalculation(frame,entry,dispute,evidence);
+  const body=claimBody(line),expression=writtenExpression(body);
+  const proof=boundCalculation(frame,entry,dispute,evidence,expression);
   const {result}=proof;
   const rawValues=result.operands.map(x=>x.raw??x.value);
   const citedOperands=operandCitations(frame,result,evidence);
-  const body=claimBody(line);
   operandOwners(body,result,citedOperands,active);
+  const checked=expressionProof(expression,result,citedOperands,true);
+  if (!auxiliary && entry.sourceRelation==="supports" && expression?.output && !checked?.sameOutput)
+    throw Error("完整算式的目标数值或量纲与原稿不同。");
   if (!auxiliary && (!arithmeticClaim(body) || entry.sourceRelation==="insufficient")) {
     throw Error("计算凭据仅可判定原稿的单一数量验算。含行为归因、时序或其他独立事实时，给出能证明整句的原文或记录尚缺前提。");
   }
@@ -521,7 +617,7 @@ function calculationBasis(frame,entry,role,dispute,evidence,line,quote,auxiliary
   // The source calculator deliberately leaves unfamiliar count units as "原单位".
   // Recover only an unambiguous matching unit from the signed operand lines.
   const units=result.operands.map((op,i)=>{
-    if (result.unit!=="原单位") return result.unit;
+    if (result.unit!=="原单位") return directUnits[result.unit]??result.unit;
     const ref=citedOperands[i];
     const m=numbers(ref.quote).find(m=>m[0]===rawValues[i]);return m && followingUnit(ref.quote,m);
   });
@@ -568,12 +664,17 @@ function calculationBasis(frame,entry,role,dispute,evidence,line,quote,auxiliary
       originalValues.some(v=>!sameValue(v,result.value) && !rawValues.some(s=>present(s,v)))) {
     throw Error("原句另有未由本算式绑定的数量，须独立核该项所需输入。");
   }
-  const expression=result.formula.replace(/\b[a-d]\b/gu,letter=>"("+rawValues[letter.charCodeAt(0)-97]+")");
+  const formula=result.formula.replace(/\b[a-d]\b/gu,letter=>"("+rawValues[letter.charCodeAt(0)-97]+")");
   const observedKind=!auxiliary && outputRows.length===1 && (reportOnly || entry.counterQuote || !originalValues.length)
     ? checkReportedIdentity(frame,active,body,outputRows[0],result,entry,compare,citedOperands,unit) : undefined;
-  const sourceRecord=observed??(reportOnly||entry.counterQuote ? outputRows[0] : null);
-  return {proofId:proof.proofId,result,...(sourceRecord?{observed:sourceRecord,...(observedKind==="numeric-cross-check"?{comparison:observedKind}:{})}:{}),basis:(auxiliary?"辅助数值核对（仅限这项数量）：":"按已签名的原始数值复算，")+expression+" = "+result.value+" "+(unit??result.unit)+
-    (sourceRecord?(observedKind==="numeric-cross-check"?"；同段汇总另记「"+short(sourceRecord.quote,120)+"」，仅交叉核对数值，本项反证依据为上述算式":"；独立登记原文「"+short(sourceRecord.quote,120)+"」"):"")+
+  // On a reader cross-check, the independently located record substantiates
+  // the numeric comparison. Its value cannot authenticate a named edition.
+  const requestedScope=!auxiliary && entry.sourceRelation==="supports" && expression?.qualifier!==undefined && expression.restScope;
+  const scopeRow=requestedScope && citedAmountRow(evidence,result,unit);
+  if (requestedScope && !scopeRow) throw Error("请给出所引报告中实际刊载的同量纲数值；算式本身不证明出版或版本限定。");
+  const sourceRecord=observed??(scopeRow || (reportOnly||entry.counterQuote ? outputRows[0] : null));
+  return {proofId:proof.proofId,result,...(sourceRecord?{observed:sourceRecord,...(scopeRow || observedKind==="numeric-cross-check"?{comparison:"numeric-cross-check"}:{})}:{}),basis:(auxiliary?"辅助数值核对（仅限这项数量）：":"按已签名的原始数值复算，")+formula+" = "+result.value+" "+(unit??result.unit)+
+    (scopeRow?"；本次数值核验仅指当前资料 "+scopeRow.file+"#"+scopeRow.start+" 所载同数，原稿的「"+short(requestedScope,100)+"」不由算式证明":sourceRecord?(observedKind==="numeric-cross-check"?"；同段汇总另记「"+short(sourceRecord.quote,120)+"」，仅交叉核对数值，本项反证依据为上述算式":"；独立登记原文「"+short(sourceRecord.quote,120)+"」"):"")+
     (reportOnly?"；此值来自所引登记记录。":compare===undefined?"。":"；原稿所称值为 "+compare+"。")};
 }
 
@@ -637,14 +738,35 @@ export function groundedOriginalReceipt(frame,active,dispute,entry,evidence,line
     calculation=calculationBasis(frame,entry,frame.role,dispute,evidence,line,quote,true,evidence,active);
   }
   if (grounds==="missing-premise") {
-    const saved=dispute.calculations?.[frame.role];
-    if (entry.calculation!==undefined && (!saved || saved.id!==entry.id || saved.proofId!==entry.calculation)) {
-      throw Error("辅助复算须属于本角色当前原稿。");
-    }
-    if (saved?.id===entry.id) {
-      const result=saved.result,body=claimBody(line);
-      const explicit=entry.calculation!==undefined;
-      if (explicit || (!saved.alternatives?.length && numbers(body).some(m=>sameValue(m[0],result.value)))) {
+    const current=dispute.calculations?.[frame.role], explicit=entry.calculation!==undefined;
+    const body=claimBody(line),written=writtenExpression(body);
+    if (explicit && current?.id!==entry.id) throw Error("辅助复算须属于本角色当前原稿。");
+    const saved=current?.id===entry.id && (explicit || written && current.alternatives?.length)
+      ? boundCalculation(frame,entry,dispute,evidence,written,!explicit) : current;
+    if (saved && current?.id===entry.id) {
+      const result=saved.result;
+      if (written && written.qualifier!==undefined) {
+        const cited=evidence.filter(ref=>result.operands.some(op=>keyOf(ref.file)===keyOf(op.file) && ref.sha256===op.sha256 && ref.start<=op.line && op.line<=ref.end));
+        // A reviewer may genuinely have no usable inputs. Only apply the
+        // expression check to the submitted current operand spans.
+        if (result.operands.every(op=>cited.some(ref=>keyOf(ref.file)===keyOf(op.file) && ref.start<=op.line && ref.end>=op.line && literal(ref.quote,op.raw??op.value)))) {
+          const inputs=operandCitations(frame,result,cited);
+          operandOwners(body,result,inputs,active);
+          const typed=expressionProof(written,result,inputs,false);
+          const observed=typed?.sameOutput && citedAmountRow(evidence,result,typed.unit);
+          if (observed) {
+            const residual=focused && !check.test(focused) ? focused : written.restScope;
+            if (!residual) throw Error("原稿明确的有序运算、完整操作数、结果和单位已经绑定，所引另行也登记同数。若另有待证事项，请定位其原句与证据边界。");
+            const formula=result.formula.replace(/\b[a-d]\b/gu,l=>"("+String(result.operands[l.charCodeAt(0)-97].raw??result.operands[l.charCodeAt(0)-97].value)+")");
+            const known="可复核的数值关系："+formula+" = "+result.value+" "+typed.unit+"；"+observed.file+"#"+observed.start+" 另记同数。";
+            gap="余下限定「"+short(residual,220)+"」在本次所引材料下仍待证。";
+            basis=known+gap;
+            calculation={proofId:saved.proofId,result,observed,comparison:"numeric-cross-check",basis:""};
+            calculationEvidence=cited;
+          }
+        }
+      }
+      if (!calculation && (explicit || (!saved.alternatives?.length && numbers(body).some(m=>sameValue(m[0],result.value))))) {
         const inputs=result.operands.map(op=>{
           const raw=readBytes(frame.root,op.file);
           if (!raw || digest(raw)!==op.sha256) throw Error("已签名的计算来源已更新。");
@@ -652,7 +774,7 @@ export function groundedOriginalReceipt(frame,active,dispute,entry,evidence,line
         });
         const supplemental={...entry,calculation:saved.proofId};
         const first=numbers(inputs[0].quote).find(m=>m[0]===(result.operands[0].raw??result.operands[0].value));
-        const measuredUnit=result.unit==="原单位" ? first && followingUnit(inputs[0].quote,first) : result.unit;
+        const measuredUnit=result.unit==="原单位" ? first && followingUnit(inputs[0].quote,first) : directUnits[result.unit]??result.unit;
         if (explicit || independentObservation(supplemental,body,evidence,result,measuredUnit)) {
           calculation=calculationBasis(frame,supplemental,frame.role,dispute,inputs,line,quote,true,evidence,active);
           calculationEvidence=inputs;
@@ -669,7 +791,7 @@ export function groundedOriginalReceipt(frame,active,dispute,entry,evidence,line
     calculation=undefined;
     calculationEvidence=undefined;
   }
-  if (calculation && grounds!=="calculation") basis+=" "+calculation.basis;
+  if (calculation?.basis && grounds!=="calculation") basis+=" "+calculation.basis;
   return {grounds,sourceRelation,scope,basis,gap:gap??("本次判断限于原稿「"+short(quote,160)+"」及所引行。"),
     ...(calculation?{calculation:{proofId:calculation.proofId,...calculation.result,...(calculation.observed?(calculation.comparison==="numeric-cross-check"?{numericCrossCheck:calculation.observed}:{observation:calculation.observed}):{})}}:{}),
     ...(calculationEvidence?{calculationEvidence}:{}),...(limitation?{limitation}:{}),...(policy?{policy}:{}),

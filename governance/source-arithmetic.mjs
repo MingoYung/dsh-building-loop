@@ -68,7 +68,7 @@ export function arithmeticSources(frame, active, spec) {
 
 /** Consume every numeral as one descending sequence of time components. This
  * prevents selecting only the minutes when the hour boundary also changed. */
-function compoundDuration(quote) {
+export function compoundDuration(quote) {
   const tokens = [...quote.matchAll(decimalToken)];
   const invalid = () => new Error("该原文行须含唯一、连续、没有限定词的完整复合时长");
   if (tokens.length < 1 || tokens.length > 3) throw invalid();

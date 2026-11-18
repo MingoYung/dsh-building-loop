@@ -8,6 +8,7 @@ import { groundedOriginalReceipt, originalRecheckSchema, ORIGINAL_RECHECK_TOOL }
 import { goalSnapshot } from "../governance/goals.mjs";
 import { authority, digest, keyOf } from "../governance/policy.mjs";
 import { lineList, QUALITY } from "../governance/preflight.mjs";
+import { calculateFromSources } from "../governance/source-arithmetic.mjs";
 import { workspaceStateFile } from "../governance/session-mode.mjs";
 import { fixture, host, policy } from "./helpers.mjs";
 
@@ -902,6 +903,58 @@ test("an original's arithmetic uses its own signed operands, including intention
   assert.throws(()=>vote(subject,[13,14],"supports"),/主体/u);
   assert.equal(vote(subject,[16,17],"supports").calculation.value,"20");
   assert.equal(vote(subject,[19,20],"supports").calculation.value,"20");
+}));
+
+test("a written arithmetic expression separates the entire ordered quantities from publication and attribution",()=>fixture((root,write)=>{
+  const file="cycle-times.txt",rows=["duration 2 hours and 5 minutes","duration 1 hour and 40 minutes","reported difference 25 minutes",
+    "duration 2 hours and 50 minutes","duration 2 hours and 25 minutes","weighed 10 kg","weighed 4 kg","reported difference 6 kg","weighed 10 kg","weighed 4 kg"];
+  const raw=rows.join("\n")+"\n",sha256=digest(raw);write(file,raw);
+  const frame={root,role:"reviewer",reads:[file],policy:{sourcePins:{[file]:{kind:"primary",sha256}}}};
+  const active={phase:"final-review",seen:{[file]:{hash:sha256,ranges:[[1,rows.length]]}}},spec={phases:{"final-review":{evidence:[file]}}};
+  const ref=n=>({file,start:n,end:n,sha256,quote:rows[n-1]});
+  function calc(indices,values,durationUnit){
+    return calculateFromSources(frame,active,spec,{operation:"difference",operands:indices.map((line,i)=>({line,file,...(values?{value:values[i]}:{})})),durationUnit});
+  }
+  function vote(body,result,indices,missing=false,extra={},alternatives=[]){
+    const entry={id:"C1",grounds:missing?"missing-premise":"calculation",sourceRelation:missing?"insufficient":"supports",...extra};
+    return groundedOriginalReceipt(frame,active,{calculations:{reviewer:{id:"C1",proofId:"signed",result,alternatives}}},entry,indices.map(ref),body,entry.quote??body);
+  }
+  const given="用 2 小时 5 分减 1 小时 40 分，可以复核 25 分钟。",indices=[1,2,3];
+  const full=calc([1,2],undefined,"min"),tails=calc([1,2],["5","40"]),partialSame=calc([4,5],["50","25"]);
+  assert.equal(vote(given,full,indices).calculation.value,"25");
+  for(const mode of [true,false]) {
+    assert.throws(()=>vote(given,tails,indices,mode),/durationUnit/u);
+    assert.throws(()=>vote("用 2 小时 50 分减 2 小时 25 分，可以复核 25 分钟。",partialSame,[4,5,3],mode),/durationUnit/u);
+  }
+  assert.equal(vote("用 50 分减 25 分，可以复核 25 分钟。",partialSame,[4,5,3]).calculation.value,"25");
+  for(const wrong of [given.replace("减","加"),given.replace("2 小时 5 分减 1 小时 40 分","1 小时 40 分减 2 小时 5 分")]) {
+    assert.throws(()=>vote(wrong,full,indices),/算符|顺序/u);
+    assert.ok(vote(wrong,full,indices,true).gap);
+  }
+  assert.throws(()=>vote(given,full,indices,true),/已经绑定/u);
+  const qualified=given.replace("复核","复核初版报告的");
+  for (const [latest,older] of [[full,tails],[tails,full]]) {
+    for(const missing of [false,true]) {
+      const selected=vote(qualified,latest,indices,missing,{},[{proofId:"older",result:older}]);
+      assert.equal(selected.calculation.operands[0].raw,rows[0].slice("duration ".length));
+    }
+  }
+  const kept=vote(qualified,full,indices,true);
+  assert.equal(kept.calculation.value,"25");assert.ok(kept.calculation.numericCrossCheck.quote.includes("25 minutes"));
+  assert.match(kept.gap,/初版报告/u);
+  const narrow=vote(qualified,full,indices);
+  assert.equal(narrow.calculation.numericCrossCheck.start,3);assert.match(narrow.basis,/初版报告.{0,8}不由算式证明/u);
+  assert.throws(()=>vote(qualified,full,[1,2]),/实际刊载/u);
+  assert.throws(()=>vote(given.replace("可以复核","编制人实际采用该算法得到"),full,indices),/单一数量|限定/u);
+  const attributed=vote(given.replace("可以复核","编制人实际采用该算法得到"),full,indices,true);
+  assert.equal(attributed.calculation.value,"25");assert.match(attributed.gap,/编制人实际采用该算法/u);
+  assert.match(vote(qualified.replace("。","，观察顺序未知。"),full,indices,true).gap,/观察顺序未知/u);
+  const mass="用 10 kg 减 4 kg，可以核对 6 kg。",scale=calc([6,7],["10","4"]);
+  assert.equal(vote(mass,scale,[6,7,8]).calculation.value,"6");
+  const other=calc([9,10],["10","4"]);
+  for(const missing of [false,true]) assert.throws(()=>vote(mass,scale,[6,7,8,9,10],missing,{},[{proofId:"other",result:other}]),/无法唯一绑定/u);
+  assert.throws(()=>vote(mass.replace("6 kg","10 kg"),scale,[6,7,8]),/目标/u);
+  assert.throws(()=>vote(mass.replace("10 kg","10 m"),scale,[6,7,8]),/量纲/u);
 }));
 
 test("source witnesses stay with the named party and an unrecorded premise is not a contrary observation", () => {
