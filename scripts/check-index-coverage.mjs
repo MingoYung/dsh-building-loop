@@ -20,8 +20,10 @@ function requiresProjectEntry(path) {
 }
 
 const tracked = gitFiles(['--cached'])
-const pendingReleaseFiles = gitFiles(['--others', '--exclude-standard', '--', ...manifest.files])
-const missing = [...new Set([...tracked, ...pendingReleaseFiles])]
+// Documentation, tests and source tools stay indexed even though the storefront installs only runtime files.
+const sourcePaths = ['client.jsx', 'docs/', 'experiments/', 'scripts/', 'test/']
+const pendingProjectFiles = gitFiles(['--others', '--exclude-standard', '--', ...manifest.files, ...sourcePaths])
+const missing = [...new Set([...tracked, ...pendingProjectFiles])]
   .filter(path => requiresProjectEntry(path) && !registered.has(path))
   .sort()
 

@@ -2,7 +2,7 @@
 
 **一句话交代目标，后续按项目推进。** Building-loop 是 DeepSeek Harness（DSH）的长任务模式。你告诉它要交付什么、哪些业务边界不能动。Building-loop 按当前会话判断该直接回答、澄清还是开工；确认后自动建档、分工、核验和记账。需求变了更新目标，新会话接手时可以顺着项目文件找到现状和证据。
 
-**当前稳定版：0.7.39** · [下载验收包（GitHub Release）](https://github.com/MingoYung/dsh-building-loop/releases/tag/v0.7.39) · [这次更新了什么](docs/release-0.7.39.md) · [安装](#安装) · [实测与复算](experiments/README.md)
+**当前稳定版：0.7.50** · [下载验收包](https://github.com/MingoYung/dsh-building-loop/blob/main/docs/release-0.7.50.md#安装包) · [本版兼容与验收](docs/release-0.7.50.md) · [安装](#安装) · [实测与复算](experiments/README.md)
 
 ## 发布规划器遇到需求变更，32 项新样例全部通过
 
@@ -19,7 +19,7 @@ G4 要在已有发布规划器上改批量回退，保住原有接口、依赖�
 
 **历史验证投入 5.55 亿可计量 Token，涵盖 166 条公开运行。** 公开归档包含真实模型、对照组、专项试验、失败和中断。[数据与复算入口](experiments/README.md#验证规模)
 
-**当前稳定版实测：** 0.7.39 在隔离 Windows DSH 用 DeepSeek Flash 完成 G3 **48/48**、G4 **72/72**，在原目录换新会话接上第二关，两关都走完双审、账本复盘并关单。同包另做过 **496/496** 项 Windows 回归及 **3 个**强退恢复场景。[0.7.39 版本与验收](docs/release-0.7.39.md)
+**0.7.39 能力基线。** 0.7.39 在隔离 Windows DSH 用 DeepSeek Flash 完成 G3 **48/48**、G4 **72/72**，在原目录换新会话接上第二关，两关都走完双审、账本复盘并关单。同包另做过 **496/496** 项 Windows 回归及 **3 个**强退恢复场景。[0.7.39 版本与验收](docs/release-0.7.39.md)
 
 历史三组实测中，0.7.27 发布规划器两轮盲评通过 **96/96**，普通标准为 **59/96**，清单组为 **41/96**。0.7.39 四组实测的两套工程盲评合计 **84/84**，其中 X1/X2 与两个标准组同分。[两轮历史盲评](experiments/showcase-0.7.39.md) · [0.7.39 四组实测](experiments/results-0.7.39-four-way.md)
 
@@ -72,9 +72,9 @@ G4 要在已有发布规划器上改批量回退，保住原有接口、依赖�
 
 ## 安装
 
-兼容基线为 DeepSeek Harness `0.2.2-rc.1`，对应 DSH NEXT `2.0.22-next`。Desktop 和 Web 的插件安装入口各自管理对应的 Profile。
+0.7.50 适配 Windows DSH NEXT `2.0.24-next`，内置 DeepSeek Harness `0.2.2-rc.5`。Desktop 和 Web 的插件安装入口各自管理对应的 Profile。
 
-- Windows Desktop 可从侧栏「插件」打开「添加插件」，选择从 [0.7.39 Release](https://github.com/MingoYung/dsh-building-loop/releases/tag/v0.7.39) 下载的 `.tgz` 安装包，或选择仓库来源。
+- Windows Desktop 可从侧栏「插件」打开「添加插件」，选择从 [0.7.50 下载页](https://github.com/MingoYung/dsh-building-loop/blob/main/docs/release-0.7.50.md#安装包) 下载的 `.tgz` 安装包，或选择仓库来源。
 - 命令行管理 Desktop 时，先启动应用初始化目标 Profile，再使用 DSH NEXT 打开的内置终端和它自带的 `dsh`。安装后重新打开应用并核对模式。Windows 系统终端里的 npm 版 `dsh` 只用于它自己管理的 Profile。
 
 ```powershell

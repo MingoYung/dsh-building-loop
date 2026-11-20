@@ -1,0 +1,149 @@
+{
+  "spec": "building-loop-dsh-release-qualification/1",
+  "date": "2026-11-20",
+  "version": "0.7.50",
+  "host": {
+    "platform": "Windows",
+    "desktop": "2.0.24-next",
+    "harness": "0.2.2-rc.5",
+    "protocol": "0.2.2-rc.5",
+    "testedHostSha256": "0201a0501180d6bd4efc39e91e12f3918e99637f0b7c986c39b2856d01730934"
+  },
+  "packaging": {
+    "beforeRuntimeFileSelection": {
+      "entries": 1549,
+      "bytes": 374472433
+    },
+    "published": {
+      "entries": 59,
+      "bytes": 647609,
+      "sha256": "255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e"
+    },
+    "byteIdenticalToPreviousDesktop": 57,
+    "differentFiles": [
+      "package.json",
+      "README.md"
+    ]
+  },
+  "regression": {
+    "first": {
+      "tests": 496,
+      "pass": 495,
+      "fail": 1,
+      "skip": 0
+    },
+    "firstFailure": "ledger-crash: Node child hit the existing ten-second crash-test timeout during simultaneous package installation",
+    "isolatedLedger": {
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "skip": 0
+    },
+    "remainingSuites": {
+      "tests": 474,
+      "pass": 474,
+      "fail": 0,
+      "skip": 0
+    },
+    "uniquePassing": 496,
+    "rebuiltClientCodecAndParsersMatch": true
+  },
+  "native": {
+    "fixture": "Shipped DSH NEXT Electron host and local scripted model responses",
+    "public039": {
+      "status": "failed",
+      "sha256": "65e39183266aa4d5623a80cac03af38c0e421dcc42da46164e6845ffd7b59ee1",
+      "files": 59,
+      "localScriptedRequests": 4,
+      "paidModelCalls": 0,
+      "failure": "No original executor reached intake after confirmed opening"
+    },
+    "desktop039": {
+      "status": "passed",
+      "sha256": "fdea0beb2b99d8ded793464ac8e470d86ef8d5a0a86df35cffcb3dc81cfc840f",
+      "files": 59,
+      "localScriptedRequests": 31,
+      "paidModelCalls": 0,
+      "firstAndFinal": true
+    },
+    "release": [
+      {
+        "lane": "crash-ready-and-delivered",
+        "status": "passed",
+        "sha256": "255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e",
+        "files": 59,
+        "localScriptedRequests": 4,
+        "paidModelCalls": 0,
+        "forcedStops": 2,
+        "repeatedChildCatalogEntries": 0,
+        "reusedHandoff": true
+      },
+      {
+        "lane": "handoffs-waits",
+        "status": "passed",
+        "sha256": "255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e",
+        "files": 59,
+        "localScriptedRequests": 31,
+        "paidModelCalls": 0,
+        "independentFinal": true,
+        "prematureAuditRejected": true,
+        "independentProofs": 3,
+        "blockedNewChildren": 0,
+        "blockedNewChildTurns": 0,
+        "resumedAfterOwner": true
+      },
+      {
+        "lane": "host-hash-bracketed",
+        "status": "passed",
+        "sha256": "255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e",
+        "files": 59,
+        "localScriptedRequests": 32,
+        "paidModelCalls": 0,
+        "independentFinal": true,
+        "prematureAuditRejected": true,
+        "independentProofs": 3,
+        "blockedNewChildren": 0,
+        "blockedNewChildTurns": 0,
+        "resumedAfterOwner": true
+      },
+      {
+        "lane": "crash-reserved",
+        "status": "passed",
+        "sha256": "255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e",
+        "files": 59,
+        "localScriptedRequests": 6,
+        "paidModelCalls": 0,
+        "forcedStops": 1,
+        "sameReservedActor": true,
+        "sameHandoffId": true,
+        "oneNativeCatalogEntry": true
+      }
+    ]
+  },
+  "desktop": {
+    "isolatedUpgradeAndRollback": [
+      {
+        "step": "verify-frozen-hotfix",
+        "files": 59,
+        "otherDependencies": 18
+      },
+      {
+        "step": "verify-frozen-rollback",
+        "files": 59,
+        "otherDependencies": 18
+      }
+    ],
+    "rollbackPackageAndLockExact": true,
+    "production": {
+      "status": "compatible-installed",
+      "version": "0.7.50",
+      "files": 59,
+      "sha256": "255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e",
+      "unchangedDependencies": 18,
+      "rollback": "dsh-building-loop-0.7.39-rc3-compatible.tgz"
+    },
+    "firstRehearsal": "90s installer deadline while old G: package store was still resolving the frozen profile",
+    "secondRehearsal": "offline G: store lacked some packages used by the current desktop; fetched the locked artifacts and repeated offline upgrade and rollback",
+    "hostChangedDuringQA": "First deployment guard stopped before a write; desktop/harness versions matched, the final archive ran against the new host fingerprint, then deployment passed."
+  }
+}

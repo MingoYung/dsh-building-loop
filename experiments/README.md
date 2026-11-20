@@ -4,6 +4,7 @@
 
 | 要核对什么 | 入口 |
 |---|---|
+| Windows DSH NEXT 2.0.24 的派发、双审与恢复 | [0.7.50 宿主与包验收](observations-0.7.50-dsh-next.json) · [安装说明](../docs/release-0.7.50.md) |
 | 11 月 17 日四组测试对照 | [基础回归、困难工程、HTTP、资料真实性与完整用量](benchmark-comparison-2026-11-17.md) |
 | 看同题结果、稳定版能力和验证规模 | [实测亮点与复算口径](showcase-0.7.39.md) |
 | 0.7.39 四模式同模型旧题、新难题和资料核查 | [Building-loop、两种标准与 ClearAI](results-0.7.39-four-way.md) |

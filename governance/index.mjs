@@ -2303,10 +2303,13 @@ export function apply(ctx, config = {}) {
       await ctx.subagents.sendMessage(agent, childId, content, { signal });
     } else {
       const selection = agent.model.current();
+      const request = { parent: agent, cwd: next.workspace, agentPreset: presetId, prompt: content, maxDepth: 1,
+        ...(selection ? { agentOptions: selection } : {}) };
+      // DSH rc.3 reads the request fields at the top level. Earlier hosts
+      // use the nested request. Keep both shapes in a single activation.
       await ctx.subagents.startActivation({
         provider: "spawn", childId, label: unit + " " + next.phase, delivery: "parent", signal,
-        request: { parent: agent, cwd: next.workspace, agentPreset: presetId, prompt: content, maxDepth: 1,
-          ...(selection ? { agentOptions: selection } : {}) },
+        ...request, request,
       });
     }
   }
