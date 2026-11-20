@@ -10,7 +10,7 @@
 dsh plugin --profile desktop add https://github.com/MingoYung/dsh-building-loop/releases/download/v0.7.50/dsh-building-loop-0.7.50.tgz
 ```
 
-安装包为 **647,609 字节**，SHA-256 为 `255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e`。发布页同时提供逐文件摘要。
+安装包为 **647,609 字节**，SHA-256 为 `255256381e3b6b92bb365d0a1d3a3f475f53c33f91e7fc19287eb00c27f9df9e`。发布页同时提供逐文件摘要。 用公开下载地址在空 Profile、空软件包缓存中在线安装成功，已登记插件并核对全部 59 个文件。[市场申录记录](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/17129)
 
 ## 哪些行为经过验证
 
